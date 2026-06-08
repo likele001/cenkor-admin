@@ -1,0 +1,12 @@
+{
+  "name": "@cenkor/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./tokens.css",
+  "exports": {
+    "./tailwind-preset": "./tailwind.preset.js",
+    "./tokens.css": "./tokens.css"
+  },
+  "files": ["tokens.css", "tailwind.preset.js"]
+}

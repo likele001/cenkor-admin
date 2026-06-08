@@ -1,0 +1,88 @@
+"""Cenkor Admin · 配置层（从 .env 加载，跨 DB 兼容）"""
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """应用配置 - 全部从环境变量读取，缺省值只用于 dev。"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ---- 应用 ----
+    APP_NAME: str = "Cenkor Admin"
+    APP_VERSION: str = "0.1.0"
+    APP_ENV: Literal["development", "staging", "production"] = "development"
+    DEBUG: bool = True
+
+    # ---- 安全 ----
+    SECRET_KEY: str = "dev-secret-change-me-32-bytes-min"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # ---- 数据库 ----
+    DATABASE_URL: str = "postgresql+asyncpg://cenkor:li123456@localhost:5432/cenkor"
+    DATABASE_URL_SYNC: str = "postgresql://cenkor:li123456@localhost:5432/cenkor"
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_ECHO: bool = False
+
+    # ---- Redis ----
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # ---- S3 / MinIO ----
+    S3_ENDPOINT: str = "http://localhost:9000"
+    S3_API_PORT: int = 9000  # 公网访问的端口（Docker 映射后的端口）
+    S3_ACCESS_KEY: str = "minio"
+    S3_SECRET_KEY: str = "minio12345"
+    S3_BUCKET_PUBLIC: str = "cenkor-public"
+    S3_BUCKET_PRIVATE: str = "cenkor-private"
+    S3_REGION: str = "us-east-1"
+
+    # ---- 飞书 OAuth ----
+    FEISHU_APP_ID: str = ""
+    FEISHU_APP_SECRET: str = ""
+    FEISHU_REDIRECT_URI: str = "http://localhost:5173/auth/feishu/callback"
+
+    # ---- CORS ----
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:8000"
+
+    # ---- 公网 ----
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+
+    @property
+    def db_dialect(self) -> str:
+        """返回当前数据库方言（postgresql | mysql）"""
+        url = self.DATABASE_URL.lower()
+        if "postgresql" in url:
+            return "postgresql"
+        if "mysql" in url:
+            return "mysql"
+        return "unknown"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def is_postgres(self) -> bool:
+        return self.db_dialect == "postgresql"
+
+    @property
+    def is_mysql(self) -> bool:
+        return self.db_dialect == "mysql"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

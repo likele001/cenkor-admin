@@ -1,0 +1,23 @@
+[Unit]
+Description=Cenkor Admin Backend (FastAPI)
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/www/wwwroot/cenkor-admin/backend
+EnvironmentFile=-/www/wwwroot/cenkor-admin/.env.prod
+EnvironmentFile=-/www/wwwroot/cenkor-admin/deploy/examples/env.host.override
+EnvironmentFile=-/etc/cenkor/env.host.override
+Environment=PYTHONPATH=/www/wwwroot/cenkor-admin/backend/src
+Environment=APP_ENV=production
+ExecStart=/usr/bin/python3 -m uvicorn cenkor_admin.main:app --host 127.0.0.1 --port 8002 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/cenkor-backend.log
+StandardError=append:/var/log/cenkor-backend.log
+
+[Install]
+WantedBy=multi-user.target

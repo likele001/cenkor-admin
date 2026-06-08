@@ -1,0 +1,47 @@
+/* =============================================================
+   Cenkor · 共享设计 Token
+   公网站点 + Admin Web + Portal Web 全部消费这里
+   ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* OKLCH 颜色 */
+  --bg:        oklch(1 0 0);
+  --surface:   oklch(0.985 0.003 250);
+  --ink-1:     oklch(0.18 0 0);
+  --ink-2:     oklch(0.40 0.008 260);
+  --ink-3:     oklch(0.55 0.008 260);
+  --ink-4:     oklch(0.72 0.008 260);
+  --border:    oklch(0.92 0.005 260);
+
+  --accent:    oklch(0.62 0.165 165);
+  --accent-2:  oklch(0.52 0.180 165);
+
+  --line-enterprise:    oklch(0.62 0.165 250);
+  --line-ai:            oklch(0.62 0.195 295);
+  --line-manufacturing: oklch(0.62 0.165 165);
+
+  /* 字体 */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* 圆角 */
+  --radius-sm: 0.5rem;
+  --radius:    0.75rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+  --radius-2xl: 2.5rem;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.04);
+  --shadow:    0 4px 12px -2px rgba(10, 10, 10, 0.08);
+  --shadow-lg: 0 10px 40px -10px rgba(10, 10, 10, 0.12);
+
+  /* 动效 */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration: 250ms;
+  --duration-slow: 400ms;
+}

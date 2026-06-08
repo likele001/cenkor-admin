@@ -1,0 +1,14 @@
+[Unit]
+Description=Cenkor Admin Web (static)
+After=network.target
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/cenkor-admin/frontend/admin-web/dist
+ExecStart=/usr/bin/npx serve -s /www/wwwroot/cenkor-admin/frontend/admin-web/dist -l 5174
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

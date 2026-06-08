@@ -1,0 +1,46 @@
+# Env
+.env
+.env.local
+.env.*.local
+.env.prod
+deploy/baota/cenkor-backend.host.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Node
+node_modules/
+.pnpm-store/
+dist/
+.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build
+build/
+*.tar.gz
+*.zip
+
+# Local data
+data/
+*.sqlite
+*.db

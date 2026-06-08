@@ -1,0 +1,12 @@
+# 可选扩展 · 外部官网静态站挂载
+# 用法：
+#   docker compose -f docker-compose.prod.yml -f docker-compose.addon-website.yml up -d
+#
+# 并在 deploy/nginx/nginx.prod.conf 中取消注释：
+#   include /etc/nginx/snippets/website.conf;
+
+services:
+  nginx:
+    volumes:
+      - ./deploy/nginx/snippets/website.conf:/etc/nginx/snippets/website.conf:ro
+      - ${WEBSITE_ROOT:-/www/wwwroot/website}:/var/www/website:ro

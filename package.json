@@ -1,0 +1,19 @@
+{
+  "name": "cenkor-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend/*"
+  ],
+  "scripts": {
+    "dev:backend": "cd backend && poetry run uvicorn cenkor_admin.main:app --reload --port 8000",
+    "dev:admin": "cd frontend/admin-web && npm run dev",
+    "dev:portal": "cd frontend/portal-web && npm run dev",
+    "build:admin": "cd frontend/admin-web && npm run build",
+    "build:portal": "cd frontend/portal-web && npm run build",
+    "build:tokens": "echo 'design-tokens 已通过 CSS exports 发布'",
+    "package:core": "bash scripts/package-core.sh",
+    "lint": "cd frontend/admin-web && npm run lint",
+    "type-check": "cd frontend/admin-web && npm run type-check"
+  }
+}

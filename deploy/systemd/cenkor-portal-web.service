@@ -1,0 +1,14 @@
+[Unit]
+Description=Cenkor Portal Web (static)
+After=network.target
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/cenkor-admin/frontend/portal-web/dist
+ExecStart=/usr/bin/npx serve -s /www/wwwroot/cenkor-admin/frontend/portal-web/dist -l 5175
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

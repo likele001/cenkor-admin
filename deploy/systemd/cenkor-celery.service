@@ -1,0 +1,17 @@
+[Unit]
+Description=Cenkor Celery Worker
+After=network.target redis.service cenkor-backend.service
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/cenkor-admin/backend
+EnvironmentFile=/www/wwwroot/cenkor-admin/.env.prod
+Environment=PYTHONPATH=/www/wwwroot/cenkor-admin/backend/src
+ExecStart=/usr/bin/python3 -m celery -A cenkor_admin.core.celery_app:celery_app worker --loglevel=info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

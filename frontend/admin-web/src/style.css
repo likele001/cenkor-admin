@@ -1,0 +1,33 @@
+@import '../../design-tokens/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-ink-50 text-ink-900;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-ink-900 text-white hover:bg-ink-800;
+  }
+  .btn-ghost {
+    @apply btn text-ink-700 hover:bg-ink-100;
+  }
+  .btn-outline {
+    @apply btn border border-ink-200 bg-white text-ink-900 hover:bg-ink-50;
+  }
+  .card {
+    @apply bg-white border border-ink-200 rounded-2xl p-6;
+  }
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-ink-200 bg-white text-sm focus:border-ink-900 focus:ring-0 focus:outline-none transition;
+  }
+}
