@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+import SearchInput from '@/components/SearchInput.vue'
+import CsvExportButton from '@/components/CsvExportButton.vue'
 
 interface UserItem {
   id: number
@@ -24,6 +26,7 @@ const error = ref('')
 const showDialog = ref(false)
 const isNew = ref(true)
 const saving = ref(false)
+const search = ref('')
 const form = ref({
   id: 0,
   username: '',
@@ -40,7 +43,7 @@ async function load() {
   error.value = ''
   try {
     const [u, r] = await Promise.all([
-      api.get('/api/v1/auth/users', { params: { page_size: 100 } }),
+      api.get('/api/v1/auth/users', { params: { page_size: 100, search: search.value || undefined } }),
       api.get('/api/v1/rbac/roles'),
     ])
     users.value = u.data.items
@@ -108,6 +111,7 @@ function roleName(id: number) {
 }
 
 onMounted(load)
+watch(search, () => { load() })
 </script>
 
 <template>
@@ -123,9 +127,13 @@ onMounted(load)
       <div v-if="loading" class="card text-ink-500">加载中…</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 class="text-2xl font-semibold tracking-tight">用户列表（{{ users.length }}）</h1>
-          <button @click="openNew" class="btn-primary">+ 新建用户</button>
+          <div class="flex items-center gap-3">
+            <SearchInput v-model="search" placeholder="按用户名/邮箱/昵称搜索…" />
+            <CsvExportButton endpoint="/api/v1/auth/users/export" filename="users.csv" :params="{ search: search || undefined }" />
+            <button @click="openNew" class="btn-primary">+ 新建用户</button>
+          </div>
         </div>
         <div class="card overflow-hidden p-0">
           <table class="w-full text-sm">

@@ -1,46 +1,58 @@
-# Env
+# ============ Python / Backend ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ============ Node / Frontend ============
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.output/
+
+# ============ IDE / OS ============
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.log
+
+# ============ Env / Secrets ============
 .env
 .env.local
 .env.*.local
 .env.prod
 deploy/baota/cenkor-backend.host.env
+*.pem
+*.key
 
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-.mypy_cache/
-.ruff_cache/
-.pytest_cache/
+# ============ Release / Build artifacts ============
+release/*.tar.gz
+release/*.zip
+backend/dist/
 
-# Node
-node_modules/
-.pnpm-store/
-dist/
-.vite/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Build
-build/
-*.tar.gz
-*.zip
-
-# Local data
-data/
+# ============ Uploads / Runtime ============
+uploads/
+runtime/
 *.sqlite
 *.db

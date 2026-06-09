@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { api } from '@/lib/api'
+import SearchInput from '@/components/SearchInput.vue'
 
 interface MediaItem {
   id: number
@@ -23,12 +24,15 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const filter = ref<'all' | 'image' | 'doc'>('all')
 const selected = ref<MediaItem | null>(null)
 const copied = ref(false)
+const search = ref('')
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await api.get('/api/v1/cms/media', { params: { page_size: 200 } })
+    const { data } = await api.get('/api/v1/cms/media', {
+      params: { page_size: 200, search: search.value || undefined },
+    })
     media.value = data.items
   } catch (e: any) {
     error.value = e?.response?.data?.detail || '加载失败'
@@ -121,6 +125,7 @@ function getPresignedUrl(m: MediaItem) {
 }
 
 onMounted(load)
+watch(search, () => { load() })
 </script>
 
 <template>
@@ -149,11 +154,14 @@ onMounted(load)
         </div>
       </div>
 
-      <!-- 筛选 -->
-      <div class="flex gap-2 mb-4">
-        <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-700'" class="px-3 py-1.5 rounded-full text-sm">全部</button>
-        <button @click="filter = 'image'" :class="filter === 'image' ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-700'" class="px-3 py-1.5 rounded-full text-sm">图片</button>
-        <button @click="filter = 'doc'" :class="filter === 'doc' ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-700'" class="px-3 py-1.5 rounded-full text-sm">文档</button>
+      <!-- 筛选 + 搜索 -->
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <div class="flex gap-2">
+          <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-700'" class="px-3 py-1.5 rounded-full text-sm">全部</button>
+          <button @click="filter = 'image'" :class="filter === 'image' ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-700'" class="px-3 py-1.5 rounded-full text-sm">图片</button>
+          <button @click="filter = 'doc'" :class="filter === 'doc' ? 'bg-ink-900 text-white' : 'bg-white border border-ink-200 text-ink-700'" class="px-3 py-1.5 rounded-full text-sm">文档</button>
+        </div>
+        <SearchInput v-model="search" placeholder="按 key/url/mime 搜索…" />
       </div>
 
       <!-- 上传区 -->

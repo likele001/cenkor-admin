@@ -33,7 +33,10 @@ async function submit() {
       <input v-model="form.password" type="password" required class="input" placeholder="密码" />
       <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
       <button class="btn w-full" :disabled="loading">{{ loading ? '登录中…' : '登录' }}</button>
-      <router-link to="/register" class="block text-center text-sm text-slate-500">没有账号？注册</router-link>
+      <div class="flex items-center justify-between text-sm">
+        <router-link to="/register" class="text-slate-500 hover:text-slate-900">没有账号？注册</router-link>
+        <router-link to="/forgot-password" class="text-slate-500 hover:text-slate-900">忘记密码？</router-link>
+      </div>
     </form>
   </div>
 </template>

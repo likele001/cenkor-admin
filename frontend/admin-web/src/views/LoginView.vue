@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+import SliderCaptcha from '@/components/SliderCaptcha.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,20 +13,39 @@ const username = ref('admin@cenkor.cn')
 const password = ref('admin123')
 const loading = ref(false)
 const error = ref('')
+const captchaRef = ref<InstanceType<typeof SliderCaptcha> | null>(null)
+const captchaVerified = ref(false)
+const captchaToken = ref('')
+
+function onCaptchaUpdate(verified: boolean) {
+  captchaVerified.value = verified
+  if (verified) {
+    captchaToken.value = captchaRef.value?.token() || ''
+  } else {
+    captchaToken.value = ''
+  }
+}
 
 async function submit() {
+  if (!captchaVerified.value) {
+    error.value = '请先完成滑动验证'
+    return
+  }
   loading.value = true
   error.value = ''
   try {
     const { data } = await api.post('/api/v1/auth/login', {
       username: username.value,
       password: password.value,
+      captcha_token: captchaToken.value,
     })
     auth.setToken(data.access_token, data.user)
     auth.setRefresh(data.refresh_token)
     router.push((route.query.redirect as string) || '/')
   } catch (e: any) {
     error.value = e?.response?.data?.detail || '登录失败'
+    captchaRef.value?.refresh()
+    captchaVerified.value = false
   } finally {
     loading.value = false
   }
@@ -70,6 +90,10 @@ function loginFeishu() {
             required
             class="input"
           />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1.5">安全验证</label>
+          <SliderCaptcha ref="captchaRef" @update:verified="onCaptchaUpdate" />
         </div>
         <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
         <button type="submit" :disabled="loading" class="btn-primary w-full">

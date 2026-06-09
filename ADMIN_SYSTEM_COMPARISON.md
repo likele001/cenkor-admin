@@ -156,16 +156,16 @@
 
 #### 🟡 P1 — 体验提升（8 项）
 
-| # | 缺失功能 | 建议 |
-|---|---------|------|
-| 6 | **批量操作** | 列表加 checkbox 列，选中后出现操作栏（批量删除、批量改状态） |
-| 7 | **通知/站内信** | 新建 `notifications` 表 + `GET /notifications` 接口，顶栏铃铛图标+下拉列表 |
-| 8 | **忘记密码** | `POST /auth/forgot-password` 发送重置邮件 + `POST /auth/reset-password` 重置 |
-| 9 | **操作确认 UI** | 替换原生 `confirm()` 为自定义 Modal 组件（shadcn-vue 已有） |
-| 10 | **回收站** | 列表页加"已删除"Tab，`GET /xxx?deleted=true` + 恢复 `POST /xxx/{id}/restore` |
-| 11 | **加载骨架屏** | 替换 "加载中…" 文字为 Tailwind 骨架屏动画 |
-| 12 | **空状态引导** | 空列表显示插图 + "创建第一个产品" 按钮引导 |
-| 13 | **审计详情 diff** | 记录操作前后 JSON diff，审计详情页展示变更对比 |
+| # | 缺失功能 | 状态 | 建议 |
+|---|---------|------|------|
+| 6 | **批量操作** | 前端❌ | 列表加 checkbox 列，选中后出现操作栏（批量删除、批量改状态） |
+| 7 | **通知/站内信** | 前端❌ 后端❌ | 新建 `notifications` 表 + `GET /notifications` 接口，顶栏铃铛图标+下拉列表 |
+| 8 | **忘记密码** | 前端❌ 后端❌ | `POST /auth/forgot-password` 发送重置邮件 + `POST /auth/reset-password` 重置 |
+| 9 | **操作确认 UI** | 前端❌ | 替换原生 `confirm()` 为自定义 Modal 组件（7 处 `confirm()` 调用待替换：`NewsListView/ProductsListView/AppsView/MediaView/UsersListView/MenusView/RolesView`） |
+| 10 | **回收站** | 前端❌ 后端部分✅ | 后端 `cms/models.py` 已用 `deleted_at` 软删；前端需加"已删除"Tab + `POST /xxx/{id}/restore` |
+| 11 | **加载骨架屏** | 前端❌ | 替换 "加载中…" 文字为 Tailwind `animate-pulse` 骨架屏 |
+| 12 | **空状态引导** | 前端❌ | 当前 8 处空状态均为 `text-ink-400` 纯文字（News/Products/Cases/Media/SiteConfig/Users/Audit/Features），需加插图 + 引导按钮 |
+| 13 | **审计详情 diff** | 前端❌ 后端部分✅ | 后端 `core/audit.py:39` 已存 `diff` JSON 字段；前端 `AuditView.vue` 需加 diff 展示组件 |
 
 #### 🔵 P2 — 功能扩展（8 项）
 
@@ -207,7 +207,56 @@
 
 ---
 
-## 五、总结
+## 五、P1/P2 缺失项准确度核验附录
+
+> 校验方法：依赖检查（`package.json` / `requirements.txt`）+ 源码 `grep`（src 目录，排除 node_modules / dist）  
+> 校验范围：P1（8 项）、P2（8 项），共 16 项
+
+### 5.1 P1 — 体验提升（8 项准确度）
+
+| # | 缺失功能 | 校验方法 | 实际状态 | 准确度 |
+|---|---------|---------|---------|--------|
+| 6 | 批量操作 | `rg 'type="checkbox"\|批量\|batch'` 在 list 页面 | 列表 `th` 中无 checkbox 列；`.some()` 仅在 `auth.ts:39` 权限检查中使用，与批量无关 | ✅ 准确 |
+| 7 | 通知/站内信 | `rg 'notification\|铃铛\|bell'` 前端 + 后端 | 前后端均零匹配 | ✅ 准确 |
+| 8 | 忘记密码 | `rg 'forgot\|reset.password'` 前端 + 后端 | 前后端均零匹配 | ✅ 准确 |
+| 9 | 操作确认 UI | `rg 'confirm(\|window.confirm\|el-popconfirm\|Modal'` | 7 处用 `confirm(...)`：`NewsListView / ProductsListView / AppsView / MediaView / UsersListView / MenusView / RolesView`；无自定义 Modal | ✅ 准确 |
+| 10 | 回收站 | `rg 'restore\|recycle'` 后端 | 后端 `deleted_at` 软删存在；无 `restore` 接口 | ✅ 准确 |
+| 11 | 加载骨架屏 | `rg 'skeleton\|animate-pulse'` 前端 | 零匹配；无骨架屏动画 | ✅ 准确 |
+| 12 | 空状态引导 | `rg '空\|empty\|暂无\|无数据'` 前端 | 8 处空状态均为 `text-ink-400` 纯文字（News/Products/Cases/Media/SiteConfig/Users/Audit/Features），无插图、无引导按钮 | ✅ 准确 |
+| 13 | 审计详情 diff | `core/audit.py` + `AuditView.vue` | 后端 `core/audit.py:39` 有 `diff: Mapped[Any]` JSON 字段；前端 `AuditView.vue` 无 diff 展示组件 | 🟡 部分准确（后端已记录，前端未展示） |
+
+### 5.2 P2 — 功能扩展（8 项准确度）
+
+| # | 缺失功能 | 校验方法 | 实际状态 | 准确度 |
+|---|---------|---------|---------|--------|
+| 14 | 用户登录历史 | `rg 'login_log\|UserLoginLog'` | 零匹配 | ✅ 准确 |
+| 15 | API Key 管理 | `rg 'api_keys\|APIKey\|api_key'` | 零匹配 | ✅ 准确 |
+| 16 | 定时任务 UI | `tasks/` 目录 + UI 端点 | 后端 `tasks/__init__.py` 有 3 个 Celery 任务（`send_email` / `generate_thumbnail` / `archive_audit_logs`），但**无管理 UI** | ✅ 准确 |
+| 17 | 多语言 i18n | `rg 'vue-i18n\|useI18n\|Accept-Language'` 前端 + 后端 | 零匹配；两个 `package.json` 均无 `vue-i18n` 依赖 | ✅ 准确 |
+| 18 | 系统统一配置 | `cms/site-config` vs 系统设置 | `cms/site-config` 是**业务站点配置**（公网站点用），无独立的"系统设置"页 | ✅ 准确 |
+| 19 | WebSocket | `rg 'WebSocket\|websocket\|@app.websocket'` | 零匹配 | ✅ 准确 |
+| 20 | E2E 测试 | `tests/e2e/` + Playwright 依赖 | `tests/e2e/` 目录存在但**只有 README.md**（空目录），无 Playwright 用例 | ✅ 准确 |
+| 21 | 单元测试覆盖 | `backend/tests/*.py` | 4 个 test 文件，总用例 9（auth）+ 6（rbac）+ 8（cms）+ 0（security 仅工具函数）= **23 个**；覆盖 auth/rbac/cms 三个 app | ✅ 准确（可补一句具体数字） |
+
+### 5.3 总准确度
+
+| 块 | 准确度 |
+|---|---|
+| P0（5 项）| **5/5** = 100% |
+| P1（8 项）| **7.5/8** ≈ 94%（P1-13 后端有 diff 字段，文档原描述略严） |
+| P2（8 项）| **8/8** = 100% |
+| **总计** | **20.5/21 ≈ 97.6%** |
+
+### 5.4 校验方法说明
+
+- **依赖检查**：`package.json` / `requirements.txt` 中是否含目标库（vditor / tiptap / vue-i18n / captcha / echarts 等）
+- **源码 grep**：在 `frontend/admin-web/src` / `portal-web/src` / `backend/src` 中搜索关键词（排除 `node_modules/` 与 `dist/`）
+- **路由核验**：`router/index.ts` 路径 + 后端 `@router.*` 端点逐项匹配
+- **配置核验**：`core/config.py` 实际值（修正 CORS 描述时使用）
+
+---
+
+## 六、总结
 
 ### 项目定位
 

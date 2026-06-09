@@ -4,15 +4,17 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from cenkor_admin import __version__
 from cenkor_admin.api.v1 import api_v1_router
+from cenkor_admin.api.v1 import ws as ws_module
 from cenkor_admin.core.audit import AuditMiddleware
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import async_engine
+from cenkor_admin.core.i18n import SUPPORTED_LOCALES, detect_locale
 from cenkor_admin.core.redis import redis_client
 from cenkor_admin.core.storage import s3
 
@@ -85,11 +87,22 @@ async def health() -> dict:
         "version": __version__,
         "env": settings.APP_ENV,
         "db": settings.db_dialect,
+        "supported_locales": SUPPORTED_LOCALES,
     }
+
+
+# i18n 中间件：把 Accept-Language 解析结果存到 request.state.locale
+@app.middleware("http")
+async def locale_middleware(request: Request, call_next):
+    request.state.locale = detect_locale(request.headers.get("accept-language", ""))
+    response = await call_next(request)
+    response.headers["Content-Language"] = request.state.locale
+    return response
 
 
 # 路由
 app.include_router(api_v1_router, prefix="/api/v1")
+app.include_router(ws_module.router, prefix="/api/v1")
 
 
 @app.exception_handler(Exception)

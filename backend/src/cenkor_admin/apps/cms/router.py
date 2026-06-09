@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +16,11 @@ from cenkor_admin.apps.cms import models, schemas
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
+from cenkor_admin.core.repository import (
+    apply_filters,
+    paginate,
+    stream_for_csv,
+)
 from cenkor_admin.core.storage import s3
 
 settings = get_settings()
@@ -37,28 +44,72 @@ async def list_products(
     db: AsyncSession = Depends(get_db),
     line: str | None = None,
     status: str = "published",
+    search: str | None = Query(None, description="按 name / chinese_name / slug 模糊搜索"),
+    include_deleted: bool = Query(False, description="包含已删除（回收站）"),
+    only_deleted: bool = Query(False, description="只查已删除"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
     """产品列表（管理端）。"""
-    stmt = select(models.Product).where(
-        models.Product.deleted_at.is_(None),
-        models.Product.status == status,
-    )
+    extras = [models.Product.status == status]
     if line:
-        stmt = stmt.where(models.Product.line == line)
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-
-    stmt = stmt.order_by(models.Product.sort, models.Product.id.desc())
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    items = (await db.execute(stmt)).scalars().all()
+        extras.append(models.Product.line == line)
+    conds = apply_filters(
+        models.Product,
+        search=search,
+        search_fields=["name", "chinese_name", "slug", "tagline"],
+        extra=extras,
+        include_deleted=include_deleted,
+        only_deleted=only_deleted,
+    )
+    stmt = select(models.Product).where(*conds).order_by(models.Product.sort, models.Product.id.desc())
+    data = await paginate(db, stmt, page=page, page_size=page_size)
     return {
-        "items": [_to_product_dict(p) for p in items],
-        "total": total,
-        "page": page,
-        "page_size": page_size,
+        "items": [_to_product_dict(p) for p in data["items"]],
+        "total": data["total"],
+        "page": data["page"],
+        "page_size": data["page_size"],
     }
+
+
+@router.post("/products/{product_id}/restore", status_code=200)
+async def restore_product(product_id: int, db: AsyncSession = Depends(get_db)):
+    """恢复软删产品。"""
+    await db.execute(
+        update(models.Product)
+        .where(models.Product.id == product_id)
+        .values(deleted_at=None)
+    )
+    await db.commit()
+    return {"id": product_id, "restored": True}
+
+
+@router.get("/products/export")
+async def export_products_csv(
+    db: AsyncSession = Depends(get_db),
+    line: str | None = None,
+    status: str = "published",
+    search: str | None = None,
+):
+    """导出产品 CSV（分块流式）。"""
+    extras = [models.Product.status == status]
+    if line:
+        extras.append(models.Product.line == line)
+    conds = apply_filters(
+        models.Product,
+        search=search,
+        search_fields=["name", "chinese_name", "slug", "tagline"],
+        extra=extras,
+    )
+    base_stmt = select(models.Product).where(*conds)
+
+    return StreamingResponse(
+        _csv_stream(db, base_stmt, _product_csv_row, "products"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="products_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"',
+        },
+    )
 
 
 @router.post("/products", response_model=schemas.ProductOut, status_code=status.HTTP_201_CREATED)
@@ -107,19 +158,91 @@ async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
 
+@router.post("/products/batch-delete", status_code=200)
+async def batch_delete_products(body: dict, db: AsyncSession = Depends(get_db)):
+    """批量软删产品。body: {ids: [int, ...]}"""
+    ids = body.get("ids") or []
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(400, "ids 必须是非空数组")
+    await db.execute(
+        update(models.Product)
+        .where(models.Product.id.in_(ids))
+        .values(deleted_at=func.now())
+    )
+    await db.commit()
+    return {"deleted": len(ids)}
+
+
+@router.post("/products/batch-status", status_code=200)
+async def batch_update_product_status(body: dict, db: AsyncSession = Depends(get_db)):
+    """批量更新状态。body: {ids: [...], status: 'published'|'draft'|'archived'}"""
+    ids = body.get("ids") or []
+    new_status = body.get("status")
+    if not isinstance(ids, list) or not ids or new_status not in ("draft", "published", "archived"):
+        raise HTTPException(400, "参数错误")
+    await db.execute(
+        update(models.Product)
+        .where(models.Product.id.in_(ids))
+        .values(status=new_status)
+    )
+    await db.commit()
+    return {"updated": len(ids), "status": new_status}
+
+
 # ===== Case =====
 @router.get("/cases", response_model=dict[str, Any])
 async def list_cases(
     db: AsyncSession = Depends(get_db),
+    search: str | None = Query(None, description="按 name / industry / tag 模糊搜索"),
+    include_deleted: bool = Query(False),
+    only_deleted: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    stmt = select(models.Case).where(models.Case.deleted_at.is_(None))
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.order_by(models.Case.sort, models.Case.id.desc()).offset((page - 1) * page_size).limit(page_size)
-    items = (await db.execute(stmt)).scalars().all()
-    return {"items": [_to_case_dict(c) for c in items], "total": total, "page": page, "page_size": page_size}
+    conds = apply_filters(
+        models.Case,
+        search=search,
+        search_fields=["name", "industry", "tag"],
+        include_deleted=include_deleted,
+        only_deleted=only_deleted,
+    )
+    stmt = select(models.Case).where(*conds).order_by(models.Case.sort, models.Case.id.desc())
+    data = await paginate(db, stmt, page=page, page_size=page_size)
+    return {
+        "items": [_to_case_dict(c) for c in data["items"]],
+        "total": data["total"],
+        "page": data["page"],
+        "page_size": data["page_size"],
+    }
+
+
+@router.post("/cases/{case_id}/restore", status_code=200)
+async def restore_case(case_id: int, db: AsyncSession = Depends(get_db)):
+    await db.execute(
+        update(models.Case).where(models.Case.id == case_id).values(deleted_at=None)
+    )
+    await db.commit()
+    return {"id": case_id, "restored": True}
+
+
+@router.get("/cases/export")
+async def export_cases_csv(
+    db: AsyncSession = Depends(get_db),
+    search: str | None = None,
+):
+    conds = apply_filters(
+        models.Case,
+        search=search,
+        search_fields=["name", "industry", "tag"],
+    )
+    base_stmt = select(models.Case).where(*conds)
+    return StreamingResponse(
+        _csv_stream(db, base_stmt, _case_csv_row, "cases"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="cases_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"',
+        },
+    )
 
 
 @router.post("/cases", response_model=schemas.CaseOut, status_code=status.HTTP_201_CREATED)
@@ -159,6 +282,18 @@ async def delete_case(case_id: int, db: AsyncSession = Depends(get_db)):
         update(models.Case).where(models.Case.id == case_id).values(deleted_at=func.now())
     )
     await db.commit()
+
+
+@router.post("/cases/batch-delete", status_code=200)
+async def batch_delete_cases(body: dict, db: AsyncSession = Depends(get_db)):
+    ids = body.get("ids") or []
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(400, "ids 必须是非空数组")
+    await db.execute(
+        update(models.Case).where(models.Case.id.in_(ids)).values(deleted_at=func.now())
+    )
+    await db.commit()
+    return {"deleted": len(ids)}
 
 
 # ===== Site Config =====
@@ -247,20 +382,63 @@ def _to_site_config_dict(s: models.SiteConfig) -> dict:
 async def list_news(
     db: AsyncSession = Depends(get_db),
     publish_status: str = Query("published", alias="status"),
+    search: str | None = Query(None, description="按 title / slug / excerpt 模糊搜索"),
+    include_deleted: bool = Query(False),
+    only_deleted: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    stmt = select(models.News).where(
-        models.News.deleted_at.is_(None), models.News.status == publish_status
+    conds = apply_filters(
+        models.News,
+        search=search,
+        search_fields=["title", "slug", "excerpt"],
+        extra=[models.News.status == publish_status],
+        include_deleted=include_deleted,
+        only_deleted=only_deleted,
     )
-    count = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
-    stmt = stmt.order_by(*order_nulls_last(models.News.published_at), models.News.id.desc())
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    items = (await db.execute(stmt)).scalars().all()
+    stmt = (
+        select(models.News)
+        .where(*conds)
+        .order_by(*order_nulls_last(models.News.published_at), models.News.id.desc())
+    )
+    data = await paginate(db, stmt, page=page, page_size=page_size)
     return {
-        "items": [_to_news_dict(n) for n in items],
-        "total": count, "page": page, "page_size": page_size,
+        "items": [_to_news_dict(n) for n in data["items"]],
+        "total": data["total"],
+        "page": data["page"],
+        "page_size": data["page_size"],
     }
+
+
+@router.post("/news/{nid}/restore", status_code=200)
+async def restore_news(nid: int, db: AsyncSession = Depends(get_db)):
+    await db.execute(
+        update(models.News).where(models.News.id == nid).values(deleted_at=None)
+    )
+    await db.commit()
+    return {"id": nid, "restored": True}
+
+
+@router.get("/news/export")
+async def export_news_csv(
+    db: AsyncSession = Depends(get_db),
+    publish_status: str = Query("published", alias="status"),
+    search: str | None = None,
+):
+    conds = apply_filters(
+        models.News,
+        search=search,
+        search_fields=["title", "slug", "excerpt"],
+        extra=[models.News.status == publish_status],
+    )
+    base_stmt = select(models.News).where(*conds)
+    return StreamingResponse(
+        _csv_stream(db, base_stmt, _news_csv_row, "news"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="news_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"',
+        },
+    )
 
 
 @router.post("/news", response_model=schemas.NewsOut, status_code=status.HTTP_201_CREATED)
@@ -298,20 +476,51 @@ async def delete_news(nid: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
 
+@router.post("/news/batch-delete", status_code=200)
+async def batch_delete_news(body: dict, db: AsyncSession = Depends(get_db)):
+    ids = body.get("ids") or []
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(400, "ids 必须是非空数组")
+    await db.execute(
+        update(models.News).where(models.News.id.in_(ids)).values(deleted_at=func.now())
+    )
+    await db.commit()
+    return {"deleted": len(ids)}
+
+
+@router.post("/news/batch-status", status_code=200)
+async def batch_update_news_status(body: dict, db: AsyncSession = Depends(get_db)):
+    ids = body.get("ids") or []
+    new_status = body.get("status")
+    if not isinstance(ids, list) or not ids or new_status not in ("draft", "published", "archived"):
+        raise HTTPException(400, "参数错误")
+    await db.execute(
+        update(models.News).where(models.News.id.in_(ids)).values(status=new_status)
+    )
+    await db.commit()
+    return {"updated": len(ids), "status": new_status}
+
+
 # ===== Media =====
 @router.get("/media", response_model=dict[str, Any])
 async def list_media(
     db: AsyncSession = Depends(get_db),
+    search: str | None = Query(None, description="按 key / url / mime / alt 模糊搜索"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ):
-    stmt = select(models.Media).where(models.Media.deleted_at.is_(None))
-    count = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
-    stmt = stmt.order_by(models.Media.id.desc()).offset((page - 1) * page_size).limit(page_size)
-    items = (await db.execute(stmt)).scalars().all()
+    conds = apply_filters(
+        models.Media,
+        search=search,
+        search_fields=["key", "url", "mime", "alt"],
+    )
+    stmt = select(models.Media).where(*conds).order_by(models.Media.id.desc())
+    data = await paginate(db, stmt, page=page, page_size=page_size)
     return {
-        "items": [_to_media_dict(m) for m in items],
-        "total": count, "page": page, "page_size": page_size,
+        "items": [_to_media_dict(m) for m in data["items"]],
+        "total": data["total"],
+        "page": data["page"],
+        "page_size": data["page_size"],
     }
 
 
@@ -467,3 +676,73 @@ def _extract_image_metadata(content: bytes, content_type: str) -> dict:
 def _generate_thumbnail_url(bucket: str, key: str, width: int = 300) -> str:
     """生成缩略图 URL（占位：MVP 不真生成，只是约定 key 规则）"""
     return f"{settings.PUBLIC_BASE_URL.rsplit(':', 1)[0]}:{settings.S3_API_PORT}/{bucket}/thumbs/{width}_{key.split('/')[-1]}"
+
+
+# ===== CSV 导出（流式分块） =====
+async def _csv_stream(db: AsyncSession, base_stmt, row_fn, model_id_attr: str):
+    """通用 CSV 流：先 yield BOM + header，再按 keyset 分块 yield 行。
+
+    关键点：
+    - 输出首部加 BOM 让 Excel 正确识别 UTF-8
+    - 使用 keyset（id > last_id）分批，避免 OFFSET 在大表上的性能问题
+    - 每批 500 行，足够小以控制内存
+    """
+    yield "\ufeff"  # UTF-8 BOM
+    yield ",".join(_CSV_HEADER) + "\r\n"
+
+    # 反射 base_stmt 对应模型主键
+    model = base_stmt.column_descriptions[0]["entity"]
+    id_col = getattr(model, model_id_attr)
+
+    async for row in stream_for_csv(db, base_stmt, id_column=id_col, batch_size=500):
+        yield row_fn(row)
+
+
+_CSV_HEADER = [
+    "id", "name", "chinese_name", "slug", "industry", "tag", "line",
+    "title", "excerpt", "status", "view_count", "published_at",
+    "created_at", "updated_at",
+]
+
+
+def _product_csv_row(p) -> str:
+    return _csv_line([
+        p.id, p.name, p.chinese_name, p.slug, "", "", p.line,
+        "", "", p.status, "", "",
+        _iso(p.created_at), _iso(p.updated_at),
+    ])
+
+
+def _case_csv_row(c) -> str:
+    return _csv_line([
+        c.id, c.name, "", "", c.industry, c.tag, "",
+        "", "", c.status, "", "",
+        _iso(c.created_at), _iso(c.updated_at),
+    ])
+
+
+def _news_csv_row(n) -> str:
+    return _csv_line([
+        n.id, "", "", n.slug, "", "", "",
+        n.title, n.excerpt, n.status, n.view_count, _iso(n.published_at),
+        _iso(n.created_at), _iso(n.updated_at),
+    ])
+
+
+def _iso(dt):
+    return dt.isoformat() if dt else ""
+
+
+def _csv_line(values) -> str:
+    """将任意值转成 CSV 安全字符串。None -> 空，复杂值 -> str()"""
+    parts = []
+    for v in values:
+        if v is None or v == "":
+            parts.append("")
+        else:
+            # csv.writer 处理引号转义；这里手工简单版
+            s = str(v)
+            if any(c in s for c in [",", '"', "\n", "\r"]):
+                s = '"' + s.replace('"', '""') + '"'
+            parts.append(s)
+    return ",".join(parts) + "\r\n"

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { api } from '@/lib/api'
+import SearchInput from '@/components/SearchInput.vue'
+import CsvExportButton from '@/components/CsvExportButton.vue'
 
 interface NewsItem {
   id: number
@@ -16,12 +18,15 @@ interface NewsItem {
 const news = ref<NewsItem[]>([])
 const loading = ref(true)
 const error = ref('')
+const search = ref('')
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await api.get('/api/v1/cms/news', { params: { page_size: 100 } })
+    const { data } = await api.get('/api/v1/cms/news', {
+      params: { page_size: 100, search: search.value || undefined },
+    })
     news.value = data.items
   } catch (e: any) {
     error.value = e?.response?.data?.detail || '加载失败'
@@ -40,6 +45,7 @@ async function del(n: NewsItem) {
   }
 }
 
+watch(search, () => { load() })
 onMounted(load)
 </script>
 
@@ -56,9 +62,13 @@ onMounted(load)
       <div v-if="loading" class="card text-ink-500">加载中…</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 class="text-2xl font-semibold tracking-tight">新闻列表（{{ news.length }}）</h1>
-          <router-link to="/cms/news/new" class="btn-primary">+ 新建新闻</router-link>
+          <div class="flex items-center gap-3">
+            <SearchInput v-model="search" placeholder="按标题/Slug/摘要搜索…" />
+            <CsvExportButton endpoint="/api/v1/cms/news/export" filename="news.csv" :params="{ search: search || undefined }" />
+            <router-link to="/cms/news/new" class="btn-primary">+ 新建新闻</router-link>
+          </div>
         </div>
         <div class="card overflow-hidden p-0">
           <table class="w-full text-sm">

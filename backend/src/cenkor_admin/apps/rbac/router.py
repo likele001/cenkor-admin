@@ -20,8 +20,15 @@ router = APIRouter()
 async def list_roles(
     db: AsyncSession = Depends(get_db),
     _: auth_models.User = Depends(require_permission("rbac:role:read")),
+    search: str | None = Query(None, description="按 code / name / description 模糊搜索"),
 ):
-    result = await db.execute(select(models.Role).order_by(models.Role.id))
+    from cenkor_admin.core.repository import apply_filters
+    conds = apply_filters(
+        models.Role,
+        search=search,
+        search_fields=["code", "name", "description"],
+    )
+    result = await db.execute(select(models.Role).where(*conds).order_by(models.Role.id))
     roles = result.scalars().all()
     return {
         "items": [

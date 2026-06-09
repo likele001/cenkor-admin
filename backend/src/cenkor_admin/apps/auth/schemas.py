@@ -12,6 +12,7 @@ class LoginRequest(BaseModel):
     """账号密码登录"""
     username: str = Field(..., description="邮箱 / 用户名 / 手机号")
     password: str
+    captcha_token: str | None = Field(None, description="滑动验证 token（前端 SliderCaptcha 生成）")
 
 
 class TokenResponse(BaseModel):
@@ -48,6 +49,7 @@ class UserCreate(BaseModel):
     phone: str | None = None
     is_superuser: bool = False
     role_ids: list[int] = []
+    captcha_token: str | None = Field(None, description="滑动验证 token")
 
 
 class UserUpdate(BaseModel):

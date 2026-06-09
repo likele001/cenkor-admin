@@ -8,12 +8,20 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.api.deps import require_permission
+from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.system.app_registry import install_app, list_apps_with_status, uninstall_app
+from cenkor_admin.apps.system.settings_router import router as settings_router
+from cenkor_admin.apps.system.tasks_router import router as tasks_router
 from cenkor_admin.core.audit import AuditLog
 from cenkor_admin.core.db import get_db
 
+AuthUser = auth_models.User
+
 router = APIRouter()
+
+# 子路由：定时任务
+router.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
+router.include_router(settings_router, prefix="/settings", tags=["settings"])
 
 
 @router.get("/apps", response_model=dict[str, Any])
@@ -50,6 +58,32 @@ async def uninstall_app_endpoint(
         return {"ok": True, "key": app_key, "status": "uninstalled"}
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+
+
+@router.get("/audit/{audit_id}", response_model=dict[str, Any])
+async def get_audit_log(
+    audit_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AuthUser = Depends(get_current_user),
+):
+    """单条审计详情（用于 diff 查看）。"""
+    obj = await db.get(AuditLog, audit_id)
+    if not obj:
+        raise HTTPException(404, "审计记录不存在")
+    return {
+        "id": obj.id,
+        "request_id": obj.request_id,
+        "user_id": obj.user_id,
+        "method": obj.method,
+        "path": obj.path,
+        "status_code": obj.status_code,
+        "duration_ms": obj.duration_ms,
+        "ip": obj.ip,
+        "user_agent": obj.user_agent,
+        "diff": obj.diff,
+        "error": obj.error,
+        "created_at": obj.created_at.isoformat() if obj.created_at else None,
+    }
 
 
 @router.get("/audit", response_model=dict[str, Any])

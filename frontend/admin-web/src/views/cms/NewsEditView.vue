@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/lib/api'
+import VditorEditor from '@/components/VditorEditor.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,7 +83,7 @@ async function save() {
         </div>
         <div>
           <label class="block text-sm font-medium mb-1.5">内容 (Markdown) *</label>
-          <textarea v-model="form.content_md" required rows="14" class="input font-mono text-sm"></textarea>
+          <VditorEditor v-model="form.content_md" :height="520" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1.5">状态</label>

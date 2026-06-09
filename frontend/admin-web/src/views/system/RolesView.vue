@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { api } from '@/lib/api'
+import SearchInput from '@/components/SearchInput.vue'
 
 interface Role {
   id: number
@@ -25,6 +26,7 @@ const error = ref('')
 const showDialog = ref(false)
 const isNew = ref(true)
 const saving = ref(false)
+const search = ref('')
 const form = ref({
   id: 0,
   code: '',
@@ -39,7 +41,7 @@ async function load() {
   error.value = ''
   try {
     const [r, p] = await Promise.all([
-      api.get('/api/v1/rbac/roles'),
+      api.get('/api/v1/rbac/roles', { params: { search: search.value || undefined } }),
       api.get('/api/v1/rbac/permissions'),
     ])
     roles.value = r.data.items
@@ -115,6 +117,7 @@ const groupedPerms = () => {
 }
 
 onMounted(load)
+watch(search, () => { load() })
 </script>
 
 <template>
@@ -130,9 +133,12 @@ onMounted(load)
       <div v-if="loading" class="card text-ink-500">加载中…</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 class="text-2xl font-semibold tracking-tight">角色列表（{{ roles.length }}）</h1>
-          <button @click="openNew" class="btn-primary">+ 新建角色</button>
+          <div class="flex items-center gap-3">
+            <SearchInput v-model="search" placeholder="按 code/名称/描述搜索…" />
+            <button @click="openNew" class="btn-primary">+ 新建角色</button>
+          </div>
         </div>
         <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div v-for="r in roles" :key="r.id" class="card flex flex-col">

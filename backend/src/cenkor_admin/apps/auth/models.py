@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import String, Integer, Boolean, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -66,4 +66,52 @@ class UserOAuth(Base):
     __table_args__ = (
         # 一个 provider 同一个 open_id 只能绑一个用户
         # PG: UNIQUE(provider, open_id) - MySQL 也支持
+    )
+
+
+class LoginLog(Base):
+    """用户登录历史"""
+    __tablename__ = "login_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    provider: Mapped[str] = mapped_column(String(40), default="local", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+class ApiKey(Base):
+    """API Key（用户级访问凭证）"""
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    scopes: Mapped[Any | None] = mapped_column("scopes", String(500), nullable=True)  # 简单存逗号分隔字符串
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SystemSetting(Base):
+    """系统级 KV（与 cms_site_config 区分）"""
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[Any | None] = mapped_column("value", String(2000), nullable=True)  # 存 JSON 字符串
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    group: Mapped[str] = mapped_column(String(40), index=True, nullable=False, default="general")
+    updated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

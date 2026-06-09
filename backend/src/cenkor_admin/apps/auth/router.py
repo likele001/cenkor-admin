@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import structlog
 from typing import Any
@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models, schemas
 from cenkor_admin.apps.auth.oauth import feishu
+from cenkor_admin.apps.notification.models import PasswordReset
 from cenkor_admin.apps.rbac.models import (
     Role,
     UserRole,
@@ -26,6 +27,7 @@ from cenkor_admin.apps.rbac.models import (
 )
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
+from cenkor_admin.core.mail import send_email
 from cenkor_admin.core.security import (
     create_access_token,
     create_refresh_token,
@@ -104,9 +106,22 @@ def _build_user_brief(user: models.User) -> schemas.UserBrief:
 
 
 # ---- 注册（portal 用户中心） ----
+def _verify_slider_captcha(token: str | None) -> None:
+    """轻量校验：token 必须存在且为合法 32 位 hex 字符串。
+
+    真正的安全强度依赖 HTTPS + 限流；这里主要挡住纯脚本自动注册/登录。
+    """
+    if not token or not isinstance(token, str):
+        raise HTTPException(400, "请先完成滑动验证")
+    import re
+    if not re.fullmatch(r"[0-9a-f]{16,128}", token):
+        raise HTTPException(400, "滑动验证无效，请刷新重试")
+
+
 @router.post("/register", response_model=schemas.TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
     """公开注册（默认分配 viewer 角色）"""
+    _verify_slider_captcha(body.captcha_token)
     existing = await db.execute(
         select(models.User).where(
             (models.User.email == body.email) | (models.User.username == body.username),
@@ -179,6 +194,7 @@ async def change_own_password(
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """账号密码登录。username 可以是邮箱、用户名或手机号。"""
+    _verify_slider_captcha(body.captcha_token)
     # 查找用户
     stmt = select(models.User).where(
         models.User.deleted_at.is_(None),
@@ -188,16 +204,35 @@ async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession =
     )
     user = (await db.execute(stmt)).scalar_one_or_none()
 
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent", "")[:500]
+
     if not user or not verify_password(body.password, user.password_hash):
-        log.warning("auth.login.failed", username=body.username, ip=request.client.host if request.client else None)
+        log.warning("auth.login.failed", username=body.username, ip=ip)
+        # 记录失败日志（user_id 可能是 0 / None）
+        if user is not None:
+            db.add(models.LoginLog(
+                user_id=user.id, ip=ip, user_agent=ua,
+                success=False, reason="wrong_password", provider="local",
+            ))
+            await db.commit()
         raise HTTPException(status_code=401, detail="账号或密码错误")
 
     if user.status != "active":
+        db.add(models.LoginLog(
+            user_id=user.id, ip=ip, user_agent=ua,
+            success=False, reason=f"status_{user.status}", provider="local",
+        ))
+        await db.commit()
         raise HTTPException(status_code=403, detail=f"账号已{user.status}")
 
     # 更新最后登录
     user.last_login_at = datetime.now(timezone.utc)
-    user.last_login_ip = request.client.host if request.client else None
+    user.last_login_ip = ip
+    # 成功登录日志
+    db.add(models.LoginLog(
+        user_id=user.id, ip=ip, user_agent=ua, success=True, provider="local",
+    ))
     await db.commit()
 
     log.info("auth.login.ok", user_id=user.id, username=user.username)
@@ -251,6 +286,106 @@ async def logout(
     user.token_version = (user.token_version or 0) + 1
     await db.commit()
     log.info("auth.logout", user_id=user.id)
+
+
+# ===== 忘记密码 =====
+@router.post("/forgot-password", status_code=200)
+async def forgot_password(body: dict, request: Request, db: AsyncSession = Depends(get_db)):
+    """请求重置密码：发邮件。
+
+    body: { email, frontend_base? }
+    为防止枚举账户，无论邮箱是否存在都返回成功。
+    """
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(400, "请输入邮箱")
+    frontend_base = body.get("frontend_base") or settings.PUBLIC_BASE_URL
+
+    # 查用户
+    user = (await db.execute(
+        select(models.User).where(
+            models.User.email == email, models.User.deleted_at.is_(None)
+        )
+    )).scalar_one_or_none()
+
+    # 始终返回 200，避免邮箱枚举
+    if not user:
+        log.info("auth.forgot.unknown_email", email=email)
+        return {"ok": True, "message": "如果该邮箱已注册，重置链接已发送"}
+
+    # 生成 token + 失效时间
+    token = secrets.token_urlsafe(48)[:64]
+    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    db.add(PasswordReset(
+        user_id=user.id, token=token, expires_at=expires,
+        ip=request.client.host if request.client else None,
+    ))
+    await db.commit()
+
+    # 构造重置链接
+    reset_link = f"{frontend_base.rstrip('/')}/reset-password?token={token}"
+    subject = "【Cenkor Admin】重置您的密码"
+    body_text = (
+        f"您好，\n\n"
+        f"我们收到了重置 {email} 账户密码的请求。\n"
+        f"请点击下方链接在 1 小时内重置密码：\n\n"
+        f"  {reset_link}\n\n"
+        f"如果这不是您本人的操作，请忽略此邮件。\n\n"
+        f"—— Cenkor Admin"
+    )
+    body_html = (
+        f"<p>您好，</p>"
+        f"<p>我们收到了重置 <b>{email}</b> 账户密码的请求。</p>"
+        f"<p><a href=\"{reset_link}\" "
+        f"style=\"display:inline-block;padding:10px 18px;background:#0f172a;color:white;"
+        f"border-radius:8px;text-decoration:none;font-weight:500;\">重置密码</a></p>"
+        f"<p style=\"color:#64748b;font-size:13px;\">链接 1 小时内有效。如果不是您本人的操作，请忽略此邮件。</p>"
+        f"<hr><p style=\"color:#94a3b8;font-size:11px;\">Cenkor Admin</p>"
+    )
+    try:
+        result = send_email(email, subject, body_text)
+        if not result.get("ok"):
+            log.warning("auth.forgot.email_failed", email=email, reason=result.get("reason"))
+    except Exception as e:
+        log.error("auth.forgot.email_exception", error=str(e), email=email)
+
+    return {"ok": True, "message": "如果该邮箱已注册，重置链接已发送"}
+
+
+@router.post("/reset-password", status_code=200)
+async def reset_password(body: dict, db: AsyncSession = Depends(get_db)):
+    """使用 token 重置密码。
+
+    body: { token, new_password }
+    """
+    token = (body.get("token") or "").strip()
+    new_password = body.get("new_password") or ""
+    if not token or len(new_password) < 8:
+        raise HTTPException(400, "参数错误：token 必填，新密码 ≥8 位")
+
+    reset = (await db.execute(
+        select(PasswordReset).where(PasswordReset.token == token)
+    )).scalar_one_or_none()
+    if not reset:
+        raise HTTPException(400, "重置链接无效或已过期")
+    if reset.used_at is not None:
+        raise HTTPException(400, "重置链接已被使用")
+    expires_at = reset.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(400, "重置链接已过期")
+
+    user = await db.get(models.User, reset.user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(400, "用户不存在")
+
+    user.password_hash = hash_password(new_password)
+    user.token_version = (user.token_version or 0) + 1  # 旧 token 全部失效
+    reset.used_at = datetime.now(timezone.utc)
+    await db.commit()
+    log.info("auth.reset.ok", user_id=user.id)
+    return {"ok": True}
 
 
 # /me 路由在 api/v1/__init__.py 中定义（避免循环引用）
@@ -341,16 +476,25 @@ import secrets  # noqa: E402
 async def list_users(
     db: AsyncSession = Depends(get_db),
     _: models.User = Depends(require_permission("rbac:user:read")),
+    search: str | None = Query(None, description="按 username / email / nickname 模糊搜索"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
     """用户列表（含角色 ID）"""
+    from cenkor_admin.core.repository import apply_filters, paginate
+    from sqlalchemy import and_
+
+    base_filters = apply_filters(
+        models.User,
+        search=search,
+        search_fields=["username", "email", "nickname"],
+    )
     stmt = (
         select(models.User, UserRole.role_id)
         .outerjoin(UserRole, UserRole.user_id == models.User.id)
-        .where(models.User.deleted_at.is_(None))
+        .where(and_(*base_filters))
     )
-    # 先 count
+    # paginate 直接用会丢失 UserRole 的 role_id 字段；这里手工 count + 切片
     from sqlalchemy import func
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
@@ -374,6 +518,87 @@ async def list_users(
             user_dict[user.id]["role_ids"].append(role_id)
 
     return {"items": list(user_dict.values()), "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/users/export")
+async def export_users_csv(
+    db: AsyncSession = Depends(get_db),
+    _: models.User = Depends(require_permission("rbac:user:read")),
+    search: str | None = None,
+):
+    """导出用户 CSV（流式分块）"""
+    from cenkor_admin.core.repository import apply_filters, stream_for_csv
+    from datetime import datetime as _dt
+    from fastapi.responses import StreamingResponse
+
+    base_filters = apply_filters(
+        models.User,
+        search=search,
+        search_fields=["username", "email", "nickname"],
+    )
+    base_stmt = select(models.User).where(*base_filters)
+
+    header = "id,username,email,nickname,status,is_superuser,last_login_at,created_at\r\n"
+
+    async def gen():
+        yield "\ufeff" + header
+        async for u in stream_for_csv(db, base_stmt, id_column=models.User.id, batch_size=500):
+            cells = [
+                u.id, u.username, u.email, u.nickname or "",
+                u.status, "1" if u.is_superuser else "0",
+                u.last_login_at.isoformat() if u.last_login_at else "",
+                u.created_at.isoformat() if u.created_at else "",
+            ]
+            line = ",".join(
+                f'"{str(c).replace(chr(34), chr(34)*2)}"' if c and any(ch in str(c) for ch in [",", '"', "\n"]) else str(c)
+                for c in cells
+            )
+            yield line + "\r\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="users_{_dt.now().strftime("%Y%m%d_%H%M%S")}.csv"',
+        },
+    )
+
+
+@router.get("/users/{user_id}/login-history", response_model=dict[str, Any])
+async def get_user_login_history(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: models.User = Depends(require_permission("rbac:user:read")),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """用户登录历史（最近 90 天）"""
+    from datetime import timedelta
+    from cenkor_admin.core.repository import paginate
+    since = datetime.now(timezone.utc) - timedelta(days=90)
+    stmt = (
+        select(models.LoginLog)
+        .where(models.LoginLog.user_id == user_id, models.LoginLog.created_at >= since)
+        .order_by(models.LoginLog.created_at.desc(), models.LoginLog.id.desc())
+    )
+    data = await paginate(db, stmt, page=page, page_size=page_size)
+    return {
+        "items": [
+            {
+                "id": l.id,
+                "ip": l.ip,
+                "user_agent": l.user_agent,
+                "success": l.success,
+                "reason": l.reason,
+                "provider": l.provider,
+                "created_at": l.created_at.isoformat() if l.created_at else None,
+            }
+            for l in data["items"]
+        ],
+        "total": data["total"],
+        "page": data["page"],
+        "page_size": data["page_size"],
+    }
 
 
 @router.post("/users", status_code=201)

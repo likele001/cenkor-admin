@@ -18,6 +18,9 @@ import RolesView from '@/views/system/RolesView.vue'
 import MenusView from '@/views/system/MenusView.vue'
 import AuditView from '@/views/system/AuditView.vue'
 import AppsView from '@/views/system/AppsView.vue'
+import ApiKeysView from '@/views/system/ApiKeysView.vue'
+import TasksView from '@/views/system/TasksView.vue'
+import SettingsView from '@/views/system/SettingsView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -45,6 +48,9 @@ const routes: RouteRecordRaw[] = [
       { path: 'system/menus', name: 'system-menus', component: MenusView, meta: { permission: 'rbac:menu:read' } },
       { path: 'system/apps', name: 'system-apps', component: AppsView, meta: { permission: 'rbac:role:read' } },
       { path: 'system/audit', name: 'system-audit', component: AuditView, meta: { permission: 'system:audit:read' } },
+      { path: 'system/api-keys', name: 'system-api-keys', component: ApiKeysView, meta: { permission: 'apikey:read' } },
+      { path: 'system/tasks', name: 'system-tasks', component: TasksView, meta: { permission: 'task:read' } },
+      { path: 'system/settings', name: 'system-settings', component: SettingsView, meta: { permission: 'settings:read' } },
       { path: '403', name: 'forbidden', component: ForbiddenView },
     ],
   },

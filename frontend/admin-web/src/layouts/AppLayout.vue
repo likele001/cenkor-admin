@@ -3,6 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/lib/api'
+import NotificationBell from '@/components/NotificationBell.vue'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
+import WsStatus from '@/components/WsStatus.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -83,6 +86,8 @@ function isActive(path: string) {
           </nav>
         </div>
         <div class="flex items-center gap-3 shrink-0">
+          <NotificationBell v-if="me" />
+          <LocaleSwitcher />
           <span v-if="me" class="text-sm text-ink-500 hidden sm:inline">{{ me.nickname || me.username }}</span>
           <button @click="logout" class="text-sm text-ink-500 hover:text-ink-900">登出</button>
         </div>
@@ -91,5 +96,6 @@ function isActive(path: string) {
     <main class="max-w-7xl mx-auto px-6 py-10">
       <RouterView />
     </main>
+    <WsStatus />
   </div>
 </template>

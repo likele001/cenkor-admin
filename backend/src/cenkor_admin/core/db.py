@@ -17,12 +17,15 @@ from cenkor_admin.core.config import get_settings
 settings = get_settings()
 
 # 异步引擎
+_engine_kwargs: dict = {"echo": settings.DB_ECHO, "pool_pre_ping": True}
+# SQLite 不支持 pool_size / max_overflow
+if not settings.DATABASE_URL.startswith("sqlite"):
+    _engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
+    _engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+
 async_engine = create_async_engine(
     settings.DATABASE_URL,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    echo=settings.DB_ECHO,
-    pool_pre_ping=True,
+    **_engine_kwargs,
 )
 
 # 会话工厂

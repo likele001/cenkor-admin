@@ -10,11 +10,12 @@ from cenkor_admin.core.config import get_settings
 
 
 def json_column(**kwargs):
-    """PG 使用 JSONB，MySQL 使用 JSON。"""
+    """PG 使用 JSONB，MySQL/SQLite 使用 JSON。"""
     settings = get_settings()
-    if settings.is_mysql:
-        return JSON(**kwargs)
-    return JSONB(**kwargs)
+    if settings.is_postgres:
+        from sqlalchemy.dialects.postgresql import JSONB as _JSONB
+        return _JSONB(**kwargs)
+    return JSON(**kwargs)
 
 
 def alembic_json():

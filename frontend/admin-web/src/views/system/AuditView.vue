@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
+import AuditDetailDrawer from '@/components/AuditDetailDrawer.vue'
 
 interface AuditEntry {
   id: number
@@ -19,6 +20,7 @@ const entries = ref<AuditEntry[]>([])
 const stats = ref<any>({})
 const loading = ref(true)
 const error = ref('')
+const selectedId = ref<number | null>(null)
 
 const filters = ref({
   method: '',
@@ -127,11 +129,12 @@ onMounted(load)
                 <th class="px-4 py-3 font-medium">用户</th>
                 <th class="px-4 py-3 font-medium">耗时</th>
                 <th class="px-4 py-3 font-medium">IP</th>
+                <th class="px-4 py-3 font-medium text-right">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="entries.length === 0">
-                <td colspan="7" class="px-4 py-12 text-center text-ink-400">暂无审计记录</td>
+                <td colspan="8" class="px-4 py-12 text-center text-ink-400">暂无审计记录</td>
               </tr>
               <tr v-for="e in entries" :key="e.id" class="border-b border-ink-100 last:border-0 hover:bg-ink-50">
                 <td class="px-4 py-3 text-ink-500 text-xs font-mono">{{ e.created_at?.slice(11, 19) }}</td>
@@ -145,11 +148,18 @@ onMounted(load)
                 <td class="px-4 py-3 text-ink-500">{{ e.user_id || '-' }}</td>
                 <td class="px-4 py-3 text-ink-500">{{ e.duration_ms }}ms</td>
                 <td class="px-4 py-3 text-ink-400 text-xs">{{ e.ip || '-' }}</td>
+                <td class="px-4 py-3 text-right">
+                  <button class="text-sm text-brand-600 hover:underline" @click="selectedId = e.id">
+                    详情
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
     </main>
+
+    <AuditDetailDrawer :audit-id="selectedId" @close="selectedId = null" />
   </div>
 </template>

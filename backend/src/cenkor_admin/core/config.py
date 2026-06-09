@@ -57,17 +57,27 @@ class Settings(BaseSettings):
     # ---- CORS ----
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:8000"
 
+    # ---- SMTP（忘记密码 / 通知邮件；本期 P1 接入）----
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "noreply@cenkor.cn"
+    SMTP_USE_TLS: bool = True
+
     # ---- 公网 ----
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 
     @property
     def db_dialect(self) -> str:
-        """返回当前数据库方言（postgresql | mysql）"""
+        """返回当前数据库方言（postgresql | mysql | sqlite | unknown）"""
         url = self.DATABASE_URL.lower()
-        if "postgresql" in url:
+        if "postgresql" in url or "postgres" in url:
             return "postgresql"
         if "mysql" in url:
             return "mysql"
+        if "sqlite" in url:
+            return "sqlite"
         return "unknown"
 
     @property
@@ -81,6 +91,10 @@ class Settings(BaseSettings):
     @property
     def is_mysql(self) -> bool:
         return self.db_dialect == "mysql"
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.db_dialect == "sqlite"
 
 
 @lru_cache
