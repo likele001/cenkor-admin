@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from cenkor_admin.apps.auth import models as auth_models
+from cenkor_admin.apps.portal.auth import is_portal_token
 from cenkor_admin.apps.rbac.models import Role, UserRole, RolePermission, Permission, RoleMenu, Menu
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.security import decode_token
@@ -22,28 +23,45 @@ async def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> auth_models.User:
-    """从 Bearer token 解析当前用户（含完整角色/权限/菜单关联）"""
+    """从 Bearer token 解析当前后台用户（含完整角色/权限/菜单关联）。
+
+    拒绝 portal token（前台用户无法访问后台路由）。
+    """
     if not creds or not creds.credentials:
         raise HTTPException(status_code=401, detail="未提供认证信息")
+
+    # 先尝试 admin SECRET 解码；失败则尝试 portal SECRET 并返回 403
     try:
         payload = decode_token(creds.credentials)
-    except JWTError as e:
-        raise HTTPException(401, f"Token 无效: {e}")
+    except JWTError:
+        try:
+            from cenkor_admin.apps.portal.auth import decode_portal_token, PORTAL_JWT_ISSUER
+            portal_payload = decode_portal_token(creds.credentials)
+            if portal_payload.get("iss") == PORTAL_JWT_ISSUER:
+                raise HTTPException(403, "前台用户无法访问后台管理接口")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+        raise HTTPException(401, "Token 无效")
 
     if payload.get("type") != "access":
         raise HTTPException(401, "不是 access token")
 
+    # 拒绝 portal token（如果 SECRET 相同也能区分）
+    if is_portal_token(payload):
+        raise HTTPException(403, "前台用户无法访问后台管理接口")
+
     user_id = int(payload["sub"])
 
-    # joinedload 一条 SQL 拉所有层级（性能更稳，避免后续懒加载的 greenlet 问题）
     stmt = (
         select(auth_models.User)
         .options(
-            joinedload(auth_models.User.roles)  # type: ignore[arg-type]
+            joinedload(auth_models.User.roles)
             .joinedload(UserRole.role)
             .joinedload(Role.permissions)
             .joinedload(RolePermission.permission),
-            joinedload(auth_models.User.roles)  # type: ignore[arg-type]
+            joinedload(auth_models.User.roles)
             .joinedload(UserRole.role)
             .joinedload(Role.menus)
             .joinedload(RoleMenu.menu),

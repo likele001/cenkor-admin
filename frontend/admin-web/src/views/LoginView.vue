@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
@@ -8,6 +9,7 @@ import SliderCaptcha from '@/components/SliderCaptcha.vue'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const username = ref('admin@cenkor.cn')
 const password = ref('admin123')
@@ -28,7 +30,7 @@ function onCaptchaUpdate(verified: boolean) {
 
 async function submit() {
   if (!captchaVerified.value) {
-    error.value = '请先完成滑动验证'
+    error.value = t('login.captchaRequired')
     return
   }
   loading.value = true
@@ -43,7 +45,7 @@ async function submit() {
     auth.setRefresh(data.refresh_token)
     router.push((route.query.redirect as string) || '/')
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '登录失败'
+    error.value = e?.response?.data?.detail || t('login.loginFailed')
     captchaRef.value?.refresh()
     captchaVerified.value = false
   } finally {
@@ -62,15 +64,15 @@ function loginFeishu() {
     <div class="w-full max-w-sm">
       <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-ink-900 text-white text-xl font-bold mb-4">
-          辰
+          {{ t('app.logo', '辰') }}
         </div>
-        <h1 class="text-2xl font-semibold tracking-tight">Cenkor Admin</h1>
-        <p class="mt-1 text-sm text-ink-500">企业后台管理</p>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ t('app.name') }}</h1>
+        <p class="mt-1 text-sm text-ink-500">{{ t('login.title') }}</p>
       </div>
 
       <form @submit.prevent="submit" class="card space-y-4">
         <div>
-          <label for="f-username" class="block text-sm font-medium mb-1.5">邮箱 / 用户名</label>
+          <label for="f-username" class="block text-sm font-medium mb-1.5">{{ t('login.username') }}</label>
           <input
             id="f-username"
             v-model="username"
@@ -81,7 +83,7 @@ function loginFeishu() {
           />
         </div>
         <div>
-          <label for="f-password" class="block text-sm font-medium mb-1.5">密码</label>
+          <label for="f-password" class="block text-sm font-medium mb-1.5">{{ t('login.password') }}</label>
           <input
             id="f-password"
             v-model="password"
@@ -92,17 +94,17 @@ function loginFeishu() {
           />
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1.5">安全验证</label>
+          <label class="block text-sm font-medium mb-1.5">{{ t('login.captcha') }}</label>
           <SliderCaptcha ref="captchaRef" @update:verified="onCaptchaUpdate" />
         </div>
         <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
         <button type="submit" :disabled="loading" class="btn-primary w-full">
-          {{ loading ? '登录中…' : '登录' }}
+          {{ loading ? t('login.submitting') : t('login.submit') }}
         </button>
 
         <div class="relative my-2">
           <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-ink-200"></div></div>
-          <div class="relative flex justify-center text-xs"><span class="px-2 bg-white text-ink-400">或</span></div>
+          <div class="relative flex justify-center text-xs"><span class="px-2 bg-white text-ink-400">{{ t('login.or') }}</span></div>
         </div>
 
         <button
@@ -111,11 +113,11 @@ function loginFeishu() {
           class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-ink-200 hover:border-ink-900 hover:bg-ink-50 transition text-sm font-medium"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8.5L3 14.5V3zM21 3v11.5L12.5 3H21zM3 21h8.5L3 9.5V21zM21 21V9.5L12.5 21H21z"/></svg>
-          使用飞书登录
+          {{ t('login.feishu') }}
         </button>
 
         <p class="text-xs text-ink-400 text-center">
-          默认账号 <code class="px-1.5 py-0.5 rounded bg-ink-100">admin@cenkor.cn</code> /
+          {{ t('login.defaultHint') }} <code class="px-1.5 py-0.5 rounded bg-ink-100">admin@cenkor.cn</code> /
           <code class="px-1.5 py-0.5 rounded bg-ink-100">admin123</code>
         </p>
       </form>

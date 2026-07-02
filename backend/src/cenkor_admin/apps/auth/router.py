@@ -120,7 +120,13 @@ def _verify_slider_captcha(token: str | None) -> None:
 
 @router.post("/register", response_model=schemas.TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
-    """公开注册（默认分配 viewer 角色）"""
+    """注册后台用户（已废弃 — V2 已分离前后台用户体系）
+
+    前台用户请使用 `/api/v1/public/portal/auth/register`
+    后台用户由管理员通过 `/api/v1/auth/users` 创建
+
+    本接口保留以保证向后兼容，但仅创建后台 User 实体。
+    """
     _verify_slider_captcha(body.captcha_token)
     existing = await db.execute(
         select(models.User).where(
@@ -511,6 +517,7 @@ async def list_users(
                 "nickname": user.nickname, "avatar": user.avatar,
                 "status": user.status, "is_superuser": user.is_superuser,
                 "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+                "last_login_ip": user.last_login_ip,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "role_ids": [],
             }

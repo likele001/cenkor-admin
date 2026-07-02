@@ -31,7 +31,13 @@ function connect() {
     }, 25_000)
   }
   ws.onmessage = (e) => {
-    try { lastMessage.value = JSON.parse(e.data) } catch { lastMessage.value = e.data }
+    try {
+      const msg = JSON.parse(e.data)
+      lastMessage.value = msg
+      if (msg.type === 'notification' && msg.data) {
+        window.dispatchEvent(new CustomEvent('notify:new', { detail: msg.data }))
+      }
+    } catch { lastMessage.value = e.data }
   }
   ws.onclose = () => {
     status.value = 'closed'

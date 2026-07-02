@@ -1,5 +1,6 @@
 """Alembic env.py — 同步模式（async 由业务代码处理）"""
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
@@ -10,7 +11,8 @@ sys.path.insert(0, "src")
 
 from cenkor_admin.core.config import get_settings  # noqa: E402
 from cenkor_admin.core.db import Base  # noqa: E402
-from cenkor_admin.apps.cms import models as cms_models  # noqa: F401, E402  # 注册模型
+from cenkor_admin.apps.cms import models as cms_models  # noqa: F401, E402
+from cenkor_admin.apps.portal import models as portal_models  # noqa: F401, E402
 
 config = context.config
 if config.config_file_name is not None:

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
 import AuditDetailDrawer from '@/components/AuditDetailDrawer.vue'
@@ -44,7 +46,7 @@ async function load() {
     entries.value = listRes.data.items
     stats.value = statsRes.data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
   } finally {
     loading.value = false
   }
@@ -65,7 +67,7 @@ onMounted(load)
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← Dashboard</router-link>
-        <span class="font-semibold">审计日志</span>
+        <span class="font-semibold">{{ t('audit.审计日志_c4zzjm') }}</span>
       </div>
     </header>
 
@@ -74,11 +76,11 @@ onMounted(load)
       <div v-if="stats && stats.total !== undefined" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="card text-center">
           <div class="text-3xl font-semibold">{{ stats.total }}</div>
-          <div class="text-sm text-ink-500 mt-1">近 7 天总数</div>
+          <div class="text-sm text-ink-500 mt-1">{{ t('audit.近_1ozmyu') }}</div>
         </div>
         <div class="card text-center">
           <div class="text-3xl font-semibold text-amber-600">{{ stats.errors || 0 }}</div>
-          <div class="text-sm text-ink-500 mt-1">错误数</div>
+          <div class="text-sm text-ink-500 mt-1">{{ t('audit.错误数_mijp6') }}</div>
         </div>
         <div class="card text-center">
           <div class="text-3xl font-semibold text-emerald-600">{{ stats.by_status?.[200] || 0 }}</div>
@@ -86,7 +88,7 @@ onMounted(load)
         </div>
         <div class="card text-center">
           <div class="text-3xl font-semibold text-red-600">{{ stats.by_status?.[500] || 0 }}</div>
-          <div class="text-sm text-ink-500 mt-1">500 错误</div>
+          <div class="text-sm text-ink-500 mt-1">{{ t('audit.text_pvdj41') }}</div>
         </div>
       </div>
 
@@ -94,9 +96,9 @@ onMounted(load)
       <div class="card mb-6">
         <div class="flex flex-wrap items-end gap-3">
           <div>
-            <label class="block text-xs text-ink-500 mb-1">方法</label>
+            <label class="block text-xs text-ink-500 mb-1">{{ t('auditDetailDrawer.方法_hwe4') }}</label>
             <select v-model="filters.method" class="input">
-              <option value="">全部</option>
+              <option value="">{{ t('media.全部_en40') }}</option>
               <option value="POST">POST</option>
               <option value="PATCH">PATCH</option>
               <option value="PUT">PUT</option>
@@ -104,37 +106,37 @@ onMounted(load)
             </select>
           </div>
           <div>
-            <label class="block text-xs text-ink-500 mb-1">状态码</label>
-            <input v-model.number="filters.status_code" type="number" placeholder="如 200" class="input" />
+            <label class="block text-xs text-ink-500 mb-1">{{ t('audit.状态码_h9uty') }}</label>
+            <input v-model.number="filters.status_code" type="number" :placeholder="t('audit.如_1tv6ya')" class="input" />
           </div>
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-xs text-ink-500 mb-1">路径包含</label>
+            <label class="block text-xs text-ink-500 mb-1">{{ t('audit.路径包含_iav0u3') }}</label>
             <input v-model="filters.path" placeholder="/api/v1/cms" class="input" />
           </div>
-          <button @click="load" class="btn-primary">应用</button>
+          <button @click="load" class="btn-primary">{{ t('audit.应用_gqac') }}</button>
         </div>
       </div>
 
-      <div v-if="loading" class="card text-ink-500">加载中…</div>
+      <div v-if="loading" class="card text-ink-500">{{ t('usersList.加载中_b0k5km') }}</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
         <div class="card overflow-hidden p-0">
           <table class="w-full text-sm">
             <thead class="bg-ink-50 border-b border-ink-200">
               <tr class="text-left text-ink-500">
-                <th class="px-4 py-3 font-medium">时间</th>
-                <th class="px-4 py-3 font-medium">方法</th>
-                <th class="px-4 py-3 font-medium">状态</th>
-                <th class="px-4 py-3 font-medium">路径</th>
-                <th class="px-4 py-3 font-medium">用户</th>
-                <th class="px-4 py-3 font-medium">耗时</th>
+                <th class="px-4 py-3 font-medium">{{ t('auditDetailDrawer.时间_i5z2') }}</th>
+                <th class="px-4 py-3 font-medium">{{ t('auditDetailDrawer.方法_hwe4') }}</th>
+                <th class="px-4 py-3 font-medium">{{ t('usersList.状态_k1e3') }}</th>
+                <th class="px-4 py-3 font-medium">{{ t('menus.路径_onzp') }}</th>
+                <th class="px-4 py-3 font-medium">{{ t('dashboard.用户_kgsv') }}</th>
+                <th class="px-4 py-3 font-medium">{{ t('auditDetailDrawer.耗时_mchr') }}</th>
                 <th class="px-4 py-3 font-medium">IP</th>
-                <th class="px-4 py-3 font-medium text-right">操作</th>
+                <th class="px-4 py-3 font-medium text-right">{{ t('usersList.操作_hkxb') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="entries.length === 0">
-                <td colspan="8" class="px-4 py-12 text-center text-ink-400">暂无审计记录</td>
+                <td colspan="8" class="px-4 py-12 text-center text-ink-400">{{ t('audit.暂无审计_1dt517') }}</td>
               </tr>
               <tr v-for="e in entries" :key="e.id" class="border-b border-ink-100 last:border-0 hover:bg-ink-50">
                 <td class="px-4 py-3 text-ink-500 text-xs font-mono">{{ e.created_at?.slice(11, 19) }}</td>
@@ -150,7 +152,7 @@ onMounted(load)
                 <td class="px-4 py-3 text-ink-400 text-xs">{{ e.ip || '-' }}</td>
                 <td class="px-4 py-3 text-right">
                   <button class="text-sm text-brand-600 hover:underline" @click="selectedId = e.id">
-                    详情
+                    {{ t('audit.detail') }}
                   </button>
                 </td>
               </tr>

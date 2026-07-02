@@ -3,8 +3,6 @@
    公网站点 + Admin Web + Portal Web 全部消费这里
    ============================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
 :root {
   /* OKLCH 颜色 */
   --bg:        oklch(1 0 0);
@@ -23,8 +21,8 @@
   --line-manufacturing: oklch(0.62 0.165 165);
 
   /* 字体 */
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Source Code Pro', monospace;
 
   /* 圆角 */
   --radius-sm: 0.5rem;

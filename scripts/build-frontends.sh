@@ -25,10 +25,16 @@ cd ../portal-web
 npm install --silent 2>/dev/null || npm install
 VITE_API_BASE_URL="$API_BASE" npm run build
 
+info "构建 developer-web..."
+cd ../developer-web
+npm install --silent 2>/dev/null || npm install
+VITE_API_BASE_URL="$API_BASE" npm run build
+
 cd ../..
 info "完成"
 echo ""
 echo "  管理后台 dist: frontend/admin-web/dist"
 echo "  用户中心 dist: frontend/portal-web/dist"
+echo "  开发者中心 dist: frontend/developer-web/dist"
 echo ""
 echo "宝塔建站根目录请指向上面的 dist 目录，详见 docs/BAOTA_STATIC_DEPLOY.md"

@@ -1,0 +1,23 @@
+{
+  "媒体库_dnl4i": "Media library",
+  "总文件数_ck7e1y": "Total files",
+  "图片_ff9l": "Image",
+  "总大小_ej39f": "Total size",
+  "全部_en40": "All",
+  "文档_hubg": "Document",
+  "按_xd7i7v": "Search by key/url/mime…",
+  "上传中_a6b52n": "Uploading…",
+  "点击或拖_1ypob7": "Click or drag files here to upload",
+  "图片自动_hn4nmi": "Auto-extract image dimensions · supports any format",
+  "加载中_b0k5km": "Loading…",
+  "媒体详情_brjfj4": "Media details",
+  "文件名_f98ri": "Filename",
+  "类型_lnjk": "Type",
+  "大小_fo3s": "Size",
+  "尺寸_g6wu": "Size",
+  "上传_dphy": "Upload",
+  "打开_h8ul": "Open",
+  "删除_eslg": "Delete",
+  "确定删除_1iag8y": "Are you sure you want to delete media ${m.key}?",
+  "删除失败_1kc17l": "Delete failed:"
+}

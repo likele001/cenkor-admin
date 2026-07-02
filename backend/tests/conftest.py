@@ -40,6 +40,7 @@ def admin_token(client):
     r = client.post(f"{BASE_URL}/api/v1/auth/login", json={
         "username": "admin@cenkor.cn",
         "password": "admin123",
+        "captcha_token": "a" * 32,  # 16+ hex chars to pass captcha validation
     })
     assert r.status_code == 200, f"登录失败: {r.text}"
     return r.json()["access_token"]

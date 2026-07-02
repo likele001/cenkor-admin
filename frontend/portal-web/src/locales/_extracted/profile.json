@@ -1,0 +1,20 @@
+{
+  "text_rsxywz": "Cenkor 用户中心",
+  "登出_klpb": "登出",
+  "个人资料_a74l2d": "个人资料",
+  "头像_1beize": "头像 URL",
+  "昵称_i1y3": "昵称",
+  "邮箱_padf": "邮箱",
+  "保存资料_agovg0": "保存资料",
+  "修改密码_ai7i2u": "修改密码",
+  "原密码_cp78a": "原密码",
+  "新密码_11z82o": "新密码（≥8 位）",
+  "第三方登_1top54": "第三方登录",
+  "飞书_qfk8": "飞书",
+  "微信_gpo3": "微信",
+  "text_u2ddg2": "union_id（可选）",
+  "注_1qzjer": "注：实际 OAuth 流程需通过各平台 SDK 完成，本接口用于后端对接。",
+  "提交绑定_cxcblp": "提交绑定",
+  "解绑_o5e6": "解绑",
+  "确定解绑_lpipuc": "确定解绑 ${PROVIDER_LABELS[oauth.provider] || oauth.provider}？"
+}

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
 
@@ -26,7 +28,7 @@ async function load() {
         typeof item.value === 'string' ? item.value : JSON.stringify(item.value, null, 2)
     }
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
   } finally {
     loading.value = false
   }
@@ -54,7 +56,7 @@ async function save(item: SiteConfigItem) {
     })
     await load()
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '保存失败'
+    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
   } finally {
     saving.value = null
   }
@@ -65,10 +67,10 @@ onMounted(load)
 
 <template>
   <div>
-    <h1 class="text-2xl font-semibold tracking-tight mb-2">站点配置</h1>
-    <p class="text-ink-500 mb-6">管理官网品牌信息、联系方式等 KV 配置。</p>
+    <h1 class="text-2xl font-semibold tracking-tight mb-2">{{ t('siteConfig.站点配置_fz0r7l') }}</h1>
+    <p class="text-ink-500 mb-6">{{ t('siteConfig.管理官网_1nkjj0') }}</p>
 
-    <div v-if="loading" class="card text-ink-500">加载中…</div>
+    <div v-if="loading" class="card text-ink-500">{{ t('usersList.加载中_b0k5km') }}</div>
     <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
     <div v-else class="space-y-4">
       <div v-for="item in items" :key="item.key" class="card">
@@ -90,7 +92,7 @@ onMounted(load)
           </button>
         </div>
       </div>
-      <div v-if="items.length === 0" class="card text-center text-ink-400 py-12">暂无配置项</div>
+      <div v-if="items.length === 0" class="card text-center text-ink-400 py-12">{{ t('siteConfig.暂无配置_1n3u3j') }}</div>
     </div>
   </div>
 </template>

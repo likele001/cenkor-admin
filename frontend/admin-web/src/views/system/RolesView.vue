@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted, watch } from 'vue'
 import { api } from '@/lib/api'
 import SearchInput from '@/components/SearchInput.vue'
@@ -47,7 +49,7 @@ async function load() {
     roles.value = r.data.items
     permissions.value = p.data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
   } finally {
     loading.value = false
   }
@@ -73,7 +75,7 @@ async function openEdit(r: Role) {
     }
     showDialog.value = true
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载角色失败'
+    error.value = e?.response?.data?.detail || 't("roles.加载角色失败")'
   }
 }
 
@@ -89,7 +91,7 @@ async function save() {
     showDialog.value = false
     await load()
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '保存失败'
+    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
   } finally {
     saving.value = false
   }
@@ -101,7 +103,7 @@ async function del(r: Role) {
     await api.delete(`/api/v1/rbac/roles/${r.id}`)
     await load()
   } catch (e: any) {
-    alert('删除失败：' + (e?.response?.data?.detail || e.message))
+    alert('t("usersList.删除失败_1kc17l")' + (e?.response?.data?.detail || e.message))
   }
 }
 
@@ -109,7 +111,7 @@ async function del(r: Role) {
 const groupedPerms = () => {
   const groups: Record<string, Permission[]> = {}
   for (const p of permissions.value) {
-    const prefix = p.code.split(':')[0] || '其他'
+    const prefix = p.code.split(':')[0] || 't("roles.其他")'
     if (!groups[prefix]) groups[prefix] = []
     groups[prefix].push(p)
   }
@@ -125,19 +127,19 @@ watch(search, () => { load() })
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← Dashboard</router-link>
-        <span class="font-semibold">角色 & 权限</span>
+        <span class="font-semibold">{{ t('roles.角色_epasbr') }}</span>
       </div>
     </header>
 
     <main class="max-w-7xl mx-auto px-6 py-10">
-      <div v-if="loading" class="card text-ink-500">加载中…</div>
+      <div v-if="loading" class="card text-ink-500">{{ t('usersList.加载中_b0k5km') }}</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 class="text-2xl font-semibold tracking-tight">角色列表（{{ roles.length }}）</h1>
           <div class="flex items-center gap-3">
-            <SearchInput v-model="search" placeholder="按 code/名称/描述搜索…" />
-            <button @click="openNew" class="btn-primary">+ 新建角色</button>
+            <SearchInput v-model="search" :placeholder="t('roles.按_fqum9q')" />
+            <button @click="openNew" class="btn-primary">{{ t('roles.text_y2u7b3') }}</button>
           </div>
         </div>
         <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -147,15 +149,15 @@ watch(search, () => { load() })
                 <h3 class="font-semibold">{{ r.name }}</h3>
                 <code class="text-xs text-ink-400">{{ r.code }}</code>
               </div>
-              <span v-if="r.is_system" class="text-xs px-2 py-0.5 rounded bg-ink-900 text-white">系统</span>
+              <span v-if="r.is_system" class="text-xs px-2 py-0.5 rounded bg-ink-900 text-white">{{ t('roles.系统_lydg') }}</span>
             </div>
             <p v-if="r.description" class="text-sm text-ink-600 mb-3">{{ r.description }}</p>
             <div class="text-xs text-ink-400 mt-auto">
               {{ r.created_at?.slice(0, 10) }}
             </div>
             <div class="mt-3 flex gap-2">
-              <button @click="openEdit(r)" class="text-sm text-ink-600 hover:text-ink-900">编辑</button>
-              <button v-if="!r.is_system" @click="del(r)" class="text-sm text-red-600 hover:underline">删除</button>
+              <button @click="openEdit(r)" class="text-sm text-ink-600 hover:text-ink-900">{{ t('usersList.编辑_mekb') }}</button>
+              <button v-if="!r.is_system" @click="del(r)" class="text-sm text-red-600 hover:underline">{{ t('usersList.删除_eslg') }}</button>
             </div>
           </div>
         </div>
@@ -173,12 +175,12 @@ watch(search, () => { load() })
               <input v-model="form.code" required :disabled="!isNew" class="input" placeholder="cms_editor" />
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1.5">名称 *</label>
-              <input v-model="form.name" required class="input" placeholder="内容编辑" />
+              <label class="block text-sm font-medium mb-1.5">{{ t('roles.名称_b3i4lp') }}</label>
+              <input v-model="form.name" required class="input" :placeholder="t('roles.内容编辑_ao7f9r')" />
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">描述</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t('tasks.描述_hrlt') }}</label>
             <textarea v-model="form.description" rows="2" class="input"></textarea>
           </div>
           <div>
@@ -200,7 +202,7 @@ watch(search, () => { load() })
             <button type="submit" :disabled="saving" class="btn-primary flex-1">
               {{ saving ? '保存中…' : isNew ? '创建' : '保存' }}
             </button>
-            <button type="button" @click="showDialog = false" class="btn-ghost">取消</button>
+            <button type="button" @click="showDialog = false" class="btn-ghost">{{ t('usersList.取消_ev02') }}</button>
           </div>
         </form>
       </div>
