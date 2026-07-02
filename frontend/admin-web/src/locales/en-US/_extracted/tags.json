@@ -1,0 +1,11 @@
+{
+  "标签管理_dn1dss": "Tag management",
+  "管理各内_2f5syy": "Manage tags for all content types.",
+  "text_y2of06": "+ New tag",
+  "加载中_b0k5km": "Loading…",
+  "名称_eyrn": "Name",
+  "标签名称_dmuom2": "Tag name",
+  "颜色_qo9i": "Color",
+  "取消_ev02": "Cancel",
+  "确定删除_hxlnzo": "Are you sure you want to delete tag \"${tag.name}\"?"
+}

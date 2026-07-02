@@ -1,0 +1,15 @@
+{
+  "角色_epasbr": "Role & permissions",
+  "加载中_b0k5km": "Loading…",
+  "按_fqum9q": "Search by code/name/description…",
+  "text_y2u7b3": "+ New role",
+  "系统_lydg": "System",
+  "编辑_mekb": "Edit",
+  "删除_eslg": "Delete",
+  "名称_b3i4lp": "Name *",
+  "内容编辑_ao7f9r": "Content editing",
+  "描述_hrlt": "Description",
+  "取消_ev02": "Cancel",
+  "确定删除_1xzm4h": "Are you sure you want to delete role \"${r.name}\"?",
+  "删除失败_1kc17l": "Delete failed:"
+}

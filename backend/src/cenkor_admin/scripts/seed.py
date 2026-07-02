@@ -38,6 +38,22 @@ DEFAULT_PERMISSIONS = [
     ("media:upload", "API", "上传媒体"),
     # 系统
     ("system:audit:read", "API", "查看审计日志"),
+    # 通知
+    ("notification:read", "API", "查看通知列表"),
+    ("notification:write", "API", "管理通知"),
+    # 前台用户管理
+    ("portal:users:read", "API", "查看前台用户"),
+    ("portal:users:write", "API", "管理前台用户"),
+    # 公告管理
+    ("announcements:read", "API", "查看公告"),
+    ("announcements:write", "API", "管理公告"),
+    # 工单系统
+    ("tickets:read", "API", "查看工单"),
+    ("tickets:write", "API", "管理工单"),
+    ("tickets:assign", "API", "分配工单"),
+    # 链接收藏
+    ("links:read", "API", "查看链接"),
+    ("links:write", "API", "管理链接"),
 ]
 
 DEFAULT_MENUS = [
@@ -51,9 +67,11 @@ DEFAULT_MENUS = [
     ("cms:media", "cms", "媒体库", "image", "/cms/media", 55),
     ("system", None, "系统", "settings-2", None, 90),
     ("system:users", "system", "用户", "users", "/system/users", 91),
+    ("system:portal-users", "system", "前台会员", "users", "/system/portal-users", 94),
     ("system:roles", "system", "角色", "shield", "/system/roles", 92),
     ("system:menus", "system", "菜单", "menu", "/system/menus", 93),
     ("system:audit", "system", "审计日志", "history", "/system/audit", 99),
+    ("system:notifications", "system", "通知管理", "bell", "/system/notifications", 95),
 ]
 
 DEFAULT_ROLES = [

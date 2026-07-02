@@ -1,0 +1,11 @@
+{
+  "name": "cloud-storage-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "vite": "^5.4.10",
+    "vue": "^3.5.38"
+  }
+}

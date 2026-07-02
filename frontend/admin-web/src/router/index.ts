@@ -13,6 +13,13 @@ import NewsListView from '@/views/cms/NewsListView.vue'
 import NewsEditView from '@/views/cms/NewsEditView.vue'
 import MediaView from '@/views/cms/MediaView.vue'
 import SiteConfigView from '@/views/cms/SiteConfigView.vue'
+import ContentTypeListView from '@/views/cms/ContentTypeListView.vue'
+import FieldDefinitionsView from '@/views/cms/FieldDefinitionsView.vue'
+import CategoriesView from '@/views/cms/CategoriesView.vue'
+import TagsView from '@/views/cms/TagsView.vue'
+import EntryListView from '@/views/cms/EntryListView.vue'
+import EntryEditView from '@/views/cms/EntryEditView.vue'
+import TemplatePreviewView from '@/views/cms/TemplatePreviewView.vue'
 import UsersListView from '@/views/system/UsersListView.vue'
 import RolesView from '@/views/system/RolesView.vue'
 import MenusView from '@/views/system/MenusView.vue'
@@ -21,6 +28,11 @@ import AppsView from '@/views/system/AppsView.vue'
 import ApiKeysView from '@/views/system/ApiKeysView.vue'
 import TasksView from '@/views/system/TasksView.vue'
 import SettingsView from '@/views/system/SettingsView.vue'
+import AnnouncementsView from '@/views/system/AnnouncementsView.vue'
+import TicketsView from '@/views/system/TicketsView.vue'
+import LinksView from '@/views/system/LinksView.vue'
+import NotificationsView from '@/views/system/NotificationsView.vue'
+import PortalUsersListView from '@/views/system/PortalUsersListView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -29,9 +41,21 @@ const routes: RouteRecordRaw[] = [
   { path: '/auth/feishu/callback', name: 'feishu-callback', component: FeishuCallbackView, meta: { public: true } },
   {
     path: '/',
+    name: 'layout',
     component: AppLayout,
     children: [
       { path: '', name: 'dashboard', component: DashboardView },
+      // CMS - 内容引擎
+      { path: 'cms/content-types', name: 'cms-content-types', component: ContentTypeListView, meta: { permission: 'cms:content_types:read' } },
+      { path: 'cms/content-types/:id/fields', name: 'cms-content-type-fields', component: FieldDefinitionsView, meta: { permission: 'cms:field_definitions:read' } },
+      { path: 'cms/categories', name: 'cms-categories', component: CategoriesView, meta: { permission: 'cms:categories:read' } },
+      { path: 'cms/tags', name: 'cms-tags', component: TagsView, meta: { permission: 'cms:tags:read' } },
+      // CMS - 通用内容
+      { path: 'cms/entries', name: 'cms-entries', component: EntryListView, meta: { permission: 'cms:entries:read' } },
+      { path: 'cms/entries/new', name: 'cms-entry-new', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
+      { path: 'cms/entries/:id', name: 'cms-entry-edit', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
+      { path: 'cms/templates', name: 'cms-templates', component: TemplatePreviewView, meta: { permission: 'cms:site:read' } },
+      // CMS - 传统内容
       { path: 'cms/products', name: 'cms-products', component: ProductsListView, meta: { permission: 'cms:product:read' } },
       { path: 'cms/products/new', name: 'cms-product-new', component: ProductEditView, meta: { permission: 'cms:product:write' } },
       { path: 'cms/products/:id', name: 'cms-product-edit', component: ProductEditView, meta: { permission: 'cms:product:write' } },
@@ -43,14 +67,21 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/news/:id', name: 'cms-news-edit', component: NewsEditView, meta: { permission: 'cms:news:write' } },
       { path: 'cms/site', name: 'cms-site', component: SiteConfigView, meta: { permission: 'cms:site:read' } },
       { path: 'cms/media', name: 'cms-media', component: MediaView, meta: { permission: 'media:upload' } },
+      // System
       { path: 'system/users', name: 'system-users', component: UsersListView, meta: { permission: 'rbac:user:read' } },
+      { path: 'system/portal-users', name: 'system-portal-users', component: PortalUsersListView, meta: { permission: 'portal:users:read' } },
       { path: 'system/roles', name: 'system-roles', component: RolesView, meta: { permission: 'rbac:role:read' } },
       { path: 'system/menus', name: 'system-menus', component: MenusView, meta: { permission: 'rbac:menu:read' } },
       { path: 'system/apps', name: 'system-apps', component: AppsView, meta: { permission: 'rbac:role:read' } },
       { path: 'system/audit', name: 'system-audit', component: AuditView, meta: { permission: 'system:audit:read' } },
+      { path: 'system/notifications', name: 'system-notifications', component: NotificationsView, meta: { permission: 'notification:read' } },
       { path: 'system/api-keys', name: 'system-api-keys', component: ApiKeysView, meta: { permission: 'apikey:read' } },
       { path: 'system/tasks', name: 'system-tasks', component: TasksView, meta: { permission: 'task:read' } },
       { path: 'system/settings', name: 'system-settings', component: SettingsView, meta: { permission: 'settings:read' } },
+      // Apps
+      { path: 'announcements', name: 'announcements', component: AnnouncementsView, meta: { permission: 'announcements:read' } },
+      { path: 'tickets', name: 'tickets', component: TicketsView, meta: { permission: 'tickets:read' } },
+      { path: 'links', name: 'links', component: LinksView, meta: { permission: 'links:read' } },
       { path: '403', name: 'forbidden', component: ForbiddenView },
     ],
   },

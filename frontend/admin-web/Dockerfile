@@ -16,7 +16,7 @@ FROM base AS build
 ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 COPY . .
-RUN npm run build
+RUN npx vite build
 
 FROM node:20-alpine AS production
 WORKDIR /app

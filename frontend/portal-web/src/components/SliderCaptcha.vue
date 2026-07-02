@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const emit = defineEmits<{ 'update:verified': [boolean] }>()
 const props = withDefaults(defineProps<{
   width?: number
   height?: number
 }>(), { width: 320, height: 40 })
+const { t } = useI18n()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const sliderX = ref(0)
@@ -123,7 +125,7 @@ function onPointerUp() {
     verifiedToken.value = generateToken()
     emit('update:verified', true)
   } else {
-    errorMsg.value = '位置不匹配，请重试'
+    errorMsg.value = t('sliderCaptcha.mismatch')
     setTimeout(() => {
       sliderX.value = 0
       errorMsg.value = ''
@@ -172,9 +174,9 @@ defineExpose({ token: () => verifiedToken.value, verified: () => verified.value,
         <span v-else>→</span>
       </div>
       <div class="absolute inset-0 flex items-center justify-center text-sm text-slate-500 pointer-events-none">
-        <span v-if="verified" class="text-emerald-600 font-medium">验证通过</span>
+        <span v-if="verified" class="text-emerald-600 font-medium">{{ t('sliderCaptcha.verified') }}</span>
         <span v-else-if="errorMsg" class="text-red-600 font-medium">{{ errorMsg }}</span>
-        <span v-else>拖动滑块完成拼图</span>
+        <span v-else>{{ t('sliderCaptcha.dragHint') }}</span>
       </div>
     </div>
     <button
@@ -183,7 +185,7 @@ defineExpose({ token: () => verifiedToken.value, verified: () => verified.value,
       class="text-xs text-slate-500 hover:text-slate-900"
       @click="refresh"
     >
-      换一张
+      {{ t('sliderCaptcha.refresh') }}
     </button>
   </div>
 </template>

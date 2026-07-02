@@ -1,0 +1,20 @@
+{
+  "内容类型_ao6o90": "Content type",
+  "定义内容_ij3unb": "Define content structure: product, case, news, or custom types.",
+  "text_y2rp5b": "+ New type",
+  "加载中_b0k5km": "Loading…",
+  "分类_emut": "Category",
+  "标签_idef": "Tag",
+  "字段管理_bz47yb": "Field management",
+  "编辑_mekb": "Edit",
+  "删除_eslg": "Delete",
+  "名称_eyrn": "Name",
+  "产品_dud6": "Product",
+  "描述_hrlt": "Description",
+  "可选_f2ey": "Optional",
+  "图标_fd8p": "Icon",
+  "支持分类_d6cdpj": "Supports categories",
+  "支持标签_d6g495": "Supports tags",
+  "取消_ev02": "Cancel",
+  "确定删除_16egdo": "Are you sure you want to delete content type \"${ct.name}\"?"
+}

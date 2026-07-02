@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/lib/api'
@@ -26,7 +28,7 @@ onMounted(async () => {
     const { data } = await api.get(`/api/v1/cms/cases/${route.params.id}`)
     Object.assign(form.value, data)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
   } finally {
     loading.value = false
   }
@@ -45,7 +47,7 @@ async function save() {
     // 简单跳转
     setTimeout(() => router.push('/cms/cases'), 500)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '保存失败'
+    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
   } finally {
     saving.value = false
   }
@@ -56,48 +58,48 @@ async function save() {
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-4xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/cms/cases" class="text-sm text-ink-500 hover:text-ink-900">← 案例列表</router-link>
+        <router-link to="/cms/cases" class="text-sm text-ink-500 hover:text-ink-900">{{ t('caseEdit.text_xav8zo') }}</router-link>
         <span class="font-semibold">{{ isNew ? '新建案例' : '编辑案例' }}</span>
       </div>
     </header>
 
     <main class="max-w-4xl mx-auto px-6 py-10">
-      <div v-if="loading" class="card text-ink-500">加载中…</div>
+      <div v-if="loading" class="card text-ink-500">{{ t('usersList.加载中_b0k5km') }}</div>
       <form v-else @submit.prevent="save" class="card space-y-4">
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium mb-1.5">行业 *</label>
-            <input v-model="form.industry" required class="input" placeholder="智能制造" />
+            <label class="block text-sm font-medium mb-1.5">{{ t('caseEdit.行业_hib8wo') }}</label>
+            <input v-model="form.industry" required class="input" :placeholder="t('productEdit.智能制造_dglz8t')" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">客户名 *</label>
-            <input v-model="form.name" required class="input" placeholder="某精密机加工企业" />
+            <label class="block text-sm font-medium mb-1.5">{{ t('caseEdit.客户名_fuv4de') }}</label>
+            <input v-model="form.name" required class="input" :placeholder="t('caseEdit.某精密机_fk7dgg')" />
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1.5">描述 *</label>
+          <label class="block text-sm font-medium mb-1.5">{{ t('caseEdit.描述_d69xvv') }}</label>
           <textarea v-model="form.desc" required rows="3" class="input"></textarea>
         </div>
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium mb-1.5">标签 *</label>
-            <input v-model="form.tag" required class="input" placeholder="LightMes" />
+            <label class="block text-sm font-medium mb-1.5">{{ t('caseEdit.标签_dmfqn5') }}</label>
+            <input v-model="form.tag" required class="input" placeholder="辰科MES" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">外链 URL</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t('caseEdit.外链_fo6wuv') }}</label>
             <input v-model="form.href" class="input" placeholder="https://..." />
           </div>
         </div>
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium mb-1.5">排序</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t('productEdit.排序_hge5') }}</label>
             <input v-model.number="form.sort" type="number" class="input" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">状态</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t('usersList.状态_k1e3') }}</label>
             <select v-model="form.status" class="input">
-              <option value="published">已发布</option>
-              <option value="draft">草稿</option>
+              <option value="published">{{ t('productEdit.已发布_e656s') }}</option>
+              <option value="draft">{{ t('productEdit.草稿_n02e') }}</option>
             </select>
           </div>
         </div>
@@ -106,7 +108,7 @@ async function save() {
           <button type="submit" :disabled="saving" class="btn-primary">
             {{ saving ? '保存中…' : isNew ? '创建案例' : '保存修改' }}
           </button>
-          <router-link to="/cms/cases" class="btn-ghost">取消</router-link>
+          <router-link to="/cms/cases" class="btn-ghost">{{ t('usersList.取消_ev02') }}</router-link>
         </div>
       </form>
     </main>

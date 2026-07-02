@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 
+const { t } = useI18n()
 const email = ref('')
 const error = ref('')
 const sent = ref(false)
@@ -12,13 +14,13 @@ async function submit() {
   loading.value = true
   error.value = ''
   try {
-    await api.post('/api/v1/auth/forgot-password', {
+    await api.post('/api/v1/public/portal/auth/forgot-password', {
       email: email.value,
       frontend_base: window.location.origin,
     })
     sent.value = true
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '请求失败'
+    error.value = e?.response?.data?.detail || t('error.requestFailed')
   } finally {
     loading.value = false
   }
@@ -28,28 +30,19 @@ async function submit() {
 <template>
   <div class="min-h-screen flex items-center justify-center bg-slate-50 px-4">
     <form class="w-full max-w-md bg-white rounded-2xl shadow-sm border p-8 space-y-4" @submit.prevent="submit">
-      <h1 class="text-2xl font-semibold">忘记密码</h1>
-      <p v-if="!sent" class="text-sm text-slate-500">
-        输入您注册时使用的邮箱，我们会发送一封密码重置链接。
-      </p>
+      <h1 class="text-2xl font-semibold">{{ t('forgotPassword.title') }}</h1>
+      <p v-if="!sent" class="text-sm text-slate-500">{{ t('error.sentHint') }}</p>
       <template v-if="!sent">
-        <input
-          v-model="email"
-          type="email"
-          required
-          class="input"
-          placeholder="you@example.com"
-        />
+        <input v-model="email" type="email" required class="input" placeholder="you@example.com" />
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
         <button class="btn w-full" :disabled="loading">
-          {{ loading ? '发送中…' : '发送重置链接' }}
+          {{ loading ? t('error.sendLink') : t('error.sendLinkAction') }}
         </button>
       </template>
       <div v-else class="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700">
-        ✅ 重置链接已发送（如该邮箱存在）。
-        请检查收件箱（含垃圾邮件）。
+        {{ t('error.sentOk') }}
       </div>
-      <router-link to="/login" class="block text-center text-sm text-slate-500">返回登录</router-link>
+      <router-link to="/login" class="block text-center text-sm text-slate-500">{{ t('error.backToLogin') }}</router-link>
     </form>
   </div>
 </template>

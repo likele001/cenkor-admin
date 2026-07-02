@@ -1,0 +1,19 @@
+{
+  "已运行_egkxa": "Running",
+  "已执行_e8uuv": "Executed",
+  "按名称_l3al0q": "Search by name/Chinese name/tag…",
+  "text_y2jvyx": "+ New product",
+  "名称_eyrn": "Name",
+  "业务线_bukt4": "Business line",
+  "标签_idef": "Tag",
+  "状态_k1e3": "Status",
+  "旗舰_i1bt": "Flagship",
+  "操作_hkxb": "Action",
+  "text_n44v6z": "includeDeleted ? 'Recycle bin is empty' : 'No products yet'",
+  "编辑_mekb": "Edit",
+  "删除_eslg": "Delete",
+  "批量删除_fg8hbo": "Batch delete products",
+  "删除失败_1kc17l": "Delete failed:",
+  "批量删除_1guh5h": "Batch delete failed:",
+  "批量更新_1xjycv": "Batch update status failed:"
+}

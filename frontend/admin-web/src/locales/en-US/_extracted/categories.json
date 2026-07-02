@@ -1,0 +1,11 @@
+{
+  "分类管理_av9sai": "Category management",
+  "管理各内_b6gtl6": "Manage tree categories for all content types.",
+  "text_y2kogk": "+ New category",
+  "加载中_b0k5km": "Loading…",
+  "text_11zpjk": "+ Subcategory",
+  "编辑_mekb": "Edit",
+  "删除_eslg": "Delete",
+  "该分类下_1bsetq": "This category has ${cat.children.length} subcategories. Please delete them first.",
+  "确定删除_k0guvi": "Are you sure you want to delete category \"${cat.name}\"?"
+}

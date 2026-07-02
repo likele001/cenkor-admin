@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -32,6 +34,6 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen flex items-center justify-center bg-ink-50">
-    <p class="text-ink-500">飞书登录处理中…</p>
+    <p class="text-ink-500">{{ t('feishuCallback.飞书登录_16gozd') }}</p>
   </div>
 </template>

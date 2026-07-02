@@ -1,0 +1,140 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "back": "← Back",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "saving": "Saving…",
+    "saveSuccess": "Saved",
+    "saveFailed": "Save failed",
+    "loadFailed": "Load failed",
+    "draft": "Draft",
+    "published": "Published",
+    "archived": "Archived"
+  },
+  "nav": {
+    "home": "Home",
+    "products": "Products",
+    "cases": "Cases",
+    "news": "News",
+    "login": "Log in",
+    "register": "Sign up",
+    "profile": "Profile",
+    "forgotPassword": "Forgot password",
+    "language": "Language"
+  },
+  "home": {
+    "categories": "Categories",
+    "all": "All",
+    "welcome": "Welcome, {name}",
+    "siteNameFallback": "Cenkor",
+    "heroTitleFallback": "Universal enterprise management platform",
+    "heroSubtitleFallback": "Content, users, apps — all in one",
+    "contentFallback": "Content",
+    "footer": "© 2026 Cenkor · Universal enterprise management platform"
+  },
+  "contentList": {
+    "allCategories": "All categories",
+    "empty": "No content",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "{total} items",
+    "viewCount": "{n} views",
+    "titleMap": {
+      "product": "Products",
+      "case": "Case Studies",
+      "news": "News"
+    }
+  },
+  "login": {
+    "title": "Sign in to Cenkor",
+    "emailOrUsername": "Email or username",
+    "password": "Password",
+    "noAccount": "No account? Sign up",
+    "forgotPassword": "Forgot password?",
+    "haveAccount": "Have an account? Sign in"
+  },
+  "register": {
+    "title": "Create an account",
+    "username": "Username",
+    "email": "Email",
+    "nicknameOptional": "Nickname (optional)",
+    "passwordHint": "Password (min 8 chars)",
+    "captcha": "Verification",
+    "submit": "Sign up"
+  },
+  "forgotPassword": {
+    "title": "Forgot password",
+    "submit": "Next"
+  },
+  "resetPassword": {
+    "title": "Reset password",
+    "newPassword": "New password (min 8 chars)",
+    "confirmPassword": "Confirm new password",
+    "submit": "Reset password"
+  },
+  "contentDetail": {
+    "back": "← Back"
+  },
+  "profile": {
+    "title": "Cenkor User Center",
+    "logout": "Sign out",
+    "section": {
+      "profile": "Profile",
+      "password": "Change password",
+      "oauth": "Third-party login"
+    },
+    "avatar": "Avatar URL",
+    "nickname": "Nickname",
+    "email": "Email",
+    "saveProfile": "Save profile",
+    "oldPassword": "Current password",
+    "newPassword": "New password (min 8 chars)",
+    "updatePassword": "Update password",
+    "feishu": "Feishu",
+    "wechat": "WeChat",
+    "unionIdOptional": "union_id (optional)",
+    "oauthHint": "Note: actual OAuth flows must be completed through each platform's SDK; this endpoint is for backend integration.",
+    "bind": "Bind",
+    "unbind": "Unbind",
+    "unbindConfirm": "Are you sure to unbind {provider}?"
+  },
+  "sliderCaptcha": {
+    "verified": "Verified",
+    "dragHint": "Drag the slider to complete the puzzle",
+    "mismatch": "Position does not match, please retry",
+    "refresh": "Refresh"
+  },
+  "error": {
+    "loginFailed": "Sign in failed",
+    "registerFailed": "Sign up failed",
+    "captchaRequired": "Please complete the slider verification first",
+    "requestFailed": "Request failed",
+    "sendLink": "Sending…",
+    "sendLinkAction": "Send reset link",
+    "sentHint": "Enter the email you used to sign up and we'll send a password reset link.",
+    "sentOk": "✅ Reset link has been sent (if the email exists). Please check your inbox (including spam).",
+    "backToLogin": "Back to sign in",
+    "missingToken": "Missing reset token; please use the link in the email",
+    "passwordMin8": "New password must be at least 8 characters",
+    "passwordMismatch": "The two passwords don't match",
+    "resetFailed": "Reset failed",
+    "submitting": "Submitting…",
+    "resetOk": "✅ Password has been reset. Redirecting to sign in in 2 seconds.",
+    "authFail": "Unauthorized",
+    "loadFailed": "Failed to load",
+    "saveSuccess": "Profile saved",
+    "saveFailed": "Save failed",
+    "passwordChanged": "Password changed, please sign in again",
+    "passwordChangeFailed": "Update failed",
+    "bindSuccess": "OAuth bound successfully",
+    "bindFailed": "Bind failed",
+    "unbindSuccess": "Unbound",
+    "unbindFailed": "Unbind failed",
+    "unbindConfirm": "Are you sure to unbind {provider}?",
+    "noBinding": "No third-party accounts bound yet",
+    "bindAt": "Bound on {date}"
+  }
+}

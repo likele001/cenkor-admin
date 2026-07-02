@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, PieChart, BarChart } from 'echarts/charts'
@@ -30,6 +31,7 @@ use([
 provide(THEME_KEY, 'light')
 
 const auth = useAuthStore()
+const { t } = useI18n()
 const me = ref<{ username?: string; email?: string; nickname?: string; permissions?: string[]; is_superuser?: boolean } | null>(auth.user as any)
 const overview = ref<Record<string, number> | null>(null)
 const trend = ref<Array<{ date: string; count: number }>>([])
@@ -59,7 +61,7 @@ async function load() {
       xAxis: { type: 'category', data: trend.value.map((p) => p.date.slice(5)) },
       yAxis: { type: 'value', minInterval: 1 },
       series: [{
-        name: 'API 调用',
+        name: t('dashboard.apiCalls'),
         type: 'line',
         smooth: true,
         areaStyle: { opacity: 0.15 },
@@ -93,7 +95,7 @@ async function load() {
       }],
     }
   } catch (e: any) {
-    error.value = e?.message || '加载失败'
+    error.value = e?.message || t('common.loadFailed', '加载失败')
   } finally {
     loading.value = false
   }
@@ -107,58 +109,58 @@ onMounted(() => {
 
 <template>
   <div>
-    <h1 class="text-3xl font-semibold tracking-tight">Dashboard</h1>
-    <p class="mt-2 text-ink-500">欢迎回来。这是 Cenkor Admin Platform 的起点。</p>
+    <h1 class="text-3xl font-semibold tracking-tight">{{ t('nav.dashboard', 'Dashboard') }}</h1>
+    <p class="mt-2 text-ink-500">{{ t('dashboard.welcome', '欢迎回来。这是 Cenkor Admin Platform 的起点。') }}</p>
 
-    <div v-if="loading" class="mt-8 text-ink-400">加载中…</div>
+    <div v-if="loading" class="mt-8 text-ink-400">{{ t('app.loading') }}</div>
     <div v-else-if="error" class="mt-8 text-red-600">{{ error }}</div>
 
     <template v-else>
       <div class="mt-8 grid md:grid-cols-5 gap-4">
         <div class="card">
           <div class="text-3xl font-semibold">{{ overview?.users ?? 0 }}</div>
-          <div class="mt-1 text-sm text-ink-500">用户</div>
+          <div class="mt-1 text-sm text-ink-500">{{ t('dashboard.users') }}</div>
         </div>
         <div class="card">
           <div class="text-3xl font-semibold">{{ overview?.products ?? 0 }}</div>
-          <div class="mt-1 text-sm text-ink-500">产品</div>
+          <div class="mt-1 text-sm text-ink-500">{{ t('dashboard.products') }}</div>
         </div>
         <div class="card">
           <div class="text-3xl font-semibold">{{ overview?.cases ?? 0 }}</div>
-          <div class="mt-1 text-sm text-ink-500">案例</div>
+          <div class="mt-1 text-sm text-ink-500">{{ t('dashboard.cases') }}</div>
         </div>
         <div class="card">
           <div class="text-3xl font-semibold">{{ overview?.news ?? 0 }}</div>
-          <div class="mt-1 text-sm text-ink-500">新闻</div>
+          <div class="mt-1 text-sm text-ink-500">{{ t('dashboard.news') }}</div>
         </div>
         <div class="card">
           <div class="text-3xl font-semibold">{{ overview?.media ?? 0 }}</div>
-          <div class="mt-1 text-sm text-ink-500">媒体</div>
+          <div class="mt-1 text-sm text-ink-500">{{ t('dashboard.media') }}</div>
         </div>
       </div>
 
       <div class="mt-8 grid lg:grid-cols-2 gap-4">
         <div class="card">
-          <h2 class="font-semibold mb-3">API 调用 · 近 7 天</h2>
+          <h2 class="font-semibold mb-3">{{ t('dashboard.apiCalls7d') }}</h2>
           <v-chart class="h-64" :option="lineOption" autoresize />
         </div>
         <div class="card">
-          <h2 class="font-semibold mb-3">HTTP 方法分布</h2>
+          <h2 class="font-semibold mb-3">{{ t('dashboard.methodDistribution') }}</h2>
           <v-chart class="h-64" :option="methodOption" autoresize />
         </div>
       </div>
 
       <div class="mt-4 card">
-        <h2 class="font-semibold mb-3">状态码分布 · 近 7 天</h2>
+        <h2 class="font-semibold mb-3">{{ t('dashboard.statusDistribution') }}</h2>
         <v-chart class="h-64" :option="statusOption" autoresize />
       </div>
     </template>
 
     <div v-if="me" class="mt-8 card">
-      <h2 class="font-semibold mb-3">当前用户</h2>
+      <h2 class="font-semibold mb-3">{{ t('dashboard.currentUser') }}</h2>
       <dl class="grid sm:grid-cols-2 gap-3 text-sm">
-        <div><dt class="text-ink-500">用户名</dt><dd class="font-medium">{{ me.username }}</dd></div>
-        <div><dt class="text-ink-500">权限数</dt><dd class="font-medium">{{ me.permissions?.length ?? 0 }}</dd></div>
+        <div><dt class="text-ink-500">{{ t('dashboard.username') }}</dt><dd class="font-medium">{{ me.username }}</dd></div>
+        <div><dt class="text-ink-500">{{ t('dashboard.permissionCount') }}</dt><dd class="font-medium">{{ me.permissions?.length ?? 0 }}</dd></div>
       </dl>
     </div>
   </div>

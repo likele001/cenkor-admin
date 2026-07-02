@@ -30,6 +30,7 @@ class User(Base):
 
     status: Mapped[str] = mapped_column(String(20), default="active")  # active / disabled / locked
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    user_type: Mapped[str] = mapped_column(String(20), default="admin")  # admin / superadmin
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)

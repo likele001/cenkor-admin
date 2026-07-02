@@ -11,6 +11,7 @@
     "dev:portal": "cd frontend/portal-web && npm run dev",
     "build:admin": "cd frontend/admin-web && npm run build",
     "build:portal": "cd frontend/portal-web && npm run build",
+    "build:developer": "cd frontend/developer-web && npm run build",
     "build:tokens": "echo 'design-tokens 已通过 CSS exports 发布'",
     "package:core": "bash scripts/package-core.sh",
     "lint": "cd frontend/admin-web && npm run lint",

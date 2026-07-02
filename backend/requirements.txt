@@ -31,3 +31,7 @@ loguru>=0.7.2
 email-validator>=2.1.0
 python-slugify>=8.0.0
 Pillow>=10.0.0
+
+# Liquid 模板引擎 + Markdown 渲染（M3-B）
+python-liquid>=2.2.0
+markdown>=3.5.0

@@ -1,0 +1,18 @@
+{
+  "应用中心_cezjgq": "App center",
+  "管理平台_179xak": "Manage business apps installed on the platform. Installing/uninstalling triggers automatic content engine registration/cleanup.",
+  "加载中_b0k5km": "Loading…",
+  "卸载_ezgl": "Uninstall",
+  "权限委派_dnbv9z": "Permission delegation",
+  "内容类型_ao6o90": "Content type",
+  "所需权限_1chifx": "Required permissions",
+  "权限委派_1x8cwh": "Permission delegation (current)",
+  "公共_q1ie5w": "Public API prefix",
+  "委派给_doxtb": "Delegate to",
+  "删除角色_azli5g": "Delete role",
+  "text_1ai6a": "+ Permission",
+  "text_z2onsq": "+ Add role",
+  "取消_ev02": "Cancel",
+  "保存_e32z": "Save",
+  "确定卸载_bshtv3": "确定卸载 ${key}？\\n注意：相关数据会被软删/清理"
+}

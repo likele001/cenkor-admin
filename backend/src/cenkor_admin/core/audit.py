@@ -106,10 +106,27 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
 
 async def _write_audit(**kwargs: Any) -> None:
-    """异步写审计日志（独立 session）"""
+    """异步写审计日志（独立 session）；失败请求同时创建通知。"""
     try:
         async with AsyncSessionLocal() as db:
             db.add(AuditLog(**kwargs))
             await db.commit()
+
+        # 失败请求 → 通知对应用户
+        status_code = kwargs.get("status_code", 200)
+        user_id = kwargs.get("user_id")
+        if status_code >= 400 and user_id:
+            from cenkor_admin.apps.notification.service import create_notification
+            async with AsyncSessionLocal() as ndb:
+                await create_notification(
+                    ndb,
+                    user_id=user_id,
+                    type="audit",
+                    title=f"请求失败 ({status_code})",
+                    body=f"{kwargs.get('method', '')} {kwargs.get('path', '')} — {kwargs.get('error', '')}",
+                    link=None,
+                    payload={"request_id": kwargs.get("request_id")},
+                )
+                await ndb.commit()
     except Exception as e:
         log.warning("audit.write.failed", error=str(e))
