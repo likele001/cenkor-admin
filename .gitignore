@@ -56,3 +56,6 @@ uploads/
 runtime/
 *.sqlite
 *.db
+cloud_storage-1.0.0.zip
+quick_notes-1.0.0.zip
+my_todo_app-1.0.0.zip

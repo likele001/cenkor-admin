@@ -20,6 +20,12 @@ const loading = ref(false)
 const error = ref('')
 let pollTimer: number | undefined
 
+function onNotifyNew(e: Event) {
+  const n = (e as CustomEvent).detail as Notification
+  items.value.unshift(n)
+  unread.value++
+}
+
 async function fetchUnread() {
   try {
     const { data } = await api.get('/api/v1/notifications/unread-count')
@@ -87,10 +93,12 @@ function timeAgo(iso: string | null): string {
 onMounted(() => {
   fetchUnread()
   pollTimer = window.setInterval(fetchUnread, 30_000)
+  window.addEventListener('notify:new', onNotifyNew)
 })
 
 onBeforeUnmount(() => {
   if (pollTimer) window.clearInterval(pollTimer)
+  window.removeEventListener('notify:new', onNotifyNew)
 })
 </script>
 

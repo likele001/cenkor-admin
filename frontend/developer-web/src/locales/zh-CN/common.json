@@ -1,0 +1,35 @@
+{
+  "dev": {
+    "brand": "Cenkor Developer",
+    "navStore": "应用商店",
+    "navDocs": "开发文档",
+    "login": "登录",
+    "register": "注册",
+    "heroTitle": "构建下一个伟大的应用",
+    "heroDesc": "加入 Cenkor 开发者社区，创建和发布可插拔应用，扩展企业级平台的能力。",
+    "startNow": "立即开始",
+    "readDocs": "阅读文档",
+    "feature1Title": "简单开发",
+    "feature1Desc": "基于 manifest 声明式定义，无需复杂的配置，快速创建应用。",
+    "feature2Title": "快速发布",
+    "feature2Desc": "上传 ZIP 包即可发布，审核通过后自动安装到平台。",
+    "feature3Title": "安全可靠",
+    "feature3Desc": "应用运行在沙箱环境中，权限最小化，确保系统安全。",
+    "stepsTitle": "发布流程",
+    "step1": "注册账号",
+    "step1Desc": "创建开发者账号",
+    "step2": "开发应用",
+    "step2Desc": "按照规范开发应用",
+    "step3": "提交审核",
+    "step3Desc": "上传 ZIP 包提交审核",
+    "step4": "上架发布",
+    "step4Desc": "审核通过后自动上架",
+    "footer": "All rights reserved."
+  },
+  "sliderCaptcha": {
+    "dragHint": "拖动滑块完成拼图",
+    "verified": "验证通过",
+    "mismatch": "滑块位置错误，请重试",
+    "refresh": "刷新验证"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "新闻管理_dgakuo": "News management",
+  "加载中_b0k5km": "Loading…",
+  "按标题_ve272g": "Search by title/Slug/summary…",
+  "text_y2o5wq": "+ New news",
+  "标题_ij5d": "Title",
+  "状态_k1e3": "Status",
+  "阅读_qaae": "Read",
+  "操作_hkxb": "Action",
+  "暂无新闻_dcvgq1": "No news",
+  "编辑_mekb": "Edit",
+  "删除_eslg": "Delete",
+  "确定删除_8vpeu5": "Are you sure you want to delete \"${n.title}\"?",
+  "删除失败_1kc17l": "Delete failed:"
+}

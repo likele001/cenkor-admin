@@ -17,6 +17,7 @@ export function toProductPayload(form: {
   license: string
   sort: number
   status: string
+  custom_fields?: Record<string, any>
 }) {
   return {
     name: form.name,
@@ -35,6 +36,7 @@ export function toProductPayload(form: {
     license: form.license || null,
     sort: form.sort,
     status: form.status,
+    custom_fields: form.custom_fields,
   }
 }
 
@@ -56,6 +58,7 @@ export function fromProductApi(data: Record<string, unknown>) {
     license: (data.license as string) || '',
     sort: (data.sort as number) ?? 0,
     status: (data.status as string) || 'published',
+    custom_fields: (data.custom_fields as Record<string, any>) || {},
   }
 }
 

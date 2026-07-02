@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.notification import models
+from cenkor_admin.apps.notification.service import create_notification, create_system_notification_to_all
 from cenkor_admin.core.db import get_db
 
 router = APIRouter()
@@ -109,6 +110,41 @@ async def delete_notification(
         raise HTTPException(404, "通知不存在")
     await db.delete(n)
     await db.commit()
+
+
+@router.post("/send", status_code=201)
+async def send_notification(
+    body: dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(require_permission("notification:write")),
+):
+    """发送通知给指定用户或全员。
+
+    {
+      "user_id": 1,          // 可选；不传则发送给所有用户
+      "type": "system",
+      "title": "系统维护通知",
+      "body": "今晚 22:00-23:00 系统维护",
+      "link": "/system/notifications"
+    }
+    """
+    uid = body.get("user_id")
+    if uid:
+        n = await create_notification(
+            db, user_id=uid, type=body.get("type", "system"),
+            title=body["title"], body=body.get("body"),
+            link=body.get("link"), payload=body.get("payload"),
+        )
+        await db.commit()
+        return {"id": n.id, "type": n.type, "title": n.title}
+    # 全员
+    ns = await create_system_notification_to_all(
+        db, type=body.get("type", "system"),
+        title=body["title"], body=body.get("body"),
+        link=body.get("link"), payload=body.get("payload"),
+    )
+    await db.commit()
+    return {"count": len(ns)}
 
 
 def _to_dict(n: models.Notification) -> dict:

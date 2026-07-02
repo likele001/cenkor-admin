@@ -1,18 +1,34 @@
 """Cenkor Admin · 配置层（从 .env 加载，跨 DB 兼容）"""
 from __future__ import annotations
 
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _find_env_file() -> str | None:
+    """按优先级查找 .env 文件（兼容宝塔 / Docker / 手动启动等各种 CWD）"""
+    candidates = [
+        Path.cwd() / ".env",
+        Path.cwd().parent / ".env",
+        Path(__file__).resolve().parent.parent.parent.parent / ".env",
+        Path(os.environ.get("HOME", "/tmp")) / ".env",
+    ]
+    for p in candidates:
+        if p.exists():
+            return str(p.resolve())
+    return ".env"
+
+
 class Settings(BaseSettings):
     """应用配置 - 全部从环境变量读取，缺省值只用于 dev。"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_find_env_file(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -26,9 +42,26 @@ class Settings(BaseSettings):
 
     # ---- 安全 ----
     SECRET_KEY: str = "dev-secret-change-me-32-bytes-min"
+    # 历史 SECRET_KEY 列表（用于轮换：旧 token 仍可解码，但新 token 用新 key）
+    SECRET_KEY_OLD: str = ""  # 逗号分隔
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # Cookie Secure（生产应为 True）
+    COOKIE_SECURE: bool = False
+    # 限流（API 调用频率）
+    RATE_LIMIT_PER_MINUTE: int = 300
+
+    @property
+    def secret_keys(self) -> list[str]:
+        """所有有效的 SECRET_KEY（包含历史的）"""
+        keys = [self.SECRET_KEY]
+        if self.SECRET_KEY_OLD:
+            for k in self.SECRET_KEY_OLD.split(","):
+                k = k.strip()
+                if k and k not in keys:
+                    keys.append(k)
+        return keys
 
     # ---- 数据库 ----
     DATABASE_URL: str = "postgresql+asyncpg://cenkor:li123456@localhost:5432/cenkor"
@@ -99,4 +132,13 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    # 强制从 .env 加载，覆盖可能继承的旧环境变量
+    env_path = _find_env_file()
+    if env_path and os.path.exists(env_path):
+        try:
+            from dotenv import dotenv_values
+            overrides = {k: v for k, v in dotenv_values(env_path).items() if v is not None}
+            return Settings(**overrides)
+        except ImportError:
+            pass
     return Settings()

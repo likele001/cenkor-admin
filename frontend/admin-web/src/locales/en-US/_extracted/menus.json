@@ -1,0 +1,16 @@
+{
+  "菜单管理_gzj3um": "Menu management",
+  "加载中_b0k5km": "Loading…",
+  "text_6dvuyx": "+ New top-level menu",
+  "菜单_mvw9": "Menu",
+  "路径_onzp": "Path",
+  "状态_k1e3": "Status",
+  "排序_hge5": "Sort",
+  "操作_hkxb": "Action",
+  "text_j2d": "+ Sub",
+  "编辑_mekb": "Edit",
+  "删除_eslg": "Delete",
+  "确定删除_1k5wug": "Are you sure you want to delete menu \"${m.title}\"? Child menus will also be deleted.",
+  "删除失败_1kc17l": "Delete failed:",
+  "失败_drpmu": "Failed:"
+}

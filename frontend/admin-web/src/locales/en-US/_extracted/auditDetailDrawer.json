@@ -1,0 +1,17 @@
+{
+  "加载中_b0k5km": "Loading…",
+  "基本信息_biyzkw": "Basic info",
+  "方法_hwe4": "Method",
+  "状态_k1e3": "Status",
+  "路径_onzp": "Path",
+  "用户_18a491": "User ID",
+  "耗时_mchr": "Duration",
+  "时间_i5z2": "Time",
+  "请求_1rp4j0": "Request ID",
+  "变更对比_b08e8n": "Change diff",
+  "字段_g4la": "Field",
+  "变更前_cs2i9": "Before change",
+  "变更后_cs2uq": "After change",
+  "该请求无_1osgc6": "This request has no diff data (likely a query operation or diff logging is not enabled).",
+  "错误_q4mu": "Error"
+}

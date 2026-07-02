@@ -17,6 +17,7 @@ from cenkor_admin.core.db import async_engine
 from cenkor_admin.core.i18n import SUPPORTED_LOCALES, detect_locale
 from cenkor_admin.core.redis import redis_client
 from cenkor_admin.core.storage import s3
+from pathlib import Path
 
 settings = get_settings()
 log = structlog.get_logger()
@@ -34,6 +35,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.error("db.fail", error=str(e))
 
+    # 启动时自动应用所有待执行的数据库迁移
+    # 安装 App 时拷贝的迁移文件会在下次重启时自动生效
+    try:
+        from alembic.config import Config
+        from alembic import command
+        _alembic_cfg = Config(Path(__file__).resolve().parent.parent.parent / "alembic.ini")
+        command.upgrade(_alembic_cfg, "head")
+        log.info("migration.ok")
+    except Exception as e:
+        log.warning("migration.fail", error=str(e))
+
     try:
         await redis_client.ping()
         log.info("redis.ok")
@@ -47,6 +59,29 @@ async def lifespan(app: FastAPI):
         log.info("s3.buckets.ready", public=settings.S3_BUCKET_PUBLIC, private=settings.S3_BUCKET_PRIVATE)
     except Exception as e:
         log.warning("s3.buckets.fail", error=str(e))
+
+    # 启动时自动安装：仅装 platform_apps 里**完全没有记录**的 App
+    # （已 uninstall 的 App 不会自动重装，必须由管理员显式安装）
+    try:
+        from cenkor_admin.core.db import AsyncSessionLocal
+        from cenkor_admin.apps.system.app_registry import (
+            install_app, scan_app_manifests, list_apps_with_status,
+        )
+        from sqlalchemy import select
+        from cenkor_admin.apps.system.models import InstalledApp
+        async with AsyncSessionLocal() as db:
+            manifests = scan_app_manifests()
+            all_rows = (await db.execute(select(InstalledApp))).scalars().all()
+            known_keys = {a.key for a in all_rows}  # 包括 uninstalled 的
+            for key, manifest in manifests.items():
+                if key not in known_keys:
+                    try:
+                        await install_app(db, key)
+                        log.info("app.auto_installed", key=key, version=manifest.version)
+                    except Exception as e:
+                        log.warning("app.auto_install_failed", key=key, error=str(e))
+    except Exception as e:
+        log.warning("app.auto_install.check_fail", error=str(e))
 
     yield
 
@@ -65,18 +100,33 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS（按环境收紧：生产禁用 allow_origins=["*"]）
+cors_kwargs = {
+    "allow_origins": settings.cors_origins_list,
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "allow_headers": [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "X-Request-Id",
+    ],
+    "expose_headers": ["X-Request-Id", "Content-Language"],
+    "max_age": 600,  # 10 min
+}
+if settings.APP_ENV == "production":
+    # 生产环境不允许 allow_origins=["*"]（已通过 cors_origins_list 控制）
+    pass
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # 审计（写操作 + 鉴权请求）
 app.add_middleware(AuditMiddleware)
 
+# 挂载 App 前端静态资源（安装时从 ZIP 解压出来的前端 bundle）
+from fastapi.staticfiles import StaticFiles
+_app_static_dir = Path(__file__).resolve().parent / "static" / "apps"
+_app_static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/.app-assets", StaticFiles(directory=str(_app_static_dir)), name="app_assets")
 
 # 健康检查
 @app.get("/api/health", tags=["meta"])

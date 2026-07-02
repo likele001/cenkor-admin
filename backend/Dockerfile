@@ -40,6 +40,8 @@ RUN pip install --upgrade pip && \
     "email-validator>=2.1.0" \
     "python-slugify>=8.0.0" \
     "python-multipart>=0.0.9" \
+    "markdown>=3.5.0" \
+    "python-liquid>=2.2.0" \
     "Pillow>=10.0.0"
 
 # 代码（开发模式挂载）

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 
 interface Setting {
@@ -11,6 +12,7 @@ interface Setting {
   updated_at: string | null
 }
 
+const { t } = useI18n()
 const items = ref<Setting[]>([])
 const loading = ref(true)
 const error = ref('')
@@ -25,7 +27,7 @@ async function load() {
     const { data } = await api.get('/api/v1/system/settings')
     items.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t('settings.loadFailed', '加载失败')
   } finally {
     loading.value = false
   }
@@ -68,7 +70,7 @@ async function save(key: string) {
     editing.value = null
     await load()
   } catch (e: any) {
-    alert('保存失败：' + (e?.response?.data?.detail || e.message))
+    alert(t('settings.saveFailed', '保存失败') + '：' + (e?.response?.data?.detail || e.message))
   } finally {
     saving.value = false
   }
@@ -87,13 +89,13 @@ onMounted(load)
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← Dashboard</router-link>
-        <span class="font-semibold">系统设置</span>
+        <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← {{ t('nav.dashboard') }}</router-link>
+        <span class="font-semibold">{{ t('settings.title', '系统设置') }}</span>
       </div>
     </header>
 
     <main class="max-w-5xl mx-auto px-6 py-10">
-      <div v-if="loading" class="card text-ink-500">加载中…</div>
+      <div v-if="loading" class="card text-ink-500">{{ t('app.loading') }}</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else class="space-y-6">
         <section v-for="(group, name) in grouped" :key="name" class="card p-0 overflow-hidden">
@@ -113,7 +115,7 @@ onMounted(load)
                   class="text-sm text-brand-600 hover:underline shrink-0"
                   @click="startEdit(s)"
                 >
-                  编辑
+                  {{ t('app.edit') }}
                 </button>
               </div>
               <div v-if="editing === s.key" class="mt-3 space-y-3">
@@ -121,12 +123,12 @@ onMounted(load)
                   v-model="draft.value"
                   rows="4"
                   class="input font-mono text-xs"
-                  placeholder="JSON 字符串"
+                  :placeholder="t('settings.jsonPlaceholder', 'JSON 字符串')"
                 />
                 <input
                   v-model="draft.description"
                   class="input"
-                  placeholder="描述（可选）"
+                  :placeholder="t('settings.descPlaceholder', '描述（可选）')"
                 />
                 <div class="flex items-center gap-2">
                   <button
@@ -135,15 +137,15 @@ onMounted(load)
                     :disabled="saving"
                     @click="save(s.key)"
                   >
-                    {{ saving ? '保存中…' : '保存' }}
+                    {{ saving ? t('app.saving', '保存中…') : t('app.save') }}
                   </button>
-                  <button type="button" class="btn-ghost text-sm" @click="cancelEdit">取消</button>
+                  <button type="button" class="btn-ghost text-sm" @click="cancelEdit">{{ t('app.cancel') }}</button>
                 </div>
               </div>
               <div v-else class="mt-2">
                 <pre class="text-xs bg-ink-50 border border-ink-200 rounded-md p-2 overflow-x-auto">{{ displayValue(s.value) }}</pre>
                 <p v-if="s.updated_at" class="mt-1 text-[10px] text-ink-400">
-                  上次更新：{{ s.updated_at }} · by user#{{ s.updated_by ?? '?' }}
+                  {{ t('settings.lastUpdated', '上次更新') }}：{{ s.updated_at }} · by user#{{ s.updated_by ?? '?' }}
                 </p>
               </div>
             </li>

@@ -82,6 +82,7 @@ services:
     build:
       context: ./frontend/admin-web
       dockerfile: Dockerfile
+      target: development
     container_name: cenkor-admin-web
     restart: unless-stopped
     ports:

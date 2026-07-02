@@ -65,6 +65,7 @@ def _register_all_models() -> None:
     from cenkor_admin.apps.rbac import models as _rbac  # noqa
     from cenkor_admin.apps.cms import models as _cms  # noqa
     from cenkor_admin.apps.system import models as _system  # noqa
+    from cenkor_admin.apps.portal import models as _portal  # noqa
     from cenkor_admin.core.audit import AuditLog  # noqa
 
 

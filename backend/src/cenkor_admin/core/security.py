@@ -1,4 +1,4 @@
-"""安全工具：JWT + 密码哈希"""
+"""安全工具：JWT + 密码哈希（支持 SECRET_KEY 轮换）"""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -26,12 +26,13 @@ def create_access_token(
     extra: dict[str, Any] | None = None,
     expires_minutes: int | None = None,
 ) -> str:
-    """创建 access token。"""
+    """创建 access token（用最新 SECRET_KEY）"""
     minutes = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "sub": str(subject),
         "type": "access",
+        "iss": "cenkor-admin",
         "iat": now,
         "exp": now + timedelta(minutes=minutes),
     }
@@ -45,6 +46,7 @@ def create_refresh_token(subject: str | int, token_version: int = 0) -> str:
     payload = {
         "sub": str(subject),
         "type": "refresh",
+        "iss": "cenkor-admin",
         "tv": token_version,
         "iat": now,
         "exp": now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
@@ -53,8 +55,20 @@ def create_refresh_token(subject: str | int, token_version: int = 0) -> str:
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    """解码并校验 token。失败抛 JWTError。"""
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    """解码并校验 token。失败抛 JWTError。
+
+    支持 SECRET_KEY 轮换：依次尝试所有有效 key（最新的优先）。
+    """
+    last_err: Exception | None = None
+    for key in settings.secret_keys:
+        try:
+            return jwt.decode(token, key, algorithms=[settings.JWT_ALGORITHM])
+        except JWTError as e:
+            last_err = e
+            continue
+    if last_err:
+        raise last_err
+    raise JWTError("No valid SECRET_KEY configured")
 
 
 __all__ = [
