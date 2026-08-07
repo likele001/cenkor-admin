@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 const { t } = useI18n()
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -222,8 +223,7 @@ onMounted(async () => {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">{{ t('entryEdit.内容_aduoyw') }}</label>
-            <textarea v-model="form.content.text" class="input min-h-[200px] font-mono text-sm"
-              :placeholder="t('entryEdit.富文本内_72xjm1')"></textarea>
+            <RichTextEditor v-model="form.content.text" placeholder="t('entryEdit.富文本内_72xjm1')" />
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
@@ -137,7 +138,7 @@ onMounted(load)
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">内容</label>
-            <textarea v-model="sendForm.body" rows="3" class="input" placeholder="通知内容（可选）"></textarea>
+            <RichTextEditor v-model="sendForm.body" placeholder="通知内容（可选）" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">链接</label>

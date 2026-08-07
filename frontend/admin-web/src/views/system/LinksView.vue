@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
@@ -182,7 +183,7 @@ onMounted(load)
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">描述</label>
-            <textarea v-model="form.description" rows="3" class="input"></textarea>
+            <RichTextEditor v-model="form.description" />
           </div>
           <label class="flex items-center gap-2 text-sm">
             <input v-model="form.is_favorite" type="checkbox" class="rounded" /> 收藏
