@@ -14,6 +14,21 @@
             {{ providerLabel(p) }} {{ config.providers[p]?.has_secret ? '✓' : '(未配置)' }}
           </option>
         </select>
+        <p class="text-xs text-ink-400">切换激活 provider 前需先在该 provider 标签页配置并保存凭据。</p>
+      </div>
+    </div>
+
+    <div class="card mb-6">
+      <h2 class="font-semibold mb-3">通用设置</h2>
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" v-model="keepLocalBackup" class="w-4 h-4" />
+        <div>
+          <div class="text-sm font-medium">保留本地备份 (MinIO)</div>
+          <div class="text-xs text-ink-400">开启后，上传到云存储的文件会同时在本地 MinIO 留一份副本作备份。</div>
+        </div>
+      </label>
+      <div class="mt-3">
+        <button class="btn-primary" @click="saveSettings">保存设置</button>
       </div>
     </div>
 
@@ -28,7 +43,7 @@
       </div>
 
       <div v-if="!config.providers[tab]?.has_secret" class="space-y-3">
-        <p class="text-sm text-ink-500">此 provider 尚未配置凭据。请填写以下信息：</p>
+        <p class="text-sm text-ink-500">此 provider 尚未配置凭据。填写并保存后，再到上方「当前激活」切换。</p>
         <div class="grid grid-cols-2 gap-3">
           <input v-model="form.access_key" class="input" placeholder="AccessKey / Operator" />
           <input v-model="form.secret_key" class="input" type="password" placeholder="SecretKey / Password" />
@@ -156,7 +171,7 @@ const providers = ['tencent', 'aliyun', 'qiniu', 'upyun']
 const providerLabels = { tencent: '腾讯云 COS', aliyun: '阿里云 OSS', qiniu: '七牛云 Kodo', upyun: '又拍云' }
 function providerLabel(p) { return providerLabels[p] || p }
 
-const config = ref({ active_provider: 'tencent', providers: {} })
+const config = ref({ active_provider: 'tencent', keep_local_backup: true, providers: {} })
 const active = ref('tencent')
 const tab = ref('tencent')
 const editMode = ref(false)
@@ -169,6 +184,7 @@ const files = ref(null)
 const migBucket = ref('')
 const migPrefix = ref('')
 const migJob = ref(null)
+const keepLocalBackup = ref(true)
 
 function regionHint(p) {
   return { tencent: 'ap-shanghai / ap-guangzhou / ap-beijing', aliyun: 'oss-cn-hangzhou', qiniu: 'z0 / z1 / z2 / cn-east-2', upyun: '（又拍无需 region）' }[p] || 'Region'
@@ -184,33 +200,17 @@ function formatSize(b) {
   return b.toFixed(2) + ' ' + u[i]
 }
 
-function getToken() {
-  try {
-    const raw = localStorage.getItem('cenkor.auth') || ''
-    const obj = JSON.parse(raw)
-    return obj?.access_token || obj?.token || ''
-  } catch { return '' }
-}
+// 统一走框架注入的 window.__PLUGIN_API__（从 auth store 实时取 token，
+// 且底层复用主程序 axios，带 401 自动刷新），避免手搓 token 读错 localStorage key。
 async function api(method, path, body) {
-  const token = getToken()
-  const r = await fetch(path, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (!r.ok) {
-    const e = await r.json().catch(() => ({}))
-    throw new Error(e.detail || r.statusText)
-  }
-  return r.json()
+  return await window.__PLUGIN_API__(method, path, body)
 }
 
 async function loadConfig() {
   config.value = await api('GET', '/api/v1/cloud_storage/config')
   active.value = config.value.active_provider
+  tab.value = config.value.active_provider
+  keepLocalBackup.value = !!config.value.keep_local_backup
   if (config.value.providers[active.value]?.bucket && !browseBucket.value) {
     browseBucket.value = config.value.providers[active.value].bucket
   }
@@ -218,6 +218,12 @@ async function loadConfig() {
     migBucket.value = config.value.providers[active.value].bucket
   }
 }
+async function saveSettings() {
+  await api('PUT', '/api/v1/cloud_storage/config', { keep_local_backup: keepLocalBackup.value })
+  alert('设置已保存')
+  await loadConfig()
+}
+
 async function saveCreds() {
   if (!form.value.access_key || !form.value.secret_key || !form.value.bucket) {
     alert('AccessKey / SecretKey / Bucket 必填')
@@ -233,8 +239,12 @@ async function saveCreds() {
   await loadConfig()
 }
 async function activate() {
-  await api('POST', '/api/v1/cloud_storage/config/activate', { provider: active.value })
-  await loadConfig()
+  try {
+    await api('POST', '/api/v1/cloud_storage/config/activate', { provider: active.value })
+    await loadConfig()
+  } catch (e) {
+    alert(e.message || '激活失败')
+  }
 }
 async function deleteCreds() {
   if (!confirm('确定删除该 provider 的凭据？')) return
@@ -263,10 +273,7 @@ async function getUrl(key) {
 }
 async function del(key) {
   if (!confirm(`确定删除 ${key}？`)) return
-  await fetch(`/api/v1/cloud_storage/files?bucket=${encodeURIComponent(browseBucket.value)}&key=${encodeURIComponent(key)}`, {
-    method: 'DELETE',
-    headers: { Authorization: 'Bearer ' + getToken() },
-  })
+  await api('DELETE', `/api/v1/cloud_storage/files?bucket=${encodeURIComponent(browseBucket.value)}&key=${encodeURIComponent(key)}`)
   await listFiles()
 }
 async function startMigration() {

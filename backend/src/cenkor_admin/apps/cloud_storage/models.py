@@ -1,6 +1,6 @@
 from datetime import datetime
 from cenkor_admin.core.db import Base
-from sqlalchemy import String, Integer, DateTime, Text, func
+from sqlalchemy import String, Integer, DateTime, Text, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -16,6 +16,8 @@ class CloudStorageConfig(Base):
     creds_aliyun:  Mapped[str | None] = mapped_column(Text, nullable=True)
     creds_qiniu:   Mapped[str | None] = mapped_column(Text, nullable=True)
     creds_upyun:   Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 开启后：上传到云存储（七牛/腾讯云等）的同时，服务端把对象回写一份到本地 MinIO 作备份
+    keep_local_backup: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

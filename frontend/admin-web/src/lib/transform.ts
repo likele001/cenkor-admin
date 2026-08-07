@@ -18,6 +18,9 @@ export function toProductPayload(form: {
   sort: number
   status: string
   custom_fields?: Record<string, any>
+  seoTitle?: string
+  seoDescription?: string
+  seoKeywords?: string
 }) {
   return {
     name: form.name,
@@ -37,6 +40,9 @@ export function toProductPayload(form: {
     sort: form.sort,
     status: form.status,
     custom_fields: form.custom_fields,
+    seo_title: form.seoTitle || null,
+    seo_description: form.seoDescription || null,
+    seo_keywords: form.seoKeywords || null,
   }
 }
 
@@ -59,6 +65,9 @@ export function fromProductApi(data: Record<string, unknown>) {
     sort: (data.sort as number) ?? 0,
     status: (data.status as string) || 'published',
     custom_fields: (data.custom_fields as Record<string, any>) || {},
+    seoTitle: (data.seo_title as string) || '',
+    seoDescription: (data.seo_description as string) || '',
+    seoKeywords: (data.seo_keywords as string) || '',
   }
 }
 

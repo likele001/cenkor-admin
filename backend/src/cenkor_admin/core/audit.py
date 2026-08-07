@@ -112,10 +112,11 @@ async def _write_audit(**kwargs: Any) -> None:
             db.add(AuditLog(**kwargs))
             await db.commit()
 
-        # 失败请求 → 通知对应用户
+        # 失败请求 → 通知对应用户（仅服务端 5xx 错误才通知；
+        # 4xx 是用户在界面已看到的业务报错，不再进铃铛，避免噪声）
         status_code = kwargs.get("status_code", 200)
         user_id = kwargs.get("user_id")
-        if status_code >= 400 and user_id:
+        if status_code >= 500 and user_id:
             from cenkor_admin.apps.notification.service import create_notification
             async with AsyncSessionLocal() as ndb:
                 await create_notification(
