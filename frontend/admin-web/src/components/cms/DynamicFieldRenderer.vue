@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 import MediaPicker from './MediaPicker.vue'
 
 export interface FieldDef {
@@ -246,15 +247,13 @@ function onImageError(e: Event) {
 
     <!-- longtext -->
     <div v-else-if="definition.field_type === 'longtext'" class="field-input-wrapper">
-      <textarea v-model="fieldValue" class="field-textarea" :placeholder="placeholder" :disabled="disabled"
-        :maxlength="validation.max_length" rows="4"></textarea>
+      <RichTextEditor v-model="fieldValue" :disabled="disabled" :maxlength="validation.max_length" :placeholder="placeholder" />
     </div>
 
     <!-- richtext -->
     <div v-else-if="definition.field_type === 'richtext'" class="field-input-wrapper">
       <div class="rich-text-toolbar">HTML 编辑器</div>
-      <textarea v-model="fieldValue" class="field-textarea field-code" :placeholder="placeholder" :disabled="disabled"
-        rows="6"></textarea>
+      <RichTextEditor v-model="fieldValue" :disabled="disabled" :placeholder="placeholder" />
     </div>
 
     <!-- markdown -->

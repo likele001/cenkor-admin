@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -85,7 +86,7 @@ async function save() {
         </div>
         <div>
           <label class="block text-sm font-medium mb-1.5">{{ t('caseEdit.描述_d69xvv') }}</label>
-          <textarea v-model="form.desc" required rows="3" class="input"></textarea>
+          <RichTextEditor v-model="form.desc" />
         </div>
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
