@@ -280,14 +280,16 @@ class ProductBase(BaseModel):
     features: list[Any] = Field(default_factory=list)
     is_flagship: bool = False
     is_open_source: bool = False
-    custom_fields: dict[str, Any] | None = None
+    custom_fields: dict[str, Any] = Field(default_factory=dict)
     github_url: str | None = None
     demo_url: str | None = None
     website_url: str | None = None
     license: str | None = None
     sort: int = 0
     status: Literal["draft", "published", "archived"] = "published"
-    custom_fields: dict[str, Any] = Field(default_factory=dict)
+    seo_title: str | None = Field(None, max_length=200)
+    seo_description: str | None = None
+    seo_keywords: str | None = Field(None, max_length=500)
 
 
 class ProductCreate(ProductBase):
@@ -312,6 +314,9 @@ class ProductUpdate(BaseModel):
     license: str | None = None
     sort: int | None = None
     status: Literal["draft", "published", "archived"] | None = None
+    seo_title: str | None = Field(None, max_length=200)
+    seo_description: str | None = None
+    seo_keywords: str | None = Field(None, max_length=500)
 
 
 class ProductOut(ProductBase):
@@ -334,6 +339,9 @@ class CaseBase(BaseModel):
     href: str | None = None
     sort: int = 0
     status: Literal["draft", "published", "archived"] = "published"
+    seo_title: str | None = Field(None, max_length=200)
+    seo_description: str | None = None
+    seo_keywords: str | None = Field(None, max_length=500)
 
 
 class CaseCreate(CaseBase):
@@ -348,6 +356,9 @@ class CaseUpdate(BaseModel):
     href: str | None = None
     sort: int | None = None
     status: Literal["draft", "published", "archived"] | None = None
+    seo_title: str | None = Field(None, max_length=200)
+    seo_description: str | None = None
+    seo_keywords: str | None = Field(None, max_length=500)
 
 
 class CaseOut(CaseBase):
@@ -386,6 +397,9 @@ class NewsBase(BaseModel):
     content_md: str
     cover_image: str | None = None
     status: Literal["draft", "published", "archived"] = "draft"
+    seo_title: str | None = Field(None, max_length=200)
+    seo_description: str | None = None
+    seo_keywords: str | None = Field(None, max_length=500)
 
 
 class NewsCreate(NewsBase):
@@ -399,6 +413,9 @@ class NewsUpdate(BaseModel):
     cover_image: str | None = None
     status: Literal["draft", "published", "archived"] | None = None
     published_at: datetime | None = None
+    seo_title: str | None = Field(None, max_length=200)
+    seo_description: str | None = None
+    seo_keywords: str | None = Field(None, max_length=500)
 
 
 class NewsOut(NewsBase):

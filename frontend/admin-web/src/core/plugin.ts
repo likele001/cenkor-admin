@@ -95,22 +95,18 @@ export class PluginManager {
     // token 变化时同步（登录/刷新/登出）
     auth.$subscribe(() => syncToken(), { detached: true })
 
+    // 复用主程序的 axios 实例（自带 401 自动刷新 token），避免插件拿过期 token 请求后端。
+    // 返回解析后的响应体；非 2xx 时抛出 Error(detail)，与插件侧 catch 约定一致。
     window.__PLUGIN_API__ = async (method, path, body) => {
-      const headers: Record<string, string> = {}
-      if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`
-      if (body !== undefined) headers['Content-Type'] = 'application/json'
-      const r = await fetch(path, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      })
-      if (!r.ok) {
-        const e = await r.json().catch(() => ({}))
-        throw new Error(e.detail || r.statusText)
+      try {
+        const r = await api({ method, url: path, data: body })
+        if (r.status === 204) return null
+        return r.data
+      } catch (err: any) {
+        const resp = err?.response
+        const detail = resp?.data?.detail || resp?.statusText || err?.message || '请求失败'
+        throw new Error(detail)
       }
-      if (r.status === 204) return null
-      const ct = r.headers.get('content-type') || ''
-      return ct.includes('application/json') ? r.json() : r.text()
     }
 
     try {

@@ -36,6 +36,9 @@ const form = ref({
   sort: 0,
   status: 'published',
   custom_fields: {} as Record<string, any>,
+  seoTitle: '',
+  seoDescription: '',
+  seoKeywords: '',
 })
 
 const featureInput = ref('')
@@ -224,15 +227,15 @@ onMounted(load)
           <div class="grid sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium mb-1.5">Meta 标题（title）</label>
-              <input v-model="form.custom_fields.seo_title" class="input" placeholder="辰科MES · 中小加工厂生产管理系统" />
+              <input v-model="form.seoTitle" class="input" placeholder="辰科MES · 中小加工厂生产管理系统" />
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium mb-1.5">Meta 描述（description）</label>
-              <textarea v-model="form.custom_fields.seo_description" rows="2" class="input" placeholder="源码交付·私有部署·数据不出厂。扫码报工/计件工资/CRM/AI。"></textarea>
+              <textarea v-model="form.seoDescription" rows="2" class="input" placeholder="源码交付·私有部署·数据不出厂。扫码报工/计件工资/CRM/AI。"></textarea>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium mb-1.5">Meta 关键词（keywords，逗号分隔）</label>
-              <input v-model="form.custom_fields.seo_keywords" class="input" placeholder="MES系统,生产管理系统,扫码报工,计件工资,加工厂管理软件" />
+              <input v-model="form.seoKeywords" class="input" placeholder="MES系统,生产管理系统,扫码报工,计件工资,加工厂管理软件" />
             </div>
           </div>
         </div>

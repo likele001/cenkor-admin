@@ -238,6 +238,38 @@ DEFAULT_PRODUCTS = [
         ],
         False, False, None, None, None, 1, None,
     ),
+    (
+        "fettle", "Fettle", "AI 智能体", "中小企业 AI 智能体平台", "ai",
+        "Go 1.22 + Gin / Python FastAPI + LangChain / Vue 3 + TypeScript / PostgreSQL + Redis + Milvus",
+        "自研核心引擎的 AI 智能体自动化平台，面向中小企业提供零代码、开箱即用的智能客服、客户运营、销售跟进等能力。支持多租户、多渠道接入、流式对话、知识库 RAG。",
+        [
+            "AI 智能体管理：创建和管理多个 AI 智能体，个性化人设与工作流",
+            "知识库 RAG：上传文档（PDF/Word/TXT），向量检索增强精确回答",
+            "技能市场：内置技能 + 自定义扩展，热插拔",
+            "SSE 流式对话：实时流式响应，首 token < 100ms",
+            "多渠道接入：Web Widget、微信公众号、REST API、Webhook",
+            "数据分析：对话分析、用量统计、趋势报告",
+            "多租户架构：数据完全隔离，租户级配额控制",
+            "多模型支持：通义千问、DeepSeek、OpenAI、MiniMax 等 10+ 模型"
+        ],
+        False, False, None, None, None, 4, "https://fettle.cenkor.cn",
+    ),
+    (
+        "laborpack", "LaborPack", "劳务管理系统", "智慧劳务管理平台", "enterprise",
+        "ThinkPHP 8 / MySQL / Tailwind CSS",
+        "面向建筑劳务公司的劳务承包管理系统，实现从接单到发薪的全流程数字化管理。覆盖员工档案、班组管理、订单管理、工单派工、工作计划、班组报工、考勤打卡、薪资计算等核心业务。",
+        [
+            "员工与班组管理：工人档案、班组创建与成员分配，Excel 批量导入",
+            "订单与工单：订单全周期管理，Kanban 看板拖拽切换状态",
+            "计划排期与甘特图：可视化排期，日/周/月视图，多维度分组",
+            "班组报工与审核：每日进度上报，审核通过自动生成考勤",
+            "考勤与打卡：GPS 定位打卡，请假在线审批",
+            "薪资计算：自动汇总考勤×日薪/时薪，个税、社保、公积金扣除",
+            "电子工资条：手机端电子签名确认，银行 CSV 导出代发",
+            "Dashboard 与 AI：7 张核心指标卡，AI 智能问答与排班建议"
+        ],
+        False, False, None, None, None, 4, None,
+    ),
 ]
 
 DEFAULT_CASES = [

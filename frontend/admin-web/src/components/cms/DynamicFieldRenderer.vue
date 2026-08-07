@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import MediaPicker from './MediaPicker.vue'
 
 export interface FieldDef {
   id: number
@@ -33,6 +34,28 @@ const fieldValue = computed({
 
 const uploading = ref(false)
 const uploadError = ref('')
+
+// 媒体库选择弹窗状态
+const pickerVisible = ref(false)
+const pickerMultiple = ref(false)
+
+function openMediaPicker(multiple: boolean) {
+  pickerMultiple.value = multiple
+  pickerVisible.value = true
+}
+
+function onMediaSelected(urls: string[]) {
+  if (!urls.length) return
+  if (pickerMultiple.value) {
+    const current = [...(fieldValue.value || [])]
+    for (const u of urls) {
+      if (!current.includes(u)) current.push(u)
+    }
+    fieldValue.value = current
+  } else {
+    fieldValue.value = urls[0]
+  }
+}
 
 const validation = computed(() => props.definition.validation || {})
 
@@ -315,12 +338,15 @@ function onImageError(e: Event) {
 
     <!-- image -->
     <div v-else-if="definition.field_type === 'image'" class="field-input-wrapper">
-      <div v-if="fieldValue" class="image-preview-single">
+        <div v-if="fieldValue" class="image-preview-single">
         <div class="image-card">
           <img :src="fieldValue" class="preview-img" @error="onImageError" />
           <div class="image-actions">
             <button type="button" class="action-btn replace" :disabled="disabled || uploading" @click="onFileUpload('image')">
               {{ uploading ? '⏳' : '🔄' }} 替换
+            </button>
+            <button type="button" class="action-btn pick" :disabled="disabled || uploading" @click="openMediaPicker(false)">
+              📚 从媒体库选择
             </button>
             <button type="button" class="action-btn delete" @click="fieldValue = ''">
               🗑️ 删除
@@ -329,10 +355,17 @@ function onImageError(e: Event) {
         </div>
         <input v-model="fieldValue" type="url" class="field-input image-url-input" placeholder="图片 URL" :disabled="disabled" />
       </div>
-      <div v-else class="upload-zone" @click="!disabled && onFileUpload('image')" :class="{ disabled, uploading }">
-        <div class="upload-icon">🖼️</div>
-        <div class="upload-text">{{ uploading ? '上传中...' : '点击上传图片' }}</div>
-        <div class="upload-hint">支持 JPG、PNG、GIF、WebP 格式</div>
+      <div v-else>
+        <div class="upload-zone" @click="!disabled && onFileUpload('image')" :class="{ disabled, uploading }">
+          <div class="upload-icon">🖼️</div>
+          <div class="upload-text">{{ uploading ? '上传中...' : '点击上传图片' }}</div>
+          <div class="upload-hint">支持 JPG、PNG、GIF、WebP 格式</div>
+        </div>
+        <div class="media-picker-trigger">
+          <button type="button" class="picker-link" :disabled="disabled || uploading" @click="openMediaPicker(false)">
+            📚 或从媒体库选择
+          </button>
+        </div>
       </div>
       <p v-if="uploadError" class="error-text">{{ uploadError }}</p>
     </div>
@@ -353,6 +386,11 @@ function onImageError(e: Event) {
           <div class="upload-icon">➕</div>
           <div class="upload-text">{{ uploading ? '上传中...' : '添加图片' }}</div>
         </div>
+      </div>
+      <div class="media-picker-trigger">
+        <button type="button" class="picker-link" :disabled="disabled || uploading" @click="openMediaPicker(true)">
+          📚 从媒体库选择
+        </button>
       </div>
       <p v-if="uploadError" class="error-text">{{ uploadError }}</p>
     </div>
@@ -489,6 +527,13 @@ function onImageError(e: Event) {
       <input v-model="fieldValue" type="text" class="field-input" :disabled="disabled" />
     </div>
   </div>
+
+  <MediaPicker
+    :visible="pickerVisible"
+    :multiple="pickerMultiple"
+    @close="pickerVisible = false"
+    @select="onMediaSelected"
+  />
 </template>
 
 <style scoped>
@@ -1165,6 +1210,40 @@ function onImageError(e: Event) {
 
 .action-btn.delete:hover {
   background: #fee2e2;
+}
+
+.action-btn.pick {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.action-btn.pick:hover {
+  background: #e5e7eb;
+}
+
+.media-picker-trigger {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.picker-link {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.picker-link:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+.picker-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 错误和警告 */
