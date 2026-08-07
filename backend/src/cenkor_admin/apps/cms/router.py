@@ -1,6 +1,7 @@
 """CMS App · 后台管理路由（需要鉴权 - MVP 阶段先放开）"""
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Any
@@ -24,11 +25,22 @@ from cenkor_admin.core.repository import (
 from cenkor_admin.core.storage import s3
 
 settings = get_settings()
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _media_public_url(bucket: str, key: str, *, presigned_fallback: str | None = None) -> str:
-    """与 presign_upload 一致的公网访问 URL"""
+async def _media_public_url(bucket: str, key: str, *, presigned_fallback: str | None = None) -> str:
+    """与 presign_upload 一致的公网访问 URL。"""
+    try:
+        return await s3.public_url(bucket, key)
+    except Exception:
+        pass
+    try:
+        ep = await s3.public_endpoint()
+        if ep:
+            return f"{ep.rstrip('/')}/{bucket}/{key.lstrip('/')}"
+    except Exception:
+        pass
     if settings.PUBLIC_BASE_URL:
         base = settings.PUBLIC_BASE_URL.rsplit(":", 1)[0]
         return f"{base}:{settings.S3_API_PORT}/{bucket}/{key}"
@@ -36,6 +48,31 @@ def _media_public_url(bucket: str, key: str, *, presigned_fallback: str | None =
         return presigned_fallback.split("?")[0]
     endpoint = settings.S3_ENDPOINT.rstrip("/")
     return f"{endpoint}/{bucket}/{key}"
+
+
+async def _mirror_to_local(
+    bucket: str,
+    key: str,
+    content: bytes | None = None,
+    content_type: str = "application/octet-stream",
+) -> None:
+    """云端上传成功后可选地写一份到本地 MinIO 作备份。
+
+    - content 不为 None 时（服务端代理上传路径）直接写本地；
+    - content 为 None 时（前端直传路径）先从云端下载再写本地。
+    通过 cloud_storage_config.keep_local_backup 开关控制，默认开启。
+    """
+    try:
+        if not await s3.keep_local_backup():
+            return
+        local = s3.minio
+        await local.ensure_bucket(bucket)
+        if content is None:
+            content = await s3.download(bucket, key)
+        import io
+        await local.upload_fileobj(bucket, key, io.BytesIO(content), content_type)
+    except Exception as e:
+        log.warning("media.local_backup_failed", bucket=bucket, key=key, error=str(e))
 
 
 # ===== Product =====
@@ -532,7 +569,7 @@ async def presign_upload(
     current: auth_models.User = Depends(get_current_user),
 ):
     """前端直传预签名（推荐）"""
-    bucket = body.bucket or settings.S3_BUCKET_PUBLIC
+    bucket = body.bucket or await s3.public_bucket()
     await s3.ensure_bucket(bucket)
 
     # 构造 key：日期/uuid-filename
@@ -543,7 +580,7 @@ async def presign_upload(
 
     expires = 600
     upload_url = await s3.presigned_put_url(bucket, key, expires=expires)
-    public_url = _media_public_url(bucket, key, presigned_fallback=upload_url)
+    public_url = await _media_public_url(bucket, key, presigned_fallback=upload_url)
 
     # 写媒体库记录（前端确认上传完成后再调 confirm）
     media = models.Media(
@@ -568,11 +605,11 @@ async def confirm_upload(
     db: AsyncSession = Depends(get_db),
     current: auth_models.User = Depends(get_current_user),
 ):
-    """前端直传后调用此接口确认（更新元数据/尺寸）"""
+    """前端直传后调用此接口确认（更新元数据/尺寸，并把对象镜像到本地 MinIO 作备份）"""
     media = await db.get(models.Media, media_id)
     if not media:
         raise HTTPException(404, "Media not found")
-    # 可以这里用 Pillow 等拿尺寸；MVP 暂时不取
+    await _mirror_to_local(media.bucket, media.key)
     return {"id": media.id, "url": media.url}
 
 
@@ -583,7 +620,7 @@ async def upload_file(
     file: UploadFile = File(...),
 ):
     """服务端代理上传（适合小文件，自动提取图片元数据）"""
-    bucket = settings.S3_BUCKET_PUBLIC
+    bucket = await s3.public_bucket()
     await s3.ensure_bucket(bucket)
 
     content = await file.read()
@@ -594,7 +631,8 @@ async def upload_file(
 
     import io
     await s3.upload_fileobj(bucket, key, io.BytesIO(content), file.content_type or "application/octet-stream")
-    public_url = _media_public_url(bucket, key)
+    await _mirror_to_local(bucket, key, content, file.content_type or "application/octet-stream")
+    public_url = await _media_public_url(bucket, key)
 
     # 提取图片元数据
     img_meta = _extract_image_metadata(content, file.content_type or "")

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import structlog
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import aiobotocore.session
 from aiobotocore.config import AioConfig
@@ -36,7 +36,10 @@ class _S3Fallback:
             aws_access_key_id=self._access_key,
             aws_secret_access_key=self._secret_key,
             region_name=self._region,
-            config=AioConfig(signature_version="s3v4"),
+            config=AioConfig(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},  # MinIO 本机 endpoint 必须用 path-style
+            ),
         ) as c:
             yield c
 
@@ -70,6 +73,18 @@ class _S3Fallback:
         async with self.client() as c:
             await c.delete_object(Bucket=bucket, Key=key)
 
+    def public_url(self, bucket: str, key: str) -> str:
+        ep = self._endpoint.rstrip("/") if self._endpoint else ""
+        return f"{ep}/{bucket}/{key.lstrip('/')}" if ep else f"/{bucket}/{key}"
+
+    async def download(self, bucket: str, key: str) -> bytes:
+        async with self.client() as c:
+            r = await c.get_object(Bucket=bucket, Key=key)
+            return await r["Body"].read()
+
+
+_minio_local = _S3Fallback()
+
 
 class _Dispatch:
     """运行时按配置切换 driver。
@@ -78,6 +93,7 @@ class _Dispatch:
     的 active_provider 加载 driver。如果没装 cloud_storage app，则用旧 .env 配置。
     """
     _driver = None
+    _meta: dict[str, Any] | None = None
 
     async def _resolve(self):
         if self._driver is not None:
@@ -111,15 +127,28 @@ class _Dispatch:
             d = get_driver(cfg.active_provider)
             d.configure(plain)
             self._driver = d
+            self._meta = {
+                "provider": cfg.active_provider,
+                "bucket": plain.get("bucket"),
+                "cdn_domain": plain.get("cdn_domain"),
+            }
             return d
         except Exception as e:
             log.debug("storage.fallback_to_minio", error=str(e))
             self._driver = _S3Fallback()
+            self._meta = {"provider": "minio", "bucket": settings.S3_BUCKET_PUBLIC}
             return self._driver
 
-    async def ensure_bucket(self, bucket: str) -> None:
+    async def public_bucket(self) -> str:
+        """当前激活存储的默认 bucket（cloud_storage 凭据优先于 .env）。"""
+        await self._resolve()
+        bucket = (self._meta or {}).get("bucket")
+        return bucket or settings.S3_BUCKET_PUBLIC
+
+    async def ensure_bucket(self, bucket: str | None = None) -> None:
         d = await self._resolve()
-        await d.ensure_bucket(bucket)
+        target = bucket or await self.public_bucket()
+        await d.ensure_bucket(target)
 
     async def presigned_put_url(self, bucket: str, key: str, expires: int = 600) -> str:
         d = await self._resolve()
@@ -136,6 +165,47 @@ class _Dispatch:
     async def delete(self, bucket: str, key: str) -> None:
         d = await self._resolve()
         await d.delete(bucket, key)
+
+    async def public_endpoint(self) -> str | None:
+        """当前激活存储的公开访问 endpoint（已含 CDN 域名优先）。"""
+        d = await self._resolve()
+        return getattr(d, "public_endpoint", None)
+
+    async def public_url(self, bucket: str, key: str) -> str:
+        """生成对象公网 URL（优先 driver 的 CDN 规则）。"""
+        d = await self._resolve()
+        if hasattr(d, "public_url"):
+            return d.public_url(bucket, key)
+        ep = getattr(d, "public_endpoint", None) or settings.S3_ENDPOINT
+        return f"{str(ep).rstrip('/')}/{bucket}/{key.lstrip('/')}"
+
+    @property
+    def minio(self):
+        """稳定的本地 MinIO driver 单例（用于「云端上传同时本地备份」）。"""
+        return _minio_local
+
+    async def keep_local_backup(self) -> bool:
+        """是否开启「云端上传同时本地 MinIO 备份」（从 cloud_storage_config 读取，默认开启）。"""
+        try:
+            from cenkor_admin.core.db import AsyncSessionLocal
+            from cenkor_admin.apps.cloud_storage.models import CloudStorageConfig
+            from sqlalchemy import select
+            async with AsyncSessionLocal() as db:
+                cfg = (await db.execute(
+                    select(CloudStorageConfig).where(CloudStorageConfig.id == 1)
+                )).scalar_one_or_none()
+                if not cfg:
+                    return True
+                return bool(cfg.keep_local_backup)
+        except Exception:
+            return True
+
+    async def download(self, bucket: str, key: str) -> bytes:
+        """从当前激活存储下载对象内容（用于本地备份回写）。"""
+        d = await self._resolve()
+        async with d.client() as c:
+            r = await c.get_object(Bucket=bucket, Key=key)
+            return await r["Body"].read()
 
 
 s3 = _Dispatch()

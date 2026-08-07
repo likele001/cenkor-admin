@@ -20,13 +20,20 @@ const form = ref({
   href: '',
   sort: 0,
   status: 'published',
+  seoTitle: '',
+  seoDescription: '',
+  seoKeywords: '',
 })
 
 onMounted(async () => {
   if (isNew) return
   try {
     const { data } = await api.get(`/api/v1/cms/cases/${route.params.id}`)
-    Object.assign(form.value, data)
+    Object.assign(form.value, data, {
+      seoTitle: (data as any).seo_title || '',
+      seoDescription: (data as any).seo_description || '',
+      seoKeywords: (data as any).seo_keywords || '',
+    })
   } catch (e: any) {
     error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
   } finally {
@@ -103,6 +110,25 @@ async function save() {
             </select>
           </div>
         </div>
+
+        <!-- SEO -->
+        <div class="space-y-4 pt-4 border-t border-ink-200">
+          <h2 class="font-semibold text-lg">SEO</h2>
+          <p class="text-sm text-ink-500">覆盖站点默认 meta，留空则使用站点全局配置。</p>
+          <div>
+            <label class="block text-sm font-medium mb-1.5">Meta 标题（title）</label>
+            <input v-model="form.seoTitle" class="input" :placeholder="form.name + ' - 客户案例'" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1.5">Meta 描述（description）</label>
+            <textarea v-model="form.seoDescription" rows="2" class="input" placeholder="案例摘要 + 客户成果关键词"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1.5">Meta 关键词（keywords，逗号分隔）</label>
+            <input v-model="form.seoKeywords" class="input" placeholder="客户案例,行业,解决方案" />
+          </div>
+        </div>
+
         <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
         <div class="flex gap-3">
           <button type="submit" :disabled="saving" class="btn-primary">

@@ -1,6 +1,7 @@
 """云存储 App 路由：凭据 CRUD / 文件浏览 / 迁移"""
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime, timezone
 from typing import Any
@@ -93,7 +94,11 @@ async def get_config(
     _: auth_models.User = Depends(require_permission("cloud_storage:read")),
 ):
     row = await _get_config(db)
-    out: dict[str, Any] = {"active_provider": row.active_provider, "providers": {}}
+    out: dict[str, Any] = {
+        "active_provider": row.active_provider,
+        "keep_local_backup": bool(row.keep_local_backup),
+        "providers": {},
+    }
     for p in SUPPORTED_PROVIDERS:
         plain = _creds_for(row, p)
         if plain:
@@ -151,6 +156,24 @@ async def activate(
     row.active_provider = body.provider
     await db.commit()
     return {"ok": True, "active_provider": body.provider}
+
+
+class ConfigSettings(BaseModel):
+    keep_local_backup: bool
+
+
+@router.put("/config", response_model=dict)
+async def save_settings(
+    body: ConfigSettings,
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(require_permission("cloud_storage:admin")),
+):
+    """保存云存储全局设置（如「保留本地备份」开关）。"""
+    row = await _get_config(db)
+    row.keep_local_backup = body.keep_local_backup
+    row.updated_by = user.id
+    await db.commit()
+    return {"ok": True, "keep_local_backup": row.keep_local_backup}
 
 
 # ============================================================
@@ -302,9 +325,10 @@ async def _run_migration(job_id: int, src, dst, bucket: str, prefix: str) -> Non
         failed = 0
         for it in items:
             try:
-                # 读源 → 写目标
-                from cenkor_admin.core.storage import s3 as _old_s3
-                async with _old_s3.client() as c:
+                # 读源 → 写目标。注意：必须用 src（MinIO 源 driver）读对象，
+                # 不能复用 core.storage.s3，因为 active_provider 已切到目标 provider，
+                # 它会从目标 driver 读源 bucket，导致失败。
+                async with src.client() as c:
                     r = await c.get_object(Bucket=src_bucket, Key=it["key"])
                     body = await r["Body"].read()
                 from io import BytesIO

@@ -52,11 +52,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.error("redis.fail", error=str(e))
 
-    # 启动时创建默认 bucket
+    # 启动时校验默认 bucket（cloud_storage 激活时用凭据中的 bucket）
     try:
-        await s3.ensure_bucket(settings.S3_BUCKET_PUBLIC)
-        await s3.ensure_bucket(settings.S3_BUCKET_PRIVATE)
-        log.info("s3.buckets.ready", public=settings.S3_BUCKET_PUBLIC, private=settings.S3_BUCKET_PRIVATE)
+        public_bucket = await s3.public_bucket()
+        await s3.ensure_bucket(public_bucket)
+        log.info("s3.buckets.ready", public=public_bucket)
     except Exception as e:
         log.warning("s3.buckets.fail", error=str(e))
 

@@ -11,8 +11,19 @@ sys.path.insert(0, "src")
 
 from cenkor_admin.core.config import get_settings  # noqa: E402
 from cenkor_admin.core.db import Base  # noqa: E402
-from cenkor_admin.apps.cms import models as cms_models  # noqa: F401, E402
-from cenkor_admin.apps.portal import models as portal_models  # noqa: F401, E402
+# 导入所有 app 的 models，确保 autogenerate 能感知全部表，避免误生成 drop 全表的迁移
+import importlib, os
+import cenkor_admin.apps as _apps_pkg  # noqa: F401
+_APPS_DIR = os.path.dirname(_apps_pkg.__file__)
+for _name in sorted(os.listdir(_APPS_DIR)):
+    if _name.startswith("_"):
+        continue
+    _modfile = os.path.join(_APPS_DIR, _name, "models.py")
+    if os.path.isfile(_modfile):
+        try:
+            importlib.import_module(f"cenkor_admin.apps.{_name}.models")  # noqa: F401
+        except Exception:
+            pass
 
 config = context.config
 if config.config_file_name is not None:

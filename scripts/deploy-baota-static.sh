@@ -51,6 +51,7 @@ echo "  | 域名              | 根目录（dist）                             
 echo "  |-------------------|---------------------------------------------|"
 echo "  | admin.example.com | /www/wwwroot/cenkor-admin/frontend/admin-web/dist   |"
 echo "  | portal.example.com| /www/wwwroot/cenkor-admin/frontend/portal-web/dist  |"
+echo "  | landing.example.com| /www/wwwroot/cenkor-admin/frontend/landing-web/dist |"
 echo ""
 echo "  每个站点：伪静态 SPA + location /api/ → 127.0.0.1:8002"
 echo "  文档：docs/CORE_PLATFORM.md · docs/BAOTA_STATIC_DEPLOY.md"
