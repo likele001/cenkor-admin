@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 const { t } = useI18n()
 import { ref, onMounted, computed } from 'vue'
 import { api } from '@/lib/api'
@@ -188,7 +189,7 @@ onMounted(load)
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">描述</label>
-            <textarea v-model="form.description" rows="6" class="input"></textarea>
+            <RichTextEditor v-model="form.description" />
           </div>
           <div class="flex gap-3 pt-2">
             <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? '保存中...' : '保存' }}</button>

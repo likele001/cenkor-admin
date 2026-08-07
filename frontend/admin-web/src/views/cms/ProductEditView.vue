@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 const { t } = useI18n()
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -155,7 +156,7 @@ onMounted(load)
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium mb-1.5">{{ t('productEdit.详细描述_1r9w02') }}</label>
-              <textarea v-model="form.desc" required rows="4" class="input"></textarea>
+              <RichTextEditor v-model="form.desc" />
             </div>
           </div>
         </div>

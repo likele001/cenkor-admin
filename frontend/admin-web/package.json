@@ -11,15 +11,23 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.5",
-    "pinia": "^2.1.7",
     "@tanstack/vue-query": "^5.28.0",
+    "@tiptap/extension-image": "^2.27.2",
+    "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/extension-placeholder": "^2.27.2",
+    "@tiptap/extension-underline": "^2.27.2",
+    "@tiptap/pm": "^2.27.2",
+    "@tiptap/starter-kit": "^2.27.2",
+    "@tiptap/vue-3": "^2.27.2",
     "axios": "^1.6.7",
+    "dompurify": "^3.4.13",
     "echarts": "^5.5.0",
-    "vue-echarts": "^7.0.0",
+    "pinia": "^2.1.7",
     "vditor": "^3.9.0",
-    "vue-i18n": "^9.13.0"
+    "vue": "^3.4.0",
+    "vue-echarts": "^7.0.0",
+    "vue-i18n": "^9.13.0",
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
+import RichTextContent from '@/components/RichTextContent.vue'
 const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
@@ -120,12 +122,13 @@ onMounted(load)
             <th class="px-4 py-3 font-medium">状态</th>
             <th class="px-4 py-3 font-medium">浏览</th>
             <th class="px-4 py-3 font-medium">创建时间</th>
+            <th class="px-4 py-3 font-medium">内容预览</th>
             <th class="px-4 py-3 font-medium text-right">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="items.length === 0">
-            <td colspan="7" class="px-4 py-12 text-center text-ink-400">暂无公告</td>
+            <td colspan="8" class="px-4 py-12 text-center text-ink-400">暂无公告</td>
           </tr>
           <tr v-for="item in items" :key="item.id" class="border-b border-ink-100 last:border-0 hover:bg-ink-50">
             <td class="px-4 py-3 font-medium">
@@ -143,6 +146,11 @@ onMounted(load)
             </td>
             <td class="px-4 py-3 text-ink-500">{{ item.view_count }}</td>
             <td class="px-4 py-3 text-ink-500 text-xs">{{ item.created_at?.slice(0, 10) }}</td>
+            <td class="px-4 py-3 align-top">
+              <div class="max-h-32 max-w-[280px] overflow-auto text-xs text-ink-600">
+                <RichTextContent :content="item.content || ''" />
+              </div>
+            </td>
             <td class="px-4 py-3 text-right space-x-2">
               <button class="text-sm text-ink-600 hover:text-ink-900" @click="openEdit(item)">编辑</button>
               <button class="text-sm text-red-600 hover:underline" @click="del(item)">删除</button>
@@ -186,7 +194,13 @@ onMounted(load)
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">内容</label>
-            <textarea v-model="form.content" required rows="8" class="input"></textarea>
+            <RichTextEditor v-model="form.content" />
+            <div class="mt-3">
+              <span class="block text-xs text-ink-400 mb-1">内容预览</span>
+              <div class="border border-ink-200 rounded-lg p-3 bg-ink-50 max-h-60 overflow-auto">
+                <RichTextContent :content="form.content" />
+              </div>
+            </div>
           </div>
           <div class="flex gap-4">
             <label class="flex items-center gap-2 text-sm">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 const { t } = useI18n()
 import { ref, onMounted, watch } from 'vue'
 import { api } from '@/lib/api'
@@ -181,7 +182,7 @@ watch(search, () => { load() })
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ t('tasks.描述_hrlt') }}</label>
-            <textarea v-model="form.description" rows="2" class="input"></textarea>
+            <RichTextEditor v-model="form.description" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-2">权限（{{ permissions.length }} 个）</label>
