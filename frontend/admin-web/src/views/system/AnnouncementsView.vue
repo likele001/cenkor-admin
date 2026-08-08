@@ -100,8 +100,8 @@ onMounted(load)
     </div>
 
     <div class="card mb-4 flex flex-wrap gap-3 items-center">
-      <input v-model="search" type="text" class="input w-60" placeholder="搜索标题/内容..." @keyup.enter="load" />
-      <select v-model="categoryFilter" class="input w-32" @change="load">
+      <input v-model="search" type="text" class="input w-full sm:w-60" placeholder="搜索标题/内容..." @keyup.enter="load" />
+      <select v-model="categoryFilter" class="input w-full sm:w-32" @change="load">
         <option value="">全部分类</option>
         <option value="general">通用</option>
         <option value="system">系统</option>
@@ -113,7 +113,7 @@ onMounted(load)
     <div v-if="loading" class="card text-ink-500">加载中...</div>
     <div v-else-if="error" class="card text-red-600">{{ error }}</div>
     <div v-else class="card overflow-hidden p-0">
-      <table class="w-full text-sm">
+      <div class="overflow-x-auto"><table class="w-full text-sm">
         <thead class="bg-ink-50 border-b border-ink-200">
           <tr class="text-left text-ink-500">
             <th class="px-4 py-3 font-medium">标题</th>
@@ -157,7 +157,7 @@ onMounted(load)
             </td>
           </tr>
         </tbody>
-      </table>
+      </table></div>
     </div>
 
     <!-- Edit Modal -->
@@ -169,7 +169,7 @@ onMounted(load)
             <label class="block text-sm font-medium mb-1.5">标题</label>
             <input v-model="form.title" required class="input" />
           </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium mb-1.5">分类</label>
               <select v-model="form.category" class="input">

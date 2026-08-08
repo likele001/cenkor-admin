@@ -209,7 +209,7 @@ onMounted(async () => {
     </div>
 
     <div v-if="!ct" class="card text-ink-500">{{ t('usersList.加载中_b0k5km') }}</div>
-    <div v-else class="grid grid-cols-3 gap-4">
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- Main column: dynamic fields -->
       <div class="col-span-2 space-y-4">
         <div class="card space-y-3">
@@ -243,7 +243,7 @@ onMounted(async () => {
               @click="activeGroup = g.id"
             >{{ g.label }}</button>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <DynamicFieldRenderer
               v-for="fd in visibleFields"
               :key="fd.id"

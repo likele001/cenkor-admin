@@ -114,7 +114,7 @@ onMounted(async () => {
       <p class="text-ink-500">{{ t('templatePreview.使用_1mk1ub') }}</p>
     </div>
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <!-- Left: editor -->
       <div class="space-y-3">
         <div class="card">

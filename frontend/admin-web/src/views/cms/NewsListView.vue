@@ -73,7 +73,7 @@ onMounted(load)
           </div>
         </div>
         <div class="card overflow-hidden p-0">
-          <table class="w-full text-sm">
+          <div class="overflow-x-auto"><table class="w-full text-sm">
             <thead class="bg-ink-50 border-b border-ink-200">
               <tr class="text-left text-ink-500">
                 <th class="px-4 py-3 font-medium">{{ t('newsList.标题_ij5d') }}</th>
@@ -103,7 +103,7 @@ onMounted(load)
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </main>

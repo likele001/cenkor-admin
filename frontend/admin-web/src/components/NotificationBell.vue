@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
     >
       <div
         v-if="open"
-        class="absolute right-0 mt-2 w-96 max-h-[70vh] overflow-hidden flex flex-col rounded-xl border border-ink-200 bg-white shadow-lg z-50"
+        class="absolute right-0 mt-2 w-full sm:w-96 max-h-[70vh] overflow-hidden flex flex-col rounded-xl border border-ink-200 bg-white shadow-lg z-50"
       >
         <div class="flex items-center justify-between px-4 py-3 border-b border-ink-200">
           <h3 class="font-semibold text-sm">通知</h3>
