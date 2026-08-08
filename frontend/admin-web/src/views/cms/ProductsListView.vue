@@ -146,7 +146,7 @@ onMounted(load)
       />
 
       <div class="card overflow-hidden p-0">
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto"><table class="w-full text-sm">
           <thead class="bg-ink-50 border-b border-ink-200">
             <tr class="text-left text-ink-500">
               <th class="px-4 py-3 w-10">
@@ -212,7 +212,7 @@ onMounted(load)
               </td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
 

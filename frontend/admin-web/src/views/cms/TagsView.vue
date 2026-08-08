@@ -101,7 +101,7 @@ onMounted(async () => {
         <p class="text-ink-500">{{ t('tags.管理各内_2f5syy') }}</p>
       </div>
       <div class="flex gap-2">
-        <select v-model="selectedCtKey" class="input w-40" @change="onCtChange">
+        <select v-model="selectedCtKey" class="input w-full sm:w-40" @change="onCtChange">
           <option v-for="ct in contentTypes" :key="ct.key" :value="ct.key">{{ ct.name }}</option>
         </select>
         <button class="btn-primary" @click="openCreate">{{ t('tags.text_y2of06') }}</button>

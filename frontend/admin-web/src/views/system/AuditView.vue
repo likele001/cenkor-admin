@@ -73,7 +73,7 @@ onMounted(load)
 
     <main class="max-w-7xl mx-auto px-6 py-10">
       <!-- 统计卡片 -->
-      <div v-if="stats && stats.total !== undefined" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div v-if="stats && stats.total !== undefined" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="card text-center">
           <div class="text-3xl font-semibold">{{ stats.total }}</div>
           <div class="text-sm text-ink-500 mt-1">{{ t('audit.近_1ozmyu') }}</div>
@@ -121,7 +121,7 @@ onMounted(load)
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
         <div class="card overflow-hidden p-0">
-          <table class="w-full text-sm">
+          <div class="overflow-x-auto"><table class="w-full text-sm">
             <thead class="bg-ink-50 border-b border-ink-200">
               <tr class="text-left text-ink-500">
                 <th class="px-4 py-3 font-medium">{{ t('auditDetailDrawer.时间_i5z2') }}</th>
@@ -157,7 +157,7 @@ onMounted(load)
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </main>

@@ -141,7 +141,7 @@ watch(search, () => { load() })
 
     <main class="max-w-7xl mx-auto px-6 py-10">
       <!-- 统计 -->
-      <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div class="card text-center">
           <div class="text-3xl font-semibold">{{ stats.total }}</div>
           <div class="text-sm text-ink-500 mt-1">{{ t('media.总文件数_ck7e1y') }}</div>
@@ -191,7 +191,7 @@ watch(search, () => { load() })
       <div v-else-if="filtered.length === 0" class="card text-center text-ink-400 py-12">
         {{ t('media.暂无媒体') }}
       </div>
-      <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         <div
           v-for="m in filtered" :key="m.id"
           class="card !p-3 group cursor-pointer hover:shadow-lg transition-shadow"
@@ -216,7 +216,7 @@ watch(search, () => { load() })
       </div>
 
       <!-- 详情侧栏（选中时显示）-->
-      <div v-if="selected" class="fixed bottom-6 right-6 w-96 card !p-5 shadow-2xl z-40">
+      <div v-if="selected" class="fixed bottom-6 right-6 w-full sm:w-96 card !p-5 shadow-2xl z-40">
         <div class="flex items-start justify-between mb-3">
           <h3 class="font-semibold">{{ t('media.媒体详情_brjfj4') }}</h3>
           <button @click="selected = null" class="text-ink-400 hover:text-ink-900">✕</button>

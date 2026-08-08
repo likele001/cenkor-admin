@@ -155,7 +155,7 @@ onMounted(async () => {
         <p class="text-ink-500">{{ t('entryList.管理各内_1vsukx') }}</p>
       </div>
       <div class="flex gap-2">
-        <select v-model="selectedCtKey" class="input w-40" @change="onCtChange">
+        <select v-model="selectedCtKey" class="input w-full sm:w-40" @change="onCtChange">
           <option v-for="ct in contentTypes" :key="ct.key" :value="ct.key">{{ ct.icon }} {{ ct.name }}</option>
         </select>
         <button class="btn-primary" @click="newEntry">{{ t('entryList.text_y2oa4s') }}</button>
@@ -164,12 +164,12 @@ onMounted(async () => {
 
     <!-- Filters -->
     <div class="card mb-4 flex flex-wrap gap-3 items-center">
-      <input v-model="search" type="text" class="input w-60" :placeholder="t('entryList.按标题搜_1z0o89')" @keyup.enter="onSearch" />
-      <select v-if="selectedCt?.supports_category" v-model.number="categoryFilter" class="input w-40" @change="onStatusChange">
+      <input v-model="search" type="text" class="input w-full sm:w-60" :placeholder="t('entryList.按标题搜_1z0o89')" @keyup.enter="onSearch" />
+      <select v-if="selectedCt?.supports_category" v-model.number="categoryFilter" class="input w-full sm:w-40" @change="onStatusChange">
         <option :value="null">{{ t('entryList.全部分类_av9kmt') }}</option>
         <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
-      <select v-model="statusFilter" class="input w-32" @change="onStatusChange">
+      <select v-model="statusFilter" class="input w-full sm:w-32" @change="onStatusChange">
         <option value="">{{ t('portalUsersList.全部状态_avez63') }}</option>
         <option value="draft">{{ t('productEdit.草稿_n02e') }}</option>
         <option value="published">{{ t('productEdit.已发布_e656s') }}</option>

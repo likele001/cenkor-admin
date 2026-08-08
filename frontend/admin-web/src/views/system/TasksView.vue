@@ -95,7 +95,7 @@ onMounted(load)
       <div v-if="loading" class="card text-ink-500">{{ t('usersList.加载中_b0k5km') }}</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else class="card p-0 overflow-hidden">
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto"><table class="w-full text-sm">
           <thead class="bg-ink-50 border-b border-ink-200">
             <tr class="text-left text-ink-500">
               <th class="px-4 py-3 font-medium">{{ t('tasks.任务_dvye') }}</th>
@@ -144,7 +144,7 @@ onMounted(load)
               </td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
     </main>
   </div>
