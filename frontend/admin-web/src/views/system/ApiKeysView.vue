@@ -144,7 +144,7 @@ onMounted(load)
         {{ t('apiKeys.还没有APIKey') }}
       </div>
       <div v-else class="card p-0 overflow-hidden">
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto"><table class="w-full text-sm">
           <thead class="bg-ink-50 border-b border-ink-200">
             <tr class="text-left text-ink-500">
               <th class="px-4 py-3 font-medium">{{ t('tags.名称_eyrn') }}</th>
@@ -180,7 +180,7 @@ onMounted(load)
               </td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
     </main>
   </div>

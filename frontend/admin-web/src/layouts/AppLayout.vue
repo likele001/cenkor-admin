@@ -175,6 +175,12 @@ function isGroupActive(items: MenuItem[]) {
   return items.some(i => isActive(i.path!))
 }
 
+function closeIfMobile() {
+  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+    sidebarOpen.value = false
+  }
+}
+
 onMounted(async () => {
   if (!auth.isAuthed) return
   try {
@@ -200,10 +206,12 @@ async function logout() {
 
 <template>
   <div class="min-h-screen bg-ink-50 flex">
+    <!-- Mobile overlay -->
+    <div v-if="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-black/40 z-30 md:hidden"></div>
     <!-- Sidebar -->
     <aside
-      class="bg-white border-r border-ink-200 flex flex-col shrink-0 transition-all duration-200 z-30"
-      :class="sidebarOpen ? 'w-56' : 'w-0 overflow-hidden'"
+      class="bg-white border-r border-ink-200 flex flex-col shrink-0 z-40 md:z-30 fixed inset-y-0 left-0 w-full sm:w-64 max-w-[82%] transform transition-transform duration-200 md:static md:translate-x-0"
+      :class="sidebarOpen ? 'translate-x-0 md:w-56' : '-translate-x-full md:w-0 md:overflow-hidden'"
     >
       <!-- Logo -->
       <div class="h-14 flex items-center gap-2 px-4 border-b border-ink-200 shrink-0">
@@ -220,6 +228,7 @@ async function logout() {
               v-for="item in group.items"
               :key="item.path!"
               :to="item.path!"
+              @click="closeIfMobile"
               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors mb-0.5"
               :class="isActive(item.path!) ? 'bg-ink-100 text-ink-900 font-medium' : 'text-ink-600 hover:bg-ink-50'"
             >
@@ -248,6 +257,7 @@ async function logout() {
                 v-for="item in group.items"
                 :key="item.path!"
                 :to="item.path!"
+                @click="closeIfMobile"
                 class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors mb-0.5"
                 :class="isActive(item.path!) ? 'bg-ink-100 text-ink-900 font-medium' : 'text-ink-500 hover:text-ink-700 hover:bg-ink-50'"
               >
@@ -271,7 +281,7 @@ async function logout() {
             </svg>
           </button>
           <div class="flex-1" />
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
             <NotificationBell v-if="me" />
             <LocaleSwitcher />
             <span v-if="me" class="text-sm text-ink-500 hidden sm:inline">{{ me.nickname || me.username }}</span>
@@ -281,7 +291,7 @@ async function logout() {
       </header>
 
       <!-- Content -->
-      <main class="flex-1 p-6">
+      <main class="flex-1 p-4 sm:p-6">
         <div class="max-w-7xl mx-auto">
           <RouterView />
         </div>

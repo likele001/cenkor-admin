@@ -170,7 +170,7 @@ watch(search, () => { load() })
       <div class="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建角色' : '编辑角色' }}</h2>
         <form @submit.prevent="save" class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium mb-1.5">Code *</label>
               <input v-model="form.code" required :disabled="!isNew" class="input" placeholder="cms_editor" />

@@ -139,7 +139,7 @@ watch(search, () => { load() })
           </div>
         </div>
         <div class="card overflow-hidden p-0">
-          <table class="w-full text-sm">
+          <div class="overflow-x-auto"><table class="w-full text-sm">
             <thead class="bg-ink-50 border-b border-ink-200">
               <tr class="text-left text-ink-500">
                 <th class="px-4 py-3 font-medium">{{ t('usersList.用户名_hmxge') }}</th>
@@ -186,7 +186,7 @@ watch(search, () => { load() })
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </main>
@@ -196,7 +196,7 @@ watch(search, () => { load() })
       <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建用户' : '编辑用户' }}</h2>
         <form @submit.prevent="save" class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium mb-1.5">{{ t('usersList.用户名_18merf') }}</label>
               <input v-model="form.username" required :disabled="!isNew" class="input" />
@@ -223,7 +223,7 @@ watch(search, () => { load() })
               </label>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium mb-1.5">{{ t('usersList.状态_k1e3') }}</label>
               <select v-model="form.status" class="input">

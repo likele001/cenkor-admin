@@ -65,7 +65,7 @@ const current = computed(() => localeStore.currentMeta)
     >
       <div
         v-if="open"
-        class="absolute right-0 mt-1.5 w-40 rounded-lg border border-ink-200 bg-white shadow-lg py-1 z-50"
+        class="absolute right-0 mt-1.5 w-full sm:w-40 rounded-lg border border-ink-200 bg-white shadow-lg py-1 z-50"
         role="menu"
       >
         <button

@@ -128,7 +128,7 @@ import { computed } from 'vue'
     </div>
 
     <!-- Stats -->
-    <div v-if="stats" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+    <div v-if="stats" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-6">
       <div class="card py-3">
         <div class="text-xs text-ink-500">{{ t('portalUsersList.总用户_envyi') }}</div>
         <div class="text-2xl font-semibold">{{ stats.total }}</div>
@@ -153,8 +153,8 @@ import { computed } from 'vue'
 
     <!-- Filters -->
     <div class="card mb-4 flex flex-wrap gap-3 items-center">
-      <input v-model="search" type="text" class="input w-60" :placeholder="t('portalUsersList.按用户名_11s1ir')" @keyup.enter="load" />
-      <select v-model="statusFilter" class="input w-32" @change="load">
+      <input v-model="search" type="text" class="input w-full sm:w-60" :placeholder="t('portalUsersList.按用户名_11s1ir')" @keyup.enter="load" />
+      <select v-model="statusFilter" class="input w-full sm:w-32" @change="load">
         <option value="">{{ t('portalUsersList.全部状态_avez63') }}</option>
         <option value="active">{{ t('usersList.活跃_jcvc') }}</option>
         <option value="disabled">{{ t('usersList.禁用_lb5z') }}</option>
@@ -178,7 +178,7 @@ import { computed } from 'vue'
           <th class="py-2 px-2">{{ t('portalUsersList.注册IP') }}</th>
           <th class="py-2 px-2">{{ t('portalUsersList.最后登录_dckibs') }}</th>
           <th class="py-2 px-2">{{ t('portalUsersList.注册时间_e2y82q') }}</th>
-          <th class="py-2 px-2 w-40">{{ t('usersList.操作_hkxb') }}</th>
+          <th class="py-2 px-2 w-full sm:w-40">{{ t('usersList.操作_hkxb') }}</th>
         </tr>
       </thead>
       <tbody>

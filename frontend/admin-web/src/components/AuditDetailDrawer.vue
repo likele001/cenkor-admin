@@ -90,7 +90,7 @@ function diffKeys(diff: any): Array<{ key: string; before: any; after: any }> {
             <template v-else-if="detail">
               <section>
                 <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">基本信息</h3>
-                <dl class="grid grid-cols-2 gap-2 text-sm">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   <div><dt class="text-ink-500">方法</dt><dd class="font-mono">{{ detail.method }}</dd></div>
                   <div><dt class="text-ink-500">状态</dt><dd>{{ detail.status_code }}</dd></div>
                   <div class="col-span-2"><dt class="text-ink-500">路径</dt><dd class="font-mono text-xs break-all">{{ detail.path }}</dd></div>
@@ -106,10 +106,10 @@ function diffKeys(diff: any): Array<{ key: string; before: any; after: any }> {
               <section v-if="diffKeys(detail.diff).length > 0">
                 <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">变更对比</h3>
                 <div class="border border-ink-200 rounded-lg overflow-hidden">
-                  <table class="w-full text-xs">
+                  <div class="overflow-x-auto"><table class="w-full text-xs">
                     <thead class="bg-ink-50">
                       <tr class="text-ink-500 text-left">
-                        <th class="px-3 py-2 w-32 font-medium">字段</th>
+                        <th class="px-3 py-2 w-full sm:w-32 font-medium">字段</th>
                         <th class="px-3 py-2 font-medium">变更前</th>
                         <th class="px-3 py-2 font-medium">变更后</th>
                       </tr>
@@ -125,7 +125,7 @@ function diffKeys(diff: any): Array<{ key: string; before: any; after: any }> {
                         </td>
                       </tr>
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
               </section>
 

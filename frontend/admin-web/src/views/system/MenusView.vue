@@ -165,7 +165,7 @@ onMounted(load)
         </div>
 
         <div class="card overflow-hidden p-0">
-          <table class="w-full text-sm">
+          <div class="overflow-x-auto"><table class="w-full text-sm">
             <thead class="bg-ink-50 border-b border-ink-200">
               <tr class="text-left text-ink-500">
                 <th class="px-4 py-3 font-medium">{{ t('menus.菜单_mvw9') }}</th>
@@ -224,7 +224,7 @@ onMounted(load)
                 </tr>
               </template>
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </main>
@@ -244,7 +244,7 @@ onMounted(load)
             <label class="block text-sm font-medium mb-1.5">{{ t('newsEdit.标题_dqp6wr') }}</label>
             <input v-model="form.title" required class="input" :placeholder="t('menus.内容管理')" />
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1.5">{{ t('fieldDefinitions.图标_fd8p') }}</label>
               <input v-model="form.icon" class="input" placeholder="newspaper" />

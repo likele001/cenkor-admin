@@ -272,7 +272,7 @@ onMounted(load)
       <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-4">{{ editingField ? '编辑字段' : '新建字段' }}</h2>
         <div class="space-y-3">
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">{{ t('fieldDefinitions.字段_1ket27') }}</label>
               <input v-model="fieldForm.field_key" class="input" placeholder="price" :disabled="!!editingField" />
@@ -282,7 +282,7 @@ onMounted(load)
               <input v-model="fieldForm.label" class="input" :placeholder="t('fieldDefinitions.价格_e04l')" />
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">{{ t('fieldDefinitions.字段类型_bz47ji') }}</label>
               <select v-model="fieldForm.field_type" class="input">
@@ -297,7 +297,7 @@ onMounted(load)
               </select>
             </div>
           </div>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">{{ t('fieldDefinitions.默认值_nxrsg') }}</label>
               <input v-model="fieldForm.default_value" class="input" :placeholder="t('fieldDefinitions.可选_f2ey')" />
@@ -350,7 +350,7 @@ onMounted(load)
             <label class="block text-sm font-medium mb-1">{{ t('productsList.标签_idef') }}</label>
             <input v-model="groupForm.label" class="input" :placeholder="t('productEdit.基础信息_blh1h0')" />
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">{{ t('productEdit.排序_hge5') }}</label>
               <input v-model.number="groupForm.sort" type="number" class="input" />
