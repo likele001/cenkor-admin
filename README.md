@@ -26,7 +26,21 @@ docker compose exec backend python -m cenkor_admin.scripts.seed
 - API：http://localhost:8000/api/docs
 - 默认账号：`admin@cenkor.cn` / `admin123`
 
+> ⚠️ **安全提示（务必阅读）**
+>
+> 上面的账号是初始化种子数据里的默认管理员，密码以明文写在文档中。
+> **任何部署到公网之前，必须先做三件事：**
+> 1. 立即修改默认管理员密码
+> 2. 修改 `.env` 中的 `SECRET_KEY`（不要用仓库示例里的占位值）
+> 3. 删除或禁用不需要的种子账号
+>
+> 否则任何人都可以用 `admin@cenkor.cn` / `admin123` 直接登录你的后台。
+
 ## 生产部署（核心）
+
+> 部署到公网前，请先完成上文「安全提示」中的三件事（改默认密码、换 `SECRET_KEY`、
+> 清理种子账号），并确认 `.env` 未被提交进版本库。
+
 
 | 模式 | 命令 | 文档 |
 |------|------|------|
@@ -68,3 +82,12 @@ bash scripts/package-core.sh    # → release/cenkor-admin-core-*.tar.gz
 ```bash
 bash scripts/backup.sh
 ```
+
+## 开源许可
+
+本项目基于 [MIT License](LICENSE) 开源，版权归 **李可乐** 所有（© 2026）。
+
+你可以自由地使用、复制、修改、合并、发布、分发、再许可及销售本软件，
+**包括用于商业目的**，唯一条件是保留上述版权声明与许可声明。
+
+本软件按「原样」提供，不作任何明示或暗示的担保，详见 [LICENSE](LICENSE)。
