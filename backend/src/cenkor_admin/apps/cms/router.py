@@ -17,6 +17,7 @@ from cenkor_admin.apps.cms import models, schemas
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
+from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.core.repository import (
     apply_filters,
     paginate,
@@ -610,6 +611,11 @@ async def confirm_upload(
     if not media:
         raise HTTPException(404, "Media not found")
     await _mirror_to_local(media.bucket, media.key)
+    # 插件框架：触发媒体上传确认事件
+    try:
+        await dispatch("media.uploaded", media=media, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="media.uploaded", error=str(e))
     return {"id": media.id, "url": media.url}
 
 
@@ -648,6 +654,12 @@ async def upload_file(
     db.add(media)
     await db.commit()
     await db.refresh(media)
+
+    # 插件框架：触发媒体上传事件
+    try:
+        await dispatch("media.uploaded", media=media, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="media.uploaded", error=str(e))
 
     return schemas.MediaUploadResponse(
         id=media.id, url=public_url, mime=media.mime, size=media.size,

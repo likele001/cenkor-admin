@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models, schemas
 from cenkor_admin.apps.auth.oauth import feishu
+from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.apps.notification.models import PasswordReset
 from cenkor_admin.apps.rbac.models import (
     Role,
@@ -103,6 +104,17 @@ def _build_user_brief(user: models.User) -> schemas.UserBrief:
         permissions=sorted(permissions),
         menus=menus,
     )
+
+
+async def _is_captcha_required(db: AsyncSession) -> bool:
+    """读取 system_settings.security.captcha_required；默认开启（向后兼容）。"""
+    s = await db.get(models.SystemSetting, "security.captcha_required")
+    if not s:
+        return True
+    v = s.value
+    if isinstance(v, str):
+        return v.strip().lower() in ("1", "true", "yes", "on")
+    return bool(v)
 
 
 # ---- 注册（portal 用户中心） ----
@@ -200,7 +212,8 @@ async def change_own_password(
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """账号密码登录。username 可以是邮箱、用户名或手机号。"""
-    _verify_slider_captcha(body.captcha_token)
+    if await _is_captcha_required(db):
+        _verify_slider_captcha(body.captcha_token)
     # 查找用户
     stmt = select(models.User).where(
         models.User.deleted_at.is_(None),
@@ -243,6 +256,12 @@ async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession =
 
     log.info("auth.login.ok", user_id=user.id, username=user.username)
 
+    # 插件框架：触发登录成功事件
+    try:
+        await dispatch("user.login", user=user, db=db, request=request)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="user.login", error=str(e))
+
     # 重新加载（含权限）
     user = await _load_user_with_perms(db, user.id)
     brief = _build_user_brief(user)
@@ -253,6 +272,11 @@ async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession =
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=brief,
     )
+
+
+@router.get("/login-config", summary="登录页配置（公开，无需认证）")
+async def login_config(db: AsyncSession = Depends(get_db)):
+    return {"captcha_required": await _is_captcha_required(db)}
 
 
 @router.post("/refresh", response_model=schemas.TokenResponse)

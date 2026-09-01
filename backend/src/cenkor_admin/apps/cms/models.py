@@ -56,6 +56,8 @@ class ContentType(Base):
 
     supports_tags: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    translatable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
     default_list_template: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     default_detail_template: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -376,6 +378,8 @@ class Entry(Base):
 
     custom_fields: Mapped[dict[str, Any]] = mapped_column(json_column(), default=dict)
 
+    seo: Mapped[dict[str, Any] | None] = mapped_column(json_column(), nullable=True, default=dict)
+
     category_id: Mapped[int | None] = mapped_column(
 
         Integer, ForeignKey("cms_categories.id", ondelete="SET NULL"), nullable=True
@@ -387,6 +391,10 @@ class Entry(Base):
     author_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    expire_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     sort: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -423,6 +431,74 @@ class Entry(Base):
         Index("ix_cms_entries_custom_fields", "custom_fields", postgresql_using="gin"),
 
     )
+
+
+class EntryVersion(Base):
+
+    """内容版本快照（M1·P0 版本控制）。
+
+    每次 Entry 保存（创建/更新/回滚）都写一条不可变快照；
+    通过 ``POST /entries/{id}/restore/{v}`` 一键回滚。
+    """
+
+    __tablename__ = "cms_entry_versions"
+
+
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    entry_id: Mapped[int] = mapped_column(
+
+        Integer, ForeignKey("cms_entries.id", ondelete="CASCADE"), nullable=False, index=True
+
+    )
+
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    data: Mapped[dict[str, Any]] = mapped_column(json_column(), default=dict)
+
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+
+    __table_args__ = (
+
+        UniqueConstraint("entry_id", "version", name="uq_entry_version"),
+
+    )
+
+
+class EntryReviewLog(Base):
+
+    """发布审批记录（M2·P1 2.4 发布工作流）"""
+
+    __tablename__ = "cms_entry_review_log"
+
+
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    entry_id: Mapped[int] = mapped_column(
+
+        Integer, ForeignKey("cms_entries.id", ondelete="CASCADE"), nullable=False, index=True
+
+    )
+
+    action: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    from_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    to_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    reviewer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 
@@ -657,3 +733,108 @@ class Media(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Language(Base):
+
+    """站点语言（M1·P0 多语言 i18n）"""
+
+    __tablename__ = "cms_languages"
+
+
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+
+    flag: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    sort: Mapped[int] = mapped_column(Integer, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    updated_at: Mapped[datetime] = mapped_column(
+
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+
+    )
+
+
+
+class EntryTranslation(Base):
+
+    """条目翻译（M1·P0 多语言 i18n）。
+
+    主表 cms_entries 保留默认语言；其余语言存本表 field_values JSONB。
+    公开 API 通过 ``?lang=`` 读取并覆盖 title/content/custom_fields。
+    """
+
+    __tablename__ = "cms_entry_translations"
+
+
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    entry_id: Mapped[int] = mapped_column(
+
+        Integer, ForeignKey("cms_entries.id", ondelete="CASCADE"), nullable=False, index=True
+
+    )
+
+    lang: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    field_values: Mapped[dict[str, Any]] = mapped_column(json_column(), default=dict)
+
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    updated_at: Mapped[datetime] = mapped_column(
+
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+
+    )
+
+
+
+    __table_args__ = (
+
+        UniqueConstraint("entry_id", "lang", name="uq_entry_translation_lang"),
+
+    )
+
+
+class EntryPreview(Base):
+
+    """条目暂存预览（M4·P3 4.4 staging）。
+
+    草稿/已通过内容可生成带 token 的预览链接，发布后自动失效。
+    """
+
+    __tablename__ = "cms_entry_previews"
+
+
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    entry_id: Mapped[int] = mapped_column(
+
+        Integer, ForeignKey("cms_entries.id", ondelete="CASCADE"), nullable=False, index=True
+
+    )
+
+    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

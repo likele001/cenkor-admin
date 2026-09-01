@@ -83,7 +83,30 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("app.auto_install.check_fail", error=str(e))
 
-    yield
+    # 注册内置钩子处理器（插件框架 M1·P0）：导入模块即触发 @hook 装饰器注册
+    try:
+        from cenkor_admin.apps.system import hooks as _builtin_hooks  # noqa: F401
+        from cenkor_admin.apps.system import webhooks as _webhook_hooks  # noqa: F401  (M3·P2)
+        log.info("hooks.builtin_loaded", handlers=len(_builtin_hooks.__dict__))
+    except Exception as e:
+        log.warning("hooks.builtin_failed", error=str(e))
+
+    # 定时发布调度器（M2·P1 2.5）
+    scheduler_task = None
+    try:
+        from cenkor_admin.core.scheduler import scheduler_loop
+        import asyncio as _asyncio
+        scheduler_task = _asyncio.create_task(scheduler_loop())
+        log.info("scheduler.started")
+    except Exception as e:
+        log.warning("scheduler.start_failed", error=str(e))
+
+    try:
+        yield
+    finally:
+        if scheduler_task is not None:
+            scheduler_task.cancel()
+            log.info("scheduler.stopped")
 
     log.info("app.stopping")
     await async_engine.dispose()
@@ -148,6 +171,15 @@ async def locale_middleware(request: Request, call_next):
     response = await call_next(request)
     response.headers["Content-Language"] = request.state.locale
     return response
+
+
+# 重定向中间件（M3·P2 3.3）：GET/HEAD 命中 from_path 时 301/302
+from cenkor_admin.core.redirects import redirect_middleware
+app.middleware("http")(redirect_middleware)
+
+# 限流中间件（M4·P3 4.4）：公开写接口 60次/分钟/IP
+from cenkor_admin.core.ratelimit import rate_limit_middleware
+app.middleware("http")(rate_limit_middleware)
 
 
 # 路由

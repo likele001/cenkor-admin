@@ -107,6 +107,24 @@ function editEntry(e: Entry) {
   router.push({ name: 'cms-entry-edit', params: { id: e.id }, query: { ct: selectedCtKey.value } })
 }
 
+// ---- 发布工作流（M2·P1 2.4）----
+async function submitReview(e: Entry) {
+  await api.post(`/api/v1/cms/entries/${e.id}/submit-review`)
+  await loadEntries()
+}
+async function reviewEntry(e: Entry, action: 'approve' | 'reject') {
+  if (action === 'reject' && !window.confirm('驳回后内容将退回草稿，确认？')) return
+  await api.post(`/api/v1/cms/entries/${e.id}/review`, { action })
+  await loadEntries()
+}
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  draft: { label: '草稿', cls: 'bg-yellow-50 text-yellow-700' },
+  published: { label: '已发布', cls: 'bg-green-50 text-green-700' },
+  archived: { label: '已归档', cls: 'bg-ink-100 text-ink-500' },
+  pending_review: { label: '待审核', cls: 'bg-blue-50 text-blue-700' },
+  approved: { label: '已通过', cls: 'bg-purple-50 text-purple-700' },
+}
+
 async function batchAction(action: 'delete' | 'publish' | 'draft' | 'archive') {
   if (!selected.value.length) return
   const statusMap: Record<string, string> = { publish: 'published', draft: 'draft', archive: 'archived' }
@@ -172,6 +190,8 @@ onMounted(async () => {
       <select v-model="statusFilter" class="input w-full sm:w-32" @change="onStatusChange">
         <option value="">{{ t('portalUsersList.全部状态_avez63') }}</option>
         <option value="draft">{{ t('productEdit.草稿_n02e') }}</option>
+        <option value="pending_review">待审核</option>
+        <option value="approved">已通过</option>
         <option value="published">{{ t('productEdit.已发布_e656s') }}</option>
         <option value="archived">{{ t('productEdit.已归档_e85oj') }}</option>
       </select>
@@ -223,17 +243,16 @@ onMounted(async () => {
           <td class="py-2 px-2">
             <span
               class="text-xs px-1.5 py-0.5 rounded"
-              :class="{
-                'bg-green-50 text-green-700': e.status === 'published',
-                'bg-yellow-50 text-yellow-700': e.status === 'draft',
-                'bg-ink-100 text-ink-500': e.status === 'archived',
-              }"
-            >{{ { draft: '草稿', published: '已发布', archived: '已归档' }[e.status] }}</span>
+              :class="STATUS_META[e.status]?.cls || 'bg-ink-100 text-ink-500'"
+            >{{ STATUS_META[e.status]?.label || e.status }}</span>
           </td>
           <td class="py-2 px-2 text-ink-500">{{ e.view_count }}</td>
           <td class="py-2 px-2 text-ink-500 text-xs">{{ e.updated_at?.slice(0, 16) }}</td>
-          <td class="py-2 px-2">
+          <td class="py-2 px-2 whitespace-nowrap">
             <button class="text-blue-600 text-xs" @click="editEntry(e)">{{ t('usersList.编辑_mekb') }}</button>
+            <button v-if="e.status === 'draft' || e.status === 'approved'" class="text-purple-600 text-xs ml-2" @click="submitReview(e)">提交审核</button>
+            <button v-if="e.status === 'pending_review'" class="text-green-600 text-xs ml-2" @click="reviewEntry(e, 'approve')">通过</button>
+            <button v-if="e.status === 'pending_review'" class="text-red-500 text-xs ml-2" @click="reviewEntry(e, 'reject')">驳回</button>
           </td>
         </tr>
       </tbody>

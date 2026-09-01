@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.base import AppManifest
 from cenkor_admin.apps.system.models import InstalledApp
+from cenkor_admin.core.hooks import registry, register_app_hooks
 
 
 def scan_app_manifests() -> dict[str, AppManifest]:
@@ -250,6 +251,15 @@ async def install_app(db: AsyncSession, key: str) -> InstalledApp:
 
     await db.commit()
     await db.refresh(row)
+
+    # 注册 App 声明的钩子处理器（插件框架 M1·P0）
+    try:
+        registered = register_app_hooks(key, list(manifest.hooks or []))
+        if registered:
+            log.info("app.hooks_registered", key=key, modules=registered)
+    except Exception as e:
+        log.warning("app.hooks_register_failed", key=key, error=str(e))
+
     return row
 
 
@@ -304,6 +314,12 @@ async def uninstall_app(db: AsyncSession, key: str) -> None:
     row = result.scalar_one_or_none()
     if not row:
         raise ValueError(f"App 未安装: {key}")
+
+    # 清理 app 注册的钩子处理器（插件框架 M1·P0）
+    try:
+        registry.clear_app(key)
+    except Exception:
+        pass
 
     # 清理 app 注册的内容数据
     if manifest:

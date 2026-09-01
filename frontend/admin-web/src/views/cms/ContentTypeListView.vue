@@ -16,6 +16,7 @@ interface FieldGroup { id: number; key: string; label: string; sort: number; ico
 interface ContentType {
   id: number; key: string; name: string; description: string | null; icon: string | null
   supports_category: boolean; supports_tags: boolean
+  translatable?: boolean
   default_list_template: string | null; default_detail_template: string | null
   created_at: string; updated_at: string; deleted_at: string | null
   field_groups: FieldGroup[]; field_definitions: FieldDef[]
@@ -27,7 +28,7 @@ const error = ref('')
 const showModal = ref(false)
 const editing = ref<ContentType | null>(null)
 const saving = ref(false)
-const form = ref({ key: '', name: '', description: '', icon: '', supports_category: true, supports_tags: true })
+const form = ref({ key: '', name: '', description: '', icon: '', supports_category: true, supports_tags: true, translatable: false })
 
 async function load() {
   loading.value = true
@@ -44,7 +45,7 @@ async function load() {
 
 function openCreate() {
   editing.value = null
-  form.value = { key: '', name: '', description: '', icon: '', supports_category: true, supports_tags: true }
+  form.value = { key: '', name: '', description: '', icon: '', supports_category: true, supports_tags: true, translatable: false }
   showModal.value = true
 }
 
@@ -53,6 +54,7 @@ function openEdit(ct: ContentType) {
   form.value = {
     key: ct.key, name: ct.name, description: ct.description || '',
     icon: ct.icon || '', supports_category: ct.supports_category, supports_tags: ct.supports_tags,
+    translatable: !!ct.translatable,
   }
   showModal.value = true
 }
@@ -64,13 +66,13 @@ async function save() {
       await api.patch(`/api/v1/cms/content-types/${editing.value.id}`, {
         name: form.value.name, description: form.value.description || null,
         icon: form.value.icon || null, supports_category: form.value.supports_category,
-        supports_tags: form.value.supports_tags,
+        supports_tags: form.value.supports_tags, translatable: form.value.translatable,
       })
     } else {
       await api.post('/api/v1/cms/content-types', {
         key: form.value.key, name: form.value.name, description: form.value.description || null,
         icon: form.value.icon || null, supports_category: form.value.supports_category,
-        supports_tags: form.value.supports_tags,
+        supports_tags: form.value.supports_tags, translatable: form.value.translatable,
       })
     }
     showModal.value = false
@@ -118,6 +120,7 @@ onMounted(load)
             <div class="flex flex-wrap gap-1 mt-2">
               <span v-if="ct.supports_category" class="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{{ t('entryList.分类_emut') }}</span>
               <span v-if="ct.supports_tags" class="text-xs px-1.5 py-0.5 bg-green-50 text-green-600 rounded">{{ t('productsList.标签_idef') }}</span>
+              <span v-if="ct.translatable" class="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">🌐 多语言</span>
               <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_definitions?.length || 0 }} 字段</span>
               <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_groups?.length || 0 }} 分组</span>
             </div>
@@ -160,6 +163,10 @@ onMounted(load)
             <label class="flex items-center gap-2">
               <input type="checkbox" v-model="form.supports_tags" />
               <span class="text-sm">{{ t('contentTypeList.支持标签_d6g495') }}</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="checkbox" v-model="form.translatable" />
+              <span class="text-sm">🌐 多语言</span>
             </label>
           </div>
         </div>

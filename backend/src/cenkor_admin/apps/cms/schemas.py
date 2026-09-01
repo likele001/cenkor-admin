@@ -20,6 +20,7 @@ class ContentTypeCreate(BaseModel):
     icon: str | None = Field(None, max_length=20)
     supports_category: bool = True
     supports_tags: bool = True
+    translatable: bool = False
     default_list_template: str | None = None
     default_detail_template: str | None = None
 
@@ -30,6 +31,7 @@ class ContentTypeUpdate(BaseModel):
     icon: str | None = None
     supports_category: bool | None = None
     supports_tags: bool | None = None
+    translatable: bool | None = None
     default_list_template: str | None = None
     default_detail_template: str | None = None
 
@@ -80,6 +82,7 @@ class ContentTypeOut(BaseModel):
     icon: str | None = None
     supports_category: bool
     supports_tags: bool
+    translatable: bool = False
     default_list_template: str | None = None
     default_detail_template: str | None = None
     created_at: datetime
@@ -98,6 +101,7 @@ class ContentTypeListItem(BaseModel):
     icon: str | None = None
     supports_category: bool
     supports_tags: bool
+    translatable: bool = False
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)

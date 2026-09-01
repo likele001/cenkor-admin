@@ -47,18 +47,21 @@ async def list_app_plugins(
             InstalledApp.has_frontend == True,  # noqa: E712
         )
     )
+    from pathlib import Path
+
+    _static_base = Path(__file__).resolve().parent.parent.parent / "static" / "apps"
     items = result.scalars().all()
-    return {
-        "items": [
-            {
-                "key": a.key,
-                "name": a.name,
-                "version": a.version,
-                "script_url": f"/.app-assets/{a.key}/plugin.js",
-            }
-            for a in items
-        ]
-    }
+    _out = []
+    for a in items:
+        _p = _static_base / a.key / "plugin.js"
+        _v = int(_p.stat().st_mtime) if _p.exists() else 0
+        _out.append({
+            "key": a.key,
+            "name": a.name,
+            "version": a.version,
+            "script_url": f"/.app-assets/{a.key}/plugin.js?v={_v}",
+        })
+    return {"items": _out}
 
 
 @router.get("/apps", response_model=dict[str, Any])
