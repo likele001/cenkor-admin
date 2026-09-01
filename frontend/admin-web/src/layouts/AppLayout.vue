@@ -281,6 +281,13 @@ async function logout() {
             </svg>
           </button>
           <div class="flex-1" />
+          <div class="hidden sm:block w-56 mr-2">
+            <input
+              class="input text-sm py-1.5"
+              placeholder="搜索内容…"
+              @keyup.enter="(e: any) => { const v = (e.target.value || '').trim(); if (v) router.push({ name: 'cms-search', query: { q: v } }); }"
+            />
+          </div>
           <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
             <NotificationBell v-if="me" />
             <LocaleSwitcher />

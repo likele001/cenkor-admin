@@ -24,6 +24,8 @@ from cenkor_admin.apps.portal.router import router as portal_router
 from cenkor_admin.apps.portal.admin_router import router as portal_admin_router
 from cenkor_admin.apps.rbac.router import router as rbac_router
 from cenkor_admin.apps.system.router import router as system_router, public_router as system_public_router
+from cenkor_admin.apps.system.webhook_router import router as webhook_router
+from cenkor_admin.core.hooks_router import router as hooks_router
 
 log = get_logger(__name__)
 
@@ -34,6 +36,14 @@ api_v1_router = APIRouter()
 # ============================================================
 api_v1_router.include_router(cms_public_router, prefix="/public", tags=["public"])
 api_v1_router.include_router(portal_router, prefix="/public/portal", tags=["portal"])
+# M4·P3：评论 & 表单 公共接口
+from cenkor_admin.apps.comments.public_router import router as comments_public_router
+from cenkor_admin.apps.forms.public_router import router as forms_public_router
+api_v1_router.include_router(comments_public_router, prefix="/public", tags=["comments"])
+api_v1_router.include_router(forms_public_router, prefix="/public", tags=["forms"])
+# M3·P2：Builder 页面公共接口
+from cenkor_admin.apps.builder.public_router import router as builder_public_router
+api_v1_router.include_router(builder_public_router, prefix="/public", tags=["builder"])
 
 # ============================================================
 # 鉴权
@@ -75,11 +85,33 @@ api_v1_router.include_router(
     system_public_router, prefix="/system", tags=["system-public"],
 )
 
+# 插件框架：已注册钩子内省（受保护）
+api_v1_router.include_router(
+    hooks_router, prefix="/system", tags=["hooks"],
+    dependencies=[Depends(get_current_user)],
+)
+
+# M3·P2：Webhook 订阅 & URL 重定向管理（受保护）
+api_v1_router.include_router(
+    webhook_router, prefix="/system", tags=["webhooks-redirects"],
+    dependencies=[Depends(get_current_user)],
+)
+
 # V2 内容引擎
 api_v1_router.include_router(
     content_engine_router, prefix="/cms", tags=["content-engine"],
     dependencies=[Depends(get_current_user)],
 )
+# GraphQL（M2·P1 2.1，受保护；REST 并存）
+try:
+    from cenkor_admin.apps.cms.graphql import graphql_router
+    api_v1_router.include_router(
+        graphql_router, prefix="/cms", tags=["graphql"],
+        dependencies=[Depends(get_current_user)],
+    )
+except Exception as e:  # noqa: BLE001 - GraphQL 缺失依赖时不影响启动
+    import structlog
+    structlog.get_logger().warning("graphql.mount_failed", error=str(e))
 api_v1_router.include_router(
     template_router, prefix="/cms", tags=["templates"],
     dependencies=[Depends(get_current_user)],

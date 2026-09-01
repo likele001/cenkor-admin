@@ -19,6 +19,27 @@ const error = ref('')
 const editing = ref<string | null>(null)
 const draft = ref<{ value: string; description: string }>({ value: '', description: '' })
 const saving = ref(false)
+const toggling = ref<string | null>(null)
+
+// 布尔型设置直接渲染成开关，点击即时切换保存；其余类型维持原 textarea 编辑。
+function isBool(s: Setting): boolean {
+  return typeof s.value === 'boolean'
+}
+
+async function toggleBool(s: Setting) {
+  toggling.value = s.key
+  try {
+    await api.put(`/api/v1/system/settings/${s.key}`, {
+      value: !s.value,
+      description: s.description ?? null,
+    })
+    await load()
+  } catch (e: any) {
+    alert(t('settings.saveFailed', '保存失败') + '：' + (e?.response?.data?.detail || e.message))
+  } finally {
+    toggling.value = null
+  }
+}
 
 async function load() {
   loading.value = true
@@ -109,8 +130,30 @@ onMounted(load)
                   <code class="text-sm font-mono text-ink-900">{{ s.key }}</code>
                   <p v-if="s.description" class="mt-1 text-xs text-ink-500">{{ s.description }}</p>
                 </div>
+                <!-- 布尔型：可视化开关，点击即时切换 -->
+                <div v-if="isBool(s)" class="flex items-center gap-3 shrink-0">
+                  <span
+                    class="text-xs font-medium"
+                    :class="s.value ? 'text-brand-600' : 'text-ink-400'"
+                  >{{ s.value ? t('settings.enabled', '开启') : t('settings.disabled', '关闭') }}</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    :aria-checked="s.value"
+                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    :class="s.value ? 'bg-brand-600' : 'bg-ink-300'"
+                    :disabled="toggling === s.key"
+                    @click="toggleBool(s)"
+                  >
+                    <span
+                      class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform"
+                      :class="s.value ? 'translate-x-[22px]' : 'translate-x-0.5'"
+                    />
+                  </button>
+                </div>
+                <!-- 非布尔：编辑按钮 -->
                 <button
-                  v-if="editing !== s.key"
+                  v-else-if="editing !== s.key"
                   type="button"
                   class="text-sm text-brand-600 hover:underline shrink-0"
                   @click="startEdit(s)"
@@ -118,7 +161,8 @@ onMounted(load)
                   {{ t('app.edit') }}
                 </button>
               </div>
-              <div v-if="editing === s.key" class="mt-3 space-y-3">
+              <!-- 非布尔编辑区 -->
+              <div v-if="editing === s.key && !isBool(s)" class="mt-3 space-y-3">
                 <textarea
                   v-model="draft.value"
                   rows="4"
@@ -142,7 +186,8 @@ onMounted(load)
                   <button type="button" class="btn-ghost text-sm" @click="cancelEdit">{{ t('app.cancel') }}</button>
                 </div>
               </div>
-              <div v-else class="mt-2">
+              <!-- 非布尔只读展示 -->
+              <div v-else-if="!isBool(s)" class="mt-2">
                 <pre class="text-xs bg-ink-50 border border-ink-200 rounded-md p-2 overflow-x-auto">{{ displayValue(s.value) }}</pre>
                 <p v-if="s.updated_at" class="mt-1 text-[10px] text-ink-400">
                   {{ t('settings.lastUpdated', '上次更新') }}：{{ s.updated_at }} · by user#{{ s.updated_by ?? '?' }}

@@ -1,22 +1,77 @@
 """CMS 内容引擎路由（Content Types / Field Groups / Field Definitions / Field Options / Categories / Tags / Entries）"""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, delete, or_, cast, Text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cenkor_admin.api.deps import get_current_user
+from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import models, schemas
 from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS, validate_field_value
 from cenkor_admin.core.db import get_db
+from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.core.repository import apply_filters, paginate
 
 router = APIRouter()
+log = logging.getLogger(__name__)
+
+
+def _parse_dt(v: Any) -> datetime | None:
+    """将 ISO 字符串/对象安全转为 tz-aware datetime（asyncpg timestamptz 拒绝裸字符串）。"""
+    if v is None or v == "":
+        return None
+    if isinstance(v, datetime):
+        return v
+    if isinstance(v, str):
+        try:
+            # Python 3.11+ fromisoformat 支持 'Z'
+            return datetime.fromisoformat(v)
+        except ValueError:
+            return None
+    return None
+
+
+async def _snapshot_version(
+    db: AsyncSession,
+    entry: models.Entry,
+    user_id: int | None,
+    note: str | None = None,
+) -> models.EntryVersion:
+    """为 Entry 生成下一条版本快照（不可变，M1·P0 版本控制）。"""
+    last = (await db.execute(
+        select(func.max(models.EntryVersion.version))
+        .where(models.EntryVersion.entry_id == entry.id)
+    )).scalar()
+    next_version = (last or 0) + 1
+    snap = models.EntryVersion(
+        entry_id=entry.id,
+        version=next_version,
+        data={
+            "slug": entry.slug,
+            "title": entry.title,
+            "content": entry.content or {},
+            "custom_fields": entry.custom_fields or {},
+            "seo": entry.seo or {},
+            "category_id": entry.category_id,
+            "status": entry.status,
+            "published_at": entry.published_at.isoformat() if entry.published_at else None,
+            "scheduled_at": entry.scheduled_at.isoformat() if entry.scheduled_at else None,
+            "expire_at": entry.expire_at.isoformat() if entry.expire_at else None,
+            "sort": entry.sort,
+        },
+        created_by=user_id,
+        note=note,
+    )
+    db.add(snap)
+    await db.commit()
+    await db.refresh(snap)
+    return snap
 
 
 # ============================================================
@@ -69,6 +124,11 @@ async def create_content_type(
     db.add(obj)
     await db.commit()
     await db.refresh(obj)
+    # 插件框架：触发 content_type 创建事件
+    try:
+        await dispatch("content_type.created", content_type=obj, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="content_type.created", error=str(e))
     return obj
 
 
@@ -119,6 +179,11 @@ async def delete_content_type(
         update(models.ContentType).where(models.ContentType.id == ct_id).values(deleted_at=func.now())
     )
     await db.commit()
+    # 插件框架：触发 content_type 删除事件
+    try:
+        await dispatch("content_type.deleted", content_type_id=ct_id, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="content_type.deleted", error=str(e))
 
 
 @router.post("/content-types/{ct_id}/restore", status_code=200)
@@ -724,10 +789,13 @@ async def create_entry(
         title=title,
         content=body.get("content", {}),
         custom_fields=body.get("custom_fields", {}),
+        seo=body.get("seo"),
         category_id=body.get("category_id"),
         status=body.get("status", "draft"),
         author_id=current.id,
-        published_at=body.get("published_at"),
+        published_at=_parse_dt(body.get("published_at")),
+        scheduled_at=_parse_dt(body.get("scheduled_at")),
+        expire_at=_parse_dt(body.get("expire_at")),
         sort=body.get("sort", 0),
     )
     db.add(obj)
@@ -742,6 +810,17 @@ async def create_entry(
 
     await db.commit()
     await db.refresh(obj)
+    # 插件框架：触发 entry 保存/创建事件（失败隔离）
+    try:
+        await dispatch("entry.created", entry=obj, db=db, user=current)
+        await dispatch("entry.saved", entry=obj, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="entry.saved", error=str(e))
+    # 版本控制：创建时生成 v1 快照
+    try:
+        await _snapshot_version(db, obj, current.id, note="创建")
+    except Exception as e:
+        log.warning("version.snapshot_failed", entry_id=obj.id, error=str(e))
     return _entry_to_dict(obj)
 
 
@@ -765,9 +844,12 @@ async def update_entry(
         raise HTTPException(404, "Entry not found")
 
     tag_ids = body.pop("tag_ids", None)
-    for k in ("title", "slug", "content", "custom_fields", "category_id", "status", "published_at", "sort"):
+    for k in ("title", "slug", "content", "custom_fields", "seo", "category_id", "status", "sort"):
         if k in body:
             setattr(obj, k, body[k])
+    for k in ("published_at", "scheduled_at", "expire_at"):
+        if k in body:
+            setattr(obj, k, _parse_dt(body[k]))
 
     if tag_ids is not None:
         await db.execute(
@@ -785,7 +867,96 @@ async def update_entry(
 
     await db.commit()
     await db.refresh(obj)
+    # 插件框架：触发 entry 更新/保存事件（失败隔离）
+    try:
+        await dispatch("entry.updated", entry=obj, db=db, user=current)
+        await dispatch("entry.saved", entry=obj, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="entry.saved", error=str(e))
+    # 版本控制：更新后生成新快照
+    try:
+        await _snapshot_version(db, obj, current.id, note="更新")
+    except Exception as e:
+        log.warning("version.snapshot_failed", entry_id=obj.id, error=str(e))
     return _entry_to_dict(obj)
+
+
+@router.get("/entries/{entry_id}/versions", response_model=dict[str, Any])
+async def list_entry_versions(entry_id: int, db: AsyncSession = Depends(get_db)):
+    """版本历史列表（不含 data，保持轻量，M1·P0 版本控制）。"""
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+    rows = (await db.execute(
+        select(models.EntryVersion)
+        .where(models.EntryVersion.entry_id == entry_id)
+        .order_by(models.EntryVersion.version.desc())
+    )).scalars().all()
+    return {
+        "items": [_version_to_dict(v, include_data=False) for v in rows],
+        "total": len(rows),
+    }
+
+
+@router.get("/entries/{entry_id}/versions/{version}", response_model=dict[str, Any])
+async def get_entry_version(entry_id: int, version: int, db: AsyncSession = Depends(get_db)):
+    """单个版本快照详情。"""
+    v = (await db.execute(
+        select(models.EntryVersion).where(
+            models.EntryVersion.entry_id == entry_id,
+            models.EntryVersion.version == version,
+        )
+    )).scalar_one_or_none()
+    if not v:
+        raise HTTPException(404, "Version not found")
+    return _version_to_dict(v, include_data=True)
+
+
+@router.post("/entries/{entry_id}/restore/{version}", response_model=dict[str, Any])
+async def restore_entry_version(
+    entry_id: int,
+    version: int,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """回滚到指定版本：先快照当前状态（回滚可回滚），再覆盖内容。"""
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+    v = (await db.execute(
+        select(models.EntryVersion).where(
+            models.EntryVersion.entry_id == entry_id,
+            models.EntryVersion.version == version,
+        )
+    )).scalar_one_or_none()
+    if not v:
+        raise HTTPException(404, f"Version {version} not found")
+
+    # 先快照当前状态（回滚本身也是可回滚的）
+    try:
+        await _snapshot_version(db, entry, current.id, note=f"回滚前 v{version}")
+    except Exception as e:
+        log.warning("version.snapshot_failed", entry_id=entry.id, error=str(e))
+
+    data = v.data or {}
+    for k in ("slug", "title", "content", "custom_fields", "seo", "category_id", "status", "sort"):
+        if k in data:
+            setattr(entry, k, data[k])
+    for k in ("published_at", "scheduled_at", "expire_at"):
+        if k in data and data[k]:
+            from datetime import datetime as _dt
+            try:
+                setattr(entry, k, _dt.fromisoformat(data[k]))
+            except ValueError:
+                setattr(entry, k, None)
+    await db.commit()
+    await db.refresh(entry)
+    # 版本控制：回滚后追加一条"回滚自 vN"快照
+    try:
+        await _snapshot_version(db, entry, current.id, note=f"回滚自 v{version}")
+    except Exception as e:
+        log.warning("version.snapshot_failed", entry_id=entry.id, error=str(e))
+    return _entry_to_dict(entry)
 
 
 @router.delete("/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -801,6 +972,11 @@ async def delete_entry(
         update(models.Entry).where(models.Entry.id == entry_id).values(deleted_at=func.now())
     )
     await db.commit()
+    # 插件框架：触发 entry 删除事件
+    try:
+        await dispatch("entry.deleted", entry_id=entry_id, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="entry.deleted", error=str(e))
 
 
 @router.post("/entries/batch-delete", status_code=200)
@@ -828,10 +1004,456 @@ async def batch_update_entry_status(body: dict, db: AsyncSession = Depends(get_d
     return {"updated": len(ids), "status": new_status}
 
 
+# ---- 定时发布调度：手动触发（M2·P1 2.5） ----
+@router.post("/entries/scheduler/run", status_code=200)
+async def run_entry_scheduler(
+    current: auth_models.User = Depends(get_current_user),
+):
+    """立即执行一次定时发布/下线扫描（用于调试或手动触发）。"""
+    from cenkor_admin.core.scheduler import scheduler_tick
+    return await scheduler_tick()
+
+
+# ============================================================
+# M2·P1 站内全文搜索 / 批量导入 / 发布工作流
+# ============================================================
+
+@router.get("/search", response_model=dict[str, Any])
+async def search_entries(
+    q: str = Query(..., min_length=1, description="关键词"),
+    db: AsyncSession = Depends(get_db),
+    content_type_key: str | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """全文搜索（管理端）：匹配标题 / slug / 正文 / 自定义字段文本。"""
+    like = f"%{q}%"
+    conds = [
+        models.Entry.deleted_at.is_(None),
+        or_(
+            models.Entry.title.ilike(like),
+            models.Entry.slug.ilike(like),
+            cast(models.Entry.content, Text).ilike(like),
+            cast(models.Entry.custom_fields, Text).ilike(like),
+        ),
+    ]
+    if content_type_key:
+        ct = (await db.execute(
+            select(models.ContentType).where(models.ContentType.key == content_type_key)
+        )).scalar_one_or_none()
+        if ct:
+            conds.append(models.Entry.content_type_id == ct.id)
+    if status_filter:
+        conds.append(models.Entry.status == status_filter)
+    stmt = select(models.Entry).where(*conds).order_by(models.Entry.updated_at.desc())
+    data = await paginate(db, stmt, page=page, page_size=page_size)
+    return {
+        "items": [_entry_to_dict(e) for e in data["items"]],
+        "total": data["total"],
+        "page": data["page"],
+        "page_size": data["page_size"],
+    }
+
+
+@router.post("/entries/import", status_code=200)
+async def import_entries(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """批量导入（M2·P1 2.3）：支持 JSON 数组 或 CSV 字符串。
+
+    body 结构：
+      content_type_key: 目标内容类型 key
+      items: [{title, slug?, content?, custom_fields?, category_id?, status?,
+               published_at?, scheduled_at?, expire_at?, sort?}, ...]
+      csv:   "title,slug\\n标题一,slug-one\\n..."（与 items 二选一）
+      upsert: true（默认）时按 slug 更新已存在条目，否则视为重复跳过
+    """
+    ct_key = body.get("content_type_key")
+    if not ct_key:
+        raise HTTPException(400, "content_type_key required")
+    ct = (await db.execute(
+        select(models.ContentType).where(models.ContentType.key == ct_key)
+    )).scalar_one_or_none()
+    if not ct:
+        raise HTTPException(404, f"Content type '{ct_key}' not found")
+
+    raw_items: list[dict] = list(body.get("items") or [])
+    csv_text = body.get("csv")
+    if csv_text:
+        import csv as _csv
+        import io as _io
+        reader = _csv.DictReader(_io.StringIO(csv_text))
+        raw_items = [dict(row) for row in reader]
+    if not raw_items:
+        raise HTTPException(400, "items 或 csv 不能为空")
+
+    upsert = bool(body.get("upsert", True))
+    results: list[dict[str, Any]] = []
+    created = updated = failed = 0
+    for i, item in enumerate(raw_items, 1):
+        try:
+            title = item.get("title")
+            if not title:
+                raise ValueError("title 必填")
+            slug = item.get("slug") or None
+            existing = None
+            if slug and upsert:
+                existing = (await db.execute(
+                    select(models.Entry).where(
+                        models.Entry.content_type_id == ct.id,
+                        models.Entry.slug == slug,
+                        models.Entry.deleted_at.is_(None),
+                    )
+                )).scalar_one_or_none()
+            if existing:
+                for k in ("title", "content", "custom_fields", "seo", "category_id", "status", "sort"):
+                    if k in item:
+                        setattr(existing, k, item[k])
+                for k in ("published_at", "scheduled_at", "expire_at"):
+                    if k in item:
+                        setattr(existing, k, _parse_dt(item[k]))
+                await db.commit()
+                await db.refresh(existing)
+                try:
+                    await _snapshot_version(db, existing, current.id, note="批量导入更新")
+                except Exception:
+                    pass
+                updated += 1
+                results.append({"row": i, "ok": True, "action": "updated", "id": existing.id})
+            else:
+                obj = models.Entry(
+                    content_type_id=ct.id,
+                    slug=slug,
+                    title=title,
+                    content=item.get("content", {}),
+                    custom_fields=item.get("custom_fields", {}),
+                    seo=item.get("seo"),
+                    category_id=item.get("category_id"),
+                    status=item.get("status", "draft"),
+                    author_id=current.id,
+                    published_at=_parse_dt(item.get("published_at")),
+                    scheduled_at=_parse_dt(item.get("scheduled_at")),
+                    expire_at=_parse_dt(item.get("expire_at")),
+                    sort=item.get("sort", 0),
+                )
+                db.add(obj)
+                await db.commit()
+                await db.refresh(obj)
+                try:
+                    await _snapshot_version(db, obj, current.id, note="批量导入创建")
+                except Exception:
+                    pass
+                created += 1
+                results.append({"row": i, "ok": True, "action": "created", "id": obj.id})
+        except Exception as e:  # noqa: BLE001 - 逐行隔离
+            failed += 1
+            results.append({"row": i, "ok": False, "error": str(e)[:200]})
+    return {
+        "total": len(raw_items), "created": created,
+        "updated": updated, "failed": failed, "results": results,
+    }
+
+
+# ---- 发布工作流（M2·P1 2.4）----
+async def _write_review_log(
+    db: AsyncSession, *, entry_id: int, old: str, new: str,
+    action: str, reviewer_id: int | None, comment: str | None = None,
+) -> None:
+    """仅将审批记录加入 session（由调用方统一 commit，保证原子性）。"""
+    db.add(models.EntryReviewLog(
+        entry_id=entry_id, from_status=old, to_status=new,
+        action=action, reviewer_id=reviewer_id, comment=comment,
+    ))
+
+
+@router.post("/entries/{entry_id}/submit-review", response_model=dict[str, Any])
+async def submit_entry_for_review(
+    entry_id: int,
+    body: dict | None = None,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """提交审核：draft / approved → pending_review。body 可选 {comment}。"""
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+    if entry.status not in ("draft", "approved"):
+        raise HTTPException(400, f"当前状态 {entry.status} 不能提交审核")
+    old = entry.status
+    entry.status = "pending_review"
+    await _write_review_log(
+        db, entry_id=entry_id, old=old, new="pending_review", action="submit",
+        reviewer_id=current.id, comment=(body or {}).get("comment"),
+    )
+    await db.commit()
+    await db.refresh(entry)
+    return _entry_to_dict(entry)
+
+
+@router.post("/entries/{entry_id}/review", response_model=dict[str, Any])
+async def review_entry(
+    entry_id: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(require_permission("cms:entry:review")),
+):
+    """审批：body {action: approve|reject, comment?}。approve→published，reject→draft。"""
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+    if entry.status != "pending_review":
+        raise HTTPException(400, f"当前状态 {entry.status} 不在待审核")
+    action = body.get("action")
+    if action not in ("approve", "reject"):
+        raise HTTPException(400, "action 必须是 approve / reject")
+    old = entry.status
+    if action == "approve":
+        entry.status = "published"
+        if not entry.published_at:
+            entry.published_at = datetime.now(timezone.utc)
+    else:
+        entry.status = "draft"
+    await _write_review_log(
+        db, entry_id=entry_id, old=old, new=entry.status, action=action,
+        reviewer_id=current.id, comment=body.get("comment"),
+    )
+    await db.commit()
+    await db.refresh(entry)
+    return _entry_to_dict(entry)
+
+
+@router.get("/entries/{entry_id}/review-log", response_model=dict[str, Any])
+async def list_entry_review_log(entry_id: int, db: AsyncSession = Depends(get_db)):
+    """审批时间线。"""
+    rows = (await db.execute(
+        select(models.EntryReviewLog)
+        .where(models.EntryReviewLog.entry_id == entry_id)
+        .order_by(models.EntryReviewLog.id.desc())
+    )).scalars().all()
+    return {
+        "items": [{
+            "id": r.id, "action": r.action,
+            "from_status": r.from_status, "to_status": r.to_status,
+            "reviewer_id": r.reviewer_id, "comment": r.comment,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        } for r in rows],
+        "total": len(rows),
+    }
+
+
+# ============================================================
+# 多语言 i18n（M1·P0）
+# ============================================================
+
+@router.get("/languages", response_model=dict[str, Any])
+async def list_languages(db: AsyncSession = Depends(get_db)):
+    """语言列表（默认语言置顶）。"""
+    rows = (await db.execute(
+        select(models.Language).order_by(models.Language.is_default.desc(), models.Language.sort, models.Language.id)
+    )).scalars().all()
+    return {"items": [_language_to_dict(l) for l in rows], "total": len(rows)}
+
+
+@router.post("/languages", response_model=dict[str, Any], status_code=status.HTTP_201_CREATED)
+async def create_language(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """新增语言。code 示例：en-US / zh-CN / ja-JP。"""
+    code = body.get("code")
+    name = body.get("name")
+    if not code or not name:
+        raise HTTPException(400, "code and name required")
+    existing = await db.execute(select(models.Language).where(models.Language.code == code))
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, f"Language '{code}' 已存在")
+    if body.get("is_default"):
+        await db.execute(update(models.Language).values(is_default=False))
+    obj = models.Language(
+        code=code, name=name,
+        flag=body.get("flag"),
+        is_default=body.get("is_default", False),
+        enabled=body.get("enabled", True),
+        sort=body.get("sort", 0),
+    )
+    db.add(obj)
+    await db.commit()
+    await db.refresh(obj)
+    return _language_to_dict(obj)
+
+
+@router.patch("/languages/{code}", response_model=dict[str, Any])
+async def update_language(
+    code: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """更新语言（设为默认时自动取消其它默认）。"""
+    obj = (await db.execute(select(models.Language).where(models.Language.code == code))).scalar_one_or_none()
+    if not obj:
+        raise HTTPException(404, "Language not found")
+    if body.get("is_default"):
+        await db.execute(update(models.Language).values(is_default=False))
+    for k in ("name", "flag", "is_default", "enabled", "sort"):
+        if k in body:
+            setattr(obj, k, body[k])
+    await db.commit()
+    await db.refresh(obj)
+    return _language_to_dict(obj)
+
+
+@router.delete("/languages/{code}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_language(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """删除语言（默认语言不可删；同时清理其翻译）。"""
+    obj = (await db.execute(select(models.Language).where(models.Language.code == code))).scalar_one_or_none()
+    if not obj:
+        raise HTTPException(404, "Language not found")
+    if obj.is_default:
+        raise HTTPException(400, "不能删除默认语言")
+    await db.execute(delete(models.EntryTranslation).where(models.EntryTranslation.lang == code))
+    await db.delete(obj)
+    await db.commit()
+
+
+@router.get("/entries/{entry_id}/translations", response_model=dict[str, Any])
+async def list_entry_translations(entry_id: int, db: AsyncSession = Depends(get_db)):
+    """条目已保存的翻译列表。"""
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+    rows = (await db.execute(
+        select(models.EntryTranslation).where(models.EntryTranslation.entry_id == entry_id)
+    )).scalars().all()
+    return {"items": [_translation_to_dict(t) for t in rows], "total": len(rows)}
+
+
+@router.put("/entries/{entry_id}/translations/{lang}", response_model=dict[str, Any])
+async def upsert_entry_translation(
+    entry_id: int,
+    lang: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """保存/覆盖某语言的翻译。field_values: {title, content, custom_fields, slug}。"""
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+    row = (await db.execute(
+        select(models.EntryTranslation).where(
+            models.EntryTranslation.entry_id == entry_id,
+            models.EntryTranslation.lang == lang,
+        )
+    )).scalar_one_or_none()
+    field_values = body.get("field_values") or {}
+    status_ = body.get("status", "draft")
+    if row:
+        row.field_values = field_values
+        row.status = status_
+        row.created_by = current.id
+    else:
+        row = models.EntryTranslation(
+            entry_id=entry_id, lang=lang,
+            field_values=field_values, status=status_,
+            created_by=current.id,
+        )
+        db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return _translation_to_dict(row)
+
+
+@router.delete("/entries/{entry_id}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_entry_translation(
+    entry_id: int,
+    lang: str,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """删除某条翻译（回到默认语言）。"""
+    row = (await db.execute(
+        select(models.EntryTranslation).where(
+            models.EntryTranslation.entry_id == entry_id,
+            models.EntryTranslation.lang == lang,
+        )
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Translation not found")
+    await db.delete(row)
+    await db.commit()
+
+
+# ============================================================
+# 暂存预览（M4·P3 4.4 staging）
+# ============================================================
+@router.post("/entries/{entry_id}/preview", response_model=dict[str, Any])
+async def create_entry_preview(
+    entry_id: int,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """为草稿/已通过内容生成暂存预览链接（复用未过期的，7 天有效期）。"""
+    import secrets as _secrets
+    from datetime import timedelta as _td
+
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+    if entry.status == "published":
+        raise HTTPException(400, "内容已发布，无需预览（请直接访问正式页面）")
+    now = datetime.now(timezone.utc)
+    existing = (await db.execute(
+        select(models.EntryPreview).where(
+            models.EntryPreview.entry_id == entry_id,
+            models.EntryPreview.expires_at.is_not(None),
+            models.EntryPreview.expires_at > now,
+        ).order_by(models.EntryPreview.id.desc())
+    )).scalars().first()
+    if existing:
+        token, expires_at = existing.token, existing.expires_at
+    else:
+        token = _secrets.token_hex(32)
+        expires_at = now + _td(days=7)
+        db.add(models.EntryPreview(
+            entry_id=entry_id, token=token, created_by=current.id, expires_at=expires_at,
+        ))
+        await db.commit()
+    return {
+        "token": token,
+        "url": f"/api/v1/public/preview/{token}",
+        "json_url": f"/api/v1/public/preview/{token}.json",
+        "expires_at": expires_at.isoformat() if expires_at else None,
+    }
+
+
+@router.delete("/entries/{entry_id}/preview", status_code=200)
+async def revoke_entry_preview(
+    entry_id: int,
+    db: AsyncSession = Depends(get_db),
+    current: auth_models.User = Depends(get_current_user),
+):
+    """撤销该条目的全部暂存预览。"""
+    rows = (await db.execute(
+        select(models.EntryPreview).where(models.EntryPreview.entry_id == entry_id)
+    )).scalars().all()
+    for r in rows:
+        await db.delete(r)
+    await db.commit()
+    return {"revoked": len(rows)}
+
+
 # ============================================================
 # Field Types (metadata endpoint)
 # ============================================================
-
 @router.get("/field-types", response_model=dict[str, Any])
 async def list_field_types():
     from cenkor_admin.apps.cms.field_types import FIELD_DEFAULTS, VALIDATION_RULES, NEEDS_OPTIONS
@@ -873,6 +1495,47 @@ def _tag_to_dict(t: models.Tag) -> dict:
     }
 
 
+def _language_to_dict(l: models.Language) -> dict:
+    return {
+        "id": l.id,
+        "code": l.code,
+        "name": l.name,
+        "flag": l.flag,
+        "is_default": l.is_default,
+        "enabled": l.enabled,
+        "sort": l.sort,
+        "created_at": l.created_at.isoformat() if l.created_at else None,
+        "updated_at": l.updated_at.isoformat() if l.updated_at else None,
+    }
+
+
+def _translation_to_dict(t: models.EntryTranslation) -> dict:
+    return {
+        "id": t.id,
+        "entry_id": t.entry_id,
+        "lang": t.lang,
+        "field_values": t.field_values or {},
+        "status": t.status,
+        "created_by": t.created_by,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+    }
+
+
+def _version_to_dict(v: models.EntryVersion, include_data: bool = True) -> dict:
+    d = {
+        "id": v.id,
+        "entry_id": v.entry_id,
+        "version": v.version,
+        "created_by": v.created_by,
+        "note": v.note,
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    }
+    if include_data:
+        d["data"] = v.data or {}
+    return d
+
+
 def _entry_to_dict(e: models.Entry) -> dict:
     return {
         "id": e.id,
@@ -885,6 +1548,8 @@ def _entry_to_dict(e: models.Entry) -> dict:
         "status": e.status,
         "author_id": e.author_id,
         "published_at": e.published_at.isoformat() if e.published_at else None,
+        "scheduled_at": e.scheduled_at.isoformat() if e.scheduled_at else None,
+        "expire_at": e.expire_at.isoformat() if e.expire_at else None,
         "sort": e.sort,
         "view_count": e.view_count,
         "created_at": e.created_at.isoformat() if e.created_at else None,
