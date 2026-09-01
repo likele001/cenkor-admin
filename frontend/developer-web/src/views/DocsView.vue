@@ -134,19 +134,24 @@ const activeTab = ref<'overview' | 'backend' | 'frontend' | 'publish'>('overview
             <pre class="bg-ink-900 text-ink-100 p-5 rounded-xl text-sm overflow-x-auto font-mono leading-relaxed">my-app-1.0.0.zip
 ├── __init__.py               # 必需：Python 包标识
 ├── manifest.py               # 必需：应用清单
-├── models.py                 # 可选：数据模型
-├── router.py                 # 可选：API 路由
+├── router.py                 # 必需：API 路由（应用必须有至少一个）
+├── models.py / models/       # 可选：数据模型（单文件或 models/ 分包均可）
 ├── schemas.py                # 可选：请求/响应模型
 ├── service.py                # 可选：业务逻辑
 ├── requirements.txt          # 可选：额外依赖
+│
+├── alembic/                  # 可选：数据库迁移目录
+│   └── versions/             #   安装时自动拷贝到平台迁移目录并执行 upgrade
+│       └── *.py
 │
 ├── frontend/                 # 可选：前端资源目录
 │   └── dist/
 │       ├── plugin.js         # 必需前端入口（Vite library mode 构建产物）
 │       └── ...               # 其他静态资源（CSS、字体等）</pre>
             <p class="text-sm text-ink-500 mt-2">
-              不含前端则只需提交 <code>__init__.py + manifest.py</code> 两个必需文件。
-              安装后 <code>hasFrontend</code> 自动标记为 true。
+              不含前端则只需提交 <code>__init__.py + manifest.py</code> 两个必需文件；
+              不含迁移则无需 <code>alembic/</code>。安装后 <code>hasFrontend</code> 自动标记为 true；
+              若 ZIP 含 <code>alembic/versions/*.py</code>，安装时会自动 <code>upgrade head</code> 建表。
             </p>
           </section>
         </div>
@@ -214,6 +219,13 @@ MANIFEST = AppManifest(
           <section id="bk-model" class="mb-10">
             <h2 class="text-xl font-semibold mb-4 pb-2 border-b">2. 数据模型</h2>
             <p class="text-ink-600 mb-4">使用 SQLAlchemy 2.0 声明式映射 + async：</p>
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+              <p class="text-sm text-blue-800">
+                💡 <strong>模型可以封装为 <code>models/</code> 目录</strong>（复杂应用推荐）：包内放 <code>models/__init__.py</code> 作统一导出，
+                其余模型按模块拆分（如 <code>models/sales.py</code>、<code>models/product.py</code>）。
+                安装时整目录原样复制，功能与单文件 <code>models.py</code> 完全一致。
+              </p>
+            </div>
             <pre class="bg-ink-900 text-ink-100 p-5 rounded-xl text-sm overflow-x-auto font-mono leading-relaxed">from datetime import datetime
 from sqlalchemy import String, Integer, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -242,6 +254,7 @@ class MyItem(Base):
               <tbody class="divide-y divide-ink-100">
                 <tr><td class="px-4 py-2">表名</td><td><code>{app_key}_{plural}</code></td><td><code>my_app_items</code></td></tr>
                 <tr><td class="px-4 py-2">模型名</td><td>PascalCase 单数</td><td><code>MyItem</code></td></tr>
+                <tr><td class="px-4 py-2">模型文件</td><td><code>models.py</code> 或 <code>models/</code> 目录（含 <code>__init__.py</code>）</td><td><code>models.py</code> / <code>models/sales.py</code></td></tr>
                 <tr><td class="px-4 py-2">删除</td><td>软删 <code>deleted_at</code></td><td>不要物理删除</td></tr>
                 <tr><td class="px-4 py-2">创建人</td><td><code>creator_id</code></td><td>关联操作者 ID</td></tr>
               </tbody>
@@ -254,6 +267,13 @@ class MyItem(Base):
               创建 <code>router.py</code>，使用 FastAPI <code>APIRouter</code>。
               <strong>路由会自动注册到 <code>/api/v1/&lt;app-key&gt;/</code></strong>。
             </p>
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+              <p class="text-sm text-blue-800">
+                💡 <strong>多模块拆分可用多个子路由文件</strong>（复杂应用推荐）：如 <code>sp_router.py</code>、<code>so_router.py</code>。
+                在根 <code>router.py</code> 顶部把它们 <code>include_router</code> 汇入主路由。平台只自动注册 <code>router.py</code>，子路由不会单独注册。
+                注意避免子路由之间互相 <code>from . import xxx</code>（会造成循环导入），跨模块复用直接 <code>from .models.xxx import ...</code>。
+              </p>
+            </div>
             <pre class="bg-ink-900 text-ink-100 p-5 rounded-xl text-sm overflow-x-auto font-mono leading-relaxed">from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -375,10 +395,23 @@ MANIFEST = AppManifest(
 
           <section id="bk-migration" class="mb-10">
             <h2 class="text-xl font-semibold mb-4 pb-2 border-b">5. 数据库迁移</h2>
+            <p class="text-ink-600 mb-4">使用 Alembic 管理表结构。迁移文件放在应用源码的 <code>alembic/versions/</code> 目录，随 ZIP 一起提交。</p>
             <pre class="bg-ink-900 text-ink-100 p-5 rounded-xl text-sm overflow-x-auto font-mono leading-relaxed">cd backend
 PYTHONPATH=src alembic revision --autogenerate -m "create my_app tables"
 PYTHONPATH=src alembic upgrade head
 PYTHONPATH=src alembic downgrade -1  # 回滚</pre>
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
+              <p class="text-sm text-blue-800">
+                📦 <strong>随包提交</strong>：把迁移文件放进应用的 <code>alembic/versions/</code>，打包时带上 <code>alembic/</code> 目录。
+                安装时系统会自动把它们拷贝到平台迁移目录并根据文件内的 <code>revision</code> 去重（已存在的跳过），随后执行 <code>alembic upgrade head</code> 完成建表——无需手工干预。
+              </p>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-3">
+              <p class="text-sm text-amber-800">
+                ⚠️ <strong>规范要求</strong>：迁移脚本需<strong>幂等</strong>（用 <code>table existence</code> 判断后再创建表），避免对既有库重复执行报错。
+                建议迁移文件内含 <code>branch_labels</code> 以与应用包区分，且 <code>revision</code> 长度 ≤ 32 字符。
+              </p>
+            </div>
           </section>
 
           <section id="bk-security" class="mb-10">
@@ -670,16 +703,26 @@ dist/
             <pre class="bg-ink-900 text-ink-100 p-5 rounded-xl text-sm overflow-x-auto font-mono leading-relaxed">my-app/
 ├── __init__.py               # 必需
 ├── manifest.py               # 必需
-├── router.py                 # 可选
-├── models.py                 # 可选
+├── router.py                 # API 路由（含 include 的子路由）
+├── models.py 或 models/      # 数据模型（单文件或分包）
+├── alembic/
+│   └── versions/             # 数据库迁移（可选，安装时自动 upgrade head）
 ├── frontend/                 # 可选
 │   └── dist/
 │       └── plugin.js         # 前端插件
 └── requirements.txt          # 可选</pre>
-            <p class="text-ink-600 mt-4">打包命令：</p>
+            <p class="text-ink-600 mt-4">打包命令（白名单式，排除一切无关文件）：</p>
             <pre class="bg-ink-900 text-ink-100 p-5 rounded-xl text-sm overflow-x-auto font-mono leading-relaxed">cd my-app
-zip -r my-app-1.0.0.zip . \
-  -x "frontend/src/*" "frontend/node_modules/*" "frontend/public/*" "frontend/*.json" "frontend/*.config.*"</pre>
+zip -r my-app-1.0.0.zip \
+  __init__.py manifest.py router.py \
+  models.py \
+  alembic/ \
+  frontend/dist/ \
+  -x "*/__pycache__/*" "*.pyc" "*/.git/*" "*/node_modules/*" "*/dist/.vite/*"</pre>
+            <p class="text-sm text-ink-500 mt-2">
+              使用<strong>白名单</strong>（只列要打包的文件/目录）而不是 <code>zip -r .</code> 整目录打包，
+              可避免把 <code>node_modules/</code>、<code>.git/</code>、<code>__pycache__/</code> 等无关文件带进包内。
+            </p>
           </section>
 
           <section id="pub-check" class="mb-10">
@@ -696,6 +739,14 @@ zip -r my-app-1.0.0.zip . \
               <label class="flex items-start gap-3 p-3 bg-green-50 rounded-xl">
                 <span class="text-green-600 mt-0.5">☑</span>
                 <span class="text-sm text-green-800"><code>manifest.py</code> 中 <code>key</code> 与文件名一致，全局唯一</span>
+              </label>
+              <label class="flex items-start gap-3 p-3 bg-green-50 rounded-xl">
+                <span class="text-green-600 mt-0.5">☑</span>
+                <span class="text-sm text-green-800">若拆分子路由（<code>*_router.py</code>），已在根 <code>router.py</code> 中 <code>include_router</code> 汇入</span>
+              </label>
+              <label class="flex items-start gap-3 p-3 bg-green-50 rounded-xl">
+                <span class="text-green-600 mt-0.5">☑</span>
+                <span class="text-sm text-green-800">若携迁移文件，已放在 <code>alembic/versions/</code> 且脚本幂等、<code>revision</code> 唯一</span>
               </label>
               <label class="flex items-start gap-3 p-3 bg-green-50 rounded-xl">
                 <span class="text-green-600 mt-0.5">☑</span>

@@ -19,6 +19,13 @@ import CategoriesView from '@/views/cms/CategoriesView.vue'
 import TagsView from '@/views/cms/TagsView.vue'
 import EntryListView from '@/views/cms/EntryListView.vue'
 import EntryEditView from '@/views/cms/EntryEditView.vue'
+import LanguagesView from '@/views/cms/LanguagesView.vue'
+import SearchResultsView from '@/views/cms/SearchResultsView.vue'
+import WebhooksView from '@/views/system/WebhooksView.vue'
+import RedirectsView from '@/views/system/RedirectsView.vue'
+import CommentsView from '@/views/system/CommentsView.vue'
+import FormsView from '@/views/system/FormsView.vue'
+import BuilderPagesView from '@/views/builder/BuilderPagesView.vue'
 import TemplatePreviewView from '@/views/cms/TemplatePreviewView.vue'
 import UsersListView from '@/views/system/UsersListView.vue'
 import RolesView from '@/views/system/RolesView.vue'
@@ -55,6 +62,9 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/entries/new', name: 'cms-entry-new', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
       { path: 'cms/entries/:id', name: 'cms-entry-edit', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
       { path: 'cms/templates', name: 'cms-templates', component: TemplatePreviewView, meta: { permission: 'cms:site:read' } },
+      { path: 'cms/languages', name: 'cms-languages', component: LanguagesView, meta: { permission: 'cms:entries:read' } },
+      { path: 'cms/search', name: 'cms-search', component: SearchResultsView, meta: { permission: 'cms:entries:read' } },
+      { path: 'builder/pages', name: 'builder-pages', component: BuilderPagesView, meta: { permission: 'settings:read' } },
       // CMS - 传统内容
       { path: 'cms/products', name: 'cms-products', component: ProductsListView, meta: { permission: 'cms:product:read' } },
       { path: 'cms/products/new', name: 'cms-product-new', component: ProductEditView, meta: { permission: 'cms:product:write' } },
@@ -78,6 +88,10 @@ const routes: RouteRecordRaw[] = [
       { path: 'system/api-keys', name: 'system-api-keys', component: ApiKeysView, meta: { permission: 'apikey:read' } },
       { path: 'system/tasks', name: 'system-tasks', component: TasksView, meta: { permission: 'task:read' } },
       { path: 'system/settings', name: 'system-settings', component: SettingsView, meta: { permission: 'settings:read' } },
+      { path: 'system/webhooks', name: 'system-webhooks', component: WebhooksView, meta: { permission: 'settings:read' } },
+      { path: 'system/redirects', name: 'system-redirects', component: RedirectsView, meta: { permission: 'settings:read' } },
+      { path: 'system/comments', name: 'system-comments', component: CommentsView, meta: { permission: 'settings:read' } },
+      { path: 'system/forms', name: 'system-forms', component: FormsView, meta: { permission: 'settings:read' } },
       // Apps
       { path: 'announcements', name: 'announcements', component: AnnouncementsView, meta: { permission: 'announcements:read' } },
       { path: 'tickets', name: 'tickets', component: TicketsView, meta: { permission: 'tickets:read' } },

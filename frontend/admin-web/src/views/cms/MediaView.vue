@@ -126,6 +126,14 @@ function getPresignedUrl(m: MediaItem) {
   return m.url
 }
 
+// 图片缩略图（M4 打磨：走 /public/media/{id}/thumb，等比例小图省流量）
+function thumbUrl(m: MediaItem): string {
+  if (m.mime.startsWith('image/')) {
+    return `/api/v1/public/media/${m.id}/thumb?w=320`
+  }
+  return m.url
+}
+
 onMounted(load)
 watch(search, () => { load() })
 </script>
@@ -199,7 +207,7 @@ watch(search, () => { load() })
           @click="selected = m"
         >
           <div class="aspect-square rounded-xl overflow-hidden bg-ink-100 mb-2 flex items-center justify-center relative">
-            <img v-if="m.mime.startsWith('image/')" :src="m.url" class="w-full h-full object-cover" loading="lazy" />
+            <img v-if="m.mime.startsWith('image/')" :src="thumbUrl(m)" class="w-full h-full object-cover" loading="lazy" />
             <span v-else class="text-3xl">📄</span>
             <span v-if="m.width && m.height" class="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-ink-900/70 text-white">
               {{ m.width }}×{{ m.height }}

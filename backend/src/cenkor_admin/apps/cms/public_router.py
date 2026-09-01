@@ -4,13 +4,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
-from sqlalchemy import select, update
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request
+from fastapi.responses import Response
+from sqlalchemy import select, update, func, or_, cast, Text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import models
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.db import AsyncSessionLocal, get_db
+from cenkor_admin.core.storage import s3
 from cenkor_admin.core.template_engine import render_template_safe
 
 router = APIRouter()
@@ -24,6 +26,51 @@ async def _increment_news_view_count(news_id: int) -> None:
             .values(view_count=models.News.view_count + 1)
         )
         await session.commit()
+
+
+async def _apply_entry_translation(db: AsyncSession, item: dict, lang: str | None) -> dict:
+    """多语言 i18n：指定 lang 且存在翻译时，用翻译覆盖 title/content/custom_fields/slug。"""
+    if not lang:
+        return item
+    tr = (await db.execute(
+        select(models.EntryTranslation).where(
+            models.EntryTranslation.entry_id == item["id"],
+            models.EntryTranslation.lang == lang,
+        )
+    )).scalar_one_or_none()
+    if not tr:
+        return item
+    fv = tr.field_values or {}
+    out = dict(item)
+    for k in ("title", "slug", "content", "custom_fields"):
+        if k in fv and fv[k] is not None:
+            out[k] = fv[k]
+    out["lang"] = lang
+    return out
+
+
+def _build_og(item: dict) -> dict:
+    """M4·P3 4.1 Open Graph：从内容/SEO 字段推导 og 元数据。"""
+    seo = item.get("seo") or {}
+    content = item.get("content") or {}
+    title = (seo.get("og_title") or seo.get("seo_title") or item.get("title") or "")
+    description = (
+        seo.get("og_description") or seo.get("seo_description")
+        or item.get("excerpt") or content.get("text") or content.get("excerpt") or ""
+    )
+    if isinstance(description, str) and len(description) > 200:
+        description = description[:200] + "…"
+    image = (
+        seo.get("og_image") or item.get("cover_image")
+        or content.get("image") or content.get("cover_image") or ""
+    )
+    return {
+        "og_type": seo.get("og_type", "article"),
+        "og_title": str(title or "")[:200],
+        "og_description": str(description or ""),
+        "og_image": image or None,
+        "twitter_card": seo.get("twitter_card", "summary_large_image"),
+    }
 
 
 # ============================================================
@@ -187,6 +234,7 @@ async def get_public_entries(
     db: AsyncSession = Depends(get_db),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    lang: str | None = Query(None, description="语言代码（如 en-US），仅对内容引擎类型生效"),
 ):
     """按内容类型获取公开内容列表（自动路由到对应专用表）"""
     from sqlalchemy import func as sqlfunc
@@ -229,9 +277,13 @@ async def get_public_entries(
                 .offset((page - 1) * page_size).limit(page_size))
         entries = (await db.execute(stmt)).scalars().all()
         items = [{"id": e.id, "slug": e.slug, "title": e.title, "content": e.content or {},
-                  "custom_fields": e.custom_fields or {}, "status": e.status,
+                  "custom_fields": e.custom_fields or {}, "seo": e.seo or {}, "status": e.status,
                   "published_at": e.published_at.isoformat() if e.published_at else None,
                   "sort": e.sort, "view_count": e.view_count} for e in entries]
+        if lang:
+            items = [await _apply_entry_translation(db, it, lang) for it in items]
+        for it in items:
+            it["og"] = _build_og(it)
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -242,6 +294,7 @@ async def get_public_entry_detail(
     id_or_slug: str,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    lang: str | None = Query(None, description="语言代码（如 en-US），仅对内容引擎类型生效"),
 ):
     """获取公开内容详情（自动路由到对应专用表）"""
     if content_type_key == "product":
@@ -292,10 +345,13 @@ async def get_public_entry_detail(
         entry = (await db.execute(select(models.Entry).where(*conds))).scalar_one_or_none()
         if not entry:
             raise HTTPException(404, "Entry not found")
-        return {"id": entry.id, "slug": entry.slug, "title": entry.title, "content": entry.content or {},
-                "custom_fields": entry.custom_fields or {}, "status": entry.status,
+        item = {"id": entry.id, "slug": entry.slug, "title": entry.title, "content": entry.content or {},
+                "custom_fields": entry.custom_fields or {}, "seo": entry.seo or {}, "status": entry.status,
                 "published_at": entry.published_at.isoformat() if entry.published_at else None,
                 "sort": entry.sort, "view_count": (entry.view_count or 0) + 1}
+        item = await _apply_entry_translation(db, item, lang)
+        item["og"] = _build_og(item)
+        return item
 
 
 @router.get("/field-definitions", response_model=list[dict[str, Any]])
@@ -463,6 +519,237 @@ async def get_public_news_detail(
         "published_at": n.published_at.isoformat() if n.published_at else None,
         "view_count": view_count,
     }
+
+
+# ============================================================
+# 暂存预览（M4·P3 4.4 staging）
+# ============================================================
+
+async def _resolve_preview_entry(db: AsyncSession, token: str):
+    """解析预览 token → entry；已过期/已发布/不存在返回 None。"""
+    from datetime import datetime, timezone as _tz
+    pv = (await db.execute(
+        select(models.EntryPreview).where(models.EntryPreview.token == token)
+    )).scalar_one_or_none()
+    if not pv:
+        return None, "预览不存在"
+    if pv.expires_at and pv.expires_at < datetime.now(_tz.utc):
+        return None, "预览已过期"
+    entry = await db.get(models.Entry, pv.entry_id)
+    if not entry or entry.deleted_at:
+        return None, "内容不存在"
+    if entry.status == "published":
+        return None, "内容已发布，预览链接失效"
+    return entry, None
+
+
+@router.get("/preview/{token}.json", include_in_schema=False)
+async def preview_entry_json(token: str, db: AsyncSession = Depends(get_db)):
+    """暂存预览（JSON 数据）。"""
+    entry, err = await _resolve_preview_entry(db, token)
+    if not entry:
+        raise HTTPException(404 if "失效" not in (err or "") else 410, err or "预览不可用")
+    item = {"id": entry.id, "slug": entry.slug, "title": entry.title,
+            "content": entry.content or {}, "custom_fields": entry.custom_fields or {},
+            "seo": entry.seo or {}, "status": entry.status,
+            "published_at": entry.published_at.isoformat() if entry.published_at else None,
+            "sort": entry.sort, "view_count": entry.view_count}
+    item["og"] = _build_og(item)
+    item["preview"] = True
+    return item
+
+
+def _render_preview_html(entry: models.Entry) -> str:
+    """把条目渲染成完整 HTML 文档（彩排页，顶部带预览横幅）。"""
+    import html as _h
+    from datetime import datetime, timezone as _tz
+
+    item = {"title": entry.title, "slug": entry.slug, "content": entry.content or {},
+            "custom_fields": entry.custom_fields or {}, "seo": entry.seo or {}}
+    og = _build_og(item)
+    title = _h.escape(item.get("title") or "")
+    content = item.get("content") or {}
+    body_html = str(content.get("text") or content.get("html") or "")
+    desc = _h.escape(str(og.get("og_description") or ""))
+    img = og.get("og_image") or ""
+    img_meta = f'<meta property="og:image" content="{_h.escape(img)}" />' if img else ""
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>预览 · {title}</title>
+<meta property="og:title" content="{title}" />
+<meta property="og:description" content="{desc}" />
+{img_meta}
+<style>
+body{{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;margin:0;color:#1f2937;background:#f3f4f6;line-height:1.75}}
+.banner{{background:#6366f1;color:#fff;text-align:center;padding:8px;font-size:13px;position:sticky;top:0;z-index:10}}
+.wrap{{max-width:800px;margin:24px auto;background:#fff;border-radius:12px;padding:32px 40px;box-shadow:0 1px 3px rgba(0,0,0,.06)}}
+h1{{font-size:28px;margin:0 0 8px}}
+.slug{{color:#9ca3af;font-size:13px;margin-bottom:16px}}
+img{{max-width:100%;border-radius:8px}}
+table{{border-collapse:collapse;width:100%;margin:12px 0}}
+th,td{{border:1px solid #d1d5db;padding:6px 10px}}
+blockquote{{border-left:3px solid #d1d5db;padding-left:12px;color:#6b7280}}
+pre{{background:#1f2937;color:#f9fafb;padding:12px;border-radius:8px;overflow:auto}}
+code{{background:#f3f4f6;padding:1px 5px;border-radius:4px}}
+</style>
+</head>
+<body>
+<div class="banner">🖥 暂存预览 · 非正式页面（内容为草稿/待审核状态）</div>
+<div class="wrap">
+<h1>{title}</h1>
+<div class="slug">{_h.escape(entry.slug or '')}</div>
+<div>{body_html}</div>
+</div>
+</body>
+</html>"""
+
+
+@router.get("/preview/{token}", include_in_schema=False)
+async def preview_entry_html(token: str, db: AsyncSession = Depends(get_db)):
+    """暂存预览（完整 HTML 渲染）。"""
+    entry, err = await _resolve_preview_entry(db, token)
+    if not entry:
+        raise HTTPException(404 if "失效" not in (err or "") else 410, err or "预览不可用")
+    return Response(
+        content=_render_preview_html(entry),
+        media_type="text/html; charset=utf-8",
+        headers={"X-Robots-Tag": "noindex"},
+    )
+
+
+@router.get("/media/{media_id}/thumb", include_in_schema=False)
+async def media_thumbnail(
+    media_id: int,
+    w: int = Query(200, ge=16, le=1024, description="缩略图宽度"),
+    db: AsyncSession = Depends(get_db),
+):
+    """图片缩略图（M4·P3 4.4 打磨）：从云存储取原图，PIL 生成缩略图字节返回。
+
+    公开可用（原图 URL 本就公网可读）；带 1 天缓存头。
+    """
+    import io
+
+    from PIL import Image
+
+    media = await db.get(models.Media, media_id)
+    if not media or media.deleted_at:
+        raise HTTPException(404, "Media not found")
+    if not (media.mime or "").startswith("image/"):
+        raise HTTPException(400, "非图片类型")
+    try:
+        data = await s3.download(media.bucket, media.key)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(404, "文件缺失或不可读") from e
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.thumbnail((w, w), Image.LANCZOS)
+        fmt = "PNG" if (media.mime or "").endswith("png") else "JPEG"
+        if fmt == "JPEG" and img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, fmt, quality=82)
+        buf.seek(0)
+        return Response(
+            content=buf.getvalue(),
+            media_type=f"image/{fmt.lower()}",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, "缩略图生成失败") from e
+
+
+@router.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml(request: Request, db: AsyncSession = Depends(get_db)):
+    """Sitemap 自动生成（M3·P2 3.3）：聚合已发布内容 URL。"""
+    base = str(request.base_url).rstrip("/")
+    urls: list[tuple[str, datetime | None]] = []
+
+    # 内容引擎条目（含 slug 的已发布）
+    entries = (await db.execute(
+        select(models.Entry).where(
+            models.Entry.deleted_at.is_(None),
+            models.Entry.status == "published",
+            models.Entry.slug.is_not(None),
+        )
+    )).scalars().all()
+    for e in entries:
+        urls.append((f"{base}/{e.slug}", e.updated_at or e.created_at))
+
+    # 传统产品 / 新闻
+    prods = (await db.execute(
+        select(models.Product).where(
+            models.Product.deleted_at.is_(None), models.Product.status == "published"
+        )
+    )).scalars().all()
+    for p in prods:
+        urls.append((f"{base}/products/{p.slug}", p.updated_at or p.created_at))
+
+    news = (await db.execute(
+        select(models.News).where(
+            models.News.deleted_at.is_(None), models.News.status == "published"
+        )
+    )).scalars().all()
+    for n in news:
+        urls.append((f"{base}/news/{n.slug}", n.updated_at or n.created_at))
+
+    items = "\n".join(
+        f"  <url><loc>{loc}</loc><lastmod>{last.date().isoformat()}</lastmod></url>"
+        for loc, last in urls
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{items}\n"
+        "</urlset>"
+    )
+    return Response(content=xml, media_type="application/xml")
+
+
+@router.get("/search", response_model=dict[str, Any])
+async def search_public_entries(
+    q: str = Query(..., min_length=1, description="关键词"),
+    db: AsyncSession = Depends(get_db),
+    content_type_key: str | None = Query(None),
+    lang: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """公开全文搜索（M2·P1 2.2，仅已发布内容）。"""
+    like = f"%{q}%"
+    conds = [
+        models.Entry.deleted_at.is_(None),
+        models.Entry.status == "published",
+        or_(
+            models.Entry.title.ilike(like),
+            models.Entry.slug.ilike(like),
+            cast(models.Entry.content, Text).ilike(like),
+        ),
+    ]
+    if content_type_key:
+        ct = (await db.execute(
+            select(models.ContentType).where(models.ContentType.key == content_type_key)
+        )).scalar_one_or_none()
+        if ct:
+            conds.append(models.Entry.content_type_id == ct.id)
+    total = (await db.execute(select(func.count()).select_from(models.Entry).where(*conds))).scalar() or 0
+    stmt = (
+        select(models.Entry).where(*conds)
+        .order_by(models.Entry.published_at.desc(), models.Entry.id.desc())
+        .offset((page - 1) * page_size).limit(page_size)
+    )
+    entries = (await db.execute(stmt)).scalars().all()
+    items = [{"id": e.id, "slug": e.slug, "title": e.title, "content": e.content or {},
+              "custom_fields": e.custom_fields or {}, "seo": e.seo or {}, "status": e.status,
+              "published_at": e.published_at.isoformat() if e.published_at else None,
+              "sort": e.sort, "view_count": e.view_count} for e in entries]
+    if lang:
+        items = [await _apply_entry_translation(db, it, lang) for it in items]
+    for it in items:
+        it["og"] = _build_og(it)
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 # ============================================================

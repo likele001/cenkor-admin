@@ -38,3 +38,8 @@ class AppManifest:
     field_definitions: list[dict[str, Any]] = field(default_factory=list)
     categories_seed: list[dict[str, Any]] = field(default_factory=list)
     public_routes_prefix: str = ""
+
+    # ---- 插件框架（M1·P0）----
+    # 声明本 App 提供的钩子模块（dotted path），启动时自动 import 并注册其 @hook 处理器。
+    # 缺省会尝试 cenkor_admin.apps.{key}.hooks。
+    hooks: list[str] = field(default_factory=list)

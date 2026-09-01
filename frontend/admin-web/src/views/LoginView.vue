@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
@@ -19,6 +19,18 @@ const captchaRef = ref<InstanceType<typeof SliderCaptcha> | null>(null)
 const captchaVerified = ref(false)
 const captchaToken = ref('')
 
+// 登录页滑块是否启用：默认 true（兜底）；登录前拉取后台开关，false 时隐藏滑块
+const captchaRequired = ref(true)
+
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/api/v1/auth/login-config')
+    captchaRequired.value = !!data.captcha_required
+  } catch {
+    // 接口失败时保留默认 true，保持现有安全行为
+  }
+})
+
 function onCaptchaUpdate(verified: boolean) {
   captchaVerified.value = verified
   if (verified) {
@@ -29,7 +41,7 @@ function onCaptchaUpdate(verified: boolean) {
 }
 
 async function submit() {
-  if (!captchaVerified.value) {
+  if (captchaRequired.value && !captchaVerified.value) {
     error.value = t('login.captchaRequired')
     return
   }
@@ -93,7 +105,7 @@ function loginFeishu() {
             class="input"
           />
         </div>
-        <div>
+        <div v-if="captchaRequired">
           <label class="block text-sm font-medium mb-1.5">{{ t('login.captcha') }}</label>
           <SliderCaptcha ref="captchaRef" @update:verified="onCaptchaUpdate" />
         </div>
