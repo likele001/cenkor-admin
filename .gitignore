@@ -60,3 +60,10 @@ cloud_storage-1.0.0.zip
 quick_notes-1.0.0.zip
 my_todo_app-1.0.0.zip
 backend/src/cenkor_admin/apps/erp/release/
+
+# ============ 商业应用（私有，不进公开仓库） ============
+backend/src/cenkor_admin/apps/erp/
+backend/src/cenkor_admin/apps/crm/
+backend/src/cenkor_admin/static/apps/erp/
+backend/src/cenkor_admin/static/apps/crm/
+backend/src/apps/
