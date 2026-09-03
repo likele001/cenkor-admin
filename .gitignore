@@ -67,3 +67,10 @@ backend/src/cenkor_admin/apps/crm/
 backend/src/cenkor_admin/static/apps/erp/
 backend/src/cenkor_admin/static/apps/crm/
 backend/src/apps/
+
+# ============ ERP/CRM 迁移脚本（商业应用，不进公开仓库） ============
+# ERP/CRM 迁移脚本全部落在 08-31 之后的日期前缀；平台自身迁移均在 08-19 及以前
+backend/alembic/versions/20260831_*.py
+backend/alembic/versions/20260901_*.py
+backend/alembic/versions/20260902_*.py
+backend/alembic/versions/20260903_*.py
