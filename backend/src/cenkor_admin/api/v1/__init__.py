@@ -85,6 +85,13 @@ api_v1_router.include_router(
     system_public_router, prefix="/system", tags=["system-public"],
 )
 
+# CRM 对外 Open API（API Key 鉴权，无需 JWT）— 供外部 ES/ERP 系统对接
+try:
+    from cenkor_admin.apps.crm.routers.openapi_router import router as crm_openapi_router
+    api_v1_router.include_router(crm_openapi_router, prefix="/crm-open", tags=["crm-open"])
+except Exception as e:  # noqa: BLE001 - 缺依赖时不影响平台启动
+    log.warning("crm.openapi_mount_failed", error=str(e))
+
 # 插件框架：已注册钩子内省（受保护）
 api_v1_router.include_router(
     hooks_router, prefix="/system", tags=["hooks"],

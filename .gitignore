@@ -74,3 +74,10 @@ backend/alembic/versions/20260831_*.py
 backend/alembic/versions/20260901_*.py
 backend/alembic/versions/20260902_*.py
 backend/alembic/versions/20260903_*.py
+
+# ============ MES 应用（商业闭源，不进公开仓库） ============
+# 独立仓库维护：/www/git-repos/cenkor-mes.git（裸仓，含完整版本历史与 tag v0.1.0~v0.7.0）
+# 克隆：git clone /www/git-repos/cenkor-mes.git
+backend/src/cenkor_admin/apps/mes/
+backend/src/cenkor_admin/static/apps/mes/
+backend/alembic/versions/2026*_mes_*.py
