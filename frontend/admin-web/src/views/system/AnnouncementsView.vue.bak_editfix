@@ -49,14 +49,10 @@ function openNew() {
   showEdit.value = true
 }
 
-async function openEdit(item: Announcement) {
+function openEdit(item: Announcement) {
   isNew.value = false
-  form.value = { ...item, content: '' }
+  form.value = { ...item }
   showEdit.value = true
-  try {
-    const { data } = await api.get(`/api/v1/announcements/${item.id}`)
-    form.value.content = data.content || ''
-  } catch { /* 保留空内容 */ }
 }
 
 async function save() {
