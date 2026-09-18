@@ -34,6 +34,12 @@ UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent.parent / "uploads" / 
 # 前端静态资源目录（与 main.py 中的挂载点一致）
 FRONTEND_STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "apps"
 
+# 上传与解压安全上限（防超大包 / zip bomb / 路径穿越写出目标目录）
+MAX_APP_UPLOAD_BYTES = 200 * 1024 * 1024      # 上传压缩包 ≤ 200MB
+MAX_ZIP_ENTRIES = 10_000                       # ZIP 内条目数上限
+MAX_ZIP_FILE_SIZE = 200 * 1024 * 1024          # 单文件解压后 ≤ 200MB
+MAX_ZIP_TOTAL_SIZE = 1024 * 1024 * 1024        # 解压总大小 ≤ 1GB
+
 
 async def require_portal_or_admin(
     creds: HTTPAuthorizationCredentials | None = Depends(security),
@@ -253,10 +259,16 @@ async def submit_app(
     if not re.fullmatch(r"[a-z][a-z0-9\-_]{1,49}", app_key):
         raise HTTPException(400, "app_key 格式错误：小写字母开头，只含小写字母/数字/下划线/连字符，2-50位")
 
+    # 校验 version 格式（参与落盘文件名，必须防 ../ 等路径穿越）
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9\.\-_]{0,19}", version):
+        raise HTTPException(400, "version 格式错误：字母/数字开头，仅含字母数字与 . - _，最长 20 位")
+
     # 保存文件并校验
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = UPLOAD_DIR / f"{app_key}-{version}.zip"
-    content = await file.read()
+    content = await file.read(MAX_APP_UPLOAD_BYTES + 1)
+    if len(content) > MAX_APP_UPLOAD_BYTES:
+        raise HTTPException(413, f"应用包过大（超过 {MAX_APP_UPLOAD_BYTES // 1024 // 1024}MB 上限）")
     zip_path.write_bytes(content)
 
     file_hash = hashlib.sha256(content).hexdigest()
@@ -540,10 +552,18 @@ ALEMBIC_VERSIONS_DIR = Path(__file__).resolve().parent.parent.parent.parent.pare
 
 
 def _extract_app_zip(zf: zipfile.ZipFile, app_dir: Path) -> None:
-    """解压 App ZIP，自动剥离单层根目录（如 my_todo/manifest.py）。"""
+    """解压 App ZIP，自动剥离单层根目录（如 my_todo/manifest.py）。
+
+    安全约束（防路径穿越 / zip bomb）：
+    - 拒绝绝对路径、盘符、`..` 等可能越出 app_dir 的条目；
+    - 条目数、单文件解压大小、解压总大小均设上限；
+    - 先完成全部校验，再删除旧目录并落盘，避免半途失败留下脏状态。
+    """
     names = [n for n in zf.namelist() if n and not n.endswith("/")]
     if not names:
         raise HTTPException(400, "ZIP 包为空")
+    if len(names) > MAX_ZIP_ENTRIES:
+        raise HTTPException(400, f"ZIP 内文件条目过多（超过 {MAX_ZIP_ENTRIES}）")
 
     if "manifest.py" in names:
         prefix = ""
@@ -554,17 +574,38 @@ def _extract_app_zip(zf: zipfile.ZipFile, app_dir: Path) -> None:
         manifest_path = min(manifest_paths, key=len)
         prefix = manifest_path[: -len("manifest.py")]
 
-    if app_dir.exists():
-        shutil.rmtree(app_dir)
-    app_dir.mkdir(parents=True)
-
+    app_dir_resolved = app_dir.resolve()
+    entries: list[tuple[str, str, Path]] = []
+    total_size = 0
     for name in names:
         if prefix and not name.startswith(prefix):
             continue
         rel = name[len(prefix):] if prefix else name
         if not rel:
             continue
-        target = app_dir / rel
+        rel_norm = rel.replace("\\", "/")
+        parts = rel_norm.split("/")
+        if rel_norm.startswith("/") or ":" in parts[0] or ".." in parts:
+            raise HTTPException(400, f"ZIP 含非法路径条目: {rel}")
+        target = (app_dir / rel).resolve()
+        if app_dir_resolved not in target.parents:
+            raise HTTPException(400, f"ZIP 含越界路径条目: {rel}")
+        info = zf.getinfo(name)
+        if info.is_dir():
+            continue
+        if info.file_size > MAX_ZIP_FILE_SIZE:
+            raise HTTPException(400, f"ZIP 内单文件解压后过大: {rel}")
+        total_size += info.file_size
+        entries.append((name, rel, target))
+
+    if total_size > MAX_ZIP_TOTAL_SIZE:
+        raise HTTPException(400, "ZIP 解压总大小超限（疑似 zip bomb）")
+
+    if app_dir.exists():
+        shutil.rmtree(app_dir)
+    app_dir.mkdir(parents=True)
+
+    for name, rel, target in entries:
         target.parent.mkdir(parents=True, exist_ok=True)
         with zf.open(name) as src, open(target, "wb") as dst:
             shutil.copyfileobj(src, dst)
