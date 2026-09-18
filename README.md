@@ -9,22 +9,25 @@
 | **前端** | Vue 3 + Vite + Tailwind |
 | **后端** | Python 3.11 + FastAPI + SQLAlchemy 2.0 async |
 
-📖 **文档索引**：[`docs/INDEX.md`](docs/INDEX.md)  
+📖 **文档索引**：[`docs/INDEX.md`](docs/INDEX.md)
 📦 **打包交付**：[`docs/PACKAGING.md`](docs/PACKAGING.md)
 
 ## 快速启动（开发）
 
+> 仅用于本地开发（后端 `--reload` 热重载 + 前端 dev server）。**部署到公网请用下面的「全栈容器化生产部署」。**
+
 ```bash
 cp .env.example .env
 docker compose up -d
-docker compose exec backend alembic upgrade head
-docker compose exec backend python -m cenkor_admin.scripts.seed
 ```
 
 - 管理后台：http://localhost:5173
 - 用户中心：http://localhost:5175（`npm run dev:portal`）
 - API：http://localhost:8000/api/docs
 - 默认账号：`admin@cenkor.cn` / `admin123`
+
+> 后端启动时 lifespan 会自动执行 `alembic upgrade head` 建表，**无需手动跑迁移**。
+> seed 数据经 `docker compose exec backend python -m cenkor_admin.scripts.seed` 生成。
 
 > ⚠️ **安全提示（务必阅读）**
 >
@@ -41,10 +44,25 @@ docker compose exec backend python -m cenkor_admin.scripts.seed
 > 部署到公网前，请先完成上文「安全提示」中的三件事（改默认密码、换 `SECRET_KEY`、
 > 清理种子账号），并确认 `.env` 未被提交进版本库。
 
+**推荐：全栈容器化（一条命令 · 含全部前端 + Nginx 反代，对外可访问）**
+
+```bash
+cp .env.example .env        # 按需修改 .env 里的密码/端口
+docker compose -f docker-compose.fullstack.yml --project-name cenkor-admin-fullstack up -d --build
+```
+
+- 后端 API：http://服务器IP:8001/api/health → `/api/docs`
+- 管理后台：http://服务器IP:5185
+- 门户：http://服务器IP:5192 · 开发者门户：http://服务器IP:5175
+
+> 首次部署会自动完成数据库迁移与建表（后端 lifespan 自动 `alembic upgrade head`）。
+> 播种种子数据：`docker compose -f docker-compose.fullstack.yml --project-name cenkor-admin-fullstack exec backend python -m cenkor_admin.scripts.seed`
+> 完整说明见 [`docs/FULLSTACK_DEPLOY.md`](docs/FULLSTACK_DEPLOY.md)。
+
+其他部署模式：
 
 | 模式 | 命令 | 文档 |
 |------|------|------|
-| **全栈容器化（一条命令·含前端）** | `docker compose -f docker-compose.fullstack.yml up -d --build` | [`docs/FULLSTACK_DEPLOY.md`](docs/FULLSTACK_DEPLOY.md) |
 | **宝塔静态 dist（推荐·宝塔托管）** | `bash scripts/deploy.sh --mode baota-static` | [`docs/BAOTA_STATIC_DEPLOY.md`](docs/BAOTA_STATIC_DEPLOY.md) |
 | Docker 自管 nginx | `bash scripts/deploy.sh --mode docker` | [`docker-compose.prod.yml`](docker-compose.prod.yml) |
 | 宝塔反代 Docker 前端 | `bash scripts/deploy.sh --mode baota` | [`docs/DOMAIN_SETUP.md`](docs/DOMAIN_SETUP.md) |
