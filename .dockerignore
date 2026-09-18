@@ -1,0 +1,36 @@
+# 根级 .dockerignore —— 仅影响以仓库根为构建上下文的全栈构建
+#   （docker/fullstack/*.Dockerfile）。现有 dev by context=./backend 与
+#   ./frontend/* 各自用子目录 .dockerignore，不受影响。
+
+# version control
+.git
+.gitignore
+
+# node / npm
+node_modules
+frontend/*/node_modules
+frontend/*/dist
+
+# python 产物
+backend/__pycache__
+backend/.venv
+backend/venv
+*.pyc
+
+# 敏感文件（勿打进镜像）
+backend/.env
+.env
+.env.prod
+*.local
+deploy/nginx/certs
+
+# 无关构建产物
+backend/tests
+tests
+docs
+release
+*.zip
+*.log
+.DS_Store
+.idea
+.vscode
