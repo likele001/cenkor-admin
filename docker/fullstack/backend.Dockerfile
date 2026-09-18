@@ -22,8 +22,10 @@ COPY backend/requirements.txt ./
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# 业务代码
+# 业务代码 + 迁移（启动时 lifespan 会自动 alembic upgrade head）
 COPY backend/src ./src
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/alembic ./alembic
 
 # 非 root 运行（reduce 权限面）
 RUN useradd --create-home --uid 10001 appuser \
