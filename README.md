@@ -44,7 +44,8 @@ docker compose exec backend python -m cenkor_admin.scripts.seed
 
 | 模式 | 命令 | 文档 |
 |------|------|------|
-| **宝塔静态 dist（推荐）** | `bash scripts/deploy.sh --mode baota-static` | [`docs/BAOTA_STATIC_DEPLOY.md`](docs/BAOTA_STATIC_DEPLOY.md) |
+| **全栈容器化（一条命令·含前端）** | `docker compose -f docker-compose.fullstack.yml up -d --build` | [`docs/FULLSTACK_DEPLOY.md`](docs/FULLSTACK_DEPLOY.md) |
+| **宝塔静态 dist（推荐·宝塔托管）** | `bash scripts/deploy.sh --mode baota-static` | [`docs/BAOTA_STATIC_DEPLOY.md`](docs/BAOTA_STATIC_DEPLOY.md) |
 | Docker 自管 nginx | `bash scripts/deploy.sh --mode docker` | [`docker-compose.prod.yml`](docker-compose.prod.yml) |
 | 宝塔反代 Docker 前端 | `bash scripts/deploy.sh --mode baota` | [`docs/DOMAIN_SETUP.md`](docs/DOMAIN_SETUP.md) |
 | 裸机 systemd | `sudo bash scripts/install-native.sh` | [`docs/NATIVE_DEPLOY.md`](docs/NATIVE_DEPLOY.md) |

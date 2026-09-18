@@ -1,0 +1,173 @@
+# Cenkor Admin · 全栈容器化一条命令部署（内置 Nginx，开箱即用）
+#
+# 用法（在仓库根目录）：
+#   docker compose -f docker-compose.fullstack.yml \
+#     --project-name cenkor-admin-fullstack \
+#     --env-file .env up -d --build
+#
+#   --project-name 必须显式指定：本机 .env 里 COMPOSE_PROJECT_NAME=cenkor-admin
+#   会覆盖 compose 顶层 name，导致默认网络/服务名沿用 dev 前缀。显式指定后，
+#   网络名也会是 cenkor-admin-fullstack_*，与 dev 彻底隔离。
+#   （容器名/卷名已用固定 cenkorfs-*，即使漏了 --project-name 也不会撞车。）
+#
+# 与现有 dev（docker-compose.yml / cenkor-* 容器）完全隔离：
+#   - 容器、卷、网络全部独立命名
+#   - 独立对外端口（见下，可用 .env 覆盖）
+#
+# 端口速览（默认，均可用 .env 覆盖）：
+#   后端 API 8001 · 管理后台 5185 · 门户 5192 · 开发者门户 5175
+#   PostgreSQL 5543 · Redis 6382 · MinIO 9006/9007
+
+name: cenkor-admin-fullstack
+
+# 注意：容器/卷均用固定 cenkorfs-* 命名，与现有 dev（cenkor-*）以及本机
+# .env 里的 COMPOSE_PROJECT_NAME=cenkor-admin 完全不冲突。
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cenkorfs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cenkor}
+      POSTGRES_USER: ${POSTGRES_USER:-cenkor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    ports:
+      - "${FS_POSTGRES_PORT:-5543}:5432"
+    volumes:
+      - fs-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cenkor} -d ${POSTGRES_DB:-cenkor}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cenkorfs-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${FS_REDIS_PORT:-6382}:6379"
+    volumes:
+      - fs-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: cenkorfs-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-cenkor}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    ports:
+      - "${FS_MINIO_API_PORT:-9006}:9000"
+      - "${FS_MINIO_CONSOLE_PORT:-9007}:9001"
+    volumes:
+      - fs-minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/fullstack/backend.Dockerfile
+    image: cenkor-admin-backend:fullstack
+    container_name: cenkorfs-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
+      REDIS_URL: redis://${REDIS_PASSWORD:-}@redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+      minio:    { condition: service_healthy }
+    ports:
+      - "${FS_BACKEND_PORT:-8001}:8000"
+    command: uvicorn cenkor_admin.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: docker/fullstack/backend.Dockerfile
+    image: cenkor-admin-backend:fullstack
+    container_name: cenkorfs-celery
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
+      REDIS_URL: redis://${REDIS_PASSWORD:-}@redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    command: celery -A cenkor_admin.core.celery_app:celery_app worker --loglevel=info
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: docker/fullstack/frontend.Dockerfile
+      args:
+        FRONTEND: admin-web
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_WS_URL: ${VITE_WS_URL:-}
+    image: cenkor-admin-web-admin:fullstack
+    container_name: cenkorfs-admin-web
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "${FS_ADMIN_WEB_PORT:-5185}:80"
+
+  portal-web:
+    build:
+      context: .
+      dockerfile: docker/fullstack/frontend.Dockerfile
+      args:
+        FRONTEND: portal-web
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_WS_URL: ${VITE_WS_URL:-}
+    image: cenkor-admin-web-portal:fullstack
+    container_name: cenkorfs-portal-web
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "${FS_PORTAL_WEB_PORT:-5192}:80"
+
+  developer-web:
+    build:
+      context: .
+      dockerfile: docker/fullstack/frontend.Dockerfile
+      args:
+        FRONTEND: developer-web
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_WS_URL: ${VITE_WS_URL:-}
+    image: cenkor-admin-web-developer:fullstack
+    container_name: cenkorfs-developer-web
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "${FS_DEVELOPER_WEB_PORT:-5175}:80"
+
+volumes:
+  fs-postgres-data:
+    name: cenkorfs-postgres-data
+  fs-redis-data:
+    name: cenkorfs-redis-data
+  fs-minio-data:
+    name: cenkorfs-minio-data
