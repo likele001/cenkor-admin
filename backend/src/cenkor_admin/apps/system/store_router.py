@@ -131,6 +131,46 @@ async def register_developer(
 
 
 # ============================================================
+# 公开商店目录（无需鉴权，仅展示已审核通过的最新版）
+# ============================================================
+
+@router.get("/apps", response_model=dict[str, Any])
+async def public_store_apps(
+    db: AsyncSession = Depends(get_db),
+):
+    """应用商店公开目录：每个 app_key 只取最新的 approved/installed 版本。"""
+    inner = (
+        select(
+            store_models.AppSubmission.app_key,
+            func.max(store_models.AppSubmission.id).label("max_id"),
+        )
+        .where(store_models.AppSubmission.status.in_(["approved", "installed"]))
+        .group_by(store_models.AppSubmission.app_key)
+        .subquery()
+    )
+    stmt = (
+        select(store_models.AppSubmission, store_models.Developer.display_name)
+        .join(store_models.Developer, store_models.AppSubmission.developer_id == store_models.Developer.id)
+        .where(store_models.AppSubmission.id.in_(select(inner.c.max_id)))
+        .where(store_models.Developer.status == "active")
+        .order_by(store_models.AppSubmission.created_at.desc())
+    )
+    rows = (await db.execute(stmt)).all()
+    return {
+        "items": [
+            {"id": s.id, "key": s.app_key, "app_key": s.app_key,
+             "name": s.name, "version": s.version,
+             "description": s.description or "", "icon": s.icon,
+             "category": s.category, "author": author,
+             "download_count": s.download_count,
+             "updated_at": s.updated_at.isoformat() if s.updated_at else None}
+            for s, author in rows
+        ],
+        "total": len(rows),
+    }
+
+
+# ============================================================
 # 应用提交
 # ============================================================
 
