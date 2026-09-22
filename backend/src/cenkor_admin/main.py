@@ -92,6 +92,14 @@ async def lifespan(app: FastAPI):
                     drifted.append(key + ":" + str(row.version) + "->" + manifest.version)
                     row.version = manifest.version
                     row.name = manifest.name
+
+                # 内存钩子注册表随进程重启清空，而 register_app_hooks 只在 install_app
+                # 里调用过一次 —— 已装应用重启后会静默失去全部 @hook 处理器。这里补注册。
+                try:
+                    from cenkor_admin.core.hooks import register_app_hooks as _reg_hooks
+                    _reg_hooks(key, list(manifest.hooks or []))
+                except Exception as _he:  # noqa: BLE001
+                    log.warning("app.hooks_register_failed", key=key, error=str(_he))
             if drifted:
                 await db.commit()
                 log.info("app.version_reconciled", count=len(drifted), detail=",".join(drifted))
@@ -102,6 +110,11 @@ async def lifespan(app: FastAPI):
     try:
         from cenkor_admin.apps.system import hooks as _builtin_hooks  # noqa: F401
         from cenkor_admin.apps.system import webhooks as _webhook_hooks  # noqa: F401  (M3·P2)
+        # 闭源商业模块（无 manifest，由 api/v1/__init__.py 直接挂载 /api/v1/store）
+        try:
+            from cenkor_admin.apps.commerce import hooks as _commerce_hooks  # noqa: F401
+        except ImportError:
+            pass
         log.info("hooks.builtin_loaded", handlers=len(_builtin_hooks.__dict__))
     except Exception as e:
         log.warning("hooks.builtin_failed", error=str(e))
