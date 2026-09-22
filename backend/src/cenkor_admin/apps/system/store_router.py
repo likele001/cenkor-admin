@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import tempfile
@@ -21,6 +22,7 @@ from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.portal import models as portal_models
 from cenkor_admin.apps.system import store_models
 from cenkor_admin.apps.system.models import InstalledApp
+from cenkor_admin.apps.system.showcase_meta import SHOWCASE
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.security import decode_token
 from cenkor_admin.apps.portal.auth import decode_portal_token, is_portal_token, PORTAL_JWT_ISSUER
@@ -134,11 +136,56 @@ async def register_developer(
 # 公开商店目录（无需鉴权，仅展示已审核通过的最新版）
 # ============================================================
 
+CATEGORY_LABELS: dict[str, str] = {
+    "business": "业务应用",
+    "productivity": "效率工具",
+    "content": "内容管理",
+    "system": "系统扩展",
+    "ai": "AI 能力",
+}
+CATEGORY_ORDER = ["business", "productivity", "content", "system", "ai"]
+
+
+def _manifest_dict(value: Any) -> dict[str, Any]:
+    """manifest_data 兼容 dict / JSON 字符串两种存储形态。"""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+        except Exception:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _stamp(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+async def _installed_map(db: AsyncSession) -> dict[str, str]:
+    """平台已安装应用：{app_key: version}"""
+    rows = (
+        await db.execute(
+            select(InstalledApp.key, InstalledApp.version).where(InstalledApp.status == "installed")
+        )
+    ).all()
+    return {key: version for key, version in rows}
+
+
 @router.get("/apps", response_model=dict[str, Any])
 async def public_store_apps(
     db: AsyncSession = Depends(get_db),
+    q: str | None = Query(None, description="关键词：名称 / 描述 / 作者 / 标签 / 标识"),
+    category: str | None = Query(None, description="分类过滤"),
+    sort: str = Query("updated", pattern="^(updated|downloads|name)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=100),
 ):
-    """应用商店公开目录：每个 app_key 只取最新的 approved/installed 版本。"""
+    """应用商店公开目录：每个 app_key 只取最新的 approved/installed 版本。
+
+    支持关键词搜索、分类筛选、排序与分页；facets 供前端渲染分类计数。
+    """
     inner = (
         select(
             store_models.AppSubmission.app_key,
@@ -153,20 +200,166 @@ async def public_store_apps(
         .join(store_models.Developer, store_models.AppSubmission.developer_id == store_models.Developer.id)
         .where(store_models.AppSubmission.id.in_(select(inner.c.max_id)))
         .where(store_models.Developer.status == "active")
-        .order_by(store_models.AppSubmission.created_at.desc())
     )
     rows = (await db.execute(stmt)).all()
+    installed = await _installed_map(db)
+
+    all_items: list[dict[str, Any]] = []
+    for s, author in rows:
+        manifest = _manifest_dict(s.manifest_data)
+        showcase = SHOWCASE.get(s.app_key, {})
+        installed_version = installed.get(s.app_key)
+        all_items.append({
+            "id": s.id,
+            "key": s.app_key,
+            "app_key": s.app_key,
+            "name": s.name,
+            "version": s.version,
+            "description": s.description or "",
+            "summary": manifest.get("summary") or showcase.get("summary") or (s.description or ""),
+            "icon": s.icon,
+            "category": s.category,
+            "category_label": CATEGORY_LABELS.get(s.category, s.category),
+            "author": author,
+            "tags": manifest.get("tags") or showcase.get("tags") or [],
+            "download_count": s.download_count,
+            "installed": installed_version is not None,
+            "installed_version": installed_version,
+            "has_update": bool(installed_version and installed_version != s.version),
+            "updated_at": _stamp(s.updated_at),
+        })
+
+    items = all_items
+    keyword = (q or "").strip().lower()
+    if keyword:
+        def _hit(it: dict[str, Any]) -> bool:
+            haystack = " ".join([
+                str(it["name"]), str(it["key"]), str(it["description"]),
+                str(it["author"]), " ".join(it["tags"]),
+            ]).lower()
+            return keyword in haystack
+
+        items = [it for it in items if _hit(it)]
+
+    facets_source = items
+    if category:
+        items = [it for it in items if it["category"] == category]
+
+    if sort == "downloads":
+        items = sorted(items, key=lambda it: (-it["download_count"], it["name"]))
+    elif sort == "name":
+        items = sorted(items, key=lambda it: it["name"])
+    else:
+        items = sorted(items, key=lambda it: it["updated_at"] or "", reverse=True)
+
+    total = len(items)
+    start = (page - 1) * page_size
+    page_items = items[start:start + page_size]
+
+    counts: dict[str, int] = {}
+    for it in facets_source:
+        counts[it["category"]] = counts.get(it["category"], 0) + 1
+    ordered = [c for c in CATEGORY_ORDER if c in counts] + [c for c in counts if c not in CATEGORY_ORDER]
+
     return {
-        "items": [
-            {"id": s.id, "key": s.app_key, "app_key": s.app_key,
-             "name": s.name, "version": s.version,
-             "description": s.description or "", "icon": s.icon,
-             "category": s.category, "author": author,
-             "download_count": s.download_count,
-             "updated_at": s.updated_at.isoformat() if s.updated_at else None}
-            for s, author in rows
+        "items": page_items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_more": start + len(page_items) < total,
+        "facets": [
+            {"key": c, "label": CATEGORY_LABELS.get(c, c), "count": counts[c]}
+            for c in ordered
         ],
-        "total": len(rows),
+        "stats": {
+            "apps": len(all_items),
+            "installed": sum(1 for it in all_items if it["installed"]),
+            "upgradable": sum(1 for it in all_items if it["has_update"]),
+            "downloads": sum(it["download_count"] for it in all_items),
+        },
+    }
+
+
+@router.get("/apps/{app_key}", response_model=dict[str, Any])
+async def public_store_app_detail(
+    app_key: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """应用详情：最新版本 + 版本历史 + 权限清单 + 平台安装状态。"""
+    stmt = (
+        select(store_models.AppSubmission, store_models.Developer)
+        .join(store_models.Developer, store_models.AppSubmission.developer_id == store_models.Developer.id)
+        .where(store_models.AppSubmission.app_key == app_key)
+        .where(store_models.AppSubmission.status.in_(["approved", "installed"]))
+        .where(store_models.Developer.status == "active")
+        .order_by(store_models.AppSubmission.id.desc())
+    )
+    rows = (await db.execute(stmt)).all()
+    if not rows:
+        raise HTTPException(404, "应用不存在或尚未上架")
+
+    latest, dev = rows[0]
+    manifest = _manifest_dict(latest.manifest_data)
+    showcase = SHOWCASE.get(app_key, {})
+    inst = await db.get(InstalledApp, app_key)
+    installed_version = inst.version if inst and inst.status == "installed" else None
+
+    history = [
+        {
+            "version": s.version,
+            "status": s.status,
+            "released_at": _stamp(s.reviewed_at or s.created_at),
+            "download_count": s.download_count,
+            "is_current": s.id == latest.id,
+        }
+        for s, _dev in rows
+    ]
+    # 平台已安装但已不在上架记录里的版本，同样作为历史项展示
+    if installed_version and not any(h["version"] == installed_version for h in history):
+        history.append({
+            "version": installed_version,
+            "status": "installed",
+            "released_at": None,
+            "download_count": 0,
+            "is_current": False,
+        })
+
+    permissions = manifest.get("permissions_required") or []
+    menus = manifest.get("menus") or []
+
+    return {
+        "id": latest.id,
+        "key": app_key,
+        "app_key": app_key,
+        "name": latest.name,
+        "version": latest.version,
+        "description": latest.description or "",
+        "summary": manifest.get("summary") or showcase.get("summary") or (latest.description or ""),
+        "highlights": manifest.get("highlights") or showcase.get("highlights") or [],
+        "tags": manifest.get("tags") or showcase.get("tags") or [],
+        "screenshots": manifest.get("screenshots") or showcase.get("screenshots") or [],
+        "icon": latest.icon,
+        "category": latest.category,
+        "category_label": CATEGORY_LABELS.get(latest.category, latest.category),
+        "download_count": latest.download_count,
+        "updated_at": _stamp(latest.updated_at),
+        "released_at": _stamp(latest.reviewed_at or latest.created_at),
+        "developer": {
+            "name": dev.display_name,
+            "website": dev.website,
+            "description": dev.description,
+        },
+        "installed": installed_version is not None,
+        "installed_version": installed_version,
+        "has_update": bool(installed_version and installed_version != latest.version),
+        "has_frontend": bool(inst.has_frontend) if inst else False,
+        "permissions": permissions,
+        "permission_count": len(permissions),
+        "menu_count": len(menus),
+        "min_platform_version": manifest.get("min_platform_version"),
+        "dependencies": manifest.get("dependencies") or [],
+        "versions": history,
+        "install_hint": "管理员可在「系统 → 应用管理」中安装或升级该应用",
     }
 
 
@@ -248,9 +441,11 @@ async def list_submissions(
             return {"items": [], "total": 0}
         stmt = stmt.where(store_models.AppSubmission.id.in_(only_active_ids))
 
-    count = (await db.execute(select(func.count()).select_from(
-        select(store_models.AppSubmission).where(stmt.whereclause).subquery()
-    ))).scalar() or 0
+    # 注意：不可用 stmt.whereclause 拼 count —— 无筛选条件时 whereclause 为 None，
+    # 会生成 `WHERE NULL` 导致 total 恒为 0。直接用 stmt 的 subquery（同 list_developers）。
+    count = (await db.execute(
+        select(func.count()).select_from(stmt.order_by(None).subquery())
+    )).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     rows = (await db.execute(stmt)).all()
 
@@ -742,3 +937,88 @@ def _parse_manifest(content: str) -> dict | None:
         return result if result.get("key") else None
     except Exception:
         return None
+
+
+# ============================================================
+# 通用安装入口（商店安装 / 云端授权安装共用）
+# ============================================================
+
+async def install_app_from_zip(
+    db: AsyncSession, app_key: str, zip_path: Path
+) -> dict[str, Any]:
+    """从 ZIP 安装应用到 apps/ 目录。
+
+    与 `install_submission` 的处理步骤一致（解压 → 前端资源 → 迁移文件 →
+    alembic upgrade → install_app 注册 → 动态路由），差别只在于包来源：
+    商店安装取自 submission.file_path，云端授权安装取自本地临时副本。
+
+    返回 {has_frontend, route_registered, warnings}。
+    """
+    if not zip_path.exists():
+        raise HTTPException(400, "ZIP 文件不存在")
+
+    app_dir = APPS_DIR / app_key
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            _extract_app_zip(zf, app_dir)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"解压失败: {e}") from e
+
+    # 前端资源：frontend/dist → static/apps/{key}/
+    has_frontend = False
+    frontend_src = app_dir / "frontend" / "dist"
+    if frontend_src.exists():
+        target_dir = FRONTEND_STATIC_DIR / app_key
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        shutil.copytree(frontend_src, target_dir)
+        has_frontend = True
+
+    # 数据库迁移文件
+    _copy_migration_files(app_dir, app_key)
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        _alembic_cfg = Config(
+            str(Path(__file__).resolve().parent.parent.parent.parent.parent / "alembic.ini")
+        )
+        command.upgrade(_alembic_cfg, "head")
+    except Exception as e:  # noqa: BLE001
+        log.warning("store.migration_upgrade_fail", app_key=app_key, error=str(e))
+
+    warnings: list[str] = []
+    try:
+        from cenkor_admin.apps.system.app_registry import install_app
+
+        await install_app(db, app_key)
+    except Exception as e:  # noqa: BLE001
+        log.warning("store.install.auto_failed", app_key=app_key, error=str(e))
+        raise HTTPException(500, f"应用注册失败: {e}") from e
+
+    route_registered = False
+    try:
+        from cenkor_admin.api.v1 import register_app_router
+
+        route_registered = register_app_router(app_key)
+        if not route_registered and (app_dir / "router.py").exists():
+            warnings.append("API 路由注册失败，请检查 router.py 中的 import 路径")
+    except Exception as e:  # noqa: BLE001
+        log.warning("store.route_register_failed", app_key=app_key, error=str(e))
+        warnings.append(f"API 路由注册异常: {e}")
+
+    installed_row = (await db.execute(
+        select(InstalledApp).where(InstalledApp.key == app_key)
+    )).scalar_one_or_none()
+    if installed_row:
+        installed_row.has_frontend = has_frontend
+
+    await db.commit()
+    log.info("store.installed_from_zip", app_key=app_key, has_frontend=has_frontend)
+    return {
+        "has_frontend": has_frontend,
+        "route_registered": route_registered,
+        "warnings": warnings,
+    }

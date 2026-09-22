@@ -6,7 +6,7 @@ from cenkor_admin.apps.base import AppManifest
 MANIFEST = AppManifest(
     key="tickets",
     name="工单系统",
-    version="1.0.0",
+    version="1.0.1",
     author="Cenkor",
     description="内部工单与任务追踪，支持分配、状态流转、优先级管理",
     icon="🎫",

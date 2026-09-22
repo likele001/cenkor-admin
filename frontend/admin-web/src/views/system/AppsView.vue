@@ -41,6 +41,20 @@ interface PendingApp {
   created_at: string
 }
 
+interface StoreApp {
+  id: number
+  key: string
+  app_key: string
+  name: string
+  version: string
+  description: string
+  icon: string
+  category: string
+  author: string
+  download_count: number
+  updated_at?: string | null
+}
+
 const apps = ref<AppItem[]>([])
 const pendingApps = ref<PendingApp[]>([])
 const loading = ref(true)
@@ -54,6 +68,8 @@ const newPermCode = ref('')
 const activeTab = ref<'installed' | 'store' | 'pending'>('installed')
 const subTab = ref<'pending' | 'approved' | 'installed'>('pending')
 const categoryFilter = ref('')
+const storeCatalog = ref<StoreApp[]>([])
+const storeLoaded = ref(false)
 
 const statusLabel: Record<string, string> = {
   installed: t('apps.status_installed'),
@@ -184,19 +200,60 @@ async function installSubmission(id: number) {
   }
 }
 
+async function loadStore() {
+  try {
+    const { data } = await api.get('/api/v1/store/apps')
+    storeCatalog.value = data.items || []
+  } catch (e: any) {
+    console.error('load store catalog fail', e)
+  } finally {
+    storeLoaded.value = true
+  }
+}
+
 onMounted(() => {
   load()
   loadPending()
+  loadStore()
 })
 
 const installedApps = computed(() => apps.value.filter(a => a.status === 'installed' || a.status === 'needs_upgrade'))
 const filteredSubmissions = computed(() => pendingApps.value.filter(s => s.status === subTab.value))
 
+// 已安装应用的 key -> 当前版本（用于比对商店版本，得出「可升级」）
+const installedMap = computed(() => {
+  const m = new Map<string, string>()
+  for (const a of apps.value) {
+    if (a.status === 'installed' || a.status === 'needs_upgrade') m.set(a.key, a.version)
+  }
+  return m
+})
+
+// 商店目录 = 后端已审核通过/已安装的最新版本（与 dev.cenkor.cn/store 同源）
 const storeApps = computed(() => {
-  let list = apps.value.filter(a => a.status === 'not_installed' || a.status === 'missing')
-  if (categoryFilter.value) list = list.filter(a => (a as any).category === categoryFilter.value)
+  let list = storeCatalog.value
+  if (categoryFilter.value) list = list.filter(a => a.category === categoryFilter.value)
   return list
 })
+
+type StoreState = 'installed' | 'upgradable' | 'installable'
+function storeState(app: StoreApp): StoreState {
+  const cur = installedMap.value.get(app.key)
+  if (!cur) return 'installable'
+  return cur === app.version ? 'installed' : 'upgradable'
+}
+
+// 用 key 映射 + 调用时求值，保证切换语言时标签跟着变
+const CATEGORY_KEYS: Record<string, string> = {
+  business: 'apps.filterBusiness',
+  productivity: 'apps.filterProductivity',
+  system: 'apps.filterSystem',
+  content: 'apps.filterContent',
+}
+function categoryLabel(c: string): string {
+  const k = CATEGORY_KEYS[c]
+  return k ? t(k) : c
+}
 </script>
 
 <template>
@@ -224,6 +281,7 @@ const storeApps = computed(() => {
 
     <div v-if="activeTab === 'store'" class="mb-4 flex gap-2">
       <button class="btn-ghost text-xs" :class="!categoryFilter && 'bg-ink-100'" @click="categoryFilter = ''">{{ t('apps.filterAll') }}</button>
+      <button class="btn-ghost text-xs" :class="categoryFilter === 'business' && 'bg-ink-100'" @click="categoryFilter = 'business'">{{ t('apps.filterBusiness') }}</button>
       <button class="btn-ghost text-xs" :class="categoryFilter === 'content' && 'bg-ink-100'" @click="categoryFilter = 'content'">{{ t('apps.filterContent') }}</button>
       <button class="btn-ghost text-xs" :class="categoryFilter === 'productivity' && 'bg-ink-100'" @click="categoryFilter = 'productivity'">{{ t('apps.filterProductivity') }}</button>
       <button class="btn-ghost text-xs" :class="categoryFilter === 'system' && 'bg-ink-100'" @click="categoryFilter = 'system'">{{ t('apps.filterSystem') }}</button>
@@ -317,38 +375,53 @@ const storeApps = computed(() => {
       </div>
 
       <div v-if="activeTab === 'store' && storeApps.length === 0" class="card text-ink-500 text-center py-12">
-        {{ t('apps.emptyStore') }}
+        {{ storeLoaded ? t('apps.emptyStoreCatalog') : t('apps.loading') }}
       </div>
       <div v-for="app in storeApps" v-if="activeTab === 'store'" :key="app.key" class="card">
         <div class="flex items-start gap-3">
           <span class="text-2xl">{{ app.icon }}</span>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <h3 class="font-semibold">{{ app.name }}</h3>
               <code class="text-xs text-ink-400">{{ app.key }} @ {{ app.version }}</code>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-500">{{ t('apps.status_not_installed') }}</span>
+              <span
+                class="text-xs px-2 py-0.5 rounded-full"
+                :class="storeState(app) === 'installed' ? 'bg-green-50 text-green-700'
+                       : storeState(app) === 'upgradable' ? 'bg-amber-50 text-amber-700'
+                       : 'bg-ink-100 text-ink-500'"
+              >{{ storeState(app) === 'installed' ? t('apps.status_installed')
+                  : storeState(app) === 'upgradable' ? t('apps.status_upgradable')
+                  : t('apps.status_not_installed') }}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{{ categoryLabel(app.category) }}</span>
             </div>
             <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
+            <p class="text-xs text-ink-400 mt-1">{{ t('apps.author') }}: {{ app.author }}</p>
           </div>
         </div>
         <div class="mt-3 flex gap-2 border-t pt-3">
           <button
+            v-if="storeState(app) !== 'installed'"
             class="btn-primary text-sm"
-            :disabled="acting === app.key"
-            @click="install(app.key)"
-          >{{ t('apps.install') }}</button>
+            :disabled="acting === `install-${app.id}`"
+            @click="installSubmission(app.id)"
+          >{{ storeState(app) === 'upgradable'
+              ? t('apps.upgradeTo', { version: app.version })
+              : t('apps.install') }}</button>
+          <button v-else class="btn-ghost text-sm" disabled>{{ t('apps.status_installed') }}</button>
           <button
             class="btn-ghost text-sm"
             @click="expanded = expanded === app.key ? null : app.key"
           >{{ expanded === app.key ? t('apps.collapse') : t('apps.details') }}</button>
         </div>
-        <div v-if="expanded === app.key" class="mt-3 pt-3 border-t space-y-3 text-sm">
-          <div v-if="app.permissions_required?.length">
-            <h4 class="font-medium text-ink-500 mb-1">{{ t('apps.requiredPermissions') }}</h4>
-            <div class="flex flex-wrap gap-1">
-              <code v-for="p in app.permissions_required" :key="p" class="text-xs px-1.5 py-0.5 bg-ink-50 rounded">{{ p }}</code>
-            </div>
+        <div v-if="expanded === app.key" class="mt-3 pt-3 border-t space-y-2 text-sm">
+          <div class="flex flex-wrap gap-4 text-xs text-ink-500">
+            <span>{{ t('apps.category') }}: <code class="bg-ink-50 px-1 rounded">{{ app.category }}</code></span>
+            <span>{{ t('apps.downloads') }}: {{ app.download_count }}</span>
+            <span v-if="installedMap.get(app.key)">
+              {{ t('apps.installedVersion') }}: <code class="bg-ink-50 px-1 rounded">{{ installedMap.get(app.key) }}</code>
+            </span>
           </div>
+          <p class="text-xs text-ink-400">{{ t('apps.packageHint') }}</p>
         </div>
       </div>
     </div>

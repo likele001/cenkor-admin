@@ -3,7 +3,7 @@ from cenkor_admin.apps.base import AppManifest
 MANIFEST = AppManifest(
     key="my_todo",
     name="My Todo",
-    version="1.0.0",
+    version="1.1.2",
     author="Demo Dev",
     description="A simple todo app for testing the store install flow",
     icon="✅",

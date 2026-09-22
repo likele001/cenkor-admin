@@ -8,6 +8,8 @@ import ProfileView from '@/views/ProfileView.vue'
 import HomeView from '@/views/HomeView.vue'
 import ContentListView from '@/views/ContentListView.vue'
 import ContentDetailView from '@/views/ContentDetailView.vue'
+import AppCenterView from '@/views/AppCenterView.vue'
+import AppDetailView from '@/views/AppDetailView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -19,6 +21,8 @@ export const router = createRouter({
     { path: '/', component: HomeView, meta: { public: true } },
     { path: '/list/:ct', component: ContentListView, meta: { public: true } },
     { path: '/list/:ct/:id', component: ContentDetailView, meta: { public: true } },
+    { path: '/apps', component: AppCenterView, meta: { public: true } },
+    { path: '/apps/:key', component: AppDetailView, meta: { public: true } },
     { path: '/profile', component: ProfileView },
     { path: '/products', redirect: '/list/product' },
     { path: '/cases', redirect: '/list/case' },

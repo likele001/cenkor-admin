@@ -3,7 +3,7 @@ from cenkor_admin.apps.base import AppManifest
 MANIFEST = AppManifest(
     key="quick_notes",
     name="Quick Notes",
-    version="1.0.0",
+    version="1.0.3",
     description="简易备忘录工具，支持增删改查、颜色标记、搜索",
     icon="📝",
     category="productivity",
