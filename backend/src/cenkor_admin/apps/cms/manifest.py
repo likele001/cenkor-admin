@@ -6,7 +6,7 @@ from cenkor_admin.apps.base import AppManifest
 MANIFEST = AppManifest(
     key="cms",
     name="辰科官网 CMS",
-    version="0.3.0",
+    version="0.3.1",
     author="Cenkor",
     description="通用内容管理：内容类型 / 字段定义 / 分类标签 / Liquid 模板 / 公共 API",
     icon="📰",

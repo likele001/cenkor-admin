@@ -101,6 +101,15 @@ class Settings(BaseSettings):
     # ---- 公网 ----
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 
+    # ---- 应用授权中心（生态收费）----
+    # 留空 = 本机即授权中心（自营部署：签发与校验同库）
+    # 填 https://portal.cenkor.cn = 客户实例，向该地址激活 / 心跳 / 拉包
+    CENKOR_CLOUD_URL: str = ""
+    # 授权中心不可达时的离线宽限天数（超期后收费应用停止放行）
+    LICENSE_OFFLINE_GRACE_DAYS: int = 15
+    # 心跳间隔（小时）
+    LICENSE_HEARTBEAT_HOURS: int = 24
+
     @property
     def db_dialect(self) -> str:
         """返回当前数据库方言（postgresql | mysql | sqlite | unknown）"""

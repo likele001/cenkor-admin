@@ -237,6 +237,21 @@ _auto_register_app_routers()
 from cenkor_admin.apps.system.store_router import router as store_router  # noqa: E402
 api_v1_router.include_router(store_router, prefix="/store", tags=["app-store"])
 
+# 生态交易层（定价 / 订单 / 授权 / 云端安装）
+# 闭源商业模块，位于外置目录 src/apps/commerce/（不进公开仓库）。
+# 开源部署不含此模块，ImportError 时静默跳过，不影响平台启动。
+try:
+    from cenkor_admin.apps.commerce.commerce_router import router as commerce_router
+    api_v1_router.include_router(commerce_router, prefix="/store", tags=["app-commerce"])
+except Exception as e:  # noqa: BLE001
+    log.warning("commerce.mount_skipped", error=str(e))
+
+# 支付中心公开路由（第三方回调 / 收银台 / 状态轮询，免鉴权）
+from cenkor_admin.apps.payment.public_router import router as payment_public_router  # noqa: E402
+api_v1_router.include_router(
+    payment_public_router, prefix="/public/payment", tags=["payment-public"],
+)
+
 # ============================================================
 # /me
 # ============================================================

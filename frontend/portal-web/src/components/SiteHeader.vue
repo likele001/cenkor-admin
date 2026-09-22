@@ -21,6 +21,7 @@ const mobileOpen = ref(false)
         <RouterLink to="/" class="nav-link">首页</RouterLink>
         <RouterLink to="/products" class="nav-link">产品中心</RouterLink>
         <RouterLink to="/cases" class="nav-link">客户案例</RouterLink>
+        <RouterLink to="/apps" class="nav-link">应用中心</RouterLink>
         <LocaleSwitcher />
         <template v-if="!auth.isAuthed">
           <RouterLink to="/login" class="nav-link">{{ t('nav.login') }}</RouterLink>
@@ -41,6 +42,7 @@ const mobileOpen = ref(false)
         <RouterLink to="/" class="py-2">首页</RouterLink>
         <RouterLink to="/products" class="py-2">产品中心</RouterLink>
         <RouterLink to="/cases" class="py-2">客户案例</RouterLink>
+        <RouterLink to="/apps" class="py-2">应用中心</RouterLink>
         <template v-if="!auth.isAuthed">
           <RouterLink to="/login" class="py-2">登录</RouterLink>
         </template>

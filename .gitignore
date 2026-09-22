@@ -1,3 +1,5 @@
+# 应用存放位置：内置 cenkor_admin/apps/<key>/（开源进库）；独立/商业应用放 src/apps/<key>/（本文件已整体排除）
+
 # ============ Python / Backend ============
 __pycache__/
 *.py[cod]
@@ -81,3 +83,26 @@ backend/alembic/versions/20260903_*.py
 backend/src/cenkor_admin/apps/mes/
 backend/src/cenkor_admin/static/apps/mes/
 backend/alembic/versions/2026*_mes_*.py
+
+# ============ 支付中心应用（独立应用，不公开源码） ============
+# 源码已迁至外置应用目录 backend/src/apps/payment/，由上面的 backend/src/apps/ 规则整体覆盖，
+# 无需为本应用单独登记。下面两条仅因前端产物与迁移仍落在被跟踪的目录里：
+backend/src/cenkor_admin/static/apps/payment/
+backend/alembic/versions/2026*_payment*.py
+
+# 生态交易层（定价 / 订单 / 授权 / 云端安装，闭源）—— 源码在 backend/src/apps/commerce/，
+# 同样被上面的 backend/src/apps/ 规则整体覆盖；这里只补迁移文件。
+backend/alembic/versions/2026*_commerce*.py
+# 兜底：防止误把应用放回内置目录
+backend/src/cenkor_admin/apps/payment/
+
+# ============ 应用 Release 包（构建产物） ============
+backend/src/cenkor_admin/apps/*/release/
+
+# ============ 手工备份 / 临时文件 ============
+*.bak
+*.bak_*
+*.bak.*
+*.removed_*
+*.orig
+*.rej

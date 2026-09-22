@@ -6,7 +6,7 @@ from cenkor_admin.apps.base import AppManifest
 MANIFEST = AppManifest(
     key="announcements",
     name="公告管理",
-    version="1.0.0",
+    version="1.0.1",
     author="Cenkor",
     description="企业内部公告发布与管理，支持置顶、分类、定时发布",
     icon="📢",

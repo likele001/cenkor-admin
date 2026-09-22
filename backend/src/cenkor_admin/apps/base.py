@@ -26,11 +26,18 @@ class AppManifest:
     author: str = ""
     description: str = ""
     icon: str = "📦"
-    category: str = "system"                       # 分类: system / content / productivity / ai
+    category: str = "system"                       # 分类: business / productivity / content / system / ai
     min_platform_version: str = "0.1.0"
     dependencies: list[str] = field(default_factory=list)
     permissions_required: list[str] = field(default_factory=list)
     menus: list[dict[str, Any]] = field(default_factory=list)
+
+    # ---- 生态收费（P0）----
+    # True 时底座会校验授权：未激活 / 过期 / 被吊销一律拦截（HTTP 402）
+    license_required: bool = False
+    price_model: str = "free"       # free / one_time / subscription / seat
+    price_cents: int = 0            # 建议价（分）；实际以 app_pricing 表为准
+    trial_days: int = 0
 
     # ---- V2 扩展 ----
     content_types: list[dict[str, Any]] = field(default_factory=list)

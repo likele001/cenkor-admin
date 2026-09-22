@@ -6,7 +6,7 @@ from cenkor_admin.apps.base import AppManifest
 MANIFEST = AppManifest(
     key="links",
     name="链接收藏",
-    version="1.0.0",
+    version="1.0.1",
     author="Cenkor",
     description="书签与外部链接收集管理，支持分类、标签、收藏夹",
     icon="🔗",

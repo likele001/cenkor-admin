@@ -25,6 +25,20 @@ for _name in sorted(os.listdir(_APPS_DIR)):
         except Exception:
             pass
 
+# 外置应用目录（独立/商业应用，默认不进公开仓库）同样纳入 metadata，
+# 否则 `alembic revision --autogenerate` 会把它们的表误判为待删除。
+_EXTERNAL_APPS_DIR = os.path.join(os.path.dirname(os.path.dirname(_APPS_DIR)), "apps")
+if os.path.isdir(_EXTERNAL_APPS_DIR):
+    for _name in sorted(os.listdir(_EXTERNAL_APPS_DIR)):
+        if _name.startswith("_"):
+            continue
+        _modfile = os.path.join(_EXTERNAL_APPS_DIR, _name, "models.py")
+        if os.path.isfile(_modfile):
+            try:
+                importlib.import_module(f"cenkor_admin.apps.{_name}.models")  # noqa: F401
+            except Exception:
+                pass
+
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

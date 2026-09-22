@@ -60,8 +60,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("s3.buckets.fail", error=str(e))
 
-    # 启动时自动安装：仅装 platform_apps 里**完全没有记录**的 App
-    # （已 uninstall 的 App 不会自动重装，必须由管理员显式安装）
+    # 启动时自动安装 + 版本对齐：
+    # - platform_apps 里**完全没有记录**的 App → 自动安装
+    # - 已 installed 的 App → 同步 name/version（源码 bump 后对齐，避免商店"有更新"误报）
+    # - 已 uninstall 的 App → 不动，必须由管理员显式安装
     try:
         from cenkor_admin.core.db import AsyncSessionLocal
         from cenkor_admin.apps.system.app_registry import (
@@ -73,6 +75,8 @@ async def lifespan(app: FastAPI):
             manifests = scan_app_manifests()
             all_rows = (await db.execute(select(InstalledApp))).scalars().all()
             known_keys = {a.key for a in all_rows}  # 包括 uninstalled 的
+            by_key = {a.key: a for a in all_rows}
+            drifted = []
             for key, manifest in manifests.items():
                 if key not in known_keys:
                     try:
@@ -80,6 +84,17 @@ async def lifespan(app: FastAPI):
                         log.info("app.auto_installed", key=key, version=manifest.version)
                     except Exception as e:
                         log.warning("app.auto_install_failed", key=key, error=str(e))
+                    continue
+                row = by_key.get(key)
+                if row is None or row.status != "installed":
+                    continue  # uninstalled 的 App 不自动重装
+                if row.version != manifest.version or row.name != manifest.name:
+                    drifted.append(key + ":" + str(row.version) + "->" + manifest.version)
+                    row.version = manifest.version
+                    row.name = manifest.name
+            if drifted:
+                await db.commit()
+                log.info("app.version_reconciled", count=len(drifted), detail=",".join(drifted))
     except Exception as e:
         log.warning("app.auto_install.check_fail", error=str(e))
 
