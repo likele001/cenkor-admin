@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.portal import models as portal_models
+from cenkor_admin.apps.system import pricing_bridge
 from cenkor_admin.apps.system import pricing_rules
 from cenkor_admin.apps.system import store_models
 from cenkor_admin.apps.system.models import InstalledApp
@@ -205,6 +206,9 @@ async def public_store_apps(
     )
     rows = (await db.execute(stmt)).all()
     installed = await _installed_map(db)
+    # 批量取价格视图（跨源码边界桥）：未装 commerce 时为空 dict ——
+    # 商店照常返回，只是不带价格，接口不会因缺定价模块而失败。
+    prices = await pricing_bridge.price_map(db, [s.app_key for s, _ in rows])
 
     all_items: list[dict[str, Any]] = []
     for s, author in rows:
@@ -229,6 +233,8 @@ async def public_store_apps(
             "installed_version": installed_version,
             "has_update": bool(installed_version and installed_version != s.version),
             "updated_at": _stamp(s.updated_at),
+            # None = 免费 / 未定价（前端据此展示「免费」）
+            "price": prices.get(s.app_key),
         })
 
     items = all_items
@@ -305,6 +311,8 @@ async def public_store_app_detail(
     showcase = SHOWCASE.get(app_key, {})
     inst = await db.get(InstalledApp, app_key)
     installed_version = inst.version if inst and inst.status == "installed" else None
+    # 价格视图（跨源码边界桥）：未装 commerce 时为 {}
+    prices = await pricing_bridge.price_map(db, [app_key])
 
     history = [
         {
@@ -355,6 +363,8 @@ async def public_store_app_detail(
         "installed_version": installed_version,
         "has_update": bool(installed_version and installed_version != latest.version),
         "has_frontend": bool(inst.has_frontend) if inst else False,
+        # None = 免费 / 未定价
+        "price": prices.get(app_key),
         "permissions": permissions,
         "permission_count": len(permissions),
         "menu_count": len(menus),

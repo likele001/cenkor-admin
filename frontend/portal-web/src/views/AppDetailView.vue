@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
+import { hasPriceInfo, isFreePrice, promoRemaining, yuanText, type AppPrice } from '@/lib/pricing'
 import SiteHeader from '@/components/SiteHeader.vue'
 
 interface AppVersion {
@@ -41,6 +43,8 @@ interface AppDetail {
   dependencies: string[]
   versions: AppVersion[]
   install_hint: string
+  /** null = 免费 / 未定价 */
+  price: AppPrice | null
 }
 
 const { t } = useI18n()
@@ -50,6 +54,67 @@ const detail = ref<AppDetail | null>(null)
 const loading = ref(true)
 const error = ref('')
 const showPermissions = ref(false)
+
+// ---- 定价与购买 ----
+const router = useRouter()
+const auth = useAuthStore()
+
+const seats = ref(1)
+const buying = ref(false)
+const buyError = ref('')
+// 促销倒计时：每 30s 刷新一次时间基准，供「剩余 x 天 y 小时」重算
+const tickNow = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | undefined
+watch(() => route.params.key, () => { buyError.value = '' })
+
+const price = computed(() => detail.value?.price ?? null)
+const isFree = computed(() => isFreePrice(price.value))
+// 定价行已下架：能看不能买
+const notOnSale = computed(() => !!price.value && !isFree.value && price.value.enabled === false)
+const promoLeft = computed(() => promoRemaining(price.value?.promo_end_at, tickNow.value))
+const modelHint = computed(() => {
+  const p = price.value
+  if (!p || isFree.value) return ''
+  return p.model === 'seat'
+    ? t('price.seatHint', { n: p.period_days })
+    : t('price.oneTimeHint')
+})
+
+// 席位模式下默认按最小席位数下单
+watch(price, (p) => {
+  if (p?.model === 'seat') seats.value = p.min_seats || 1
+}, { immediate: true })
+
+async function buy() {
+  // 未登录直接跳登录，登录后回本页继续（按产品决策，不做匿名下单）
+  if (!auth.isAuthed) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  const app = detail.value
+  if (!app) return
+  buying.value = true
+  buyError.value = ''
+  try {
+    const payload: Record<string, unknown> = { app_key: app.key }
+    if (price.value?.model === 'seat') payload.seats = seats.value
+    const { data } = await api.post('/api/v1/store/orders', payload)
+    const order = data?.order ?? data
+    // 0 元订单（免费应用）：后端已即时签发授权，无需走收银台
+    if (!order?.amount_cents) {
+      buyError.value = t('price.orderDone', { no: order?.order_no ?? '' })
+      return
+    }
+    const { data: ck } = await api.post(`/api/v1/store/orders/${order.order_no}/checkout`, {})
+    const cashier = ck?.pay?.cashier_url
+    if (!cashier) throw new Error(t('price.noCashier'))
+    window.location.href = cashier
+  } catch (e: any) {
+    buyError.value = e?.response?.data?.detail || e?.message || t('price.buyError')
+  } finally {
+    buying.value = false
+  }
+}
 
 const ADMIN_CONSOLE = 'https://admin.cenkor.cn'
 
@@ -99,6 +164,11 @@ async function load() {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  tickTimer = setInterval(() => { tickNow.value = Date.now() }, 30_000)
+})
+onBeforeUnmount(() => clearInterval(tickTimer))
 
 onMounted(load)
 watch(() => route.params.key, load)
@@ -187,21 +257,74 @@ function fmtDate(iso?: string | null): string {
               </div>
             </div>
 
-            <div class="shrink-0 flex flex-col items-stretch gap-2 lg:w-44">
-              <a
-                v-if="detail.installed"
-                :href="ADMIN_CONSOLE"
-                target="_blank"
-                rel="noopener"
-                class="px-4 py-2.5 text-sm text-center rounded-lg bg-[#111827] text-white hover:bg-[#374151] transition-colors"
-              >{{ t('appDetail.openConsole') }}</a>
+            <div class="shrink-0 flex flex-col items-stretch gap-3 lg:w-56">
+              <!-- 价格（price 为 undefined 时后端未提供价格信息，整块不展示） -->
+              <div
+                v-if="hasPriceInfo(detail.price)"
+                class="rounded-xl border border-[#eef0f4] bg-[#fbfcfd] px-4 py-3.5"
+              >
+                <template v-if="isFree">
+                  <div class="text-xl font-semibold text-[#047857]">{{ t('price.free') }}</div>
+                  <div class="mt-1 text-[11px] text-[#8b8e96]">{{ t('price.freeHint') }}</div>
+                </template>
+                <template v-else-if="price">
+                  <div class="flex items-baseline gap-2 flex-wrap">
+                    <span class="text-2xl font-semibold tracking-tight text-[#111827]">¥{{ yuanText(price.unit_price) }}</span>
+                    <span v-if="price.is_discounted" class="text-xs text-[#9ca3af] line-through">¥{{ yuanText(price.list_price) }}</span>
+                  </div>
+                  <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span
+                      v-if="price.promo_active"
+                      class="px-1.5 py-0.5 text-[10px] rounded bg-[#fef3c7] text-[#b45309]"
+                    >{{ price.promo_label || t('price.promo') }}</span>
+                    <span
+                      v-else-if="price.promo_state === 'scheduled'"
+                      class="px-1.5 py-0.5 text-[10px] rounded bg-[#eef2ff] text-[#4f46e5]"
+                    >{{ t('price.promoScheduled') }}</span>
+                    <span
+                      v-if="price.is_discounted"
+                      class="px-1.5 py-0.5 text-[10px] rounded bg-[#fee2e2] text-[#b91c1c]"
+                    >{{ price.discount_label }}</span>
+                  </div>
+                  <div v-if="promoLeft" class="mt-1.5 text-[11px] text-[#b45309]">
+                    {{ t('price.promoLeft', { t: promoLeft }) }}
+                  </div>
+                  <div class="mt-1.5 text-[11px] text-[#8b8e96]">{{ modelHint }}</div>
+                </template>
+                <div v-else class="text-sm text-[#6b6e76]">{{ t('price.free') }}</div>
+              </div>
+
+              <!-- 席位选择（仅「按席位」计费） -->
+              <div
+                v-if="price?.model === 'seat' && !detail.installed"
+                class="flex items-center justify-between gap-2"
+              >
+                <span class="text-xs text-[#8b8e96]">{{ t('price.seats') }}</span>
+                <input
+                  v-model.number="seats"
+                  type="number"
+                  :min="price.min_seats"
+                  :max="price.max_seats || 9999"
+                  class="w-20 px-2 py-1 text-sm text-right rounded-lg border border-[#e5e7eb] bg-white focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+
+              <!-- 购买 / 进入控制台 -->
+              <button
+                v-if="!detail.installed"
+                :disabled="buying || notOnSale"
+                class="px-4 py-2.5 text-sm rounded-lg bg-[#4f46e5] text-white hover:bg-[#4338ca] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                @click="buy"
+              >{{ notOnSale ? t('price.notOnSale') : (buying ? t('price.buying') : t('price.buy')) }}</button>
               <a
                 v-else
                 :href="ADMIN_CONSOLE"
                 target="_blank"
                 rel="noopener"
-                class="px-4 py-2.5 text-sm text-center rounded-lg bg-[#4f46e5] text-white hover:bg-[#4338ca] transition-colors"
-              >{{ t('appDetail.installApp') }}</a>
+                class="px-4 py-2.5 text-sm text-center rounded-lg bg-[#111827] text-white hover:bg-[#374151] transition-colors"
+              >{{ t('appDetail.openConsole') }}</a>
+
+              <p v-if="buyError" class="text-[11px] text-[#b45309] leading-relaxed">{{ buyError }}</p>
               <p class="text-[11px] text-[#9ca3af] leading-relaxed">{{ detail.install_hint }}</p>
             </div>
           </div>
