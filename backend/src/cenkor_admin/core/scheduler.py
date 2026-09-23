@@ -64,6 +64,15 @@ async def scheduler_tick() -> dict[str, int]:
         if published or expired:
             await db.commit()
 
+    # 通用扩展点：任何应用都可订阅 scheduler.tick 挂自己的周期任务
+    # （结算解冻、超时关单等）。扩展点失败不能拖垮核心调度。
+    try:
+        from cenkor_admin.core.hooks import dispatch
+
+        await dispatch("scheduler.tick")
+    except Exception as e:  # noqa: BLE001
+        log.warning("scheduler.hook_failed", error=str(e))
+
     if published or expired:
         log.info("scheduler.tick", published=published, expired=expired)
     return {"published": published, "expired": expired}

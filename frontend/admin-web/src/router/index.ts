@@ -40,6 +40,10 @@ import TicketsView from '@/views/system/TicketsView.vue'
 import LinksView from '@/views/system/LinksView.vue'
 import NotificationsView from '@/views/system/NotificationsView.vue'
 import PortalUsersListView from '@/views/system/PortalUsersListView.vue'
+import MarketOverviewView from '@/views/market/MarketOverviewView.vue'
+import MarketPricingView from '@/views/market/MarketPricingView.vue'
+import MarketDevelopersView from '@/views/market/MarketDevelopersView.vue'
+import MarketWithdrawalsView from '@/views/market/MarketWithdrawalsView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -92,6 +96,11 @@ const routes: RouteRecordRaw[] = [
       { path: 'system/redirects', name: 'system-redirects', component: RedirectsView, meta: { permission: 'settings:read' } },
       { path: 'system/comments', name: 'system-comments', component: CommentsView, meta: { permission: 'settings:read' } },
       { path: 'system/forms', name: 'system-forms', component: FormsView, meta: { permission: 'settings:read' } },
+      // 应用市场（平台侧）
+      { path: 'market', name: 'market-overview', component: MarketOverviewView, meta: { permission: 'rbac:role:read' } },
+      { path: 'market/pricing', name: 'market-pricing', component: MarketPricingView, meta: { permission: 'rbac:role:read' } },
+      { path: 'market/developers', name: 'market-developers', component: MarketDevelopersView, meta: { permission: 'rbac:role:read' } },
+      { path: 'market/withdrawals', name: 'market-withdrawals', component: MarketWithdrawalsView, meta: { permission: 'rbac:role:read' } },
       // Apps
       { path: 'announcements', name: 'announcements', component: AnnouncementsView, meta: { permission: 'announcements:read' } },
       { path: 'tickets', name: 'tickets', component: TicketsView, meta: { permission: 'tickets:read' } },

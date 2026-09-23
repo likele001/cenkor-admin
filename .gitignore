@@ -106,3 +106,7 @@ backend/src/cenkor_admin/apps/*/release/
 *.removed_*
 *.orig
 *.rej
+
+# 双边结算（钱包 / 流水 / 提现，闭源）—— 源码头文件在 backend/src/apps/commerce/ 已整体忽略，这里补迁移文件。
+backend/alembic/versions/2026*_marketplace*.py
+backend/alembic/versions/2026*_payout*.py
