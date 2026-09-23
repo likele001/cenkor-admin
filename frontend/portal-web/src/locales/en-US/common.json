@@ -138,6 +138,22 @@
     "noBinding": "No third-party accounts bound yet",
     "bindAt": "Bound on {date}"
   },
+  "price": {
+    "free": "Free",
+    "freeHint": "No charge — install and use it right away",
+    "buy": "Buy now",
+    "buying": "Processing…",
+    "buyError": "Checkout failed, please retry later",
+    "noCashier": "Cashier URL was not returned",
+    "orderDone": "Order {no} completed, license issued",
+    "notOnSale": "Not for sale yet",
+    "promo": "On sale",
+    "promoScheduled": "Sale starting soon",
+    "promoLeft": "{t} left",
+    "seats": "Seats",
+    "seatHint": "Per seat · {n}-day license",
+    "oneTimeHint": "One-time purchase · perpetual"
+  },
   "appCenter": {
     "title": "App Center",
     "subtitle": "Pluggable platform apps — enable the business modules you need. All apps are published and maintained by Cenkor Official, covering sales, manufacturing, finance, content and collaboration.",

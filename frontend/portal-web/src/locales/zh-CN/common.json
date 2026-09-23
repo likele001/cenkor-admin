@@ -138,6 +138,22 @@
     "noBinding": "尚未绑定任何第三方账号",
     "bindAt": "绑定于 {date}"
   },
+  "price": {
+    "free": "免费",
+    "freeHint": "本应用不收费，可直接安装使用",
+    "buy": "立即购买",
+    "buying": "处理中…",
+    "buyError": "下单失败，请稍后重试",
+    "noCashier": "未获取到收银台地址",
+    "orderDone": "订单 {no} 已完成，授权已签发",
+    "notOnSale": "暂未开售",
+    "promo": "促销中",
+    "promoScheduled": "促销即将开始",
+    "promoLeft": "促销剩余 {t}",
+    "seats": "席位数",
+    "seatHint": "按席位计费 · {n} 天授权",
+    "oneTimeHint": "一次性买断 · 永久有效"
+  },
   "appCenter": {
     "title": "应用中心",
     "subtitle": "平台可插拔应用，按需启用业务模块。所有应用均由「Cenkor 官方」发布并持续维护，覆盖销售、制造、财务、内容与协同场景。",

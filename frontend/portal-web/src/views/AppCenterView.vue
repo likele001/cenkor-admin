@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
+import { hasPriceInfo, isFreePrice, yuanText, type AppPrice } from '@/lib/pricing'
 import SiteHeader from '@/components/SiteHeader.vue'
 
 interface StoreApp {
@@ -22,6 +23,8 @@ interface StoreApp {
   installed_version?: string | null
   has_update?: boolean
   updated_at?: string | null
+  /** null = 免费 / 未定价 */
+  price?: AppPrice | null
 }
 
 interface Facet { key: string; label: string; count: number }
@@ -295,6 +298,29 @@ function relTime(iso?: string | null): string {
                 :key="tg"
                 class="px-1.5 py-0.5 text-[10px] rounded bg-[#f8f9fb] border border-[#eef0f4] text-[#6b6e76]"
               >{{ tg }}</span>
+            </div>
+
+            <!-- 价格：免费 / 售价（含划线原价、折扣标、促销标）
+                 price 为 undefined = 后端未提供价格信息（纯开源部署 / 旧后端）→ 整行不渲染 -->
+            <div v-if="hasPriceInfo(a.price)" class="mt-4 flex items-baseline gap-2 flex-wrap">
+              <template v-if="isFreePrice(a.price)">
+                <span class="text-base font-semibold text-[#047857]">{{ t('price.free') }}</span>
+              </template>
+              <template v-else-if="a.price">
+                <span class="text-base font-semibold text-[#111827]">¥{{ yuanText(a.price.unit_price) }}</span>
+                <span
+                  v-if="a.price.is_discounted"
+                  class="text-xs text-[#9ca3af] line-through"
+                >¥{{ yuanText(a.price.list_price) }}</span>
+                <span
+                  v-if="a.price.is_discounted"
+                  class="px-1.5 py-0.5 text-[10px] rounded bg-[#fee2e2] text-[#b91c1c]"
+                >{{ a.price.discount_label }}</span>
+                <span
+                  v-if="a.price.promo_active"
+                  class="px-1.5 py-0.5 text-[10px] rounded bg-[#fef3c7] text-[#b45309]"
+                >{{ t('price.promo') }}</span>
+              </template>
             </div>
 
             <div class="mt-4 pt-3 border-t border-[#f3f4f6] flex items-center justify-between text-[11px] text-[#9ca3af]">
