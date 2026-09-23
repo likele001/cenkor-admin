@@ -101,7 +101,9 @@
     "lastUpdated": "Last updated",
     "loadFailed": "Failed to load",
     "saveFailed": "Save failed",
-    "saving": "Saving…"
+    "saving": "Saving…",
+  
+    "groups": {"GENERAL": "General", "EMAIL": "Email", "LICENSE": "License", "AUTH": "Authentication", "SECURITY": "Security", "NOTIFY": "Notifications", "SYSTEM": "System", "CUSTOM": "Custom", "UPLOAD": "Upload", "PAYMENT": "Payment", "CMS": "Content", "BILLING": "Billing", "STORAGE": "Storage"}
   },
   "products": {
     "title": "Product List",

@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import String, Integer, Boolean, DateTime, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from cenkor_admin.core.db import Base
@@ -109,7 +110,7 @@ class SystemSetting(Base):
     __tablename__ = "system_settings"
 
     key: Mapped[str] = mapped_column(String(80), primary_key=True)
-    value: Mapped[Any | None] = mapped_column("value", String(2000), nullable=True)  # 存 JSON 字符串
+    value: Mapped[Any | None] = mapped_column("value", JSONB, nullable=True)  # jsonb（bool/str/数字/对象自动 JSON 编码）
     description: Mapped[str | None] = mapped_column(String(200), nullable=True)
     group: Mapped[str] = mapped_column(String(40), index=True, nullable=False, default="general")
     updated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)

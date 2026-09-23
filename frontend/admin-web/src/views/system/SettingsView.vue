@@ -21,6 +21,16 @@ const draft = ref<{ value: string; description: string }>({ value: '', descripti
 const saving = ref(false)
 const toggling = ref<string | null>(null)
 
+// 分组英文 -> 中文显示，开源项目给非技术用户也能看懂。
+function titleCaseGroup(g: string): string {
+  return g ? g.charAt(0).toUpperCase() + g.slice(1).toLowerCase() : ''
+}
+function groupLabel(g: string): string {
+  const key = `settings.groups.${g}`
+  const label = t(key)
+  return label && label !== key ? label : titleCaseGroup(g)
+}
+
 // 布尔型设置直接渲染成开关，点击即时切换保存；其余类型维持原 textarea 编辑。
 function isBool(s: Setting): boolean {
   return typeof s.value === 'boolean'
@@ -121,14 +131,14 @@ onMounted(load)
       <div v-else class="space-y-6">
         <section v-for="(group, name) in grouped" :key="name" class="card p-0 overflow-hidden">
           <header class="px-5 py-3 bg-ink-50 border-b border-ink-200">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-500">{{ name }}</h2>
+            <h2 class="text-sm font-semibold text-ink-800">{{ groupLabel(name) }}</h2>
           </header>
           <ul class="divide-y divide-ink-100">
             <li v-for="s in group" :key="s.key" class="px-5 py-4">
               <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0 flex-1">
-                  <code class="text-sm font-mono text-ink-900">{{ s.key }}</code>
-                  <p v-if="s.description" class="mt-1 text-xs text-ink-500">{{ s.description }}</p>
+                  <p class="text-sm font-medium text-ink-900">{{ s.description || s.key }}</p>
+                  <code v-if="s.description" class="mt-0.5 block text-xs font-mono text-ink-400">{{ s.key }}</code>
                 </div>
                 <!-- 布尔型：可视化开关，点击即时切换 -->
                 <div v-if="isBool(s)" class="flex items-center gap-3 shrink-0">

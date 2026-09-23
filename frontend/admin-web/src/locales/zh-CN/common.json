@@ -101,7 +101,9 @@
     "lastUpdated": "上次更新",
     "loadFailed": "加载失败",
     "saveFailed": "保存失败",
-    "saving": "保存中…"
+    "saving": "保存中…",
+  
+    "groups": {"GENERAL": "通用", "EMAIL": "邮件", "LICENSE": "授权", "AUTH": "认证", "SECURITY": "安全", "NOTIFY": "通知", "SYSTEM": "系统", "CUSTOM": "自定义", "UPLOAD": "上传", "PAYMENT": "支付", "CMS": "内容", "BILLING": "计费", "STORAGE": "存储"}
   },
   "products": {
     "title": "产品列表",

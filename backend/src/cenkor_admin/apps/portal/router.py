@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import httpx
 from cenkor_admin.apps.portal import models, schemas
+from cenkor_admin.apps.auth.models import SystemSetting
+
 from cenkor_admin.apps.portal.auth import (
     create_portal_access_token,
     create_portal_refresh_token,
@@ -111,12 +113,32 @@ class PortalFeishuOAuth:
 portal_feishu = PortalFeishuOAuth()
 
 
-def _verify_captcha(token: str | None) -> None:
+async def _verify_captcha(token: str | None, db: AsyncSession) -> None:
+    """读取 security.captcha_required 开关；关闭时不强制滑动验证（默认开启）。"""
+    import re
+    if not await _captcha_required(db):
+        return
     if not token or not isinstance(token, str):
         raise HTTPException(400, "请先完成滑动验证")
-    import re
     if not re.fullmatch(r"[0-9a-f]{16,128}", token):
         raise HTTPException(400, "滑动验证无效，请刷新重试")
+
+
+async def _captcha_required(db: AsyncSession) -> bool:
+    """读取 security.captcha_required 开关；默认开启（向后兼容）。"""
+    s = await db.get(SystemSetting, "security.captcha_required")
+    if not s:
+        return True
+    v = s.value
+    if isinstance(v, str):
+        return v.strip().lower() in ("1", "true", "yes", "on")
+    return bool(v)
+
+
+@router.get("/auth/login-config", summary="登录页配置（公开，无需认证）")
+async def portal_login_config(db: AsyncSession = Depends(get_db)) -> dict:
+    """返回是否需要滑动验证码，供前端条件渲染滑块"""
+    return {"captcha_required": await _captcha_required(db)}
 
 
 async def get_current_portal_user(
@@ -156,7 +178,7 @@ async def portal_register(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    _verify_captcha(body.captcha_token)
+    _verify_captcha(body.captcha_token, db)
 
     existing = await db.execute(
         select(models.PortalUser).where(
@@ -207,7 +229,7 @@ async def portal_login(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    _verify_captcha(body.captcha_token)
+    _verify_captcha(body.captcha_token, db)
 
     stmt = select(models.PortalUser).where(
         models.PortalUser.deleted_at.is_(None),

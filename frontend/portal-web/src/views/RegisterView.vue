@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -15,6 +15,16 @@ const loading = ref(false)
 const captchaRef = ref<InstanceType<typeof SliderCaptcha> | null>(null)
 const captchaToken = ref('')
 const captchaVerified = ref(false)
+const captchaRequired = ref(true)
+
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/api/v1/public/portal/auth/login-config')
+    captchaRequired.value = !!data.captcha_required
+  } catch {
+    // 接口失败时保留默认 true，保持现有安全行为
+  }
+})
 
 function onCaptchaUpdate(v: boolean) {
   captchaVerified.value = v
@@ -22,7 +32,7 @@ function onCaptchaUpdate(v: boolean) {
 }
 
 async function submit() {
-  if (!captchaVerified.value) {
+  if (captchaRequired.value && !captchaVerified.value) {
     error.value = t('error.captchaRequired')
     return
   }
@@ -53,7 +63,7 @@ async function submit() {
       <input v-model="form.email" type="email" required class="input" :placeholder="t('register.email')" />
       <input v-model="form.nickname" class="input" :placeholder="t('register.nicknameOptional')" />
       <input v-model="form.password" type="password" required minlength="8" class="input" :placeholder="t('register.passwordHint')" />
-      <div>
+      <div v-if="captchaRequired">
         <label class="block text-sm font-medium mb-1.5">{{ t('register.captcha') }}</label>
         <SliderCaptcha ref="captchaRef" @update:verified="onCaptchaUpdate" />
       </div>

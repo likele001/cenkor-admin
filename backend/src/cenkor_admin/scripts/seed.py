@@ -54,6 +54,9 @@ DEFAULT_PERMISSIONS = [
     # 链接收藏
     ("links:read", "API", "查看链接"),
     ("links:write", "API", "管理链接"),
+    # 系统设置
+    ("settings:read", "API", "查看系统设置"),
+    ("settings:write", "API", "编辑系统设置"),
 ]
 
 DEFAULT_MENUS = [
@@ -72,6 +75,7 @@ DEFAULT_MENUS = [
     ("system:menus", "system", "菜单", "menu", "/system/menus", 93),
     ("system:audit", "system", "审计日志", "history", "/system/audit", 99),
     ("system:notifications", "system", "通知管理", "bell", "/system/notifications", 95),
+    ("system:settings", "system", "系统设置", "settings-2", "/system/settings", 96),
 ]
 
 DEFAULT_ROLES = [
