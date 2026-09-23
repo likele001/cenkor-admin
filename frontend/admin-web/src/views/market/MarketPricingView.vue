@@ -4,10 +4,19 @@
  * GET /api/v1/store/market/pricing        全量商品 + 归属 + 生效扣点 + 销量
  * PUT /api/v1/store/market/pricing/{key}  改定价 / 改归属 / 覆盖单应用扣点
  * GET /api/v1/store/market/developers     归属下拉用
+ *
+ * 定价字段（原价 / 售价 / 限时促销）复用与开发者端同一个 PriceFields 组件：
+ * 提交接口是「整体覆盖」语义，若这里只发部分字段，会把开发者设好的原价与促销清空。
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/lib/api'
-import { MODEL_LABEL, MODEL_CLASS, centsToYuan, toCents, bpToPercent, errText } from '@/lib/market'
+import PriceFields from '@/components/PriceFields.vue'
+import {
+  MODEL_LABEL, MODEL_CLASS, PROMO_STATE_LABEL, PROMO_STATE_CLASS,
+  centsToYuan, bpToPercent, errText,
+  emptyPriceForm, priceFormFrom, priceFormToPayload, validatePriceForm,
+  type PriceForm,
+} from '@/lib/market'
 
 const loading = ref(true)
 const error = ref('')
@@ -59,17 +68,10 @@ const showEdit = ref(false)
 const saving = ref(false)
 const formError = ref('')
 const current = ref<any>(null)
-const form = ref({
-  model: 'free',
-  price_yuan: '0.00',
-  seat_price_yuan: '0.00',
-  period_days: 365,
-  trial_days: 0,
-  min_seats: 1,
-  max_seats: 0,
-  require_approval: false,
-  enabled: true,
-  intro: '',
+/** 价格部分：与开发者端共用同一套字段与校验 */
+const price = ref<PriceForm>(emptyPriceForm())
+/** 市场专有部分：归属与扣点 */
+const meta = ref({
   owner: 'platform' as 'platform' | 'developer',
   developer_id: 0,
   fee_mode: 'default' as 'default' | 'override',
@@ -79,18 +81,9 @@ const form = ref({
 function openEdit(row: any) {
   current.value = row
   formError.value = ''
+  price.value = priceFormFrom(row)
   const isSelf = !row.developer_id || row.developer_id === 1
-  form.value = {
-    model: row.model || 'free',
-    price_yuan: centsToYuan(row.price_cents),
-    seat_price_yuan: centsToYuan(row.seat_price_cents),
-    period_days: row.period_days ?? 365,
-    trial_days: row.trial_days ?? 0,
-    min_seats: row.min_seats ?? 1,
-    max_seats: row.max_seats ?? 0,
-    require_approval: !!row.require_approval,
-    enabled: row.enabled !== false,
-    intro: row.intro || '',
+  meta.value = {
     owner: isSelf ? 'platform' : 'developer',
     developer_id: isSelf ? 0 : Number(row.developer_id),
     fee_mode: row.platform_fee_bp == null ? 'default' : 'override',
@@ -103,37 +96,27 @@ function openEdit(row: any) {
 
 async function save() {
   if (!current.value) return
-  const f = form.value
-  if (f.model !== 'free' && f.model !== 'seat' && toCents(f.price_yuan) <= 0) {
-    formError.value = '售价必须大于 0'; return
+  const bad = validatePriceForm(price.value)
+  if (bad) {
+    formError.value = bad
+    return
   }
-  if (f.model === 'seat' && toCents(f.seat_price_yuan) <= 0) {
-    formError.value = '席位单价必须大于 0'; return
-  }
-  if (f.owner === 'developer' && !f.developer_id) {
-    formError.value = '请选择归属开发者'; return
+  if (meta.value.owner === 'developer' && !meta.value.developer_id) {
+    formError.value = '请选择归属开发者'
+    return
   }
 
   saving.value = true
   formError.value = ''
   try {
     await api.put(`/api/v1/store/market/pricing/${current.value.app_key}`, {
-      model: f.model,
-      price_cents: toCents(f.price_yuan),
-      seat_price_cents: toCents(f.seat_price_yuan),
-      period_days: Number(f.period_days) || 365,
-      trial_days: Number(f.trial_days) || 0,
-      min_seats: Number(f.min_seats) || 1,
-      max_seats: Number(f.max_seats) || 0,
-      require_approval: !!f.require_approval,
-      enabled: !!f.enabled,
-      intro: f.intro || null,
+      ...priceFormToPayload(price.value),
       // 归属：0 = 收归平台自营
-      developer_id: f.owner === 'platform' ? 0 : Number(f.developer_id),
+      developer_id: meta.value.owner === 'platform' ? 0 : Number(meta.value.developer_id),
       // 扣点：null = 清除覆盖，回落全局默认
-      platform_fee_bp: f.fee_mode === 'default'
+      platform_fee_bp: meta.value.fee_mode === 'default'
         ? null
-        : Math.round(parseFloat(f.fee_percent || '0') * 100),
+        : Math.round(parseFloat(meta.value.fee_percent || '0') * 100),
     })
     showEdit.value = false
     await load()
@@ -199,8 +182,27 @@ async function save() {
             </td>
             <td class="px-3 py-3 text-right">
               <div v-if="r.model === 'free'">免费</div>
-              <div v-else-if="r.model === 'seat'">¥{{ r.seat_price }}<span class="text-xs text-ink-400">/席位</span></div>
-              <div v-else>¥{{ r.price }}</div>
+              <template v-else>
+                <div class="flex items-center justify-end gap-1.5 flex-wrap">
+                  <span>¥{{ r.unit_price }}<span v-if="r.model === 'seat'" class="text-xs text-ink-400">/席位</span></span>
+                  <span
+                    v-if="r.is_discounted"
+                    class="text-xs text-ink-400 line-through"
+                    title="原价（划线价，仅展示不参与结算）"
+                  >¥{{ r.model === 'seat' ? r.seat_list_price : r.list_price }}</span>
+                  <span
+                    v-if="r.discount_label"
+                    class="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-medium"
+                  >{{ r.discount_label }}</span>
+                </div>
+                <div v-if="r.promo_price_cents" class="mt-0.5">
+                  <span
+                    class="text-[10px] px-1.5 py-0.5 rounded"
+                    :class="PROMO_STATE_CLASS[r.promo_state]"
+                    :title="r.promo_label || '限时促销'"
+                  >{{ PROMO_STATE_LABEL[r.promo_state] }}<template v-if="r.promo_label"> · {{ r.promo_label }}</template></span>
+                </div>
+              </template>
             </td>
             <td class="px-3 py-3 text-right">
               {{ r.effective_fee_percent }}%
@@ -228,7 +230,7 @@ async function save() {
 
     <!-- 编辑弹层 -->
     <div v-if="showEdit" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" @click.self="showEdit = false">
-      <div class="bg-white rounded-2xl w-full max-w-xl my-8 shadow-xl">
+      <div class="bg-white rounded-2xl w-full max-w-2xl my-8 shadow-xl">
         <div class="px-5 py-4 border-b border-ink-200 flex items-center justify-between">
           <div>
             <h3 class="font-semibold">编辑商品</h3>
@@ -243,15 +245,15 @@ async function save() {
             <div class="text-xs font-medium text-ink-600">商品归属（决定收入归谁）</div>
             <div class="flex gap-4 text-sm">
               <label class="inline-flex items-center gap-2 cursor-pointer">
-                <input v-model="form.owner" type="radio" value="platform" />
+                <input v-model="meta.owner" type="radio" value="platform" />
                 <span>平台自营（收入全额归平台）</span>
               </label>
               <label class="inline-flex items-center gap-2 cursor-pointer">
-                <input v-model="form.owner" type="radio" value="developer" />
+                <input v-model="meta.owner" type="radio" value="developer" />
                 <span>归属开发者</span>
               </label>
             </div>
-            <select v-if="form.owner === 'developer'" v-model.number="form.developer_id" class="input">
+            <select v-if="meta.owner === 'developer'" v-model.number="meta.developer_id" class="input">
               <option :value="0">请选择开发者…</option>
               <option v-for="d in devOptions" :key="d.id" :value="d.id">
                 {{ d.display_name }}（#{{ d.id }}{{ d.email ? ' · ' + d.email : '' }}）
@@ -265,75 +267,25 @@ async function save() {
             <div class="text-xs font-medium text-ink-600">单应用扣点</div>
             <div class="flex gap-4 text-sm">
               <label class="inline-flex items-center gap-2 cursor-pointer">
-                <input v-model="form.fee_mode" type="radio" value="default" />
+                <input v-model="meta.fee_mode" type="radio" value="default" />
                 <span>用全局默认（{{ bpToPercent(defaultFeeBp) }}%）</span>
               </label>
               <label class="inline-flex items-center gap-2 cursor-pointer">
-                <input v-model="form.fee_mode" type="radio" value="override" />
+                <input v-model="meta.fee_mode" type="radio" value="override" />
                 <span>单独设置</span>
               </label>
             </div>
-            <div v-if="form.fee_mode === 'override'" class="flex items-center gap-2">
-              <input v-model="form.fee_percent" type="number" min="0" max="100" step="0.01" class="input !w-32" />
+            <div v-if="meta.fee_mode === 'override'" class="flex items-center gap-2">
+              <input v-model="meta.fee_percent" type="number" min="0" max="100" step="0.01" class="input !w-32" />
               <span class="text-sm text-ink-500">%</span>
             </div>
-            <p v-if="form.owner === 'platform'" class="text-xs text-amber-600">
+            <p v-if="meta.owner === 'platform'" class="text-xs text-amber-600">
               平台自营商品不抽成，扣点恒为 0。
             </p>
           </div>
 
-          <!-- 定价 -->
-          <div>
-            <label class="block text-xs text-ink-500 mb-1">计费模式</label>
-            <select v-model="form.model" class="input">
-              <option value="free">免费</option>
-              <option value="one_time">一次性买断</option>
-              <option value="subscription">按期订阅</option>
-              <option value="seat">按席位</option>
-            </select>
-          </div>
-
-          <template v-if="form.model !== 'free'">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs text-ink-500 mb-1">{{ form.model === 'seat' ? '席位单价（元）' : '售价（元）' }}</label>
-                <input v-if="form.model !== 'seat'" v-model="form.price_yuan" type="number" min="0" step="0.01" class="input" />
-                <input v-else v-model="form.seat_price_yuan" type="number" min="0" step="0.01" class="input" />
-              </div>
-              <div>
-                <label class="block text-xs text-ink-500 mb-1">试用天数</label>
-                <input v-model.number="form.trial_days" type="number" min="0" class="input" />
-              </div>
-            </div>
-            <div v-if="form.model === 'subscription'">
-              <label class="block text-xs text-ink-500 mb-1">授权周期（天）</label>
-              <input v-model.number="form.period_days" type="number" min="1" class="input" />
-            </div>
-            <div v-if="form.model === 'seat'" class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs text-ink-500 mb-1">最小席位</label>
-                <input v-model.number="form.min_seats" type="number" min="1" class="input" />
-              </div>
-              <div>
-                <label class="block text-xs text-ink-500 mb-1">最大席位（0 = 不限）</label>
-                <input v-model.number="form.max_seats" type="number" min="0" class="input" />
-              </div>
-            </div>
-          </template>
-
-          <div>
-            <label class="block text-xs text-ink-500 mb-1">商品简介</label>
-            <textarea v-model="form.intro" rows="2" class="input"></textarea>
-          </div>
-
-          <div class="flex flex-wrap gap-5 text-sm">
-            <label class="inline-flex items-center gap-2 cursor-pointer">
-              <input v-model="form.enabled" type="checkbox" /><span>上架销售</span>
-            </label>
-            <label class="inline-flex items-center gap-2 cursor-pointer">
-              <input v-model="form.require_approval" type="checkbox" /><span>购买需人工审核</span>
-            </label>
-          </div>
+          <!-- 定价：与开发者端同一套字段 -->
+          <PriceFields v-model="price" />
 
           <p v-if="formError" class="text-sm text-red-600">{{ formError }}</p>
         </div>

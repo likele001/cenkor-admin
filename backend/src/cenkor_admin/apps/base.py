@@ -35,9 +35,10 @@ class AppManifest:
     # ---- 生态收费（P0）----
     # True 时底座会校验授权：未激活 / 过期 / 被吊销一律拦截（HTTP 402）
     license_required: bool = False
-    price_model: str = "free"       # free / one_time / subscription / seat
+    price_model: str = "free"       # free / one_time / seat（试用与订阅已下线）
     price_cents: int = 0            # 建议价（分）；实际以 app_pricing 表为准
-    trial_days: int = 0
+    trial_days: int = 0             # 已下线（恒 0），保留字段仅为兼容
+    period_days: int = 365          # 授权周期，仅 price_model == "seat" 生效
 
     # ---- V2 扩展 ----
     content_types: list[dict[str, Any]] = field(default_factory=list)
