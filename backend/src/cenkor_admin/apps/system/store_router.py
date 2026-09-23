@@ -20,9 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.portal import models as portal_models
+from cenkor_admin.apps.system import pricing_rules
 from cenkor_admin.apps.system import store_models
 from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.apps.system.showcase_meta import SHOWCASE
+from cenkor_admin.core import hooks
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.security import decode_token
 from cenkor_admin.apps.portal.auth import decode_portal_token, is_portal_token, PORTAL_JWT_ISSUER
@@ -472,10 +474,11 @@ async def submit_app(
     version: str = Form(...),
     description: str = Form(""),
     category: str = Form("system"),
+    pricing: str = Form(""),
     db: AsyncSession = Depends(get_db),
     auth: dict = Depends(require_portal_or_admin),
 ):
-    """开发者上传应用 ZIP 包"""
+    """开发者上传应用 ZIP 包（可选同时提交定价：原价 / 售价 / 限时促销）"""
     user_id = auth["user_id"]
 
     # 检查开发者身份
@@ -497,6 +500,19 @@ async def submit_app(
     # 校验 version 格式（参与落盘文件名，必须防 ../ 等路径穿越）
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9\.\-_]{0,19}", version):
         raise HTTPException(400, "version 格式错误：字母/数字开头，仅含字母数字与 . - _，最长 20 位")
+
+    # 定价（可选）：提交时即可带价，JSON 字符串。规则由公开的 pricing_rules 统一校验，
+    # 在落盘之前就拦掉非法组合，避免白传一个几百 MB 的包。
+    price_payload: dict[str, Any] | None = None
+    if (pricing or "").strip():
+        try:
+            _parsed = json.loads(pricing)
+        except json.JSONDecodeError:
+            raise HTTPException(400, "定价参数不是合法 JSON") from None
+        try:
+            price_payload = pricing_rules.normalize_price_fields(_parsed)
+        except pricing_rules.PriceRuleError as exc:
+            raise HTTPException(400, f"定价不合法：{exc}") from None
 
     # 保存文件并校验
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -593,6 +609,22 @@ async def submit_app(
     await db.commit()
     await db.refresh(submission)
 
+    # 提交时带的价格：派发事件让收费应用（commerce）落库。
+    # 底座部署没装该应用时 events 返回空，定价不落库但提交照常成功。
+    pricing_saved = False
+    if price_payload is not None:
+        try:
+            results = await hooks.dispatch(
+                "app.submitted",
+                app_key=app_key,
+                developer_id=dev.id,
+                submission_id=submission.id,
+                pricing=price_payload,
+            )
+            pricing_saved = any(bool(r) for r in results)
+        except Exception as _pe:  # noqa: BLE001 - 定价落库失败不影响提交
+            log.warning("store.submit_pricing_fail", app_key=app_key, error=str(_pe))
+
     # 通知所有有审核权限的管理员
     try:
         from cenkor_admin.apps.rbac.models import RolePermission, UserRole, Permission
@@ -619,7 +651,13 @@ async def submit_app(
     except Exception as _ne:
         log.warning("store.submit_notification_fail", error=str(_ne))
 
-    return {"id": submission.id, "app_key": submission.app_key, "status": submission.status}
+    return {
+        "id": submission.id,
+        "app_key": submission.app_key,
+        "status": submission.status,
+        "pricing_submitted": price_payload is not None,
+        "pricing_saved": pricing_saved,
+    }
 
 
 @router.post("/submissions/{submission_id}/review")
