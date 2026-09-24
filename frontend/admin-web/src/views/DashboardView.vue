@@ -77,6 +77,26 @@ async function loadAnnouncements() {
   }
 }
 
+// 核心版本升级提示
+const release = ref<Record<string, any> | null>(null)
+const DISMISS_KEY = 'cenkor_release_dismiss'
+
+async function checkRelease() {
+  try {
+    const res = await api.get('/api/v1/release/check')
+    const d = res.data || {}
+    // 同一版本被用户关闭过则不再骚扰
+    const dismissedVer = localStorage.getItem(DISMISS_KEY)
+    if (d.enabled && d.has_update && dismissedVer !== d.latest) release.value = d
+    else release.value = null
+  } catch { /* 检查失败静默，不打扰用户 */ }
+}
+
+function dismissRelease() {
+  if (release.value?.latest) localStorage.setItem(DISMISS_KEY, release.value.latest)
+  release.value = null
+}
+
 async function toggleAnn(a: any, forceExpand = false) {
   if (!forceExpand && expandedAnnId.value === a.id) {
     expandedAnnId.value = null
@@ -154,6 +174,7 @@ onMounted(() => {
   me.value = auth.user
   load()
   loadAnnouncements()
+  checkRelease()
 })
 </script>
 
@@ -161,6 +182,25 @@ onMounted(() => {
   <div>
     <h1 class="text-3xl font-semibold tracking-tight">{{ t('nav.dashboard', 'Dashboard') }}</h1>
     <p class="mt-2 text-ink-500">{{ t('dashboard.welcome', '欢迎回来。这是 Cenkor Admin Platform 的起点。') }}</p>
+
+    <!-- 发现新版本升级横幅 -->
+    <div v-if="release" class="mt-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+      <span class="text-lg leading-none">🆙</span>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-amber-900">
+          发现新版本 {{ release.latest }}（当前 {{ release.current }}）
+        </div>
+        <div class="mt-0.5 text-xs text-amber-700">
+          建议升级到最新版以获取错误修复与新功能。
+          <span v-if="release.released_at" class="opacity-70">· 发布于 {{ release.released_at }}</span>
+        </div>
+        <div class="mt-2 flex items-center gap-3 text-xs">
+          <a v-if="release.upgrade_docs" :href="release.upgrade_docs" target="_blank" rel="noopener" class="text-accent hover:underline">查看升级方式</a>
+          <a v-if="release.notes_url" :href="release.notes_url" target="_blank" rel="noopener" class="text-accent hover:underline">更新日志</a>
+        </div>
+      </div>
+      <button type="button" class="text-xs text-amber-600 hover:text-amber-900 shrink-0" @click="dismissRelease">暂不提醒</button>
+    </div>
 
     <!-- 系统更新日志 -->
     <section class="mt-6 card">

@@ -1,0 +1,142 @@
+name: Release
+
+# 打 tag（v*）即触发自动发版：
+#   1) 校验 tag 与 VERSION 文件一致（单一来源纪律）
+#   2) 打包核心包 → 上传到 GitHub Release
+#   3) 多架构镜像（amd64/arm64）推送到 ghcr.io
+#   4) 创建 GitHub Release
+# 手动发版见 docs/UPGRADE.md。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # 创建 Release
+  packages: write   # 推送 ghcr.io 镜像
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: cenkor-admin   # 镜像名统一前缀
+
+jobs:
+  # ---------- 0. 版本一致性校验 + 输出 ----------
+  meta:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验 tag 与 VERSION 文件一致
+        id: check
+        run: |
+          TAG="${GITHUB_REF_NAME}"                 # 如 v0.2.0
+          FILE_VER="$(tr -d ' \n' < backend/src/cenkor_admin/VERSION)"
+          TAG_VER="${TAG#v}"                        # 去掉前缀 v
+          echo "tag=${TAG_VER}  VERSION文件=${FILE_VER}"
+          if [ "$TAG_VER" != "$FILE_VER" ]; then
+            echo "::error::tag (${TAG_VER}) 与 backend/src/cenkor_admin/VERSION (${FILE_VER}) 不一致。请先运行 bash scripts/release.sh ${TAG_VER} 对齐版本后再打 tag。"
+            exit 1
+          fi
+          echo "version=${FILE_VER}" >> "$GITHUB_OUTPUT"
+
+  # ---------- 1. 核心包 ----------
+  core-package:
+    name: Core Package
+    runs-on: ubuntu-latest
+    needs: meta
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 打包核心包
+        run: |
+          bash scripts/package-core.sh
+          ls -lh release/
+
+      - name: 上传核心包产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-package
+          path: release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # ---------- 2. 多架构镜像推送 ghcr ----------
+  docker:
+    name: Docker Images (multi-arch)
+    runs-on: ubuntu-latest
+    needs: meta
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 启用 QEMU（arm64 交叉构建）
+        uses: docker/setup-qemu-action@v3
+
+      - name: 启用 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送多架构镜像
+        env:
+          REGISTRY: ${{ env.REGISTRY }}/${{ github.repository_owner }}
+        run: |
+          echo "推送到 ${REGISTRY}/${IMAGE_PREFIX}-*:${{ needs.meta.outputs.version }}"
+          bash docker/fullstack/build-multiarch.sh --push
+
+  # ---------- 3. 创建 GitHub Release ----------
+  github-release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [meta, core-package, docker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载核心包产物
+        uses: actions/download-artifact@v4
+        with:
+          name: core-package
+          path: release/
+
+      - name: 生成发版说明
+        id: notes
+        run: |
+          VER="${{ needs.meta.outputs.version }}"
+          # 取 release.json 里的 notes 字段作为正文摘要
+          JSON_NOTES="$(python3 -c "import json;print(json.load(open('backend/src/cenkor_admin/release.json')).get('notes',''))" 2>/dev/null || echo '')"
+          {
+            echo "body<<EOF"
+            echo "## Cenkor Admin v${VER}"
+            echo ""
+            [ -n "$JSON_NOTES" ] && { echo "${JSON_NOTES}"; echo ""; }
+            echo "### 升级方式"
+            echo "- Docker：docker pull ${REGISTRY}/${IMAGE_PREFIX}-backend:${VER}（详见 docs/UPGRADE.md）"
+            echo "- 裸机：bash scripts/upgrade.sh --url <下方核心包附件地址>"
+            echo ""
+            echo "升级文档：docs/UPGRADE.md"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "v${{ needs.meta.outputs.version }}"
+          body: ${{ steps.notes.outputs.body }}
+          files: release/*.tar.gz
+          generate_release_notes: true

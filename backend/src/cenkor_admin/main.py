@@ -129,6 +129,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("scheduler.start_failed", error=str(e))
 
+    # 核心版本检查预热（升级提示）：spoke 向官方云查一次，发现新版记日志，不阻塞启动
+    try:
+        import asyncio as _asyncio
+        from cenkor_admin.apps.system import release_service
+        _asyncio.create_task(release_service.warm_cache())
+    except Exception as e:
+        log.warning("release.warm_spawn_failed", error=str(e))
+
     try:
         yield
     finally:

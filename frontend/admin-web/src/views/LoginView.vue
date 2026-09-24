@@ -21,8 +21,13 @@ const captchaToken = ref('')
 
 // 登录页滑块是否启用：默认 true（兜底）；登录前拉取后台开关，false 时隐藏滑块
 const captchaRequired = ref(true)
+// 核心平台版本号（公开 /api/health）
+const appVersion = ref('')
 
 onMounted(async () => {
+  api.get('/api/health').then(({ data }) => {
+    appVersion.value = data?.version || ''
+  }).catch(() => { /* ignore */ })
   try {
     const { data } = await api.get('/api/v1/auth/login-config')
     captchaRequired.value = !!data.captcha_required
@@ -133,6 +138,10 @@ function loginFeishu() {
           <code class="px-1.5 py-0.5 rounded bg-ink-100">admin123</code>
         </p>
       </form>
+
+      <p v-if="appVersion" class="mt-4 text-center text-xs text-ink-400">
+        Cenkor Admin <span class="font-mono">v{{ appVersion }}</span>
+      </p>
     </div>
   </div>
 </template>

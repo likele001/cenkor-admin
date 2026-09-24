@@ -9,6 +9,8 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from cenkor_admin import __version__ as _PKG_VERSION
+
 
 def _find_env_file() -> str | None:
     """按优先级查找 .env 文件（兼容宝塔 / Docker / 手动启动等各种 CWD）"""
@@ -36,9 +38,17 @@ class Settings(BaseSettings):
 
     # ---- 应用 ----
     APP_NAME: str = "Cenkor Admin"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = _PKG_VERSION
     APP_ENV: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
+
+    # ---- 核心版本检查（升级提示）----
+    # 是否启用「发现新版本」检查（spoke 向官方云查询核心最新版本）
+    RELEASE_CHECK_ENABLED: bool = True
+    # 查询地址；留空则回退到 CENKOR_CLOUD_URL。两者都为空 = 本机即中心，不联网检查
+    RELEASE_CHECK_URL: str = ""
+    # 检查结果缓存时长（小时），避免每次进工作台都打中心
+    RELEASE_CHECK_TTL_HOURS: int = 6
 
     # ---- 安全 ----
     SECRET_KEY: str = "dev-secret-change-me-32-bytes-min"

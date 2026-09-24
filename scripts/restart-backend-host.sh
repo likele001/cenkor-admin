@@ -9,6 +9,10 @@ PORT="${BACKEND_HOST_PORT:-8002}"
 LOG="${LOG:-/tmp/cenkor-uvicorn.log}"
 PIDFILE="${PIDFILE:-/tmp/cenkor-uvicorn.pid}"
 
+# Python 解释器：优先 venv（BACKEND_PYTHON 可覆盖），回退 PATH 上的 python3
+PYTHON_BIN="${BACKEND_PYTHON:-/www/server/pyporject_evn/cenkor/bin/python3}"
+[ -x "$PYTHON_BIN" ] || PYTHON_BIN="$(command -v python3)"
+
 env_val() {
   [ -f "$ENV_FILE" ] || return 0
   grep -E "^${1}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | sed 's/\r$//' || true
@@ -88,7 +92,7 @@ sleep 1
 
 echo "▸ 启动 uvicorn → 127.0.0.1:${PORT}"
 cd "$BACKEND_DIR"
-nohup python3 -m uvicorn cenkor_admin.main:app \
+nohup "$PYTHON_BIN" -m uvicorn cenkor_admin.main:app \
   --host 127.0.0.1 \
   --port "$PORT" \
   --workers 2 \
