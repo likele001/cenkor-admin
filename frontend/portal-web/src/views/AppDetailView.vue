@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+import { useOwnedApps } from '@/lib/ownership'
 import { hasPriceInfo, isFreePrice, promoRemaining, yuanText, type AppPrice } from '@/lib/pricing'
 import SiteHeader from '@/components/SiteHeader.vue'
 
@@ -59,6 +60,9 @@ const showPermissions = ref(false)
 const router = useRouter()
 const auth = useAuthStore()
 
+/** 本账号是否已购（已购则不再下单） */
+const { isOwned, load: loadOwned } = useOwnedApps()
+
 const seats = ref(1)
 const buying = ref(false)
 const buyError = ref('')
@@ -92,6 +96,11 @@ async function buy() {
     return
   }
   const app = detail.value
+  // 已拥有：不再重复下单，直接引导到「我的应用」
+  if (app && isOwned(app.key)) {
+    router.push('/my/apps')
+    return
+  }
   if (!app) return
   buying.value = true
   buyError.value = ''
@@ -170,7 +179,10 @@ onMounted(() => {
 })
 onBeforeUnmount(() => clearInterval(tickTimer))
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  void loadOwned()
+})
 watch(() => route.params.key, load)
 
 function fmtDate(iso?: string | null): string {
@@ -309,9 +321,14 @@ function fmtDate(iso?: string | null): string {
                 />
               </div>
 
-              <!-- 购买 / 进入控制台 -->
+              <!-- 已购 / 购买 / 进入控制台 -->
+              <RouterLink
+                v-if="!detail.installed && isOwned(detail.key)"
+                to="/my/apps"
+                class="px-4 py-2.5 text-sm text-center rounded-lg bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0] hover:bg-[#d1fae5] transition-colors"
+              >{{ t('price.owned') }}</RouterLink>
               <button
-                v-if="!detail.installed"
+                v-else-if="!detail.installed"
                 :disabled="buying || notOnSale"
                 class="px-4 py-2.5 text-sm rounded-lg bg-[#4f46e5] text-white hover:bg-[#4338ca] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 @click="buy"

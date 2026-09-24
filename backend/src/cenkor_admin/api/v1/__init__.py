@@ -246,6 +246,14 @@ try:
 except Exception as e:  # noqa: BLE001
     log.warning("commerce.mount_skipped", error=str(e))
 
+# 应用市场云端绑定（实例 ↔ 官方账号）：闭源，与 commerce 同目录。
+# 客户实例用它「连接 Cenkor 账号 / 浏览官方市场 / 拉取已购并安装」。
+try:
+    from cenkor_admin.apps.commerce.cloud_router import router as cloud_router
+    api_v1_router.include_router(cloud_router, prefix="/store", tags=["app-cloud"])
+except Exception as e:  # noqa: BLE001
+    log.warning("cloud.mount_skipped", error=str(e))
+
 # 支付中心公开路由（第三方回调 / 收银台 / 状态轮询，免鉴权）
 from cenkor_admin.apps.payment.public_router import router as payment_public_router  # noqa: E402
 api_v1_router.include_router(

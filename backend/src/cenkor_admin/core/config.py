@@ -101,6 +101,10 @@ class Settings(BaseSettings):
     # ---- 公网 ----
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 
+    # ---- 门户官网（应用市场绑定确认页）----
+    # 仅用于生成「去门户确认绑定」的链接；授权中心与客户实例都读它
+    PORTAL_PUBLIC_URL: str = "https://portal.cenkor.cn"
+
     # ---- 应用授权中心（生态收费）----
     # 留空 = 本机即授权中心（自营部署：签发与校验同库）
     # 填 https://portal.cenkor.cn = 客户实例，向该地址激活 / 心跳 / 拉包

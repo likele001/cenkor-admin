@@ -1,9 +1,13 @@
 """审计日志查询 API"""
 from __future__ import annotations
 
+import os
+import tempfile
+import zipfile
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -72,6 +76,66 @@ async def list_apps(
     """应用中心：已扫描 App 及安装状态"""
     items = await list_apps_with_status(db)
     return {"items": items}
+
+
+@router.post("/apps/install-zip")
+async def install_app_zip(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(require_permission("rbac:role:write")),
+):
+    """上传 ZIP 安装应用（离线部署 / 门户下载的授权包）。
+
+    与商店安装、云端授权安装复用同一个 ``install_app_from_zip``，
+    因此路径穿越 / zip bomb / 大小上限等安全约束完全一致。
+    应用 key 从包内 ``manifest.py`` 正则解析，**不执行包内任何代码**。
+    """
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(400, "只接受 .zip 应用包")
+
+    from cenkor_admin.apps.system.store_router import (
+        _parse_manifest,
+        install_app_from_zip,
+    )
+
+    fd, tmp_path = tempfile.mkstemp(suffix=".zip")
+    parsed: dict | None = None
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            while True:
+                chunk = await file.read(1 << 20)
+                if not chunk:
+                    break
+                fh.write(chunk)
+
+        try:
+            with zipfile.ZipFile(tmp_path) as zf:
+                names = zf.namelist()
+                mf = next((n for n in names if n.endswith("manifest.py")), None)
+                if not mf:
+                    raise HTTPException(400, "ZIP 包缺少 manifest.py")
+                parsed = _parse_manifest(zf.read(mf).decode("utf-8", "ignore"))
+        except HTTPException:
+            raise
+        except zipfile.BadZipFile as e:
+            raise HTTPException(400, f"不是有效的 ZIP 包：{e}") from e
+
+        app_key = str((parsed or {}).get("key") or "").strip()
+        if not app_key:
+            raise HTTPException(400, "无法从 manifest.py 解析出应用 key")
+
+        result = await install_app_from_zip(db, app_key, Path(tmp_path))
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    return {
+        "ok": True,
+        "key": app_key,
+        "version": (parsed or {}).get("version"),
+        "installed_by": user.id,
+        **result,
+    }
 
 
 @router.post("/apps/{app_key}/install")

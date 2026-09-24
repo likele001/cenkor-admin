@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "channel": "stable",
+  "released_at": "2026-09-24",
+  "notes_url": "https://admin.cenkor.cn/",
+  "docker_registry": "",
+  "docker_image": "cenkor-admin",
+  "core_pkg_url": "",
+  "upgrade_docs": "https://github.com/cenkor/cenkor-admin/blob/main/docs/UPGRADE.md",
+  "required_platform": ">=0.1.0",
+  "notes": "首个正式版本。后续每次核心发版由 scripts/release.sh 自动更新本文件。"
+}

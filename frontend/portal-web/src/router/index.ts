@@ -10,6 +10,8 @@ import ContentListView from '@/views/ContentListView.vue'
 import ContentDetailView from '@/views/ContentDetailView.vue'
 import AppCenterView from '@/views/AppCenterView.vue'
 import AppDetailView from '@/views/AppDetailView.vue'
+import ConnectView from '@/views/ConnectView.vue'
+import MyAppsView from '@/views/MyAppsView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -23,6 +25,8 @@ export const router = createRouter({
     { path: '/list/:ct/:id', component: ContentDetailView, meta: { public: true } },
     { path: '/apps', component: AppCenterView, meta: { public: true } },
     { path: '/apps/:key', component: AppDetailView, meta: { public: true } },
+    { path: '/connect', component: ConnectView, meta: { public: true } },
+    { path: '/my/apps', component: MyAppsView },
     { path: '/profile', component: ProfileView },
     { path: '/products', redirect: '/list/product' },
     { path: '/cases', redirect: '/list/case' },
