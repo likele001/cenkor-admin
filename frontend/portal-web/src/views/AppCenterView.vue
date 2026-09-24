@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { hasPriceInfo, isFreePrice, yuanText, type AppPrice } from '@/lib/pricing'
 import SiteHeader from '@/components/SiteHeader.vue'
+import { useOwnedApps } from '@/lib/ownership'
 
 interface StoreApp {
   id: number
@@ -31,6 +32,9 @@ interface Facet { key: string; label: string; count: number }
 interface Stats { apps: number; installed: number; upgradable: number; downloads: number }
 
 const { t } = useI18n()
+
+/** 本账号已购应用（卡片上打「已拥有」标） */
+const { isOwned, load: loadOwned } = useOwnedApps()
 
 const apps = ref<StoreApp[]>([])
 const facets = ref<Facet[]>([])
@@ -94,7 +98,10 @@ async function load(append: boolean) {
   }
 }
 
-onMounted(() => void load(false))
+onMounted(() => {
+  void load(false)
+  void loadOwned()
+})
 
 function loadMore() {
   page.value += 1
@@ -281,6 +288,10 @@ function relTime(iso?: string | null): string {
                     v-else-if="a.installed"
                     class="px-1.5 py-0.5 text-[10px] rounded-full bg-[#ecfdf5] text-[#047857]"
                   >{{ t('appCenter.installed') }}</span>
+                  <span
+                    v-if="isOwned(a.key)"
+                    class="px-1.5 py-0.5 text-[10px] rounded-full bg-[#eef2ff] text-[#4338ca]"
+                  >{{ t('appCenter.owned') }}</span>
                 </div>
                 <span class="inline-block mt-1.5 px-2 py-0.5 text-[10px] rounded-full bg-[#eef2ff] text-[#4f46e5]">
                   {{ categoryLabel(a) }}

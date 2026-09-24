@@ -139,6 +139,7 @@
     "bindAt": "Bound on {date}"
   },
   "price": {
+    "owned": "Owned · My apps",
     "free": "Free",
     "freeHint": "No charge — install and use it right away",
     "buy": "Buy now",
@@ -155,6 +156,7 @@
     "oneTimeHint": "One-time purchase · perpetual"
   },
   "appCenter": {
+    "owned": "Owned",
     "title": "App Center",
     "subtitle": "Pluggable platform apps — enable the business modules you need. All apps are published and maintained by Cenkor Official, covering sales, manufacturing, finance, content and collaboration.",
     "all": "All",

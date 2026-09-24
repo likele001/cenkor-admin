@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { api } from '@/lib/api'
 
 interface AppItem {
@@ -65,7 +65,7 @@ const showGrantsModal = ref(false)
 const editingGrants = ref<{ key: string; grants: Record<string, string[]> }>({ key: '', grants: {} })
 const newRoleKey = ref('')
 const newPermCode = ref('')
-const activeTab = ref<'installed' | 'store' | 'pending'>('installed')
+const activeTab = ref<'installed' | 'store' | 'pending' | 'cloud'>('installed')
 const subTab = ref<'pending' | 'approved' | 'installed'>('pending')
 const categoryFilter = ref('')
 const storeCatalog = ref<StoreApp[]>([])
@@ -211,10 +211,223 @@ async function loadStore() {
   }
 }
 
+// ============================================================
+// 官方应用市场（客户实例专属：连官方云账号 → 浏览 → 装已购）
+// ============================================================
+
+interface CloudPrice {
+  model: string
+  enabled: boolean
+  unit_price: string
+  list_price: string
+  is_discounted: boolean
+  discount_label: string | null
+  promo_state: string
+  promo_label: string | null
+}
+
+interface CloudApp {
+  app_key: string
+  name: string
+  version: string
+  description: string
+  icon: string
+  category: string
+  author: string
+  price: CloudPrice | null
+  installed: boolean
+  installed_version: string | null
+  needs_upgrade: boolean
+}
+
+interface CloudPurchase {
+  license_key: string
+  app_key: string
+  app_name: string
+  model: string
+  seats: number
+  status: string
+  expires_at: string | null
+  permanent: boolean
+}
+
+const cloudRole = ref<'hub' | 'spoke'>('hub')
+const cloudStatus = ref<any>({})
+const cloudApps = ref<CloudApp[]>([])
+const cloudPurchases = ref<CloudPurchase[]>([])
+const cloudLoaded = ref(false)
+const cloudError = ref('')
+const bindCode = ref<any>(null)
+const bindPolling = ref(false)
+const installing = ref<string | null>(null)
+let bindTimer: number | null = null
+
+/** 离线安装：上传本地 ZIP 应用包（如从官方门户「我的应用」下载的授权包） */
+const zipInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+
+async function onZipPicked(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  input.value = '' // 清空以便重复选择同一个文件
+  if (!f) return
+  if (!f.name.toLowerCase().endsWith('.zip')) {
+    alert('只支持 .zip 应用包')
+    return
+  }
+  uploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', f)
+    const { data } = await api.post('/api/v1/system/apps/install-zip', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300_000,
+    })
+    alert(`已安装 ${data.key}${data.version ? ' @ ' + data.version : ''}`)
+    await load()
+  } catch (err: any) {
+    alert(err?.response?.data?.detail || '安装失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
+// 授权中心（官方实例）自己就是货源，不需要这个 tab
+const isSpoke = computed(() => cloudRole.value === 'spoke')
+
+const purchasedMap = computed(() => {
+  const m = new Map<string, CloudPurchase>()
+  for (const p of cloudPurchases.value) if (!m.has(p.app_key)) m.set(p.app_key, p)
+  return m
+})
+
+function purchaseOf(key: string): CloudPurchase | undefined {
+  return purchasedMap.value.get(key)
+}
+
+async function loadCloudStatus() {
+  try {
+    const { data } = await api.get('/api/v1/store/cloud/status')
+    cloudStatus.value = data
+    cloudRole.value = data.role === 'spoke' ? 'spoke' : 'hub'
+    if (cloudRole.value === 'spoke') await loadCloud()
+  } catch {
+    // 老版本后端 / 开源部署没有这个接口：静默当作授权中心，不显示该 tab
+    cloudRole.value = 'hub'
+  }
+}
+
+async function loadCloud() {
+  cloudLoaded.value = false
+  cloudError.value = ''
+  try {
+    const cat = await api.get('/api/v1/store/cloud/catalog')
+    cloudApps.value = cat.data.items || []
+    if (cloudStatus.value?.bound) {
+      const pur = await api.get('/api/v1/store/cloud/purchases')
+      cloudPurchases.value = pur.data.items || []
+    } else {
+      cloudPurchases.value = []
+    }
+  } catch (e: any) {
+    cloudError.value = e?.response?.data?.detail || '官方应用市场不可达'
+    cloudApps.value = []
+  } finally {
+    cloudLoaded.value = true
+  }
+}
+
+async function startBind() {
+  try {
+    const { data } = await api.post('/api/v1/store/cloud/bind/start', {})
+    bindCode.value = data
+    startBindPolling(data.device_code)
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || '申请绑定码失败')
+  }
+}
+
+function startBindPolling(deviceCode: string) {
+  stopBindPolling()
+  bindPolling.value = true
+  bindTimer = window.setInterval(async () => {
+    try {
+      const { data } = await api.post('/api/v1/store/cloud/bind/poll', { device_code: deviceCode })
+      if (data.status === 'approved') {
+        stopBindPolling()
+        bindCode.value = null
+        await loadCloudStatus()
+      } else if (data.status === 'denied' || data.status === 'expired') {
+        stopBindPolling()
+        bindCode.value = null
+        alert(data.status === 'denied' ? '门户拒绝了本次绑定' : '绑定码已过期，请重新发起绑定')
+      }
+    } catch (e: any) {
+      stopBindPolling()
+      alert(e?.response?.data?.detail || '轮询绑定结果失败')
+    }
+  }, 3000)
+}
+
+function stopBindPolling() {
+  bindPolling.value = false
+  if (bindTimer !== null) {
+    window.clearInterval(bindTimer)
+    bindTimer = null
+  }
+}
+
+async function unbind() {
+  if (!confirm('解绑后本实例将无法下载已购应用，确认解绑？')) return
+  try {
+    await api.post('/api/v1/store/cloud/unbind')
+    cloudPurchases.value = []
+    await loadCloudStatus()
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || '解绑失败')
+  }
+}
+
+async function installCloud(app: CloudApp) {
+  const p = purchaseOf(app.app_key)
+  if (!p) {
+    alert('该应用尚未购买，请先到官方门户购买后再安装')
+    return
+  }
+  installing.value = app.app_key
+  try {
+    const { data } = await api.post('/api/v1/store/cloud/install', { license_key: p.license_key })
+    alert(`已安装 ${data.app_key || app.app_key}`)
+    await Promise.all([load(), loadCloud()])
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || '安装失败')
+  } finally {
+    installing.value = null
+  }
+}
+
+function cloudPriceText(app: CloudApp): string {
+  const p = app.price
+  if (!p || p.enabled === false) return '免费'
+  const unit = p.unit_price || '0.00'
+  return p.model === 'seat' ? `¥${unit} / 席` : `¥${unit}`
+}
+
+function cloudListPriceText(app: CloudApp): string {
+  const p = app.price
+  if (!p || !p.is_discounted) return ''
+  const lp = p.list_price || ''
+  return parseFloat(lp) > 0 ? `¥${lp}` : ''
+}
+
+onBeforeUnmount(() => stopBindPolling())
+
+
 onMounted(() => {
   load()
   loadPending()
   loadStore()
+  loadCloudStatus()
 })
 
 const installedApps = computed(() => apps.value.filter(a => a.status === 'installed' || a.status === 'needs_upgrade'))
@@ -277,6 +490,22 @@ function categoryLabel(c: string): string {
         :class="activeTab === 'pending' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
         @click="activeTab = 'pending'; subTab = 'pending'"
       >{{ t('apps.tabSubmissions') }} ({{ pendingApps.length }})</button>
+      <button
+        v-if="isSpoke"
+        class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+        :class="activeTab === 'cloud' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
+        @click="activeTab = 'cloud'; loadCloud()"
+      >官方应用市场 ({{ cloudApps.length }})</button>
+    </div>
+
+    <div v-if="activeTab === 'installed'" class="mb-4 flex flex-wrap items-center gap-2">
+      <input ref="zipInput" type="file" accept=".zip" class="hidden" @change="onZipPicked" />
+      <button
+        class="btn-ghost text-xs"
+        :disabled="uploading"
+        @click="zipInput?.click()"
+      >{{ uploading ? '安装中…' : '上传安装包（.zip）' }}</button>
+      <span class="text-xs text-ink-400">离线安装：上传从官方门户「我的应用」下载的授权包</span>
     </div>
 
     <div v-if="activeTab === 'store'" class="mb-4 flex gap-2">
@@ -465,6 +694,133 @@ function categoryLabel(c: string): string {
         </div>
       </div>
     </div>
+
+    <template v-if="activeTab === 'cloud'">
+      <!-- 绑定状态 -->
+      <div class="card">
+        <div v-if="!cloudStatus.bound">
+          <h3 class="font-semibold mb-1">连接 Cenkor 账号</h3>
+          <p class="text-sm text-ink-600 mb-3">
+            绑定官方账号后，即可直接浏览官方应用市场、查看本账号已购应用并一键下载安装。
+            购买请前往
+            <a
+              :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps'"
+              target="_blank"
+              class="text-blue-600 underline"
+            >{{ cloudStatus.gateway_url || 'portal.cenkor.cn' }}</a>。
+          </p>
+
+          <div v-if="bindCode" class="rounded border border-ink-200 bg-ink-50 p-3 mb-3">
+            <p class="text-sm text-ink-600 mb-1">请在浏览器中打开下面的地址，输入绑定码完成确认：</p>
+            <p class="text-xl font-mono font-semibold tracking-widest mb-1">{{ bindCode.user_code }}</p>
+            <a
+              :href="bindCode.verification_uri_complete || bindCode.verification_uri"
+              target="_blank"
+              class="text-sm text-blue-600 underline break-all"
+            >{{ bindCode.verification_uri }}</a>
+            <p class="text-xs text-ink-400 mt-2">
+              {{ bindPolling ? '正在等待门户确认…（也可直接点上面链接）' : '已停止等待，可重新发起' }}
+            </p>
+          </div>
+
+          <button class="btn-primary text-sm" @click="startBind">连接 Cenkor 账号</button>
+        </div>
+
+        <div v-else class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h3 class="font-semibold mb-1">已连接 Cenkor 账号</h3>
+            <p class="text-sm text-ink-600">
+              账号：<code class="bg-ink-50 px-1 rounded">{{ cloudStatus.account || '—' }}</code>
+              <span class="mx-2 text-ink-300">|</span>
+              官方云：<code class="bg-ink-50 px-1 rounded break-all">{{ cloudStatus.hub || '—' }}</code>
+            </p>
+          </div>
+          <button class="btn-ghost text-sm text-red-600 shrink-0" @click="unbind">解绑</button>
+        </div>
+      </div>
+
+      <div v-if="cloudError" class="card text-red-600">{{ cloudError }}</div>
+
+      <div v-if="cloudLoaded && !cloudError && cloudApps.length === 0" class="card text-ink-500 text-center py-12">
+        官方应用市场暂无可用应用
+      </div>
+      <div v-else-if="!cloudLoaded && !cloudError" class="card text-ink-500">加载中…</div>
+
+      <div v-for="app in cloudApps" :key="app.app_key" class="card">
+        <div class="flex items-start gap-3">
+          <span class="text-2xl">{{ app.icon || '📦' }}</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-semibold">{{ app.name }}</h3>
+              <code class="text-xs text-ink-400">{{ app.app_key }} @ {{ app.version }}</code>
+              <span
+                v-if="purchaseOf(app.app_key)"
+                class="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700"
+              >已购</span>
+              <span
+                v-if="app.installed"
+                class="text-xs px-2 py-0.5 rounded-full"
+                :class="app.needs_upgrade ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'"
+              >{{ app.needs_upgrade ? '可升级' : '已安装' }}</span>
+            </div>
+            <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
+            <p class="mt-1.5 text-sm">
+              <span class="font-semibold text-ink-900">{{ cloudPriceText(app) }}</span>
+              <span v-if="cloudListPriceText(app)" class="ml-2 text-xs text-ink-400 line-through">
+                {{ cloudListPriceText(app) }}
+              </span>
+              <span
+                v-if="app.price && app.price.promo_state === 'active'"
+                class="ml-2 text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600"
+              >促销中{{ app.price.discount_label ? ' · ' + app.price.discount_label : '' }}</span>
+              <span v-else-if="app.price && app.price.discount_label" class="ml-2 text-xs text-red-600">
+                {{ app.price.discount_label }}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-3 flex gap-2 border-t pt-3 flex-wrap">
+          <button
+            v-if="purchaseOf(app.app_key)"
+            class="btn-primary text-sm"
+            :disabled="installing === app.app_key"
+            @click="installCloud(app)"
+          >{{ installing === app.app_key ? '安装中…'
+              : app.installed ? (app.needs_upgrade ? '升级到最新' : '重新安装')
+              : '下载安装' }}</button>
+          <a
+            v-else
+            :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps/' + app.app_key"
+            target="_blank"
+            class="btn-ghost text-sm"
+          >去官方门户购买</a>
+          <button
+            class="btn-ghost text-sm"
+            @click="expanded = expanded === app.app_key ? null : app.app_key"
+          >{{ expanded === app.app_key ? t('apps.collapse') : t('apps.details') }}</button>
+        </div>
+
+        <div v-if="expanded === app.app_key" class="mt-3 pt-3 border-t space-y-2 text-sm">
+          <div class="flex flex-wrap gap-4 text-xs text-ink-500">
+            <span>分类：<code class="bg-ink-50 px-1 rounded">{{ app.category }}</code></span>
+            <span>作者：{{ app.author }}</span>
+            <span v-if="app.installed_version">
+              已装版本：<code class="bg-ink-50 px-1 rounded">{{ app.installed_version }}</code>
+            </span>
+          </div>
+          <div v-if="purchaseOf(app.app_key)" class="text-xs text-ink-500">
+            授权码：<code class="bg-ink-50 px-1 rounded">{{ purchaseOf(app.app_key)?.license_key }}</code>
+            <span class="ml-2">
+              {{ purchaseOf(app.app_key)?.permanent ? '永久有效' : '有效期至 ' + purchaseOf(app.app_key)?.expires_at }}
+            </span>
+          </div>
+          <p v-else class="text-xs text-ink-400">
+            尚未购买。购买发生在官方门户，付款后授权自动归到已绑定的账号，回到这里刷新即可安装。
+          </p>
+        </div>
+      </div>
+    </template>
 
     <div v-if="showGrantsModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showGrantsModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
