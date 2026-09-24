@@ -237,6 +237,10 @@ _auto_register_app_routers()
 from cenkor_admin.apps.system.store_router import router as store_router  # noqa: E402
 api_v1_router.include_router(store_router, prefix="/store", tags=["app-store"])
 
+# 核心平台版本 / 升级检查（latest 公开，check 需登录）
+from cenkor_admin.apps.system.release_router import router as release_router  # noqa: E402
+api_v1_router.include_router(release_router, prefix="/release", tags=["release"])
+
 # 生态交易层（定价 / 订单 / 授权 / 云端安装）
 # 闭源商业模块，位于外置目录 src/apps/commerce/（不进公开仓库）。
 # 开源部署不含此模块，ImportError 时静默跳过，不影响平台启动。

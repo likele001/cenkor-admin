@@ -1,3 +1,8 @@
+# 放行依赖构建脚本（pnpm 10+ 默认跳过，esbuild 缺二进制会导致构建失败）
+# pnpm 11 用 allowBuilds；pnpm 10 用 onlyBuiltDependencies，两者并存保持兼容
 allowBuilds:
-  esbuild: set this to true or false
-  vue-demi: set this to true or false
+  esbuild: true
+  vue-demi: true
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi

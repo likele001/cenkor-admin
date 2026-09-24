@@ -15,6 +15,8 @@ const { t } = useI18n()
 const me = ref(auth.user)
 const sidebarOpen = ref(true)
 const expandedGroup = ref<string | null>(null)
+// 核心平台版本号（来自公开 /api/health）
+const appVersion = ref('')
 
 interface MenuItem {
   id: number
@@ -182,6 +184,10 @@ function closeIfMobile() {
 }
 
 onMounted(async () => {
+  try {
+    const { data } = await api.get('/api/health')
+    appVersion.value = data?.version || ''
+  } catch { /* ignore */ }
   if (!auth.isAuthed) return
   try {
     const { data } = await api.get('/api/v1/auth/me')
@@ -268,6 +274,12 @@ async function logout() {
           </template>
         </template>
       </nav>
+
+      <!-- 版本信息 -->
+      <div v-if="appVersion" class="px-4 py-2.5 border-t border-ink-200 shrink-0 text-xs text-ink-400 flex items-center justify-between">
+        <span>Cenkor Admin</span>
+        <span class="font-mono">v{{ appVersion }}</span>
+      </div>
     </aside>
 
     <!-- Main -->

@@ -32,7 +32,7 @@
 ### 克隆与启动
 
 ```bash
-git clone https://github.com/cenkor/cenkor-admin.git
+git clone https://github.com/likele001/cenkor-admin.git
 cd cenkor-admin
 
 # 后端
@@ -59,6 +59,35 @@ npm run dev  # http://localhost:5175
 
 - 后台: `admin@cenkor.cn` / `admin123`（**生产请立即修改！**）
 - 前台: 注册即可
+
+### 前端包管理与构建故障排查
+
+各前端目录用哪个包管理器，**看锁文件**，不要混用（混用会弄坏 node_modules 软链）：
+
+| 目录 | 包管理器 | 安装命令（在该目录内执行） |
+|------|----------|------------------------------|
+| `frontend/admin-web` | **pnpm**（有 pnpm-lock.yaml） | `pnpm install` |
+| `frontend/developer-web` | **pnpm**（有 pnpm-lock.yaml） | `pnpm install` |
+| `frontend/portal-web` | npm（无锁文件） | `npm install` |
+| `frontend/landing-web` | npm（有 package-lock.json） | `npm install` |
+
+依赖环境损坏时的修复顺序（**注意：`pnpm install --force` 必须 cd 进对应前端目录跑，仓库根目录无效**）：
+
+```bash
+cd frontend/admin-web
+pnpm install --force          # 重建 node_modules 软链
+pnpm rebuild esbuild vue-demi # 补跑被跳过的构建脚本
+npm run build                 # 验证：vue-tsc 类型检查 + vite 构建
+```
+
+两个已知坑：
+
+1. **pnpm 10+ 默认跳过依赖构建脚本**：esbuild 会缺二进制导致 vite 报错。已在各 `pnpm-workspace.yaml` 配置 `allowBuilds`（pnpm 11）+ `onlyBuiltDependencies`（pnpm 10）放行 esbuild / vue-demi，不要删。
+2. **`vue-tsc@2.0.0` 官方发布残缺（缺 index.js，上游坏包）**：报错特征 `Cannot find module '../index.js'`，重装也无法修复，必须升级版本：
+   ```bash
+   pnpm add -D vue-tsc@2.2.10
+   ```
+   admin-web / developer-web 已钉到 2.2.10；新拉仓库若 lockfile 又解析到 2.0.0，同样用这条命令修。
 
 ---
 

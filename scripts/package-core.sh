@@ -14,7 +14,10 @@ warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${PACKAGE_VERSION:-0.1.0}"
+VERSION_FILE="$ROOT/backend/src/cenkor_admin/VERSION"
+# 版本单一来源：PACKAGE_VERSION 覆盖 > VERSION 文件 > 0.1.0
+VERSION="${PACKAGE_VERSION:-$( { [ -f "$VERSION_FILE" ] && tr -d ' \n' < "$VERSION_FILE"; } 2>/dev/null || echo 0.1.0)}"
+[ -n "$VERSION" ] || VERSION="0.1.0"
 DATE="$(date +%Y%m%d)"
 PKG_NAME="cenkor-admin-core-${VERSION}-${DATE}"
 RELEASE_DIR="$ROOT/release"

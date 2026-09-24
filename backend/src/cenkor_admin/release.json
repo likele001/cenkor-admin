@@ -1,12 +1,12 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "channel": "stable",
   "released_at": "2026-09-24",
-  "notes_url": "https://admin.cenkor.cn/",
-  "docker_registry": "",
+  "notes_url": "https://github.com/likele001/cenkor-admin/releases",
+  "docker_registry": "ghcr.io/likele001",
   "docker_image": "cenkor-admin",
-  "core_pkg_url": "",
-  "upgrade_docs": "https://github.com/cenkor/cenkor-admin/blob/main/docs/UPGRADE.md",
+  "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
+  "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/UPGRADE.md",
   "required_platform": ">=0.1.0",
-  "notes": "首个正式版本。后续每次核心发版由 scripts/release.sh 自动更新本文件。"
+  "notes": "新增核心平台升级机制：版本检查接口 /release/latest、/release/check；工作台新版本升级横幅；裸机一键升级脚本 upgrade.sh；发版助手 release.sh；CI 打 tag 自动发版（核心包 + ghcr 多架构镜像 + GitHub Release）"
 }
