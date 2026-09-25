@@ -11,4 +11,4 @@
 | 路径 | `/www/wwwroot/cenkor-admin/release/` |
 | 打包命令 | `bash scripts/package-core.sh` |
 
-详细说明见 [../PACKAGING.md](../PACKAGING.md)。
+详细说明见 [../packaging.md](../packaging.md)。

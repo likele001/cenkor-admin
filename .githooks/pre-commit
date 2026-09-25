@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# 提交前检查：防止商业应用被误提交进公开仓库。
+# 实现见 scripts/check-app-tracking.sh
+#
+# 启用（每个 clone 需执行一次）：
+#   git config core.hooksPath .githooks
+# 临时绕过（不推荐）：
+#   git commit --no-verify
+
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -n "$ROOT" ] || exit 0
+[ -f "$ROOT/scripts/check-app-tracking.sh" ] || exit 0
+
+exec bash "$ROOT/scripts/check-app-tracking.sh"

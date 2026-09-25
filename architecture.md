@@ -488,15 +488,19 @@ app.add_middleware(
 
 ### 10.2 部署
 
+> **生产部署见 [`docs/deploy.md`](docs/deploy.md)** —— 本机生产是「宿主机 + 宝塔」：
+> 后端由宝塔 Python 项目 `cenkor` 托管（用户 `www`，端口 `8002`），
+> PostgreSQL / Redis / MinIO 为宿主机原生服务。以下为**本地开发**启动方式。
+
 ```bash
 # 1. 安装依赖
 cd backend
 pip install -r requirements.txt
 
-# 2. 数据库迁移
+# 2. 数据库迁移（生产环境由后端 lifespan 自动执行）
 alembic upgrade head
 
-# 3. 启动
+# 3. 本地开发启动
 uvicorn cenkor_admin.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -509,7 +513,7 @@ python -m cenkor_admin.scripts.migrate_to_entries
 # 该脚本幂等，可重复执行
 ```
 
-详见 `docs/PLATFORM_V2_ROADMAP.md` 的 W10 联调上线部分。
+详见 `docs/roadmap.md` 的 W10 联调上线部分。
 
 ---
 

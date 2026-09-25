@@ -1,5 +1,15 @@
 # Cenkor Platform V2 — 企业级通用后台 + CMS 改造路线图
 
+> 📌 **本文档由三份规划合并而来（2026-09-25）。**
+>
+> 原 `PLATFORM_V2_ROADMAP.md`（V2 路线图）、`platform_refactor_plan.md`（改造执行计划）、
+> `platform_upgrade_plan.md`（v2.0 升级计划）三者创建于同一天、章节结构与「冻结」内容高度重复。
+> 现以本文件为**唯一规划主干**（内容最完整、含进度概览与任务清单），
+> 另两份已移入 [`archive/`](archive/)，仅作历史参考。
+>
+> **当前状态**：W1–W8 已完成，W9–W10 进行中。新增规划请追加到本文。
+
+
 > **版本**：v2.0.0-draft
 > **创建**：2026-06-10
 > **状态**：W1–W8 已完成 ✅，W9–W10 进行中
@@ -882,7 +892,7 @@ Response: { "rendered": "ThinkMES - ¥1,234.00" }
 |---|---|---|---|
 | D1-D2 | 全链路 E2E 测试 | `tests/test_content_engine.py` (25 测试) | ✅ |
 | D3 | 性能测试（1000+ 条目） | 全部 < 50ms | ✅ |
-| D4-D5 | 文档更新 | `ARCHITECTURE.md` V2 重写 + `docs/DEV_GUIDE.md` | ✅ |
+| D4-D5 | 文档更新 | `architecture.md` V2 重写 + `docs/dev_guide.md` | ✅ |
 
 **测试结果**:
 - 单元测试: 28/28 ✅
@@ -1063,7 +1073,7 @@ Response: { "rendered": "ThinkMES - ¥1,234.00" }
 - [ ] 9.5 性能测试：1000+ 内容条目查询
 - [ ] 9.6 性能测试：JSONB custom_fields 索引效率
 - [ ] 9.7 性能测试：公共 API 并发 100 QPS
-- [ ] 9.8 ARCHITECTURE.md 更新
+- [ ] 9.8 architecture.md 更新
 - [ ] 9.9 API 文档更新（OpenAPI）
 - [ ] 9.10 Docker 部署验证
 - [ ] 9.11 宝塔部署验证

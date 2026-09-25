@@ -4,9 +4,9 @@
 
 | 说明 | 文档 |
 |------|------|
-| 如何打包、包内清单、部署步骤 | [`../docs/PACKAGING.md`](../docs/PACKAGING.md) |
-| 发版日志 | [`../docs/release/CHANGELOG.md`](../docs/release/CHANGELOG.md) |
-| 最近一次打包 | [`../docs/release/LATEST.md`](../docs/release/LATEST.md) |
+| 如何打包、包内清单、部署步骤 | [`../docs/packaging.md`](../docs/packaging.md) |
+| 发版日志 | [`../docs/release/changelog.md`](../docs/release/changelog.md) |
+| 最近一次打包 | [`../docs/release/latest.md`](../docs/release/latest.md) |
 
 ```bash
 bash scripts/package-core.sh

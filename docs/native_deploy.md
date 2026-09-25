@@ -1,5 +1,12 @@
 # Cenkor Admin · 裸机部署（systemd + 宝塔反代）
 
+> ℹ️ **本机生产未采用本文方案。**
+>
+> 本机生产由**宝塔「Python 项目」**托管后端（用户 `www`，端口 `8002`），
+> 不是 systemd 单元。权威文档见 [`deploy.md`](deploy.md)。
+> 本文仅在「不用宝塔守护、改用 systemd」时参考。
+
+
 适用场景：不使用 Docker，在宿主机直接运行 Python/Node，由宝塔 nginx 做 SSL 与反代。
 
 ## 前置依赖
@@ -8,7 +15,7 @@
 - Node.js 20+
 - PostgreSQL 16（宝塔软件商店或系统包）
 - Redis 7
-- MinIO（建议仍用 Docker 单容器：`docker run -p 9000:9000 minio/minio server /data`）
+- MinIO（本机为 systemd 托管的原生服务，数据目录 `/var/minio/data`；见 [`deploy.md` §5.3](deploy.md#53-minio本地对象存储--双写备份)）
 
 ## 步骤
 
