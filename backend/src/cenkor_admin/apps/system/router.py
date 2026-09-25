@@ -17,6 +17,7 @@ from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.system.app_registry import (
     install_app,
     list_apps_with_status,
+    set_app_enabled,
     uninstall_app,
     update_permissions_grants,
 )
@@ -49,6 +50,7 @@ async def list_app_plugins(
         select(InstalledApp).where(
             InstalledApp.status == "installed",
             InstalledApp.has_frontend == True,  # noqa: E712
+            InstalledApp.enabled == True,  # noqa: E712  # 停用的应用不下发插件
         )
     )
     from pathlib import Path
@@ -160,6 +162,38 @@ async def uninstall_app_endpoint(
     try:
         await uninstall_app(db, app_key)
         return {"ok": True, "key": app_key, "status": "uninstalled"}
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.post("/apps/{app_key}/enable")
+async def enable_app_endpoint(
+    app_key: str,
+    db: AsyncSession = Depends(get_db),
+    _: auth_models.User = Depends(require_permission("rbac:role:write")),
+):
+    """启用应用：恢复菜单可见性并放行其 API。"""
+    try:
+        row = await set_app_enabled(db, app_key, True)
+        return {"ok": True, "key": row.key, "enabled": bool(row.enabled)}
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.post("/apps/{app_key}/disable")
+async def disable_app_endpoint(
+    app_key: str,
+    db: AsyncSession = Depends(get_db),
+    _: auth_models.User = Depends(require_permission("rbac:role:write")),
+):
+    """停用应用：隐藏菜单、下发插件时跳过、API 一律 403，但**保留全部业务数据与角色授权**。
+
+    与「卸载」的区别 —— 卸载会清理菜单 / 权限授权 / 注册的内容数据，停用不会，
+    用于「暂时不用但不想删数据」的场景。
+    """
+    try:
+        row = await set_app_enabled(db, app_key, False)
+        return {"ok": True, "key": row.key, "enabled": bool(row.enabled)}
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 

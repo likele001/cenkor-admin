@@ -93,7 +93,7 @@ if [ "$MODE" = "baota" ]; then
   echo "  宝塔反代目标："
   echo "    后端  http://127.0.0.1:8002  → api.cenkor.cn"
   echo "    后台  http://127.0.0.1:5174  → admin.cenkor.cn"
-  echo "  详见 docs/DOMAIN_SETUP.md 与 deploy/baota/"
+  echo "  详见 docs/domain_setup.md 与 deploy/baota/"
 else
   echo "  公网     https://cenkor.cn"
   echo "  后台     https://admin.cenkor.cn"

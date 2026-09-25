@@ -741,9 +741,14 @@ async def install_submission(
     db: AsyncSession = Depends(get_db),
     _: auth_models.User = Depends(require_permission("rbac:role:write")),
 ):
-    """安装已审核通过的应用"""
+    """安装已审核通过（或曾安装过）的应用。
+
+    ``approved`` = 首次安装；``installed`` = 重装（应用被卸载后再次安装）。
+    必须与 ``public_store_apps`` 的取数条件 ``status in ("approved", "installed")``
+    保持一致 —— 否则商店里显示「可安装」的条目点下去会被这里 400 拒绝。
+    """
     sub = await db.get(store_models.AppSubmission, submission_id)
-    if not sub or sub.status != "approved":
+    if not sub or sub.status not in ("approved", "installed"):
         raise HTTPException(400, "应用未审核通过")
 
     # 检查 ZIP 文件存在

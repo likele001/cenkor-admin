@@ -81,6 +81,10 @@ def _build_user_brief(user: models.User) -> schemas.UserBrief:
         # 菜单：role.menus 是 RoleMenu list；每项有 .menu
         for rm in role.menus:  # type: ignore[attr-defined]
             menu = rm.menu
+            # 停用应用的菜单不下发（app_registry.set_app_enabled 会置 status=disabled）。
+            # 角色-菜单授权关系保留在库里，应用重新启用后菜单即刻恢复。
+            if getattr(menu, "status", "active") != "active":
+                continue
             if menu.id in seen_menus:
                 continue
             seen_menus.add(menu.id)

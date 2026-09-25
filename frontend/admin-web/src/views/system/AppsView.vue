@@ -21,6 +21,8 @@ interface AppItem {
   categories_seed: any[]
   public_routes_prefix: string
   permissions_grants: Record<string, string[]>
+  /** 启用状态：后端未返回时为 undefined（旧版本），此时不渲染启停入口 */
+  enabled?: boolean
   registered_counts: {
     content_types?: number
     field_definitions?: number
@@ -117,6 +119,21 @@ async function uninstall(key: string) {
   }
 }
 
+/** 启用 / 停用应用。停用是软停：菜单隐藏 + API 门禁，业务数据与角色授权保留。 */
+async function toggleEnable(app: AppItem) {
+  const turnOn = app.enabled === false
+  if (!turnOn && !confirm(t('apps.confirmDisable', { key: app.key }))) return
+  acting.value = app.key
+  try {
+    await api.post(`/api/v1/system/apps/${app.key}/${turnOn ? 'enable' : 'disable'}`)
+    await load()
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || t(turnOn ? 'apps.enableFailed' : 'apps.disableFailed'))
+  } finally {
+    acting.value = null
+  }
+}
+
 function openGrants(app: AppItem) {
   editingGrants.value = {
     key: app.key,
@@ -198,6 +215,17 @@ async function installSubmission(id: number) {
   } finally {
     acting.value = null
   }
+}
+
+/** 商店安装入口：本地已有代码（内置 / 已发布应用）直接走系统安装，
+ *  避免走「提交包」链路解压 ZIP 覆盖本地源码、或被审核状态卡住。 */
+async function storeInstall(app: StoreApp) {
+  if (localAppKeys.value.has(app.key)) {
+    await install(app.key)
+    await loadStore()
+    return
+  }
+  await installSubmission(app.id)
 }
 
 async function loadStore() {
@@ -430,7 +458,14 @@ onMounted(() => {
   loadCloudStatus()
 })
 
-const installedApps = computed(() => apps.value.filter(a => a.status === 'installed' || a.status === 'needs_upgrade'))
+// 应用管理列表：含「未安装」（代码已存在但被卸载、或从未安装）——未安装项提供安装入口
+const installedApps = computed(() =>
+  apps.value.filter(
+    (a) => a.status === 'installed' || a.status === 'needs_upgrade' || a.status === 'not_installed',
+  ),
+)
+// 本地已有代码的应用 key：安装时无需 ZIP 包，直接走 /system/apps/{key}/install
+const localAppKeys = computed(() => new Set(apps.value.map((a) => a.key)))
 const filteredSubmissions = computed(() => pendingApps.value.filter(s => s.status === subTab.value))
 
 // 已安装应用的 key -> 当前版本（用于比对商店版本，得出「可升级」）
@@ -537,6 +572,10 @@ function categoryLabel(c: string): string {
                   'bg-yellow-50 text-yellow-700': app.status === 'needs_upgrade',
                 }"
               >{{ statusLabel[app.status] }}</span>
+              <span
+                v-if="app.enabled === false"
+                class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500"
+              >{{ t('apps.disabled') }}</span>
             </div>
             <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
             <div v-if="app.registered_counts" class="flex flex-wrap gap-2 mt-2 text-xs">
@@ -562,6 +601,24 @@ function categoryLabel(c: string): string {
             :disabled="acting === app.key"
             @click="install(app.key)"
           >{{ t('apps.upgrade') }}</button>
+          <button
+            v-else-if="app.status === 'not_installed'"
+            class="btn-primary text-sm"
+            :disabled="acting === app.key"
+            @click="install(app.key)"
+          >{{ t('apps.install') }}</button>
+          <button
+            v-if="app.status === 'installed' && typeof app.enabled === 'boolean' && app.enabled"
+            class="btn-ghost text-sm text-amber-600"
+            :disabled="acting === app.key"
+            @click="toggleEnable(app)"
+          >{{ t('apps.disable') }}</button>
+          <button
+            v-else-if="app.status === 'installed' && app.enabled === false"
+            class="btn-primary text-sm"
+            :disabled="acting === app.key"
+            @click="toggleEnable(app)"
+          >{{ t('apps.enable') }}</button>
           <button
             v-if="app.status === 'installed'"
             class="btn-ghost text-sm text-red-600"
@@ -631,12 +688,17 @@ function categoryLabel(c: string): string {
           <button
             v-if="storeState(app) !== 'installed'"
             class="btn-primary text-sm"
-            :disabled="acting === `install-${app.id}`"
-            @click="installSubmission(app.id)"
+            :disabled="acting === `install-${app.id}` || acting === app.key"
+            @click="storeInstall(app)"
           >{{ storeState(app) === 'upgradable'
               ? t('apps.upgradeTo', { version: app.version })
               : t('apps.install') }}</button>
-          <button v-else class="btn-ghost text-sm" disabled>{{ t('apps.status_installed') }}</button>
+          <button
+            v-else
+            class="btn-ghost text-sm text-red-600"
+            :disabled="acting === app.key"
+            @click="uninstall(app.key)"
+          >{{ t('apps.uninstall') }}</button>
           <button
             class="btn-ghost text-sm"
             @click="expanded = expanded === app.key ? null : app.key"
