@@ -3,6 +3,9 @@ import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
 export default defineConfig({
+  // 线上经 nginx 挂在 admin.cenkor.cn/landing/ 子路径下（部署目录 frontend/landing/），
+  // base 必须为 /landing/，否则产物资源路径为 /assets/... 会 404
+  base: '/landing/',
   plugins: [vue()],
   resolve: {
     alias: {
