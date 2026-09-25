@@ -29,6 +29,9 @@ my-app/
     └── index.html       # 可选：应用管理页面
 ```
 
+> ⚠️ **商业闭源应用的存放位置有专门要求**（公开仓库不收录其源码），
+> 见「九、安全规范 → 9.3 仓库边界与商业源码保护」。
+
 ### 2.2 manifest.py（必需）
 
 每个应用必须在根目录定义 `manifest.py`，导出 `MANIFEST` 对象：
@@ -337,6 +340,63 @@ docs/05-用户手册/<应用 key>_操作手册.md
 - 数据库操作通过 SQLAlchemy ORM
 - 文件操作限制在 `apps/{key}/` 目录
 - 网络请求仅允许 HTTPS
+
+### 9.3 仓库边界与商业源码保护
+
+平台仓库是**公开仓库**，因此「文件放在哪」直接决定它会不会被公开。
+
+#### 两条落点
+
+| 落点 | 忽略机制 | 用途 |
+|---|---|---|
+| `backend/src/apps/<key>/`（**外置**） | `.gitignore` 目录级整体忽略 | **商业闭源应用一律放这里** |
+| `backend/src/cenkor_admin/apps/<key>/`（**内置**） | 默认进公开仓库，闭源须逐条登记 | 开源应用 |
+
+放外置目录时，前端产物与数据库迁移仍落在被跟踪的目录里，故仍需单独登记 ——
+写法参照 `.gitignore` 中 `commerce` / `payment` 两段。
+
+#### 放内置目录时的登记清单（三条，缺一不可）
+
+```bash
+backend/src/cenkor_admin/apps/<key>/           # 后端源码
+backend/src/cenkor_admin/static/apps/<key>/    # 前端产物（plugin.js 常有 MB 级）
+backend/alembic/versions/2026*_<key>*.py       # 数据库迁移
+```
+
+#### ⚠️ 新增 ignore 规则后，必须回头查历史
+
+`.gitignore` 与 `git rm` **只管未来**。文件从工作区删掉 ≠ 从历史消失 ——
+`git clone` 会拉取全部历史对象。
+
+三条命令，缺一不可：
+
+```bash
+git ls-tree -r HEAD --name-only | grep <path>        # ① 当前快照
+git rev-list --objects --all | grep <path>           # ② 历史对象 ← 关键
+git rev-list --objects origin/main | grep <path>     # ③ 是否已推到远端
+```
+
+⚠️ **不要用 `git log --all -- <路径>` 下结论**：它只列出触碰过该路径的提交，
+**看不到仍被引用的旧 blob**。曾据此误判「文件移除了就干净了」。
+
+若 ② 有命中且 ③ 也有命中，说明源码**已进入公开仓库历史**：
+
+- **只 `force push` 清不掉** —— GitHub 要求 commit 完全无引用后才由 Support 执行 GC，
+  dangling commit 可保留数年；旧快照仍可经
+  `codeload.github.com/<owner>/<repo>/tar.gz/<旧SHA>` 下载。
+- 可选处置：① **删除仓库重建**（旧 commit 立即 404，实测有效）；
+  ② 联系 GitHub Support 请求 GC。
+  删库前先看仓库资产（stars / forks / issues），**零资产可直接重建**。
+
+#### 提交前自检
+
+仓库已装 pre-commit hook：扫出「既没被 git 跟踪、也没被 .gitignore 忽略」的应用目录，
+并**阻断提交**。
+
+```bash
+bash scripts/check-app-tracking.sh      # 手动运行，有问题时退出码 1
+git config core.hooksPath .githooks     # ⚠️ 新 clone 后必须执行一次，否则 hook 不生效
+```
 
 ## 十、示例应用
 
