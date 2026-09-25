@@ -3,7 +3,7 @@
 本文说明 **Cenkor Admin 核心平台** 发布新版本后，不同部署方式如何升级，以及维护者如何发版。
 
 > 先分清两层"升级"：
-> - **可插拔应用**（ERP / MES / CRM 等）：在后台「应用中心 / 应用商店」用授权码一键 OTA 升级，**免重启**。见 [DEV_GUIDE.md](DEV_GUIDE.md)。
+> - **可插拔应用**（ERP / MES / CRM 等）：在后台「应用中心 / 应用商店」用授权码一键 OTA 升级，**免重启**。见 [dev_guide.md](dev_guide.md)。
 > - **核心平台**（backend + admin-web + portal-web）：本文主题。核心改动涉及进程本身、数据库结构、前端产物，需"换代码 → 迁移 → 重启"。
 
 ---
@@ -17,9 +17,11 @@
 
 ---
 
-## 二、用户升级：按部署方式三选一
+## 二、用户升级：按部署方式选择
 
-### A. Docker 部署（最省心，推荐）
+> 本机生产用的是 **B. 宿主机 / 宝塔 venv 部署**。A（Docker）留给交付环境。
+
+### A. Docker 部署（交付环境用）
 
 ```bash
 docker compose -f docker-compose.baota.yml pull      # 拉取最新镜像（:latest 或指定版本 tag）
@@ -28,7 +30,7 @@ docker compose -f docker-compose.baota.yml up -d      # 滚动更新，启动时
 
 回滚：把镜像 tag 换回旧版本号再 `up -d` 即可。
 
-### B. 裸机 / 宝塔 venv 部署（一键脚本）
+### B. 宿主机 / 宝塔 venv 部署（**本机生产用的是这种**）
 
 ```bash
 # 方式 1：从 GitHub Release 下载核心包升级（<date> 为发版日期，如 20260924）
@@ -110,12 +112,44 @@ git push && git push --tags
 
 > 前置条件：仓库 Settings → Actions → General 里 Workflow permissions 选 **Read and write permissions**（GITHUB_TOKEN 需 `packages:write` / `contents:write` 推 ghcr 和建 Release，本文件顶部已声明）。首次推送的 ghcr 包默认私有，需在包设置里改为 Public，外部用户才能免登录 `docker pull`。
 
+### 手动发版（不想用 / 暂不能用 CI 的备选）
+
+GitHub 对 Actions 账号有付款验证要求（公开仓库本身免费，但需绑卡验证身份，可把消费上限设为 $0）。若账号被账单锁定或不想碰信用卡，可全程手动，效果与 CI 完全一致：
+
+```bash
+# 1. 抬版本（同自动流程）
+bash scripts/release.sh 0.2.0 --notes "修复 xxx；新增 yyy"
+
+# 2. 本地打核心包（不需要 GitHub 账号，纯本地操作）
+bash scripts/package-core.sh        # → release/cenkor-admin-core-0.2.0-<date>.tar.gz
+
+# 3. 本地构建多架构镜像并推送到 ghcr（只需 Docker，不占 Actions）
+#    需先建一个带 write:packages 权限的 token（Fine-grained → Packages: Read/Write）
+echo <token> | docker login ghcr.io -u likele001 --password-stdin
+REGISTRY=ghcr.io/likele001 bash docker/fullstack/build-multiarch.sh --push
+
+# 4. 上传核心包 + 建 Release：网页操作最稳
+#    github.com/likele001/cenkor-admin/releases → Draft a new release
+#    tag 选/输入 v0.2.0，把第 2 步的 tar.gz 拖进附件区，发布
+
+# 5. 最后再推 tag（本地已有 v0.2.0 的话）
+git push --tags
+```
+
+注意事项：
+
+- 手动路径依赖本机有 Docker + buildx（arm64 交叉构建首次执行 `docker run --privileged --rm tonistiigi/binfmt --install all` 启用 QEMU）。
+- 推 tag 仍会触发一次 Release 工作流；账号未解锁前它会秒失败，**不影响已手动完成的发版**，忽略即可。
+- ghcr 首次推送的包默认私有：网页进入 ghcr.io/likele001/<包名> → Package settings → Change visibility → Public，否则用户 `docker pull` 会报 unauthorized。
+- 账单修好后无需任何迁移：继续用 tag 自动发版即可，两条路径产物格式一致。
+
 ---
 
 ## 五、回滚
 
 | 部署 | 回滚方式 |
 |------|----------|
+| **宿主机 / 宝塔（本机）** | 换回旧代码 + 恢复数据库备份，在宝塔面板重启 Python 项目 `cenkor` |
 | Docker | `docker compose ... up -d` 指定旧镜像 tag |
 | 裸机 | 用 `upgrade.sh` 打印的备份 `pg_*.sql.gz` 恢复数据库，再用旧核心包 `--tar` 重装并重启 |
 
@@ -123,7 +157,8 @@ git push && git push --tags
 
 ```bash
 gunzip -c /www/backup/cenkor-admin/pg_<STAMP>.sql.gz | \
-  PGPASSWORD=<pwd> psql -h 127.0.0.1 -p 5433 -U cenkor -d cenkor
+  PGPASSWORD=<pwd> psql -h 127.0.0.1 -p 5432 -U cenkor -d cenkor
+# 本机生产的 PostgreSQL 在宿主机 5432（不是容器 5433）
 ```
 
 ---

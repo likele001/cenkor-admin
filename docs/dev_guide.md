@@ -19,6 +19,9 @@
 
 ## 快速开始
 
+> ⚠️ 本节是**本地开发机**的启动方式（后端 8000 + 前端 dev server）。
+> **生产部署**（宿主机 + 宝塔，后端 `8002`）见 [`deploy.md`](deploy.md)。
+
 ### 环境要求
 
 | 工具 | 版本 |
@@ -713,9 +716,9 @@ cenkor-admin/
 │       ├── src/lib/cms-render.ts      # Liquid 渲染
 │       └── ...
 ├── docs/
-│   ├── PLATFORM_V2_ROADMAP.md         # V2 路线图
-│   ├── DEV_GUIDE.md                  # ← 本文档
-│   ├── CORE_PLATFORM.md
+│   ├── roadmap.md                     # 路线图与规划
+│   ├── dev_guide.md                  # ← 本文档
+│   ├── core_platform.md
 │   └── ...
-└── ARCHITECTURE.md                  # 架构文档
+└── architecture.md                  # 架构文档
 ```

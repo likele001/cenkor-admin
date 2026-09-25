@@ -4,17 +4,17 @@
 
 | 项 | 值 |
 |----|---|
-| **类型** | Docker Compose / 宝塔静态 dist / 裸机 systemd |
-| **服务** | PostgreSQL 16 + Redis 7 + MinIO + Backend + Admin-Web + Portal-Web |
+| **类型** | 宿主机 + 宝塔托管（Docker Compose 为**可选交付路径**） |
+| **服务** | 宝塔 Python 项目 + 宿主机 PostgreSQL 16 / Redis 7 / MinIO + 宝塔 nginx 静态 dist |
 | **前端** | Vue 3 + Vite + Tailwind |
 | **后端** | Python 3.11 + FastAPI + SQLAlchemy 2.0 async |
 
-📖 **文档索引**：[`docs/INDEX.md`](docs/INDEX.md)
-📦 **打包交付**：[`docs/PACKAGING.md`](docs/PACKAGING.md)
+📖 **文档索引**：[`docs/index.md`](docs/index.md)
+📦 **打包交付**：[`docs/packaging.md`](docs/packaging.md)
 
 ## 快速启动（开发）
 
-> 仅用于本地开发（后端 `--reload` 热重载 + 前端 dev server）。**部署到公网请用下面的「全栈容器化生产部署」。**
+> 仅用于**本地开发机**（后端 `--reload` 热重载 + 前端 dev server）。**部署到公网请看下面的「生产部署（核心）」。**
 
 ```bash
 cp .env.example .env
@@ -44,7 +44,24 @@ docker compose up -d
 > 部署到公网前，请先完成上文「安全提示」中的三件事（改默认密码、换 `SECRET_KEY`、
 > 清理种子账号），并确认 `.env` 未被提交进版本库。
 
-**推荐：全栈容器化（一条命令 · 含全部前端 + Nginx 反代，对外可访问）**
+**本机生产环境是「宿主机 + 宝塔」，不使用 Docker：**
+
+| 组件 | 位置 | 端口 |
+|---|---|---|
+| 后端 FastAPI | 宝塔 Python 项目 `cenkor`（用户 `www`） | `8002` |
+| PostgreSQL | 宿主机原生 | `5432` |
+| Redis | 宿主机原生 | `6379` / `db5` |
+| MinIO | 宿主机原生（systemd） | `9000` |
+| 前端 | 宝塔 nginx 直接 serve `frontend/*/dist` | — |
+
+📖 **完整流程 / 端口台账 / 配置优先级 / 验证清单 / 回滚与排障 → [`docs/deploy.md`](docs/deploy.md)**
+
+```bash
+bash scripts/build-frontends.sh    # 构建前端 dist（宝塔直接 serve，构建完即生效）
+# 后端改动后：在宝塔面板 → 网站 → Python 项目 → cenkor → 重启
+```
+
+**可选部署模式**（交付给别人 / 换环境，本机生产未采用）：
 
 ```bash
 cp .env.example .env        # 按需修改 .env 里的密码/端口
@@ -57,16 +74,15 @@ docker compose -f docker-compose.fullstack.yml --project-name cenkor-admin-fulls
 
 > 首次部署会自动完成数据库迁移与建表（后端 lifespan 自动 `alembic upgrade head`）。
 > 播种种子数据：`docker compose -f docker-compose.fullstack.yml --project-name cenkor-admin-fullstack exec backend python -m cenkor_admin.scripts.seed`
-> 完整说明见 [`docs/FULLSTACK_DEPLOY.md`](docs/FULLSTACK_DEPLOY.md)。
+> 完整说明见 [`docs/fullstack_deploy.md`](docs/fullstack_deploy.md)。
 
 其他部署模式：
 
 | 模式 | 命令 | 文档 |
 |------|------|------|
-| **宝塔静态 dist（推荐·宝塔托管）** | `bash scripts/deploy.sh --mode baota-static` | [`docs/BAOTA_STATIC_DEPLOY.md`](docs/BAOTA_STATIC_DEPLOY.md) |
-| Docker 自管 nginx | `bash scripts/deploy.sh --mode docker` | [`docker-compose.prod.yml`](docker-compose.prod.yml) |
-| 宝塔反代 Docker 前端 | `bash scripts/deploy.sh --mode baota` | [`docs/DOMAIN_SETUP.md`](docs/DOMAIN_SETUP.md) |
-| 裸机 systemd | `sudo bash scripts/install-native.sh` | [`docs/NATIVE_DEPLOY.md`](docs/NATIVE_DEPLOY.md) |
+| Docker 全栈（交付演示） | `bash scripts/deploy.sh --mode docker` | [`docs/fullstack_deploy.md`](docs/fullstack_deploy.md) |
+| 宝塔静态 dist + Docker 中间件 | `bash scripts/deploy.sh --mode baota-static` | [`docs/baota_static_deploy.md`](docs/baota_static_deploy.md) |
+| 裸机 systemd | `sudo bash scripts/install-native.sh` | [`docs/native_deploy.md`](docs/native_deploy.md) |
 
 ```bash
 bash scripts/gen-secrets.sh          # 通用域名占位符
@@ -85,11 +101,11 @@ bash scripts/deploy-baota-static.sh    # 构建 dist + 起后端
 bash scripts/package-core.sh    # → release/cenkor-admin-core-*.tar.gz
 ```
 
-详见 [`docs/PACKAGING.md`](docs/PACKAGING.md)、[`docs/release/`](docs/release/)。
+详见 [`docs/packaging.md`](docs/packaging.md)、[`docs/release/`](docs/release/)。
 
 ## 可选扩展
 
-- 外部官网 CMS：[`docs/addons/WEBSITE_CMS.md`](docs/addons/WEBSITE_CMS.md) · [`deploy/addons/`](deploy/addons/)
+- 外部官网 CMS：[`docs/addons/website_cms.md`](docs/addons/website_cms.md) · [`deploy/addons/`](deploy/addons/)
 
 ## 数据库
 

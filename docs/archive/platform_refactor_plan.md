@@ -1,5 +1,11 @@
 # Cenkor Platform 改造执行计划
 
+> 📦 **已归档（2026-09-25）。**
+>
+> 本文创建于 2026-06-10，是 V2 改造计划的早期迭代，内容已被
+> [`../roadmap.md`](../roadmap.md) 覆盖。保留仅作历史参考，**不要据此实施**。
+
+
 > 通用企业级后台管理系统 + CMS + 前后台用户分离
 > 创建日期：2026-06-10
 > 状态：**执行中**
@@ -655,7 +661,7 @@ ALTER TABLE platform_apps ADD COLUMN permissions_grants JSONB DEFAULT '{}'::json
 - [ ] **9.6** 后端单元测试：Liquid 模板渲染 → `tests/`
 - [ ] **9.7** E2E 测试：后台完整流程 → `tests/e2e/`
 - [ ] **9.8** 性能测试：1000+ 条目查询 → `tests/perf/`
-- [ ] **9.9** 更新 ARCHITECTURE.md → `ARCHITECTURE.md`
+- [ ] **9.9** 更新 architecture.md → `architecture.md`
 - [ ] **9.10** 更新 API 文档 → OpenAPI auto-generated
 
 ---

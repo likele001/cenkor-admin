@@ -1,11 +1,21 @@
 # Cenkor Admin · 宝塔面板完整部署指南
 
-> **推荐部署模式（与 lightmes 相同）**  
+> ⚠️ **本文描述的不是本机生产架构。**
+>
+> 本机生产是**纯宿主机 + 宝塔**部署 —— 后端、PostgreSQL、Redis、MinIO 全部跑在宿主机上，
+> **不使用 Docker**。权威文档见 [`deploy.md`](deploy.md)。
+>
+> 本文保留是为了「把系统交付给别人」或「在干净环境里验证」。其中的容器端口
+> （`5433` / `6380` / `9002`）是 **Docker 映射端口**，与本机生产的宿主机端口
+> （`5432` / `6379` / `9000`）**不是一回事**，请勿混用。
+
+
+> **部署模式（与 lightmes 相同）**  
 > 前端：`npm run build` → 宝塔站点根目录指向 `dist`（纯静态）  
 > 后端：FastAPI 监听 `127.0.0.1:8002`，宝塔 **只反代 `/api/`**  
-> 中间件：PostgreSQL / Redis / MinIO 用 Docker 跑，映射到本机端口  
+> 中间件：PostgreSQL / Redis / MinIO 为**宿主机原生服务**（宝塔软件商店安装）  
 
-相关文档：[`CORE_PLATFORM.md`](CORE_PLATFORM.md) · [`addons/WEBSITE_CMS.md`](addons/WEBSITE_CMS.md)（可选官网）
+相关文档：[`core_platform.md`](core_platform.md) · [`addons/website_cms.md`](addons/website_cms.md)（可选官网）
 
 ---
 
@@ -15,7 +25,7 @@
 2. [域名与端口规划](#二域名与端口规划)
 3. [前置条件](#三前置条件)
 4. [第一步：获取代码与生成密钥](#四第一步获取代码与生成密钥)
-5. [第二步：Docker 中间件](#五第二步docker-中间件)
+5. [第二步：中间件（宿主机原生）](#五第二步中间件宿主机原生)
 6. [第三步：后端（二选一）](#六第三步后端二选一)
 7. [第四步：构建前端 dist](#七第四步构建前端-dist)
 8. [第五步：宝塔建站 — 管理后台](#八第五步宝塔建站--管理后台)
@@ -45,9 +55,9 @@
                                     │
               ┌─────────────────────┼─────────────────────┐
               ▼                     ▼                     ▼
-        cenkor-postgres       cenkor-redis          cenkor-minio
-        127.0.0.1:5433        127.0.0.1:6380        127.0.0.1:9002
-        (Docker)              (Docker)              (Docker)
+        PostgreSQL            Redis                 MinIO
+        127.0.0.1:5432        127.0.0.1:6379        127.0.0.1:9000
+        (宿主机原生)           (宿主机原生·db5)       (宿主机原生)
 ```
 
 **和 lightmes 的对应关系：**
@@ -85,10 +95,10 @@
 | 服务 | 端口 | 说明 |
 |------|------|------|
 | FastAPI 后端 | **8002** | admin/portal 反代目标 |
-| PostgreSQL | 5433 | Docker 映射 |
-| Redis | 6380 | Docker 映射 |
-| MinIO API | 9002 | 媒体存储 |
-| MinIO 控制台 | 9003 | 可选，管理 bucket |
+| PostgreSQL | 5432 | 宿主机原生（宝塔 PG） |
+| Redis | 6379 | 宿主机原生，本项目用 **db5** |
+| MinIO API | 9000 | 宿主机原生（systemd） |
+| MinIO 控制台 | 9003 | 宿主机原生（systemd） |
 
 ---
 
@@ -585,7 +595,7 @@ VITE_API_BASE_URL=https://api.cenkor.cn bash scripts/build-frontends.sh
 
 ### Q9：可选 — 官网 www.cenkor.cn
 
-官网为**独立扩展**，不在核心打包内。CMS 对接见 [`docs/addons/WEBSITE_CMS.md`](addons/WEBSITE_CMS.md)。
+官网为**独立扩展**，不在核心打包内。CMS 对接见 [`docs/addons/website_cms.md`](addons/website_cms.md)。
 
 要点：官网站点也需 `location /api/` 反代到 `127.0.0.1:8002`，供公开 CMS 数据读取。
 

@@ -5,7 +5,7 @@ name: Release
 #   2) 打包核心包 → 上传到 GitHub Release
 #   3) 多架构镜像（amd64/arm64）推送到 ghcr.io
 #   4) 创建 GitHub Release
-# 手动发版见 docs/UPGRADE.md。
+# 手动发版见 docs/upgrade.md。
 on:
   push:
     tags:
@@ -122,10 +122,10 @@ jobs:
             echo ""
             [ -n "$JSON_NOTES" ] && { echo "${JSON_NOTES}"; echo ""; }
             echo "### 升级方式"
-            echo "- Docker：docker pull ${REGISTRY}/${IMAGE_PREFIX}-backend:${VER}（详见 docs/UPGRADE.md）"
+            echo "- Docker：docker pull ${REGISTRY}/${IMAGE_PREFIX}-backend:${VER}（详见 docs/upgrade.md）"
             echo "- 裸机：bash scripts/upgrade.sh --url <下方核心包附件地址>"
             echo ""
-            echo "升级文档：docs/UPGRADE.md"
+            echo "升级文档：docs/upgrade.md"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         env:

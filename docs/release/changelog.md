@@ -15,7 +15,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 - 首次核心平台打包脚本 `scripts/package-core.sh`
 - 包含：backend、admin-web/portal-web（源码 + dist）、宝塔/systemd/Docker 部署配置
 - 不含：官网 addon、node_modules、生产密钥
-- 文档：`docs/PACKAGING.md`、`docs/CORE_PLATFORM.md`
+- 文档：`docs/packaging.md`、`docs/core_platform.md`
 
 ---
 

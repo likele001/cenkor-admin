@@ -84,6 +84,15 @@ backend/src/cenkor_admin/apps/mes/
 backend/src/cenkor_admin/static/apps/mes/
 backend/alembic/versions/2026*_mes_*.py
 
+# ============ 工作流审批（商业闭源，不进公开仓库） ============
+# ⚠️ 本应用落在【内置目录】，没有目录级忽略兜底，必须在这里逐条登记。
+# 新增商业应用若也放内置目录，照抄下面三行（源码 / 前端产物 / 迁移）——
+# 漏登记的后果是 git add -A 会把整份源码与前端产物一起提交进公开仓库。
+# 提交前自检：bash scripts/check-app-tracking.sh
+backend/src/cenkor_admin/apps/workflow/
+backend/src/cenkor_admin/static/apps/workflow/
+backend/alembic/versions/2026*_workflow*.py
+
 # ============ 支付中心应用（独立应用，不公开源码） ============
 # 源码已迁至外置应用目录 backend/src/apps/payment/，由上面的 backend/src/apps/ 规则整体覆盖，
 # 无需为本应用单独登记。下面两条仅因前端产物与迁移仍落在被跟踪的目录里：

@@ -6,7 +6,7 @@
   "docker_registry": "ghcr.io/likele001",
   "docker_image": "cenkor-admin",
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
-  "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/UPGRADE.md",
+  "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
   "notes": "新增核心平台升级机制：版本检查接口 /release/latest、/release/check；工作台新版本升级横幅；裸机一键升级脚本 upgrade.sh；发版助手 release.sh；CI 打 tag 自动发版（核心包 + ghcr 多架构镜像 + GitHub Release）"
 }

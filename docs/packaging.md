@@ -3,7 +3,7 @@
 本文档描述如何将 **Cenkor Admin 核心平台**打成可交付压缩包，以及接收方如何解压部署。
 
 > 核心平台 = `backend` + `admin-web` + `portal-web` + 部署脚本与文档。  
-> **不含**外部官网（`www.cenkor.cn` / `/www/wwwroot/website`），官网见 [addons/WEBSITE_CMS.md](addons/WEBSITE_CMS.md)。
+> **不含**外部官网（`www.cenkor.cn` / `/www/wwwroot/website`），官网见 [addons/website_cms.md](addons/website_cms.md)。
 
 ---
 
@@ -65,11 +65,11 @@ release/cenkor-admin-core-0.1.0-YYYYMMDD.tar.gz
 | `deploy/nginx/` | Docker 自管 nginx 配置 |
 | `deploy/systemd/` | 裸机 systemd 单元 |
 | `scripts/` | 构建、部署、备份、打包脚本 |
-| `docs/CORE_PLATFORM.md` | 核心平台文档 |
-| `docs/BAOTA_STATIC_DEPLOY.md` | 宝塔部署文档 |
-| `docs/NATIVE_DEPLOY.md` | 裸机部署文档 |
-| `docs/PACKAGING.md` | 本文档 |
-| `docs/INDEX.md` | 文档索引 |
+| `docs/core_platform.md` | 核心平台文档 |
+| `docs/baota_static_deploy.md` | 宝塔部署文档 |
+| `docs/native_deploy.md` | 裸机部署文档 |
+| `docs/packaging.md` | 本文档 |
+| `docs/index.md` | 文档索引 |
 | `docker-compose.yml` | 开发环境 |
 | `docker-compose.prod.yml` | 生产 Docker |
 | `docker-compose.baota-static.yml` | 宝塔静态模式后端栈 |
@@ -86,7 +86,7 @@ release/cenkor-admin-core-0.1.0-YYYYMMDD.tar.gz
 | `.git/` | 非必需 |
 | `deploy/addons/` | 官网等可选扩展，与核心解耦 |
 | `docs/addons/` | 同上 |
-| `docs/DOMAIN_SETUP.md` | Cenkor 实例专用域名文档 |
+| `docs/domain_setup.md` | Cenkor 实例专用域名文档 |
 
 ---
 
@@ -121,6 +121,9 @@ Cenkor 生产实例可参考仓库内 `deploy/examples/env.cenkor.snippet`（**�
 
 ### 4.3 启动后端
 
+> 接收方若也用**宝塔宿主机**部署（后端跑在宝塔 Python 项目里），请参考
+> [`deploy.md`](deploy.md)；下面的脚本走的是 **Docker 中间件**路径。
+
 ```bash
 bash scripts/deploy-baota-static.sh
 ```
@@ -140,7 +143,7 @@ docker compose -f docker-compose.baota-static.yml exec -T backend python -m cenk
 | 管理后台 | `frontend/admin-web/dist` | `deploy/baota/rewrite-admin.conf` | `deploy/baota/server-snippet-admin-api.conf` |
 | 用户中心 | `frontend/portal-web/dist` | `deploy/baota/rewrite-portal.conf` | `deploy/baota/server-snippet-portal-api.conf` |
 
-详细步骤：[BAOTA_STATIC_DEPLOY.md](BAOTA_STATIC_DEPLOY.md)
+详细步骤：[baota_static_deploy.md](baota_static_deploy.md)
 
 ### 4.5 验证
 
@@ -162,7 +165,7 @@ curl -s https://admin.your.com/api/health
 | `CORS_ORIGINS` | localhost | 必填 | admin + portal 域名，逗号分隔 |
 | `VITE_API_BASE_URL` | 空 | 通常空 | 构建前端时注入；同域反代留空 |
 | `BACKEND_HOST_PORT` | — | `8002` | 宿主机后端端口 |
-| `DATABASE_URL` | docker | docker/本机 | PostgreSQL 连接串 |
+| `DATABASE_URL` | docker | 宿主机或容器 | PostgreSQL 连接串（本机生产指向宿主机 `127.0.0.1:5432`） |
 
 完整模板见 `.env.example`（开发）与 `scripts/gen-secrets.sh` 生成的 `.env.prod`。
 
@@ -188,7 +191,7 @@ docker compose -f docker-compose.baota-static.yml --env-file .env.prod up -d --b
 
 ## 七、发布记录
 
-每次发版建议在 [release/CHANGELOG.md](release/CHANGELOG.md) 追加条目，并保留 `release/` 目录下的压缩包副本（该目录已 gitignore，仅作本地/服务器存储）。
+每次发版建议在 [release/changelog.md](release/changelog.md) 追加条目，并保留 `release/` 目录下的压缩包副本（该目录已 gitignore，仅作本地/服务器存储）。
 
 ---
 
@@ -198,6 +201,6 @@ docker compose -f docker-compose.baota-static.yml --env-file .env.prod up -d --b
 |------|--------------|------|
 | CMS 后台（admin） | ✅ | 编辑产品、案例、站点配置 |
 | 公开 API `/api/v1/public/*` | ✅ | 后端自带，任意前端可调用 |
-| 外部营销站 HTML | ❌ | 独立项目，见 [addons/WEBSITE_CMS.md](addons/WEBSITE_CMS.md) |
+| 外部营销站 HTML | ❌ | 独立项目，见 [addons/website_cms.md](addons/website_cms.md) |
 
 核心包可**单独交付**；需要官网 CMS 时再提供 addon 配置或 Cenkor 实例的 `website` 目录。
