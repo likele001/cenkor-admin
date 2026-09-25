@@ -102,8 +102,21 @@
     "loadFailed": "加载失败",
     "saveFailed": "保存失败",
     "saving": "保存中…",
-  
-    "groups": {"GENERAL": "通用", "EMAIL": "邮件", "LICENSE": "授权", "AUTH": "认证", "SECURITY": "安全", "NOTIFY": "通知", "SYSTEM": "系统", "CUSTOM": "自定义", "UPLOAD": "上传", "PAYMENT": "支付", "CMS": "内容", "BILLING": "计费", "STORAGE": "存储"}
+    "groups": {
+      "GENERAL": "通用",
+      "EMAIL": "邮件",
+      "LICENSE": "授权",
+      "AUTH": "认证",
+      "SECURITY": "安全",
+      "NOTIFY": "通知",
+      "SYSTEM": "系统",
+      "CUSTOM": "自定义",
+      "UPLOAD": "上传",
+      "PAYMENT": "支付",
+      "CMS": "内容",
+      "BILLING": "计费",
+      "STORAGE": "存储"
+    }
   },
   "products": {
     "title": "产品列表",
@@ -288,7 +301,13 @@
     "emptyPending": "暂无数据",
     "author": "作者",
     "approve": "通过",
-    "reject": "驳回"
+    "reject": "驳回",
+    "enable": "启用",
+    "disable": "停用",
+    "disabled": "已停用",
+    "confirmDisable": "确定停用 {key} 吗？停用后菜单隐藏、接口被拦截，但业务数据与角色授权会保留（区别于卸载）。",
+    "enableFailed": "启用失败",
+    "disableFailed": "停用失败"
   },
   "audit": {
     "detail": "详情"

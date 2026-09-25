@@ -102,8 +102,21 @@
     "loadFailed": "Failed to load",
     "saveFailed": "Save failed",
     "saving": "Saving…",
-  
-    "groups": {"GENERAL": "General", "EMAIL": "Email", "LICENSE": "License", "AUTH": "Authentication", "SECURITY": "Security", "NOTIFY": "Notifications", "SYSTEM": "System", "CUSTOM": "Custom", "UPLOAD": "Upload", "PAYMENT": "Payment", "CMS": "Content", "BILLING": "Billing", "STORAGE": "Storage"}
+    "groups": {
+      "GENERAL": "General",
+      "EMAIL": "Email",
+      "LICENSE": "License",
+      "AUTH": "Authentication",
+      "SECURITY": "Security",
+      "NOTIFY": "Notifications",
+      "SYSTEM": "System",
+      "CUSTOM": "Custom",
+      "UPLOAD": "Upload",
+      "PAYMENT": "Payment",
+      "CMS": "Content",
+      "BILLING": "Billing",
+      "STORAGE": "Storage"
+    }
   },
   "products": {
     "title": "Product List",
@@ -288,7 +301,13 @@
     "emptyPending": "No data",
     "author": "Author",
     "approve": "Approve",
-    "reject": "Reject"
+    "reject": "Reject",
+    "enable": "Enable",
+    "disable": "Disable",
+    "disabled": "Disabled",
+    "confirmDisable": "Disable {key}? Its menus will be hidden and APIs blocked, but all data and role grants are preserved (unlike uninstall).",
+    "enableFailed": "Failed to enable",
+    "disableFailed": "Failed to disable"
   },
   "audit": {
     "detail": "详情"

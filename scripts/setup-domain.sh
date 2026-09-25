@@ -64,7 +64,7 @@ if ss -tln 2>/dev/null | grep -qE ":80\b|:443\b"; then
     [ "$ok" = "y" ] || [ "$ok" = "Y" ] || err "已取消"
   else
     if [ "$NGINX_MODE" = "baota-static" ]; then
-      info "  宝塔静态 dist 模式：站点根目录指 frontend/*/dist，详见 docs/BAOTA_STATIC_DEPLOY.md"
+      info "  宝塔静态 dist 模式：站点根目录指 frontend/*/dist，详见 docs/baota_static_deploy.md"
     else
       info "  宝塔模式：现有 nginx 作为反代层"
     fi

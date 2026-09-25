@@ -169,6 +169,27 @@ def _load_app_router_module(app_key: str, router_file: Path, *, external: bool =
     return module
 
 
+def app_enabled_dependency(app_key: str):
+    """构造「App 必须处于启用状态」的 FastAPI 依赖。
+
+    停用应用后其下所有 API 一律 403，启用即时恢复。启用状态带 TTL 缓存
+    （见 ``app_registry.is_app_enabled``），不会造成每请求查库。
+    用独立 session，避免依赖与 endpoint 共用会话引发并发冲突。
+    """
+
+    async def _require_enabled() -> None:
+        from fastapi import HTTPException
+
+        from cenkor_admin.apps.system.app_registry import is_app_enabled
+        from cenkor_admin.core.db import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as session:
+            if not await is_app_enabled(session, app_key):
+                raise HTTPException(status_code=403, detail=f"应用已停用：{app_key}")
+
+    return _require_enabled
+
+
 def register_app_router(app_key: str) -> bool:
     """动态注册单个 App 路由（商店安装后无需重启）。"""
     from cenkor_admin import apps as apps_pkg
@@ -198,7 +219,10 @@ def register_app_router(app_key: str) -> bool:
             module.router,
             prefix=prefix,
             tags=[app_key],
-            dependencies=[Depends(get_current_user)],
+            dependencies=[
+                Depends(get_current_user),
+                Depends(app_enabled_dependency(app_key)),
+            ],
         )
         log.info("app.route_registered", key=app_key, prefix=prefix)
         return True

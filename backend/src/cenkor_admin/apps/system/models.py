@@ -29,6 +29,8 @@ class InstalledApp(Base):
     )
     # 是否有前端资源
     has_frontend: Mapped[bool] = mapped_column(default=False)
+    # 是否启用：停用后该 App 的菜单隐藏、API 被门禁拦截，数据与角色授权关系保留
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Webhook(Base):

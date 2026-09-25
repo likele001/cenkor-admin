@@ -11,9 +11,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from structlog import get_logger
+
 from cenkor_admin.apps.base import AppManifest
 from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.core.hooks import registry, register_app_hooks
+
+log = get_logger(__name__)
 
 
 def scan_app_manifests() -> dict[str, AppManifest]:
@@ -162,6 +166,7 @@ async def list_apps_with_status(db: AsyncSession) -> list[dict[str, Any]]:
             "public_routes_prefix": manifest.public_routes_prefix,
             "permissions_grants": row.permissions_grants if row else {},
             "has_frontend": row.has_frontend if row else False,
+            "enabled": bool(row.enabled) if row else True,
             "registered_counts": counts,
         })
 
@@ -184,6 +189,7 @@ async def list_apps_with_status(db: AsyncSession) -> list[dict[str, Any]]:
                 "public_routes_prefix": "",
                 "permissions_grants": row.permissions_grants or {},
                 "has_frontend": row.has_frontend or False,
+                "enabled": bool(row.enabled),
                 "registered_counts": {},
             })
 
@@ -204,6 +210,7 @@ async def install_app(db: AsyncSession, key: str) -> InstalledApp:
         row.status = "installed"
         row.installed_at = now
         row.uninstalled_at = None
+        row.enabled = True  # 重装 / 恢复安装一律回到启用态
     else:
         row = InstalledApp(
             key=key,
@@ -211,6 +218,7 @@ async def install_app(db: AsyncSession, key: str) -> InstalledApp:
             version=manifest.version,
             status="installed",
             installed_at=now,
+            enabled=True,
         )
         db.add(row)
     # 标记是否包含前端资源
@@ -352,6 +360,133 @@ async def update_permissions_grants(
     row.permissions_grants = grants or {}
     await db.commit()
     await db.refresh(row)
+    return row
+
+
+# ============================================================
+# 应用启用 / 停用
+# ============================================================
+
+# 启用状态的进程内缓存：key -> (enabled, monotonic 读取时刻)
+# API 门禁每个请求都要判定，加 TTL 避免打爆 DB；多 worker 部署下最多延迟
+# _APP_ENABLED_TTL 秒收敛（enable/disable 端点会主动失效本进程缓存）。
+_APP_ENABLED_CACHE: dict[str, tuple[bool, float]] = {}
+_APP_ENABLED_TTL = 5.0
+
+
+def invalidate_app_enabled_cache(key: str | None = None) -> None:
+    """清除启用状态缓存（不传 key 则全清）。"""
+    if key is None:
+        _APP_ENABLED_CACHE.clear()
+    else:
+        _APP_ENABLED_CACHE.pop(key, None)
+
+
+async def is_app_enabled(db: AsyncSession, key: str) -> bool:
+    """判断 App 是否处于启用状态。
+
+    语义：仅当 platform_apps 存在该行且 enabled=False 时返回 False。
+    行不存在（未安装 / 开源部署无此记录）一律返回 True —— 保持平台原有行为，
+    避免未纳入应用中心的 App 被误拦。
+
+    Args:
+        db: 异步会话
+        key: App 唯一标识
+
+    Returns:
+        True 启用（放行） / False 停用（拦截）
+    """
+    import time as _time
+
+    cached = _APP_ENABLED_CACHE.get(key)
+    now = _time.monotonic()
+    if cached is not None and now - cached[1] < _APP_ENABLED_TTL:
+        return cached[0]
+
+    row = (await db.execute(
+        select(InstalledApp.key, InstalledApp.enabled).where(InstalledApp.key == key)
+    )).first()
+    enabled = True if row is None else bool(row[1])
+    _APP_ENABLED_CACHE[key] = (enabled, now)
+    return enabled
+
+
+async def _collect_app_menu_ids(db: AsyncSession, key: str) -> list[int]:
+    """收集某 App 注册的全部菜单 id（顶级菜单 + 递归子菜单）。
+
+    识别规则与 ``_uninstall_app_menus`` 保持一致：``key == app_key`` 或
+    ``path == '/app_key'`` 视为该 App 的顶级菜单。
+    """
+    from cenkor_admin.apps.rbac import models as rbac_models
+
+    roots = (await db.execute(
+        select(rbac_models.Menu.id).where(
+            (rbac_models.Menu.key == key) | (rbac_models.Menu.path == f"/{key}")
+        )
+    )).scalars().all()
+
+    ids: set[int] = set()
+    stack = list(roots)
+    while stack:
+        mid = stack.pop()
+        if mid in ids:
+            continue
+        ids.add(mid)
+        kids = (await db.execute(
+            select(rbac_models.Menu.id).where(rbac_models.Menu.parent_id == mid)
+        )).scalars().all()
+        stack.extend(kids)
+    return sorted(ids)
+
+
+async def set_app_enabled(db: AsyncSession, key: str, enabled: bool) -> InstalledApp:
+    """启用 / 停用应用。
+
+    停用是「软停」——只改状态、不动业务数据：
+    ``platform_apps.enabled=False``，同时把该 App 的菜单 ``status`` 置为
+    ``disabled``（菜单行与角色授权关系**保留**，启用后原样恢复）。
+    运行时由 API 门禁（``api.v1.app_enabled_dependency``）与插件下发过滤生效。
+
+    与 ``uninstall_app`` 的区别：卸载会删除菜单、权限授权与注册的内容数据，
+    停用不会。
+
+    Args:
+        db: 异步会话
+        key: App 唯一标识
+        enabled: True 启用 / False 停用
+
+    Returns:
+        更新后的 InstalledApp 行
+
+    Raises:
+        ValueError: App 未安装
+    """
+    from sqlalchemy import update as sa_update
+
+    from cenkor_admin.apps.rbac import models as rbac_models
+
+    row = (await db.execute(
+        select(InstalledApp).where(InstalledApp.key == key)
+    )).scalar_one_or_none()
+    if not row:
+        raise ValueError(f"App 未安装: {key}")
+
+    row.enabled = bool(enabled)
+    menu_status = "active" if enabled else "disabled"
+    menu_ids = await _collect_app_menu_ids(db, key)
+    if menu_ids:
+        await db.execute(
+            sa_update(rbac_models.Menu)
+            .where(rbac_models.Menu.id.in_(menu_ids))
+            .values(status=menu_status)
+        )
+
+    await db.commit()
+    # updated_at 是 DB 端 onupdate 生成列，commit 后必须 refresh：
+    # 否则序列化时懒加载会在异步上下文抛 MissingGreenlet（BaseExceptionGroup，绕过全局处理器）
+    await db.refresh(row)
+    invalidate_app_enabled_cache(key)
+    log.info("app.toggle_enabled", key=key, enabled=bool(enabled), menus=len(menu_ids))
     return row
 
 

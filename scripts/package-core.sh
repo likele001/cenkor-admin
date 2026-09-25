@@ -73,7 +73,7 @@ info "复制核心文件到临时目录..."
     --exclude='deploy/examples' \
     --exclude='deploy/nginx/snippets' \
     --exclude='docker-compose.addon-website.yml' \
-    --exclude='docs/DOMAIN_SETUP.md' \
+    --exclude='docs/domain_setup.md' \
     .
 ) | tar -x -C "$DEST"
 
@@ -93,11 +93,11 @@ cat > "$DEST/PACKAGE.md" <<EOF
 | \`frontend/portal-web/dist\` | 用户中心静态产物 |
 | \`deploy/baota/\` | 宝塔伪静态 + API 片段 |
 | \`scripts/\` | 部署 / 构建 / 备份脚本 |
-| \`docs/PACKAGING.md\` | 打包与交付（完整文档） |
-| \`docs/INDEX.md\` | 文档索引 |
+| \`docs/packaging.md\` | 打包与交付（完整文档） |
+| \`docs/index.md\` | 文档索引 |
 | \`docs/release/\` | 发版记录 |
 
-完整说明见包内 \`docs/PACKAGING.md\`。
+完整说明见包内 \`docs/packaging.md\`。
 
 ## 快速部署（宝塔）
 
@@ -129,4 +129,4 @@ SIZE="$(du -h "$ARCHIVE" | cut -f1)"
 info "完成：${ARCHIVE} (${SIZE})"
 echo ""
 echo "  解压：tar -xzf ${PKG_NAME}.tar.gz"
-echo "  文档：docs/PACKAGING.md · docs/INDEX.md"
+echo "  文档：docs/packaging.md · docs/index.md"
