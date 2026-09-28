@@ -1,4 +1,4 @@
-"""Portal JWT 独立签发（与 admin auth 完全隔离）"""
+"""Portal JWT 独立签发（与 admin auth 完全隔离，支持 SECRET_KEY 轮换）"""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -13,7 +13,23 @@ settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 PORTAL_JWT_ISSUER = "cenkor-portal"
-PORTAL_SECRET_KEY = settings.SECRET_KEY + ":portal"
+_PORTAL_SUFFIX = ":portal"
+
+
+def _portal_keys() -> list[str]:
+    """所有有效的 portal 签名密钥（最新优先）。
+
+    与 `core.security.decode_token` 同语义：签发用最新的，校验依次回退历史 key。
+    这样轮换 `SECRET_KEY`（配 `SECRET_KEY_OLD`）不会让已登录的开发者掉线。
+    """
+    return [f"{k}{_PORTAL_SUFFIX}" for k in settings.secret_keys]
+
+
+def __getattr__(name: str) -> Any:
+    """兼容旧引用：`PORTAL_SECRET_KEY` 仍可读，返回当前最新密钥。"""
+    if name == "PORTAL_SECRET_KEY":
+        return _portal_keys()[0]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def hash_password(password: str) -> str:
@@ -40,7 +56,7 @@ def create_portal_access_token(
     }
     if extra:
         payload.update(extra)
-    return jwt.encode(payload, PORTAL_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, _portal_keys()[0], algorithm=settings.JWT_ALGORITHM)
 
 
 def create_portal_refresh_token(subject: str | int, token_version: int = 0) -> str:
@@ -53,11 +69,24 @@ def create_portal_refresh_token(subject: str | int, token_version: int = 0) -> s
         "iat": now,
         "exp": now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     }
-    return jwt.encode(payload, PORTAL_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, _portal_keys()[0], algorithm=settings.JWT_ALGORITHM)
 
 
 def decode_portal_token(token: str) -> dict[str, Any]:
-    return jwt.decode(token, PORTAL_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    """解码并校验 portal token。失败抛 JWTError。
+
+    支持 SECRET_KEY 轮换：依次尝试所有有效 key（最新的优先）。
+    """
+    last_err: Exception | None = None
+    for key in _portal_keys():
+        try:
+            return jwt.decode(token, key, algorithms=[settings.JWT_ALGORITHM])
+        except JWTError as e:
+            last_err = e
+            continue
+    if last_err:
+        raise last_err
+    raise JWTError("No valid SECRET_KEY configured")
 
 
 def is_portal_token(payload: dict[str, Any]) -> bool:

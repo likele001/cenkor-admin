@@ -29,9 +29,10 @@ DB_USER="${DB_USER:-cenkor}"
 DB_NAME="$(env_val POSTGRES_DB)"
 DB_NAME="${DB_NAME:-cenkor}"
 DB_HOST="${DB_HOST:-127.0.0.1}"
-DB_PORT="${DB_HOST_PORT:-5433}"
+# 2026-09-25 起数据库已迁移为宿主机原生 PostgreSQL(5432)/Redis(6379)，docker cenkor-* 容器已停用
+DB_PORT="${DB_HOST_PORT:-5432}"
 REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
-REDIS_PORT="${REDIS_HOST_PORT:-6380}"
+REDIS_PORT="${REDIS_HOST_PORT:-6379}"
 
 # 优先 Docker 容器内真实密码（.env.prod 可能与映射卷不一致）
 DB_PASS="$(docker_env cenkor-postgres POSTGRES_PASSWORD)"

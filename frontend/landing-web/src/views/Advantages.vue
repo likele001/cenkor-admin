@@ -94,16 +94,8 @@
 </template>
 
 <script setup lang="ts">
-import { useHead } from '@unhead/vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import ScrollReveal from '@/components/ScrollReveal.vue'
-
-useHead({
-  title: '辰科Cenkor Admin - 技术优势 | 企业级后台管理平台',
-  meta: [
-    { name: 'description', content: '辰科Cenkor Admin 技术优势：FastAPI + Vue3 现代架构、应用中心生态、通用内容引擎、前后台双用户体系、三种部署模式。' }
-  ]
-})
 
 const advantages = [
   {
