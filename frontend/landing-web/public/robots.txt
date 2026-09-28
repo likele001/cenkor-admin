@@ -1,2 +1,10 @@
+# 辰科 Cenkor Admin · robots.txt
+# 官网落地页开放收录；后端接口与后端静态资源不参与收录
+
 User-agent: *
-Allow: /
+Allow: /landing/
+
+Disallow: /api/
+Disallow: /.app-assets/
+
+Sitemap: https://admin.cenkor.cn/sitemap.xml

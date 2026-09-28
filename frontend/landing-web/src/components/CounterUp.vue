@@ -1,5 +1,5 @@
 <template>
-  <span class="counter-up">{{ displayValue }}{{ suffix }}</span>
+  <span ref="elRef" class="counter-up">{{ displayValue }}{{ suffix }}</span>
 </template>
 
 <script setup lang="ts">
@@ -14,8 +14,15 @@ const props = withDefaults(defineProps<{
   suffix: ''
 })
 
-const currentValue = ref(0)
+// 初值 = 终值：服务端预渲染时直接输出最终数字（爬虫/无 JS 环境看到的是真实数据，
+// 而不是 "0"），客户端首帧也渲染同一个值 → hydration 不会 mismatch。
+// 真正的"从 0 开始涨"在 onMounted 里（浏览器首次绘制之前）把值归零后播放。
+const currentValue = ref(props.value)
 const isVisible = ref(false)
+// 用模板 ref 拿到「本实例」的 DOM 节点。
+// 原先用 document.querySelector('.counter-up') 取的是全局第一个匹配元素，
+// 4 个统计实例会全部 observe 同一个节点 → 只要有一个进入视口，其余数字也一起跳（拆行/换布局必错乱）。
+const elRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 let animationFrame: number | null = null
 
@@ -51,6 +58,15 @@ function animate() {
 }
 
 onMounted(() => {
+  // 无 IntersectionObserver（老的/受限环境、预渲染）：保持终值，不播动画。
+  if (typeof IntersectionObserver === 'undefined') {
+    currentValue.value = props.value
+    return
+  }
+
+  // 挂载后归零：此刻首帧尚未绘制，用户看不到跳动；进入视口时再从头动画。
+  currentValue.value = 0
+
   observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -64,9 +80,8 @@ onMounted(() => {
     { threshold: 0.5 }
   )
 
-  const el = document.querySelector('.counter-up')
-  if (el) {
-    observer.observe(el)
+  if (elRef.value) {
+    observer.observe(elRef.value)
   }
 })
 

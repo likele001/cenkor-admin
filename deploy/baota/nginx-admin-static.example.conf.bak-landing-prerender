@@ -1,0 +1,74 @@
+# 管理后台 · 宝塔静态站点配置示例
+# 域名：admin.cenkor.cn
+# 根目录：/www/wwwroot/cenkor-admin/frontend/admin-web/dist
+#
+# ⚠️ 宝塔分两个地方填，不要整份粘贴到「伪静态」：
+#
+# 【1】伪静态 → 只用 deploy/baota/rewrite-admin.conf（if/rewrite，无 location /）
+# 【2】配置文件 → 追加 deploy/baota/server-snippet-admin-api.conf 里的 location /api/
+#
+# 若报 duplicate location "/"：清空伪静态里所有 location / 块，改用 rewrite-admin.conf
+
+# ---------- 以下仅供非宝塔、手写 nginx 参考 ----------
+location /assets/ {
+    try_files $uri =404;
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}
+
+location = /index.html {
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+    try_files $uri =404;
+}
+
+# 品牌官网（独立静态站，产物目录 frontend/landing/，base 必须为 /landing/）
+location ^~ /landing/ {
+    root /www/wwwroot/cenkor-admin/frontend/;
+    try_files $uri $uri/ /landing/index.html;
+    add_header Cache-Control "no-cache";
+}
+
+location = /landing {
+    return 301 /landing/;
+}
+
+# 根路径 robots.txt / sitemap.xml —— 由 landing 产物提供
+# ⚠️ 必须同时在伪静态（rewrite-admin.conf）里把这两个路径从 SPA 回退中排除，
+#    否则 server 级 rewrite 会先把 URI 改写成 /index.html，下面的精确 location 永不生效
+location = /robots.txt {
+    alias /www/wwwroot/cenkor-admin/frontend/landing/robots.txt;
+    default_type text/plain;
+    expires -1;
+    access_log off;
+}
+
+location = /sitemap.xml {
+    alias /www/wwwroot/cenkor-admin/frontend/landing/sitemap.xml;
+    default_type application/xml;
+    expires -1;
+    access_log off;
+}
+
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+location /api/ {
+    client_max_body_size 50m;
+    proxy_pass http://127.0.0.1:8002/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /api/v1/ws/ {
+    proxy_pass http://127.0.0.1:8002/api/v1/ws/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_read_timeout 86400s;
+}

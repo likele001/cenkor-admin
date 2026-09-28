@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/landing/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="keywords" content="辰科,Cenkor,Admin,后台管理系统,应用中心,RBAC,权限管理,CMS,内容管理,FastAPI,Vue3,私有化部署" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- ═══ 会随路由变化的部分 ═══
+         构建期由 scripts/prerender.mjs 用 src/config/seo.ts 的数据整块替换
+         （依据下方 seo:start / seo:end 两条注释标记之间的区间），从而每个路由产出独立的
+         title / description / canonical / og:url。
+         开发态与未预渲染时，这里是首页的默认值。改数据请改 src/config/seo.ts，别改这里。 -->
+    <!--seo:start-->
+    <title>辰科Cenkor Admin - 私有部署 | 企业级后台管理平台</title>
+    <meta name="description" content="辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal。" />
+    <link rel="canonical" href="https://admin.cenkor.cn/landing/deploy" />
+    <meta property="og:title" content="辰科Cenkor Admin - 私有部署 | 企业级后台管理平台" />
+    <meta property="og:description" content="辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal。" />
+    <meta property="og:url" content="https://admin.cenkor.cn/landing/deploy" />
+    <meta name="twitter:title" content="辰科Cenkor Admin - 私有部署 | 企业级后台管理平台" />
+    <meta name="twitter:description" content="辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal。" />
+    <!--seo:end-->
+
+    <!-- ═══ 全站固定不变的部分 ═══ -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="辰科 Cenkor Admin" />
+    <!-- og:image 必须是绝对 URL、位图格式（SVG 不被微信/微博/Twitter 采用），且 ≥1200x630 -->
+    <meta property="og:image" content="https://admin.cenkor.cn/landing/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="辰科 Cenkor Admin - 企业级后台管理平台" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://admin.cenkor.cn/landing/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "辰科Cenkor Admin",
+      "description": "企业级后台管理平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、通用内容引擎、用户中心、审计日志，支持私有化部署",
+      "brand": {
+        "@type": "Brand",
+        "name": "辰科"
+      },
+      "offers": {
+        "@type": "Offer",
+        "availability": "https://schema.org/InStock"
+      }
+    }
+    </script>
+    <script type="module" crossorigin src="/landing/assets/index-BoXI_x9r.js"></script>
+    <link rel="stylesheet" crossorigin href="/landing/assets/index-Kkol7eu3.css">
+  </head>
+  <body>
+    <!-- 预渲染注入点：scripts/prerender.mjs 把服务端渲染出的正文填进 #app 内部的注释占位处。
+         开发态这里是空的，main.ts 会自动退回普通 createApp（不走 hydration）。 -->
+    <div id="app"><div class="app-shell"><!--[--><nav class="navbar" data-v-dd9bc3fb><div class="container" data-v-dd9bc3fb><div class="navbar-content" data-v-dd9bc3fb><a href="/landing/" class="logo" data-v-dd9bc3fb><div class="logo-icon" data-v-dd9bc3fb><svg viewBox="0 0 32 32" fill="none" data-v-dd9bc3fb><rect width="32" height="32" rx="6" fill="#10b981" data-v-dd9bc3fb></rect><rect x="7" y="7" width="5" height="5" rx="1.5" fill="white" data-v-dd9bc3fb></rect><rect x="13.5" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-dd9bc3fb></rect><rect x="20" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-dd9bc3fb></rect><rect x="7" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-dd9bc3fb></rect><rect x="13.5" y="13.5" width="5" height="5" rx="1.5" fill="white" data-v-dd9bc3fb></rect><rect x="20" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-dd9bc3fb></rect><rect x="7" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-dd9bc3fb></rect><rect x="13.5" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-dd9bc3fb></rect><rect x="20" y="20" width="5" height="5" rx="1.5" fill="white" data-v-dd9bc3fb></rect></svg></div><span class="logo-text" data-v-dd9bc3fb>辰科 Cenkor Admin</span></a><div class="nav-links" data-v-dd9bc3fb><a data-v-dd9bc3fb>首页</a><a data-v-dd9bc3fb>功能</a><a data-v-dd9bc3fb>优势</a><a data-v-dd9bc3fb>私有部署</a><div class="dropdown" data-v-dd9bc3fb><span class="dropdown-trigger" data-v-dd9bc3fb>文档</span><div class="dropdown-menu" data-v-dd9bc3fb><a data-v-dd9bc3fb>使用指南</a><a data-v-dd9bc3fb>部署教程</a></div></div></div><div class="nav-actions" data-v-dd9bc3fb><a href="https://www.cenkor.cn/contact.html" target="_blank" rel="noopener" class="btn btn-ghost btn-small" data-v-dd9bc3fb>联系我们</a><a href="https://github.com/likele001/cenkor-admin" target="_blank" rel="noopener" class="btn btn-primary btn-small" data-v-dd9bc3fb>GitHub</a></div><button class="mobile-toggle" data-v-dd9bc3fb><span data-v-dd9bc3fb></span><span data-v-dd9bc3fb></span><span data-v-dd9bc3fb></span></button></div></div></nav><div class="mobile-overlay" data-v-dd9bc3fb></div><!--]--><main><div class="deploy-page" data-v-40414084><section class="page-hero" data-v-40414084><div class="container" data-v-40414084><div class="page-hero-content" data-v-40414084><span class="hero-tag" data-v-40414084>私有部署</span><h1 data-v-40414084>Cenkor Admin 私有化部署</h1><p data-v-40414084>Docker Compose / 宝塔静态 / 裸机 systemd 三种模式，快速上线</p></div></div></section><section class="section" data-v-40414084><div class="container" data-v-40414084><div class="deploy-content" data-v-40414084><div class="section-title" data-v-40414084 data-v-39eac46e><span class="tag" data-v-39eac46e>部署模式</span><h2 data-v-39eac46e>三种部署方式可选</h2><p data-v-39eac46e>根据您的环境选择最合适的交付模式</p></div><div class="mode-grid" data-v-40414084><!--[--><div class="mode-item" data-v-40414084><div class="mode-icon" data-v-40414084>🐳</div><h4 data-v-40414084>Docker Compose</h4><p data-v-40414084>容器化一键部署，开发生产一致</p></div><div class="mode-item" data-v-40414084><div class="mode-icon" data-v-40414084>🖥️</div><h4 data-v-40414084>宝塔静态 dist</h4><p data-v-40414084>构建静态前端 + 反代后端，推荐生产</p></div><div class="mode-item" data-v-40414084><div class="mode-icon" data-v-40414084>⚙️</div><h4 data-v-40414084>裸机 systemd</h4><p data-v-40414084>直接运行后端服务，轻量部署</p></div><!--]--></div></div></div></section><section class="section section-alt" data-v-40414084><div class="container" data-v-40414084><div class="section-title text-center" data-v-40414084 data-v-39eac46e><span class="tag" data-v-39eac46e>服务栈</span><h2 data-v-39eac46e>所需服务</h2><p data-v-39eac46e>PostgreSQL + Redis + MinIO + Backend + Admin-Web + Portal-Web</p></div><div class="service-grid" data-v-40414084><!--[--><div class="service-item" data-v-40414084><div class="service-icon" data-v-40414084>🗄️</div><strong data-v-40414084>PostgreSQL 16</strong><span data-v-40414084>关系型数据库</span></div><div class="service-item" data-v-40414084><div class="service-icon" data-v-40414084>🔴</div><strong data-v-40414084>Redis 7</strong><span data-v-40414084>缓存与消息队列</span></div><div class="service-item" data-v-40414084><div class="service-icon" data-v-40414084>☁️</div><strong data-v-40414084>MinIO</strong><span data-v-40414084>对象存储</span></div><div class="service-item" data-v-40414084><div class="service-icon" data-v-40414084>⚡</div><strong data-v-40414084>Backend</strong><span data-v-40414084>FastAPI 后端</span></div><div class="service-item" data-v-40414084><div class="service-icon" data-v-40414084>🖥️</div><strong data-v-40414084>Admin-Web</strong><span data-v-40414084>运营后台 SPA</span></div><div class="service-item" data-v-40414084><div class="service-icon" data-v-40414084>👤</div><strong data-v-40414084>Portal-Web</strong><span data-v-40414084>用户中心 SPA</span></div><!--]--></div></div></section><section class="section" data-v-40414084><div class="container" data-v-40414084><div class="deploy-content" data-v-40414084><div class="section-title" data-v-40414084 data-v-39eac46e><span class="tag" data-v-39eac46e>快速开始</span><h2 data-v-39eac46e>开发环境一分钟启动</h2><p data-v-39eac46e>Docker Compose 一键拉起全栈</p></div><div class="code-block" data-v-40414084><pre data-v-40414084><code data-v-40414084>cp .env.example .env
+docker compose up -d
+docker compose exec backend alembic upgrade head
+docker compose exec backend python -m cenkor_admin.scripts.seed</code></pre></div><div class="env-grid" data-v-40414084><!--[--><div class="env-item" data-v-40414084><div class="env-icon" data-v-40414084>🖥️</div><div data-v-40414084><strong data-v-40414084>管理后台</strong><span data-v-40414084>http://localhost:5173</span></div></div><div class="env-item" data-v-40414084><div class="env-icon" data-v-40414084>👤</div><div data-v-40414084><strong data-v-40414084>用户中心</strong><span data-v-40414084>http://localhost:5175</span></div></div><div class="env-item" data-v-40414084><div class="env-icon" data-v-40414084>⚡</div><div data-v-40414084><strong data-v-40414084>API 文档</strong><span data-v-40414084>http://localhost:8000/api/docs</span></div></div><div class="env-item" data-v-40414084><div class="env-icon" data-v-40414084>🔑</div><div data-v-40414084><strong data-v-40414084>初始账号</strong><span data-v-40414084>由 seed 脚本生成，首次登录后请立即修改密码</span></div></div><!--]--></div></div></div></section><section class="cta-section" data-v-40414084><div class="container" data-v-40414084><div class="cta-content" data-v-40414084><h2 data-v-40414084>准备好部署 Cenkor Admin 了吗？</h2><p data-v-40414084>获取完整部署文档与技术指导</p><div class="cta-actions" data-v-40414084><a href="https://github.com/likele001/cenkor-admin" target="_blank" rel="noopener" class="btn btn-primary btn-large" data-v-40414084>GitHub 仓库</a><a href="https://www.cenkor.cn/contact.html" target="_blank" rel="noopener" class="btn btn-secondary btn-large" data-v-40414084>联系我们</a></div></div></div></section></div></main><footer class="footer" data-v-b5198d54><div class="container" data-v-b5198d54><div class="footer-content" data-v-b5198d54><div class="footer-brand" data-v-b5198d54><div class="logo" data-v-b5198d54><div class="logo-icon" data-v-b5198d54><svg viewBox="0 0 32 32" fill="none" data-v-b5198d54><rect width="32" height="32" rx="6" fill="#10b981" data-v-b5198d54></rect><rect x="7" y="7" width="5" height="5" rx="1.5" fill="white" data-v-b5198d54></rect><rect x="13.5" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-b5198d54></rect><rect x="20" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-b5198d54></rect><rect x="7" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-b5198d54></rect><rect x="13.5" y="13.5" width="5" height="5" rx="1.5" fill="white" data-v-b5198d54></rect><rect x="20" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-b5198d54></rect><rect x="7" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-b5198d54></rect><rect x="13.5" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-b5198d54></rect><rect x="20" y="20" width="5" height="5" rx="1.5" fill="white" data-v-b5198d54></rect></svg></div><span class="logo-text" data-v-b5198d54>辰科 Cenkor Admin</span></div><p class="footer-desc" data-v-b5198d54>企业级后台管理平台 · 应用中心 + RBAC + CMS · FastAPI + Vue3</p></div><div class="footer-links" data-v-b5198d54><div class="link-group" data-v-b5198d54><h4 data-v-b5198d54>产品</h4><ul data-v-b5198d54><li data-v-b5198d54><a href="/landing/features" class="" data-v-b5198d54>功能介绍</a></li><li data-v-b5198d54><a href="/landing/advantages" class="" data-v-b5198d54>技术优势</a></li><li data-v-b5198d54><a aria-current="page" href="/landing/deploy" class="router-link-active router-link-exact-active" data-v-b5198d54>私有部署</a></li></ul></div><div class="link-group" data-v-b5198d54><h4 data-v-b5198d54>文档</h4><ul data-v-b5198d54><li data-v-b5198d54><a href="/landing/docs/guide" class="" data-v-b5198d54>使用指南</a></li><li data-v-b5198d54><a aria-current="page" href="/landing/deploy" class="router-link-active router-link-exact-active" data-v-b5198d54>部署教程</a></li><li data-v-b5198d54><a href="https://github.com/likele001/cenkor-admin" target="_blank" rel="noopener" data-v-b5198d54>GitHub 仓库</a></li></ul></div><div class="link-group" data-v-b5198d54><h4 data-v-b5198d54>支持</h4><ul data-v-b5198d54><li data-v-b5198d54><a href="https://www.cenkor.cn/contact.html" target="_blank" rel="noopener" data-v-b5198d54>联系我们</a></li><!----><!----><li data-v-b5198d54><a href="mailto:contact@cenkor.cn" data-v-b5198d54>contact@cenkor.cn</a></li></ul></div></div></div><div class="footer-bottom" data-v-b5198d54><p data-v-b5198d54>© 2026 辰科科技 Cenkor Admin. 保留所有权利.</p></div></div></footer></div></div>
+  </body>
+</html>

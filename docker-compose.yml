@@ -94,6 +94,25 @@ services:
       - backend
     command: npm run dev -- --host 0.0.0.0
 
+  # 用户中心 SPA。.env.example 里的 PORTAL_WEB_PORT / frontend/portal-web/Dockerfile
+  # 一直都在，只是此前漏了本服务 → 文档与实现不一致（/deploy 页面写的 5175 被当成"不存在的端口"）。
+  # 开发态直接用 vite dev（自带 HMR，且 vite.config 已把 /api 代理到后端）。
+  portal-web:
+    build:
+      context: ./frontend/portal-web
+      dockerfile: Dockerfile
+      target: development
+    container_name: cenkor-portal-web
+    restart: unless-stopped
+    ports:
+      - "${PORTAL_WEB_PORT:-5175}:5175"
+    volumes:
+      - ./frontend/portal-web/src:/app/src
+      - ./frontend/portal-web/index.html:/app/index.html
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0 --port 5175
+
   nginx:
     image: nginx:alpine
     container_name: cenkor-nginx

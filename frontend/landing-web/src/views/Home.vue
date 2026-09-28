@@ -177,7 +177,6 @@
 </template>
 
 <script setup lang="ts">
-import { useHead } from '@unhead/vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import FeatureCard from '@/components/FeatureCard.vue'
 import ScrollReveal from '@/components/ScrollReveal.vue'
@@ -185,13 +184,6 @@ import CounterUp from '@/components/CounterUp.vue'
 import { SITE_URLS } from '@/config/site'
 
 const urls = SITE_URLS
-
-useHead({
-  title: '辰科Cenkor Admin - 企业级后台管理平台 | 私有化部署',
-  meta: [
-    { name: 'description', content: '辰科Cenkor Admin 企业级后台管理平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、通用内容引擎、用户中心、审计日志，应用按需安装，支持私有化部署。' }
-  ]
-})
 
 const stats = [
   { value: 8, label: '内置业务应用', suffix: '' },

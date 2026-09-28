@@ -82,16 +82,8 @@
 </template>
 
 <script setup lang="ts">
-import { useHead } from '@unhead/vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import ScrollReveal from '@/components/ScrollReveal.vue'
-
-useHead({
-  title: '辰科Cenkor Admin - 核心功能 | 企业级后台管理平台',
-  meta: [
-    { name: 'description', content: '辰科Cenkor Admin 核心功能：应用中心、RBAC 权限、通用内容引擎（21+ 字段类型）、用户中心、审计日志、私有化部署。' }
-  ]
-})
 
 const featureItems = [
   {

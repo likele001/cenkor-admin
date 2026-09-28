@@ -4,19 +4,37 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="辰科Cenkor Admin - 企业级后台管理平台，FastAPI + Vue3 架构。内置应用中心、RBAC 权限、通用内容引擎（CMS）、用户中心、审计日志，应用按需安装，支持私有化部署。" />
     <meta name="keywords" content="辰科,Cenkor,Admin,后台管理系统,应用中心,RBAC,权限管理,CMS,内容管理,FastAPI,Vue3,私有化部署" />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="辰科Cenkor Admin - 企业级后台管理平台" />
-    <meta property="og:description" content="FastAPI + Vue3 架构的企业级后台管理平台，内置应用中心、RBAC、CMS、用户中心，应用按需安装，支持私有化部署。" />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://admin.cenkor.cn/" />
-    <meta property="og:locale" content="zh_CN" />
-    <link rel="canonical" href="https://admin.cenkor.cn/" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="辰科Cenkor Admin - 企业级后台管理平台" />
-    <meta name="twitter:description" content="FastAPI + Vue3 架构的企业级后台管理平台，内置应用中心、RBAC、CMS" />
+
+    <!-- ═══ 会随路由变化的部分 ═══
+         构建期由 scripts/prerender.mjs 用 src/config/seo.ts 的数据整块替换
+         （依据下方 seo:start / seo:end 两条注释标记之间的区间），从而每个路由产出独立的
+         title / description / canonical / og:url。
+         开发态与未预渲染时，这里是首页的默认值。改数据请改 src/config/seo.ts，别改这里。 -->
+    <!--seo:start-->
     <title>辰科Cenkor Admin - 企业级后台管理平台 | 私有化部署</title>
+    <meta name="description" content="辰科Cenkor Admin 企业级后台管理平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、通用内容引擎、用户中心、审计日志，应用按需安装，支持私有化部署。" />
+    <link rel="canonical" href="https://admin.cenkor.cn/landing/" />
+    <meta property="og:title" content="辰科Cenkor Admin - 企业级后台管理平台 | 私有化部署" />
+    <meta property="og:description" content="辰科Cenkor Admin 企业级后台管理平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、通用内容引擎、用户中心、审计日志，应用按需安装，支持私有化部署。" />
+    <meta property="og:url" content="https://admin.cenkor.cn/landing/" />
+    <meta name="twitter:title" content="辰科Cenkor Admin - 企业级后台管理平台 | 私有化部署" />
+    <meta name="twitter:description" content="辰科Cenkor Admin 企业级后台管理平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、通用内容引擎、用户中心、审计日志，应用按需安装，支持私有化部署。" />
+    <!--seo:end-->
+
+    <!-- ═══ 全站固定不变的部分 ═══ -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="辰科 Cenkor Admin" />
+    <!-- og:image 必须是绝对 URL、位图格式（SVG 不被微信/微博/Twitter 采用），且 ≥1200x630 -->
+    <meta property="og:image" content="https://admin.cenkor.cn/landing/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="辰科 Cenkor Admin - 企业级后台管理平台" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://admin.cenkor.cn/landing/og-image.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
@@ -38,7 +56,9 @@
     </script>
   </head>
   <body>
-    <div id="app"></div>
+    <!-- 预渲染注入点：scripts/prerender.mjs 把服务端渲染出的正文填进 #app 内部的注释占位处。
+         开发态这里是空的，main.ts 会自动退回普通 createApp（不走 hydration）。 -->
+    <div id="app"><!--app-html--></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

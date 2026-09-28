@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite --port 9910",
     "build": "vue-tsc --noEmit && vite build",
+    "build:spa": "vite build",
+    "build:ssr": "vite build --config vite.config.ssr.ts",
+    "prerender": "node scripts/prerender.mjs",
+    "build:prerender": "npm run build:spa && npm run build:ssr && npm run prerender",
     "preview": "vite preview --port 9910"
   },
   "dependencies": {
@@ -17,6 +21,7 @@
   "devDependencies": {
     "@types/node": "^20.14.9",
     "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/server-renderer": "^3.4.31",
     "sass": "^1.77.6",
     "typescript": "^5.5.3",
     "vite": "^5.3.3",
