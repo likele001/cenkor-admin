@@ -90,18 +90,10 @@ docker compose exec backend python -m cenkor_admin.scripts.seed</code></pre>
 </template>
 
 <script setup lang="ts">
-import { useHead } from '@unhead/vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import { SITE_URLS } from '@/config/site'
 
 const urls = SITE_URLS
-
-useHead({
-  title: '辰科Cenkor Admin - 私有部署 | 企业级后台管理平台',
-  meta: [
-    { name: 'description', content: '辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal。' }
-  ]
-})
 
 const modes = [
   { icon: '🐳', title: 'Docker Compose', desc: '容器化一键部署，开发生产一致' },
@@ -122,7 +114,7 @@ const envs = [
   { icon: '🖥️', label: '管理后台', value: 'http://localhost:5173' },
   { icon: '👤', label: '用户中心', value: 'http://localhost:5175' },
   { icon: '⚡', label: 'API 文档', value: 'http://localhost:8000/api/docs' },
-  { icon: '🔑', label: '默认账号', value: 'admin@cenkor.cn / admin123' }
+  { icon: '🔑', label: '初始账号', value: '由 seed 脚本生成，首次登录后请立即修改密码' }
 ]
 </script>
 

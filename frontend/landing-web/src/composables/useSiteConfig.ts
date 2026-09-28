@@ -17,7 +17,10 @@ const contact = ref<SiteContact>({
 })
 let loaded = false
 
-const PUBLIC_SITE_API = 'https://www.cenkor.cn/api/v1/public/site'
+// 必须走同域相对路径：landing 与后台同挂在 admin.cenkor.cn 下，/api/ 已由 nginx 反代到后端（127.0.0.1:8002）。
+// 原先写死 https://www.cenkor.cn/api/... 属跨域请求，而该接口响应不带 Access-Control-Allow-Origin
+// → 微信/电话在页脚永不显示（浏览器静默拦截），只有 email 的硬编码默认值能出来。
+const PUBLIC_SITE_API = '/api/v1/public/site'
 
 export function useSiteConfig() {
   async function fetchContact() {

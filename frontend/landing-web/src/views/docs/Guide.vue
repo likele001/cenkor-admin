@@ -61,18 +61,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useHead } from '@unhead/vue'
 import { SITE_URLS } from '@/config/site'
 
 const urls = SITE_URLS
 const activeSection = ref(0)
-
-useHead({
-  title: '辰科Cenkor Admin - 使用指南 | 企业级后台管理平台',
-  meta: [
-    { name: 'description', content: '辰科Cenkor Admin 使用入门指南：系统登录、应用中心安装、RBAC 权限、CMS 内容管理、用户中心快速上手。' }
-  ]
-})
 
 const sections = [
   {

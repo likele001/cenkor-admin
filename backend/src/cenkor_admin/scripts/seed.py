@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import secrets
+import string
 
 import structlog
 from sqlalchemy import select
@@ -98,10 +101,22 @@ DEFAULT_ROLES = [
     ),
 ]
 
+ADMIN_PASSWORD_ENV = "CENKOR_ADMIN_PASSWORD"
+
 DEFAULT_USERS = [
     # (email, username, password, nickname, is_superuser, roles)
-    ("admin@cenkor.cn", "admin", "admin123", "超级管理员", True, ["super_admin"]),
+    # ⚠️ password 一律留 None。把默认口令写死在源码里 = 所有实例共用同一把钥匙，
+    #    而且会随公开仓库一起发出去（本仓库历史上就这样泄露过 admin123，
+    #    还被印到了公网官网的部署页上）。
+    #    取值顺序：环境变量 CENKOR_ADMIN_PASSWORD → 随机强口令（首次初始化时打印一次）。
+    ("admin@cenkor.cn", "admin", None, "超级管理员", True, ["super_admin"]),
 ]
+
+
+def _generate_admin_password(length: int = 16) -> str:
+    """生成随机管理员口令（未提供 CENKOR_ADMIN_PASSWORD 时使用）。"""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 DEFAULT_SITE_CONFIGS = [
     ("brand.name", "辰科", "品牌中文名"),
@@ -361,10 +376,16 @@ async def main() -> None:
         log.info("seed.roles.done", count=len(DEFAULT_ROLES))
 
         # ---- 用户 ----
+        generated_passwords: list[tuple[str, str]] = []
         for email, username, password, nickname, is_super, role_codes in DEFAULT_USERS:
             existing = await db.execute(select(auth_models.User).where(auth_models.User.email == email))
             user = existing.scalar_one_or_none()
             if not user:
+                if not password:
+                    password = os.getenv(ADMIN_PASSWORD_ENV, "")
+                    if not password:
+                        password = _generate_admin_password()
+                        generated_passwords.append((email, password))
                 user = auth_models.User(
                     email=email, username=username,
                     password_hash=hash_password(password),
@@ -385,6 +406,14 @@ async def main() -> None:
                     db.add(rbac_models.UserRole(user_id=user.id, role_id=role.id))
         await db.commit()
         log.info("seed.users.done", count=len(DEFAULT_USERS))
+
+        for email, pwd in generated_passwords:
+            # 明文只在这里打印一次；不写进日志，避免口令沉淀到日志文件里
+            print("\n" + "=" * 68)
+            print(f"  已创建管理员：{email}")
+            print(f"  初始密码    ：{pwd}")
+            print("  ⚠️ 此口令只显示这一次，请立即登录并修改")
+            print("=" * 68 + "\n")
 
         # ---- 站点配置 ----
         for key, value, desc in DEFAULT_SITE_CONFIGS:
