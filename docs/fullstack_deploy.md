@@ -38,18 +38,26 @@
 
 ---
 
-## 1. 准备环境变量
+## 1. 准备环境变量（推荐交给脚本自动完成）
 
 ```bash
-# 从现有 dev 的 .env 读取数据库/密钥/S3 配置（变量名兼容），可直接复用：
-cp .env .env.fullstack        # 或按模板逐个填
-cp docker/fullstack/env.fullstack.example .env.fullstack
-
-# 编辑至少设置这两项（其余用默认即可）：
-#   POSTGRES_PASSWORD=
-#   MINIO_ROOT_PASSWORD=
-vim .env.fullstack
+bash scripts/bootstrap-fullstack.sh
 ```
+
+脚本会生成 `.env`，自动填入随机的 `POSTGRES_PASSWORD` / `MINIO_ROOT_PASSWORD` / `SECRET_KEY`
+（权限 600），并把 `PUBLIC_BASE_URL`、`CORS_ORIGINS` 指向本机 IP，无需手工编辑。
+
+**想手动指定**时：
+
+```bash
+cp docker/fullstack/env.fullstack.example .env
+vim .env                      # 至少设置 POSTGRES_PASSWORD 与 MINIO_ROOT_PASSWORD
+```
+
+> ⚠️ **文件名必须是 `.env`。** `docker-compose.fullstack.yml` 里的服务写死了 `env_file: .env`，
+> 而 `--env-file` 只影响 compose 文件的**变量插值**，**不会把变量注入容器**。
+> 所以用 `.env.fullstack` 之类的名字，最后必然报 `env file .env not found`。
+> （本文件旧版本曾这样写，已修正。）
 
 常用覆盖项（`FS_` 前缀，缺省即用上表默认值）：
 
@@ -69,34 +77,36 @@ FS_MINIO_CONSOLE_PORT=9007
 ## 2. 一条命令启动全栈
 
 ```bash
-docker compose -f docker-compose.fullstack.yml \
-  --project-name cenkor-admin-fullstack \
-  --env-file .env.fullstack \
-  up -d --build
+bash scripts/bootstrap-fullstack.sh
 ```
 
-> **必须显式 `--project-name`**：本机 `.env` 里 `COMPOSE_PROJECT_NAME=cenkor-admin`
-> 会覆盖 compose 顶层的 `name:`，导致默认网络沿用 dev 前缀。显式指定后网络名也独立。
-> （即使漏加，容器/卷名的 `cenkorfs-*` 固定前缀也保证不会撞车。）
-
-首启会自动：拉取/构建镜像 → 起 PostgreSQL/Redis/MinIO（含健康检查）→ 启动后端与 Celery →
-构建并启动三个前端（各内置 Nginx 托管 dist 并反代 `/api` 到 `backend:8000`）。
-
-首次需先初始化数据库与种子数据：
+脚本内部等价于（外加 `.env` 生成、就绪等待与结果汇总）：
 
 ```bash
-docker compose -f docker-compose.fullstack.yml \
-  --project-name cenkor-admin-fullstack \
-  --env-file .env.fullstack \
-  exec backend alembic upgrade head
-docker compose -f docker-compose.fullstack.yml \
-  --project-name cenkor-admin-fullstack \
-  --env-file .env.fullstack \
-  exec backend python -m cenkor_admin.scripts.seed
+docker compose -f docker-compose.fullstack.yml up -d --build
 ```
 
-> 若后端使用了 `DB_AUTO_CREATE`/`DB_AUTO_SEED` 之类自建表机制，则无需手动 alembic，
-> 视实际入口脚本而定。
+> **不需要 `--env-file`**：`docker compose` 会自动读取当前目录的 `.env`，同时用于变量插值与
+> 容器 `env_file`。**也不需要 `--project-name`**：compose 顶层已声明 `name: cenkor-admin-fullstack`，
+> 且容器名/卷名固定 `cenkorfs-*` 前缀，与 dev 的 `cenkor-*` 完全隔离。
+> （旧版本文档让用户传 `.env.fullstack`，会直接报 `env file .env not found`，已修正。）
+
+首启会自动完成全部初始化，**无需任何手动 `exec`**：
+
+| 阶段 | 由谁完成 |
+|---|---|
+| 拉取/构建镜像；拉起 PostgreSQL / Redis / MinIO（含健康检查） | `docker compose` |
+| 数据库迁移 `alembic upgrade head` | 容器入口 `docker/fullstack/entrypoint.sh` |
+| 灌入种子数据（幂等）→ 打印管理员初始口令 | 同上 |
+| 构建三个前端（各自内置 Nginx 托管 dist、反代 `/api` 到 `backend:8000`） | 镜像构建阶段 |
+
+管理员初始口令打印在服务端日志中：
+
+```bash
+docker compose -f docker-compose.fullstack.yml logs backend | grep -A3 已创建管理员
+```
+
+> 需要跳过自动初始化时：`SEED_ON_STARTUP=0`（跳过种子数据）、`SKIP_MIGRATE=1`（跳过迁移）。
 
 访问验证：
 
@@ -113,7 +123,7 @@ docker compose -f docker-compose.fullstack.yml \
 ## 3. 常用运维命令
 
 ```bash
-FS="docker compose -f docker-compose.fullstack.yml --project-name cenkor-admin-fullstack --env-file .env.fullstack"
+FS="docker compose -f docker-compose.fullstack.yml"
 
 $FS ps                  # 查看状态
 $FS logs -f backend     # 后端日志
@@ -138,10 +148,8 @@ bash docker/fullstack/export-fullstack.sh [输出目录]
 
 ```bash
 docker load < cenkor-fullstack_<时间戳>.tar.gz
-docker compose -f docker-compose.fullstack.yml \
-  --project-name cenkor-admin-fullstack \
-  --env-file .env.fullstack \
-  up -d
+# 目标机也要有 .env（把源机的 .env 拷过来，或跑一次 bootstrap 生成）
+docker compose -f docker-compose.fullstack.yml up -d
 ```
 
 ---
@@ -171,5 +179,6 @@ bash docker/fullstack/build-multiarch.sh [--push]
 
 在此目录下：
 - `docker/fullstack/backend.Dockerfile` —— 后端生产镜像
+- `docker/fullstack/entrypoint.sh` —— 后端容器入口（自动迁移 + 幂等灌种子数据）
 - `docker/fullstack/frontend.Dockerfile` —— 前端镜像（`--build-arg FRONTEND=admin-web|portal-web|developer-web`）
 - `docker/fullstack/nginx-app.conf` —— 前端内置 Nginx（托管 + `/api` 反代 + WebSocket）

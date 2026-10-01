@@ -29,6 +29,10 @@ COPY backend/src ./src
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/alembic ./alembic
 
+# 容器入口：启动前自动迁移 + 首次自动灌种子数据（免去手动 exec 两条命令）
+COPY docker/fullstack/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # 非 root 运行（reduce 权限面）
 RUN useradd --create-home --uid 10001 appuser \
     && chown -R appuser:appuser /app
@@ -36,8 +40,11 @@ USER appuser
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# start-period 放宽到 60s：入口脚本要先跑迁移与种子数据，再拉起 uvicorn
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # 生产入口由 compose command 覆盖（uvicorn / celery）
 CMD ["uvicorn", "cenkor_admin.main:app", "--host", "0.0.0.0", "--port", "8000"]
