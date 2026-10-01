@@ -1,7 +1,11 @@
 """平台应用启用/停用：platform_apps.enabled
 
 revision: 20260925_0026_app_enabled
-down_revision: 20260924_0025_cloud
+# 挂载点说明：本迁移只依赖公开表 platform_apps，因此挂在【公开链 head】
+# f6a8b0c2d4e6 上。切勿改回 20260924_0025_cloud —— 那属于闭源 commerce 链，
+# 不进公开仓库，改回去会让 clone 出来的实例在 alembic upgrade head 时报
+# KeyError，数据库一张表都建不出来。
+down_revision: f6a8b0c2d4e6
 
 背景：应用中心此前只有「安装 / 卸载」两态 —— 卸载会清掉菜单、权限授权与
 注册的内容数据，代价过高；而实际运营中大量场景只是「暂时不想用」（如换季停
@@ -21,7 +25,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20260925_0026_app_enabled"
-down_revision = "20260924_0025_cloud"
+down_revision = "f6a8b0c2d4e6"
 branch_labels = None
 depends_on = None
 
