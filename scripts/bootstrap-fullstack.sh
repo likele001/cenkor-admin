@@ -39,6 +39,15 @@ detect_ip() {
 }
 IP="$(detect_ip || true)"
 
+# 开发者门户（应用中心）是**闭源模块**，不在开源仓库中（见 .gitignore 的 frontend/developer-web/）。
+# 这里自动探测：源码齐全就带上 developer profile 一起构建，公开 clone 则静默跳过。
+if [ -d frontend/developer-web ]; then
+  COMPOSE_BASE="$COMPOSE_BASE --profile developer"
+  WITH_DEVELOPER=1
+else
+  WITH_DEVELOPER=0
+fi
+
 # ---------- 1. 生成 .env ----------
 if [ -f .env ]; then
   say ".env 已存在，沿用现有配置（要重新生成请先删除 .env）"
@@ -100,10 +109,17 @@ echo
 echo "======================== 部署完成 ========================"
 echo "  管理后台    http://${HOST}:${ADMIN_PORT}"
 echo "  用户中心    http://${HOST}:${PORTAL_PORT}"
-echo "  开发者门户  http://${HOST}:${DEV_PORT}"
+if [ "${WITH_DEVELOPER:-0}" = 1 ]; then
+  echo "  开发者门户  http://${HOST}:${DEV_PORT}"
+fi
 echo "  API 文档    http://${HOST}:${BACKEND_PORT}/api/docs"
 echo "  健康检查    http://${HOST}:${BACKEND_PORT}/api/health"
 echo "=========================================================="
+if [ "${WITH_DEVELOPER:-0}" != 1 ]; then
+  echo
+  echo "  提示：未包含 frontend/developer-web（闭源的应用中心），已跳过开发者门户。"
+  echo "        在源码齐全的机器上可加 --profile developer 启用。"
+fi
 echo
 if $COMPOSE_BASE logs backend 2>/dev/null | grep -q "已创建管理员"; then
   $COMPOSE_BASE logs backend 2>/dev/null | grep -A 3 "已创建管理员" | tail -6 || true

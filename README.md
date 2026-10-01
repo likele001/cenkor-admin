@@ -36,9 +36,12 @@ bash scripts/bootstrap-fullstack.sh
 |---|---|
 | `http://<IP>:5185` | 管理后台 |
 | `http://<IP>:5192` | 用户中心 |
-| `http://<IP>:5175` | 开发者门户 |
 | `http://<IP>:8001/api/docs` | API 文档 / Swagger |
 | `http://<IP>:8001/api/health` | 健康检查 |
+
+> **开发者门户（应用中心）不在本开源仓库中**（闭源模块，见 `.gitignore` 的
+> `frontend/developer-web/`），因此默认不部署。在源码齐全的机器上加
+> `--profile developer` 即可启用（默认端口 `5175`）。
 
 管理员账号为 `admin@cenkor.cn`。**初始口令是随机生成的，只在首次启动时打印一次**
 （`docker compose -f docker-compose.fullstack.yml logs backend`），请登录后立即修改。
@@ -103,7 +106,8 @@ bash scripts/bootstrap-fullstack.sh     # 见上方「一键部署（Docker）�
 
 - 后端 API：http://服务器IP:8001/api/health → `/api/docs`
 - 管理后台：http://服务器IP:5185
-- 门户：http://服务器IP:5192 · 开发者门户：http://服务器IP:5175
+- 门户：http://服务器IP:5192
+- 开发者门户：http://服务器IP:5175（可选，需 `--profile developer` 且源码齐全）
 
 > 首次部署自动完成：生成 `.env`（随机密钥）→ 数据库迁移建表 → 灌入种子数据 → 打印访问地址与初始口令。
 > 以上全部由容器入口脚本 `docker/fullstack/entrypoint.sh` 完成，**不再需要手动 `exec` 两条命令**。

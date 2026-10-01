@@ -35,7 +35,8 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    # MinIO 官方镜像已不可用（详见 docker-compose.fullstack.yml 注释），改用 Chainguard 镜像
+    image: cgr.dev/chainguard/minio:latest
     container_name: cenkor-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -47,10 +48,12 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # Chainguard 镜像无 curl/wget，用 bash 的 /dev/tcp 探测
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 10s
 
   backend:
     build:
