@@ -12,17 +12,28 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# ---- 镜像源（默认官方，可用 --build-arg 覆盖）----
+#   ⚠️ 不要硬编码单一镜像站：某些网络环境下特定镜像站会直接不可达
+#   （实测某海外机器访问清华 PyPI 的 IPv4 就完全超时 → pip 报 Network is unreachable）。
+#   中国大陆加速可传：
+#     --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+#     --build-arg APT_MIRROR=mirrors.aliyun.com
+ARG APT_MIRROR=deb.debian.org
+ARG PIP_INDEX_URL=https://pypi.org/simple
+
 # 系统依赖：asyncpg / psycopg2 编译 + 健康检查 curl
-RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources 2>/dev/null; \
-    sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list 2>/dev/null; \
+RUN if [ "$APT_MIRROR" != "deb.debian.org" ]; then \
+      sed -i "s@deb.debian.org@${APT_MIRROR}@g" /etc/apt/sources.list.d/debian.sources 2>/dev/null || true; \
+      sed -i "s@deb.debian.org@${APT_MIRROR}@g" /etc/apt/sources.list 2>/dev/null || true; \
+    fi; \
     apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 先装依赖（利用构建缓存）；requirements.txt 由 pyproject.toml 同步
 COPY backend/requirements.txt ./
-RUN pip install --upgrade pip --index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip install -r requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install --upgrade pip --index-url "${PIP_INDEX_URL}" && \
+    pip install -r requirements.txt --index-url "${PIP_INDEX_URL}"
 
 # 业务代码 + 迁移（启动时 lifespan 会自动 alembic upgrade head）
 COPY backend/src ./src

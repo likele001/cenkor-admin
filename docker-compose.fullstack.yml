@@ -87,6 +87,10 @@ services:
     build:
       context: .
       dockerfile: docker/fullstack/backend.Dockerfile
+      args:
+        # 默认官方源，任意网络都能构建；中国大陆可设 APT_MIRROR/PIP_INDEX_URL 加速
+        APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     image: cenkor-admin-backend:fullstack
     container_name: cenkorfs-backend
     restart: unless-stopped
@@ -95,7 +99,7 @@ services:
       APP_ENV: production
       DEBUG: "false"
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
-      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
       REDIS_URL: redis://${REDIS_PASSWORD:-}@redis:6379/0
       S3_ENDPOINT: http://minio:9000
     depends_on:
@@ -110,6 +114,9 @@ services:
     build:
       context: .
       dockerfile: docker/fullstack/backend.Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     image: cenkor-admin-backend:fullstack
     container_name: cenkorfs-celery
     restart: unless-stopped
@@ -118,7 +125,7 @@ services:
       APP_ENV: production
       DEBUG: "false"
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
-      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-cenkor}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cenkor}
       REDIS_URL: redis://${REDIS_PASSWORD:-}@redis:6379/0
       S3_ENDPOINT: http://minio:9000
     depends_on:
