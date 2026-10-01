@@ -10,7 +10,7 @@ import requests
 # 强制配置
 os.environ["APP_ENV"] = "development"
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://cenkor:li123456@localhost:5433/cenkor")
-os.environ.setdefault("DATABASE_URL_SYNC", "postgresql://cenkor:li123456@localhost:5433/cenkor")
+os.environ.setdefault("DATABASE_URL_SYNC", "postgresql+psycopg2://cenkor:li123456@localhost:5433/cenkor")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-unit-tests-only-32bytes")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6380/0")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost:9002")

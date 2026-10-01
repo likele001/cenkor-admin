@@ -472,7 +472,7 @@ COOKIE_SECURE=True
 
 # 数据库
 DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/db"
-DATABASE_URL_SYNC="postgresql://user:pass@host:5432/db"  # Alembic 用
+DATABASE_URL_SYNC="postgresql+psycopg2://user:pass@host:5432/db"  # Alembic 用
 
 # Redis
 REDIS_URL="redis://host:6379/0"

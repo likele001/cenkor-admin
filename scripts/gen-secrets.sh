@@ -52,11 +52,11 @@ MINIO_CONSOLE_PORT=9001
 # ---- Backend (FastAPI) ----
 BACKEND_PORT=8000
 DATABASE_URL=postgresql+asyncpg://cenkor:$PG_PW@postgres:5432/cenkor
-DATABASE_URL_SYNC=postgresql://cenkor:$PG_PW@postgres:5432/cenkor
+DATABASE_URL_SYNC=postgresql+psycopg2://cenkor:$PG_PW@postgres:5432/cenkor
 REDIS_URL=redis://:$REDIS_PW@redis:6379/0
 # 宿主机裸跑 backend（PG/Redis 映射到 127.0.0.1）时改用：
 # DATABASE_URL=postgresql+asyncpg://cenkor:$PG_PW@127.0.0.1:5433/cenkor
-# DATABASE_URL_SYNC=postgresql://cenkor:$PG_PW@127.0.0.1:5433/cenkor
+# DATABASE_URL_SYNC=postgresql+psycopg2://cenkor:$PG_PW@127.0.0.1:5433/cenkor
 # REDIS_URL=redis://:$REDIS_PW@127.0.0.1:6380/0
 S3_ENDPOINT=http://minio:9000
 S3_API_PORT=9000
