@@ -12,6 +12,40 @@
 📖 **文档索引**：[`docs/index.md`](docs/index.md)
 📦 **打包交付**：[`docs/packaging.md`](docs/packaging.md)
 
+## 一键部署（Docker，推荐）
+
+> 后端 + Celery + PostgreSQL + Redis + MinIO + 三个前端全部容器化，前端内置 Nginx。
+> **不需要预先安装任何中间件**，一台装了 Docker 的干净机器即可。
+
+```bash
+git clone https://github.com/likele001/cenkor-admin.git
+cd cenkor-admin
+bash scripts/bootstrap-fullstack.sh
+```
+
+脚本会自动完成全部步骤，中途无需干预：
+
+1. 生成 `.env`（随机填充 `POSTGRES_PASSWORD` / `MINIO_ROOT_PASSWORD` / `SECRET_KEY`，权限 600）
+2. `docker compose up -d --build` 拉起全部容器
+3. 容器启动时自动执行数据库迁移并灌入种子数据（幂等）
+4. 等待后端就绪，**在屏幕上打印访问地址和初始管理员口令**
+
+部署完成后的地址（`<IP>` 为部署机 IP）：
+
+| 地址 | 说明 |
+|---|---|
+| `http://<IP>:5185` | 管理后台 |
+| `http://<IP>:5192` | 用户中心 |
+| `http://<IP>:5175` | 开发者门户 |
+| `http://<IP>:8001/api/docs` | API 文档 / Swagger |
+| `http://<IP>:8001/api/health` | 健康检查 |
+
+管理员账号为 `admin@cenkor.cn`。**初始口令是随机生成的，只在首次启动时打印一次**
+（`docker compose -f docker-compose.fullstack.yml logs backend`），请登录后立即修改。
+
+> 端口全部可用 `.env` 里的 `FS_*` 变量覆盖。完整说明见
+> [`docs/fullstack_deploy.md`](docs/fullstack_deploy.md)。
+
 ## 快速启动（开发）
 
 > 仅用于**本地开发机**（后端 `--reload` 热重载 + 前端 dev server）。**部署到公网请看下面的「生产部署（核心）」。**
@@ -24,20 +58,20 @@ docker compose up -d
 - 管理后台：http://localhost:5173
 - 用户中心：http://localhost:5175（`npm run dev:portal`）
 - API：http://localhost:8000/api/docs
-- 默认账号：`admin@cenkor.cn` / `admin123`
+- 管理员账号：`admin@cenkor.cn`（**初始口令随机生成，不写死在源码与文档里**）
 
 > 后端启动时 lifespan 会自动执行 `alembic upgrade head` 建表，**无需手动跑迁移**。
-> seed 数据经 `docker compose exec backend python -m cenkor_admin.scripts.seed` 生成。
+> 种子数据经 `docker compose exec backend python -m cenkor_admin.scripts.seed` 生成；
+> 未设置环境变量 `CENKOR_ADMIN_PASSWORD` 时会生成随机口令并**只打印一次**。
 
 > ⚠️ **安全提示（务必阅读）**
 >
-> 上面的账号是初始化种子数据里的默认管理员，密码以明文写在文档中。
-> **任何部署到公网之前，必须先做三件事：**
-> 1. 立即修改默认管理员密码
-> 2. 修改 `.env` 中的 `SECRET_KEY`（不要用仓库示例里的占位值）
-> 3. 删除或禁用不需要的种子账号
+> 本仓库**不包含任何默认口令**，每个实例的管理员口令都在首次初始化时随机生成。
+> **部署到公网之前，必须先做两件事：**
+> 1. 用随机生成的初始口令登录，并立即在后台改成自己的口令
+> 2. 确认 `.env` 里的 `SECRET_KEY` 是随机值（不要用 `.env.example` 里的占位值）
 >
-> 否则任何人都可以用 `admin@cenkor.cn` / `admin123` 直接登录你的后台。
+> 这两步在 `bash scripts/bootstrap-fullstack.sh` 部署流程里已自动完成。
 
 ## 生产部署（核心）
 
@@ -61,19 +95,18 @@ bash scripts/build-frontends.sh    # 构建前端 dist（宝塔直接 serve，�
 # 后端改动后：在宝塔面板 → 网站 → Python 项目 → cenkor → 重启
 ```
 
-**可选部署模式**（交付给别人 / 换环境，本机生产未采用）：
+**可选部署模式**（交付给别人 / 换环境，本机未采用）：
 
 ```bash
-cp .env.example .env        # 按需修改 .env 里的密码/端口
-docker compose -f docker-compose.fullstack.yml --project-name cenkor-admin-fullstack up -d --build
+bash scripts/bootstrap-fullstack.sh     # 见上方「一键部署（Docker）」
 ```
 
 - 后端 API：http://服务器IP:8001/api/health → `/api/docs`
 - 管理后台：http://服务器IP:5185
 - 门户：http://服务器IP:5192 · 开发者门户：http://服务器IP:5175
 
-> 首次部署会自动完成数据库迁移与建表（后端 lifespan 自动 `alembic upgrade head`）。
-> 播种种子数据：`docker compose -f docker-compose.fullstack.yml --project-name cenkor-admin-fullstack exec backend python -m cenkor_admin.scripts.seed`
+> 首次部署自动完成：生成 `.env`（随机密钥）→ 数据库迁移建表 → 灌入种子数据 → 打印访问地址与初始口令。
+> 以上全部由容器入口脚本 `docker/fullstack/entrypoint.sh` 完成，**不再需要手动 `exec` 两条命令**。
 > 完整说明见 [`docs/fullstack_deploy.md`](docs/fullstack_deploy.md)。
 
 其他部署模式：
