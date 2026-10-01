@@ -283,10 +283,15 @@ except Exception as e:  # noqa: BLE001
     log.warning("cloud.mount_skipped", error=str(e))
 
 # 支付中心公开路由（第三方回调 / 收银台 / 状态轮询，免鉴权）
-from cenkor_admin.apps.payment.public_router import router as payment_public_router  # noqa: E402
-api_v1_router.include_router(
-    payment_public_router, prefix="/public/payment", tags=["payment-public"],
-)
+# 闭源商业模块，位于外置目录 src/apps/payment/（不进公开仓库）。
+# 开源部署不含此模块，ImportError 时静默跳过，不影响平台启动。
+try:
+    from cenkor_admin.apps.payment.public_router import router as payment_public_router
+    api_v1_router.include_router(
+        payment_public_router, prefix="/public/payment", tags=["payment-public"],
+    )
+except Exception as e:  # noqa: BLE001
+    log.warning("payment.mount_skipped", error=str(e))
 
 # ============================================================
 # /me
