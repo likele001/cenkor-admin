@@ -292,7 +292,7 @@ APP_ENV=production
 
 # 数据库（连 Docker 映射端口，不是 postgres:5432）
 DATABASE_URL=postgresql+asyncpg://cenkor:你的PG密码@127.0.0.1:5433/cenkor
-DATABASE_URL_SYNC=postgresql://cenkor:你的PG密码@127.0.0.1:5433/cenkor
+DATABASE_URL_SYNC=postgresql+psycopg2://cenkor:你的PG密码@127.0.0.1:5433/cenkor
 
 # Redis（若 compose 启用了 requirepass，需带密码）
 REDIS_URL=redis://:你的Redis密码@127.0.0.1:6380/0
