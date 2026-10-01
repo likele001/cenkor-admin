@@ -134,7 +134,7 @@ flowchart TB
 | 变量 | 来源 | 值 |
 |---|---|---|
 | `DATABASE_URL` | 宝塔 `env_list`（权威） | `postgresql+asyncpg://cenkor:***@127.0.0.1:5432/cenkor` |
-| `DATABASE_URL_SYNC` | `backend/.env` | `postgresql://cenkor:***@127.0.0.1:5432/cenkor` |
+| `DATABASE_URL_SYNC` | `backend/.env` | `postgresql+psycopg2://cenkor:***@127.0.0.1:5432/cenkor` |
 | `REDIS_URL` | 宝塔 `env_list`（权威） | `redis://127.0.0.1:6379/5` |
 | `S3_ENDPOINT` | 宝塔 `env_list`（权威） | `http://127.0.0.1:9000` |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | 宝塔 `env_list` | `minio` / `***` |
