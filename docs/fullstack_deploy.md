@@ -11,8 +11,9 @@
 
 
 > 在原有「后端裸机 + dev Docker 依赖」之上，提供一套 **自包含全栈** 可选方案：
-> 后端 + Celery + PostgreSQL + Redis + MinIO + 三个前端（admin / portal / developer）
+> 后端 + Celery + PostgreSQL + Redis + MinIO + 前端（admin / portal 两个开源前端）
 > 全部容器化，前端**内置 Nginx** 托管静态资源并反向代理 `/api`，开箱即用。
+> （开发者门户 developer-web 为闭源模块，不在本仓库，见下表说明。）
 
 ---
 
@@ -28,10 +29,15 @@
 | 后端 API（含 `/api/docs`） | `8001` |
 | 管理后台 admin-web | `5185` |
 | 门户 portal-web | `5192` |
-| 开发者门户 developer-web | `5175` |
+| 开发者门户 developer-web | `5175`（**可选**，闭源模块，需 `--profile developer`） |
 | PostgreSQL | `5543` |
 | Redis | `6382` |
 | MinIO API / 控制台 | `9006` / `9007` |
+
+> ⚠️ **开发者门户（应用中心）不在本开源仓库中** —— `frontend/developer-web/` 被 `.gitignore` 排除。
+> 因此 compose 里该服务挂在 `profiles: ["developer"]` 下，**默认不构建**，公开仓库 clone 下来
+> 一条命令即可跑通。在源码齐全的机器上启用：`--profile developer`。
+> `scripts/bootstrap-fullstack.sh` 会自动探测该目录是否存在并决定是否带上 profile。
 
 > 端口与宝塔 Python 项目（8000/8002/8008/8500/23789/30080/9700 等）及
 > blog/bizcloud/fettle 容器端口均不冲突。
