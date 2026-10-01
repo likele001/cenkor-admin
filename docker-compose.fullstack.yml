@@ -15,7 +15,8 @@
 #   - 独立对外端口（见下，可用 .env 覆盖）
 #
 # 端口速览（默认，均可用 .env 覆盖）：
-#   后端 API 8001 · 管理后台 5185 · 门户 5192 · 开发者门户 5175
+#   后端 API 8001 · 管理后台 5185 · 门户 5192
+#   开发者门户 5175（可选，闭源模块，需 --profile developer）
 #   PostgreSQL 5543 · Redis 6382 · MinIO 9006/9007
 
 name: cenkor-admin-fullstack
@@ -58,8 +59,11 @@ services:
       retries: 5
 
   minio:
-    # MinIO 已从 Docker Hub 下架，改用 quay.io 官方源并固定版本
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # MinIO 官方镜像已不可用：社区版停止发布后，minio/minio 于 2026-09 从 Docker Hub 删除，
+    # quay.io/minio 也已无法匿名拉取（401 UNAUTHORIZED）。改用 Chainguard 维护的免费镜像
+    # （cgr.dev/chainguard/minio，持续重建、跟进安全修复）。
+    # ⚠️ 该镜像不含 curl/wget，故健康检查改用 bash /dev/tcp（镜像内自带 bash）。
+    image: cgr.dev/chainguard/minio:latest
     container_name: cenkorfs-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -72,10 +76,12 @@ services:
     volumes:
       - fs-minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # Chainguard 镜像无 curl/wget，用 bash 的 /dev/tcp 探测 9000 端口
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 10s
 
   backend:
     build:
@@ -157,7 +163,12 @@ services:
     ports:
       - "${FS_PORTAL_WEB_PORT:-5192}:80"
 
+  # 开发者门户 / 应用中心 —— **闭源模块，不在开源仓库中**（见 .gitignore 的 frontend/developer-web/）。
+  # 故用 compose profile 隔离：默认不构建，公开仓库 clone 下来可直接跑通一条命令。
+  # 在源码齐全的机器上需要它时：docker compose -f docker-compose.fullstack.yml --profile developer up -d
+  # （scripts/bootstrap-fullstack.sh 会自动探测：有该目录就带上 profile，没有就跳过。）
   developer-web:
+    profiles: ["developer"]
     build:
       context: .
       dockerfile: docker/fullstack/frontend.Dockerfile
