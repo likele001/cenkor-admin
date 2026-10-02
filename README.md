@@ -17,6 +17,20 @@
 > 后端 + Celery + PostgreSQL + Redis + MinIO + 三个前端全部容器化，前端内置 Nginx。
 > **不需要预先安装任何中间件**，一台装了 Docker 的干净机器即可。
 
+**第 0 步 · 装 Docker**（机器上已有 `docker` + Compose v2 就跳过）：
+
+```bash
+curl -fsSL https://get.docker.com | sh
+systemctl enable --now docker
+docker compose version    # 确认能输出 v2.x
+```
+
+> 中国大陆如果构建很慢，先把
+> `cp docker/fullstack/env.fullstack.example .env` 拷一份，再打开里面的
+> `APT_MIRROR` / `PIP_INDEX_URL` / `NPM_REGISTRY` 三行注释（「构建加速」段）。
+
+**第 1 步 · 一条命令部署**：
+
 ```bash
 git clone https://github.com/likele001/cenkor-admin.git
 cd cenkor-admin

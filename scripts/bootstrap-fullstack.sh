@@ -121,11 +121,16 @@ if [ "${WITH_DEVELOPER:-0}" != 1 ]; then
   echo "        在源码齐全的机器上可加 --profile developer 启用。"
 fi
 echo
-if $COMPOSE_BASE logs backend 2>/dev/null | grep -q "已创建管理员"; then
-  $COMPOSE_BASE logs backend 2>/dev/null | grep -A 3 "已创建管理员" | tail -6 || true
+# ⚠️ 必须先把日志取到变量、再用 bash 内建匹配来判断。
+#    本脚本开了 set -euo pipefail，而 `logs ... | grep -q` 里 grep 一命中就退出，
+#    上游 docker compose 会收到 SIGPIPE 并以非 0 退出 -> pipefail 判定整条管道失败
+#    -> if 永远走 else，初始口令再也打不出来（且误报「已存在」）。
+BACKEND_LOG="$($COMPOSE_BASE logs backend 2>/dev/null || true)"
+if [[ "$BACKEND_LOG" == *"已创建管理员"* ]]; then
+  printf '%s\n' "$BACKEND_LOG" | grep -B 1 -A 2 "已创建管理员" | tail -8 || true
   echo "  （口令只显示这一次，请立即登录并修改）"
 else
-  echo "  管理员账号 admin@cenkor.cn 已存在，未重复创建。"
+  echo "  本次日志中没有新建管理员的口令（该库的管理员此前已存在）。"
   echo "  如需重置口令：$COMPOSE_BASE exec backend python -m cenkor_admin.scripts.seed"
 fi
 echo
