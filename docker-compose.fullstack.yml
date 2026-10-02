@@ -151,6 +151,7 @@ services:
         FRONTEND: admin-web
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_WS_URL: ${VITE_WS_URL:-}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     image: cenkor-admin-web-admin:fullstack
     container_name: cenkorfs-admin-web
     restart: unless-stopped
@@ -166,6 +167,7 @@ services:
         FRONTEND: portal-web
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_WS_URL: ${VITE_WS_URL:-}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     image: cenkor-admin-web-portal:fullstack
     container_name: cenkorfs-portal-web
     restart: unless-stopped
@@ -186,6 +188,7 @@ services:
         FRONTEND: developer-web
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_WS_URL: ${VITE_WS_URL:-}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     image: cenkor-admin-web-developer:fullstack
     container_name: cenkorfs-developer-web
     restart: unless-stopped
