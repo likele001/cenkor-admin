@@ -69,6 +69,7 @@
     "feishu": "Sign in with Feishu",
     "or": "or",
     "defaultHint": "Default account",
+    "initialPasswordHint": "No default password: the initial admin password is randomly generated on first startup and printed only once (see the deploy terminal or backend logs). If lost, run bash scripts/reset-admin-password.sh on the server to reset it.",
     "captchaRequired": "Please complete the captcha first",
     "loginFailed": "Login failed"
   },

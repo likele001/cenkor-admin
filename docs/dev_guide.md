@@ -60,7 +60,7 @@ npm run dev  # http://localhost:5175
 
 ### 默认账号
 
-- 后台: `admin@cenkor.cn` / `admin123`（**生产请立即修改！**）
+- 后台: `admin@cenkor.cn`（**无默认口令**，初始口令随机生成、首次 seed 时只打印一次；忘记可 `bash scripts/reset-admin-password.sh` 重置）
 - 前台: 注册即可
 
 ### 前端包管理与构建故障排查
@@ -393,7 +393,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 curl -X POST -H "Content-Type: application/json" \
   -d '{
     "username": "admin@cenkor.cn",
-    "password": "admin123",
+    "password": "<你的初始口令>",
     "captcha_token": "任意16+hex"
   }' \
   http://localhost:8000/api/v1/auth/login

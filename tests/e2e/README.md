@@ -2,7 +2,7 @@
 
 ## 关键路径
 
-1. 登录 `admin@cenkor.cn` / `admin123`
+1. 登录 `admin@cenkor.cn` / `$E2E_PASSWORD`（**无默认值**，须设为实例的实际口令）
 2. 创建产品 → 公开 API `/api/v1/public/site` 可见新产品
 3. 编辑站点配置 → 公开 API `site_config` 更新
 4. 创建 API Key → 验证 token 仅展示一次
@@ -36,7 +36,7 @@ pytest tests/e2e -v
 | `E2E_BASE_URL` | `http://localhost:5173` | admin-web 地址 |
 | `E2E_API_URL` | `http://localhost:8000` | 后端 API 地址 |
 | `E2E_USER` | `admin@cenkor.cn` | 测试账号 |
-| `E2E_PASSWORD` | `admin123` | 测试密码 |
+| `E2E_PASSWORD` | **必填（无默认值）** | 测试密码，须与实例 admin 的实际口令一致 |
 
 ## CI 集成（推荐）
 

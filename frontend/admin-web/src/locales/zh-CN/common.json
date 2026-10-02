@@ -69,6 +69,7 @@
     "feishu": "使用飞书登录",
     "or": "或",
     "defaultHint": "默认账号",
+    "initialPasswordHint": "本系统不设默认口令：初始密码在首次初始化时随机生成、只打印一次（见部署终端或后端日志）。忘记可在服务器执行 bash scripts/reset-admin-password.sh 重置。",
     "captchaRequired": "请先完成滑动验证",
     "loginFailed": "登录失败"
   },
