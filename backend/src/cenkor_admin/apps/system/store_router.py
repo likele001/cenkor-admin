@@ -1075,3 +1075,12 @@ async def install_app_from_zip(
         "route_registered": route_registered,
         "warnings": warnings,
     }
+
+# ============================================================
+# 应用市场（官方目录浏览 / 授权码一键安装）
+# 开源层实现；商业版的 commerce / cloud_router 是另一条带库表的链路。
+# 放在文件末尾 include，避免与 market_router 内部的延迟导入形成环。
+# ============================================================
+from cenkor_admin.apps.system.market_router import router as market_router  # noqa: E402
+
+router.include_router(market_router, prefix="/official", tags=["app-official"])
