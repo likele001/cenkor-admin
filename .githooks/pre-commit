@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# 提交前检查：防止商业应用被误提交进公开仓库。
-# 实现见 scripts/check-app-tracking.sh
+# 提交前检查：
+#   1) 防止商业应用被误提交进公开仓库      → scripts/check-app-tracking.sh
+#   2) 防止 alembic 迁移链在公开仓库断裂    → scripts/check-migration-graph.py
+#
+# 为什么要有第 2 项：迁移文件也分「开源 / 闭源」两类，闭源的被 .gitignore 排除。
+# 一旦把平台自己的迁移挂在闭源链中间，公开仓库就会断链 —— 表现为
+# 「一键部署容器全 healthy，但数据库一张表都没建」。
 #
 # 启用（每个 clone 需执行一次）：
 #   git config core.hooksPath .githooks
@@ -11,6 +16,17 @@ set -uo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -n "$ROOT" ] || exit 0
-[ -f "$ROOT/scripts/check-app-tracking.sh" ] || exit 0
 
-exec bash "$ROOT/scripts/check-app-tracking.sh"
+rc=0
+
+# 1) 商业应用误入库检查
+if [ -f "$ROOT/scripts/check-app-tracking.sh" ]; then
+  bash "$ROOT/scripts/check-app-tracking.sh" --quiet || rc=1
+fi
+
+# 2) 迁移图完整性（--tracked-only = 这次提交后公开仓库看到的样子）
+if [ -f "$ROOT/scripts/check-migration-graph.py" ] && command -v python3 >/dev/null 2>&1; then
+  ( cd "$ROOT" && python3 scripts/check-migration-graph.py --tracked-only ) || rc=1
+fi
+
+exit $rc
