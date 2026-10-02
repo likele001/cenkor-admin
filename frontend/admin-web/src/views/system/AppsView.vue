@@ -263,9 +263,17 @@ interface CloudApp {
   category: string
   author: string
   price: CloudPrice | null
+  /** 免费应用（官方价格未启用）——免费且本地有代码时无需授权码 */
+  is_free: boolean
+  /** 本实例是否已自带该应用代码：有代码走系统安装，不下载授权包 */
+  has_local_code: boolean
+  install_mode: 'system' | 'package'
   installed: boolean
   installed_version: string | null
   needs_upgrade: boolean
+  has_update?: boolean
+  /** 手填的授权码（仅前端内存态，不落库） */
+  license_input?: string
 }
 
 interface CloudPurchase {
@@ -280,6 +288,12 @@ interface CloudPurchase {
 }
 
 const cloudRole = ref<'hub' | 'spoke'>('hub')
+/** 官方市场是否可用：走开源层 /store/official，不再依赖闭源 commerce 的角色判定 */
+const marketReady = ref(false)
+const BIND_TOKEN_KEY = 'cenkor.market.instance_token'
+const BIND_ACCOUNT_KEY = 'cenkor.market.account'
+const instanceToken = ref<string>(localStorage.getItem(BIND_TOKEN_KEY) || '')
+const boundAccount = ref<string>(localStorage.getItem(BIND_ACCOUNT_KEY) || '')
 const cloudStatus = ref<any>({})
 const cloudApps = ref<CloudApp[]>([])
 const cloudPurchases = ref<CloudPurchase[]>([])
@@ -334,14 +348,20 @@ function purchaseOf(key: string): CloudPurchase | undefined {
 }
 
 async function loadCloudStatus() {
+  // 官方市场走开源层 /store/official（全新部署即可用，不依赖闭源 commerce）
   try {
-    const { data } = await api.get('/api/v1/store/cloud/status')
-    cloudStatus.value = data
-    cloudRole.value = data.role === 'spoke' ? 'spoke' : 'hub'
-    if (cloudRole.value === 'spoke') await loadCloud()
+    const { data } = await api.get('/api/v1/store/official/status')
+    marketReady.value = true
+    cloudStatus.value = {
+      ...data,
+      gateway_url: data.portal_url || data.hub,
+      bound: Boolean(instanceToken.value),
+      account: boundAccount.value,
+    }
+    await loadCloud()
   } catch {
-    // 老版本后端 / 开源部署没有这个接口：静默当作授权中心，不显示该 tab
-    cloudRole.value = 'hub'
+    // 极老部署没有这个接口：隐藏该 tab
+    marketReady.value = false
   }
 }
 
@@ -349,11 +369,25 @@ async function loadCloud() {
   cloudLoaded.value = false
   cloudError.value = ''
   try {
-    const cat = await api.get('/api/v1/store/cloud/catalog')
-    cloudApps.value = cat.data.items || []
-    if (cloudStatus.value?.bound) {
-      const pur = await api.get('/api/v1/store/cloud/purchases')
-      cloudPurchases.value = pur.data.items || []
+    const { data } = await api.get('/api/v1/store/official/catalog', {
+      params: { page_size: 100 },
+    })
+    cloudApps.value = (data.items || []).map((a: any) => ({
+      ...a,
+      app_key: a.key,
+      description: a.summary || a.description || '',
+      needs_upgrade: Boolean(a.has_update),
+      license_input: a.license_input || '',
+    }))
+    if (instanceToken.value) {
+      try {
+        const pur = await api.post('/api/v1/store/official/purchases', {
+          instance_token: instanceToken.value,
+        })
+        cloudPurchases.value = pur.data.items || []
+      } catch {
+        cloudPurchases.value = []
+      }
     } else {
       cloudPurchases.value = []
     }
@@ -367,7 +401,7 @@ async function loadCloud() {
 
 async function startBind() {
   try {
-    const { data } = await api.post('/api/v1/store/cloud/bind/start', {})
+    const { data } = await api.post('/api/v1/store/official/bind/start', {})
     bindCode.value = data
     startBindPolling(data.device_code)
   } catch (e: any) {
@@ -380,10 +414,19 @@ function startBindPolling(deviceCode: string) {
   bindPolling.value = true
   bindTimer = window.setInterval(async () => {
     try {
-      const { data } = await api.post('/api/v1/store/cloud/bind/poll', { device_code: deviceCode })
+      const { data } = await api.post('/api/v1/store/official/bind/poll', {
+        device_code: deviceCode,
+      })
       if (data.status === 'approved') {
         stopBindPolling()
         bindCode.value = null
+        if (data.instance_token) {
+          instanceToken.value = data.instance_token
+          boundAccount.value = data.account || ''
+          localStorage.setItem(BIND_TOKEN_KEY, data.instance_token)
+          localStorage.setItem(BIND_ACCOUNT_KEY, boundAccount.value)
+          alert(`已连接官方账号：${boundAccount.value || '——'}`)
+        }
         await loadCloudStatus()
       } else if (data.status === 'denied' || data.status === 'expired') {
         stopBindPolling()
@@ -405,27 +448,42 @@ function stopBindPolling() {
   }
 }
 
-async function unbind() {
-  if (!confirm('解绑后本实例将无法下载已购应用，确认解绑？')) return
-  try {
-    await api.post('/api/v1/store/cloud/unbind')
-    cloudPurchases.value = []
-    await loadCloudStatus()
-  } catch (e: any) {
-    alert(e?.response?.data?.detail || '解绑失败')
-  }
+function unbind() {
+  if (!confirm('解绑后本实例将无法查看已购应用，确认解绑？')) return
+  instanceToken.value = ''
+  boundAccount.value = ''
+  localStorage.removeItem(BIND_TOKEN_KEY)
+  localStorage.removeItem(BIND_ACCOUNT_KEY)
+  cloudPurchases.value = []
+  cloudStatus.value = { ...cloudStatus.value, bound: false, account: '' }
+}
+
+/** 免费应用、或本实例已自带代码的应用，都不需要授权码 */
+function needsLicense(app: CloudApp): boolean {
+  return !app.is_free && !app.has_local_code && !purchaseOf(app.app_key)
 }
 
 async function installCloud(app: CloudApp) {
-  const p = purchaseOf(app.app_key)
-  if (!p) {
-    alert('该应用尚未购买，请先到官方门户购买后再安装')
-    return
+  let lic = purchaseOf(app.app_key)?.license_key || app.license_input || ''
+
+  if (needsLicense(app) && !lic) {
+    const input = window.prompt(
+      `「${app.name}」是付费应用。\n请粘贴官方门户购买后获得的授权码：`,
+      '',
+    )
+    if (!input || !input.trim()) return
+    lic = input.trim().toUpperCase()
+    app.license_input = lic
   }
+
   installing.value = app.app_key
   try {
-    const { data } = await api.post('/api/v1/store/cloud/install', { license_key: p.license_key })
-    alert(`已安装 ${data.app_key || app.app_key}`)
+    const { data } = await api.post('/api/v1/store/official/install', {
+      app_key: app.app_key,
+      license_key: lic,
+    })
+    const mode = data.mode === 'package' ? '（授权包）' : ''
+    alert(`已安装 ${data.app_key || app.app_key}${data.version ? ' @ ' + data.version : ''}${mode}`)
     await Promise.all([load(), loadCloud()])
   } catch (e: any) {
     alert(e?.response?.data?.detail || '安装失败')
@@ -435,16 +493,19 @@ async function installCloud(app: CloudApp) {
 }
 
 function cloudPriceText(app: CloudApp): string {
+  if (app.is_free) return '免费'
   const p = app.price
   if (!p || p.enabled === false) return '免费'
-  const unit = p.unit_price || '0.00'
+  const unit =
+    p.unit_price || (p.price_cents != null ? (p.price_cents / 100).toFixed(2) : '0.00')
   return p.model === 'seat' ? `¥${unit} / 席` : `¥${unit}`
 }
 
 function cloudListPriceText(app: CloudApp): string {
   const p = app.price
   if (!p || !p.is_discounted) return ''
-  const lp = p.list_price || ''
+  const lp =
+    p.list_price || (p.list_price_cents != null ? (p.list_price_cents / 100).toFixed(2) : '')
   return parseFloat(lp) > 0 ? `¥${lp}` : ''
 }
 
@@ -526,7 +587,7 @@ function categoryLabel(c: string): string {
         @click="activeTab = 'pending'; subTab = 'pending'"
       >{{ t('apps.tabSubmissions') }} ({{ pendingApps.length }})</button>
       <button
-        v-if="isSpoke"
+        v-if="marketReady"
         class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
         :class="activeTab === 'cloud' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
         @click="activeTab = 'cloud'; loadCloud()"
@@ -763,7 +824,7 @@ function categoryLabel(c: string): string {
         <div v-if="!cloudStatus.bound">
           <h3 class="font-semibold mb-1">连接 Cenkor 账号</h3>
           <p class="text-sm text-ink-600 mb-3">
-            绑定官方账号后，即可直接浏览官方应用市场、查看本账号已购应用并一键下载安装。
+            浏览目录与安装<strong>不需要绑定</strong>；绑定官方账号后，可自动匹配本账号已购的付费应用，省去手填授权码。
             购买请前往
             <a
               :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps'"
@@ -816,6 +877,10 @@ function categoryLabel(c: string): string {
               <h3 class="font-semibold">{{ app.name }}</h3>
               <code class="text-xs text-ink-400">{{ app.app_key }} @ {{ app.version }}</code>
               <span
+                v-if="app.is_free"
+                class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-600"
+              >免费</span>
+              <span
                 v-if="purchaseOf(app.app_key)"
                 class="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700"
               >已购</span>
@@ -844,15 +909,14 @@ function categoryLabel(c: string): string {
 
         <div class="mt-3 flex gap-2 border-t pt-3 flex-wrap">
           <button
-            v-if="purchaseOf(app.app_key)"
             class="btn-primary text-sm"
             :disabled="installing === app.app_key"
             @click="installCloud(app)"
           >{{ installing === app.app_key ? '安装中…'
               : app.installed ? (app.needs_upgrade ? '升级到最新' : '重新安装')
-              : '下载安装' }}</button>
+              : (needsLicense(app) ? '填授权码安装' : '一键安装') }}</button>
           <a
-            v-else
+            v-if="needsLicense(app)"
             :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps/' + app.app_key"
             target="_blank"
             class="btn-ghost text-sm"
@@ -877,8 +941,15 @@ function categoryLabel(c: string): string {
               {{ purchaseOf(app.app_key)?.permanent ? '永久有效' : '有效期至 ' + purchaseOf(app.app_key)?.expires_at }}
             </span>
           </div>
+          <p v-else-if="app.is_free" class="text-xs text-ink-400">
+            免费应用，无需授权码，点「一键安装」即可。
+          </p>
+          <p v-else-if="app.has_local_code" class="text-xs text-ink-400">
+            本实例已自带该应用代码，点「一键安装」直接启用。
+          </p>
           <p v-else class="text-xs text-ink-400">
-            尚未购买。购买发生在官方门户，付款后授权自动归到已绑定的账号，回到这里刷新即可安装。
+            付费应用：到官方门户购买后拿到授权码，回来点「填授权码安装」；
+            也可在门户「我的应用」下载安装包，到「已安装」页用「上传安装包」离线安装。
           </p>
         </div>
       </div>
