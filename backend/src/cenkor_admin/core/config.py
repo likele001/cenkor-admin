@@ -118,6 +118,11 @@ class Settings(BaseSettings):
     # ---- 应用授权中心（生态收费）----
     # 留空 = 本机即授权中心（自营部署：签发与校验同库）
     # 填 https://portal.cenkor.cn = 客户实例，向该地址激活 / 心跳 / 拉包
+    # ---- 官方应用市场（开源层：目录浏览 + 授权码安装）----
+    # 留空则回退 PORTAL_PUBLIC_URL（默认 https://portal.cenkor.cn）
+    # 与 CENKOR_CLOUD_URL 解耦：后者决定本机是授权中心还是客户实例，
+    # 而市场目录是公开数据，两种角色都应能浏览。
+    MARKET_HUB_URL: str = ""
     CENKOR_CLOUD_URL: str = ""
     # 授权中心不可达时的离线宽限天数（超期后收费应用停止放行）
     LICENSE_OFFLINE_GRACE_DAYS: int = 15
