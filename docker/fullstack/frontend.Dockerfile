@@ -4,9 +4,11 @@
 #   developer-web 的 src/style.css 通过相对路径引用兄弟目录 frontend/design-tokens
 FROM node:20-alpine AS build
 ARG FRONTEND
+# 依赖安装源：默认官方源（任意网络可构建）；国内可传 --build-arg NPM_REGISTRY=... 换镜像站
+ARG NPM_REGISTRY=https://registry.npmjs.org
 WORKDIR /repo/frontend/$FRONTEND
 COPY frontend/$FRONTEND/package.json frontend/$FRONTEND/package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN if [ -f package-lock.json ]; then npm ci --registry="$NPM_REGISTRY"; else npm install --registry="$NPM_REGISTRY"; fi
 
 COPY frontend/$FRONTEND/ ./
 # 兄弟目录：供 ../../design-tokens/tokens.css 等相对路径解析

@@ -83,7 +83,23 @@ async def lifespan(app: FastAPI):
                         await install_app(db, key)
                         log.info("app.auto_installed", key=key, version=manifest.version)
                     except Exception as e:
-                        log.warning("app.auto_install_failed", key=key, error=str(e))
+                        # 多 worker（uvicorn --workers N）同时启动时，同一个 App 会被并发安装：
+                        # 抢先的 worker 插入成功，其余撞 platform_apps 主键（UniqueViolation）。
+                        # 这属于幂等预期内 —— 回滚后确认记录已存在即可，不要当故障刷 warning；
+                        # 更关键的是必须 rollback，否则事务被污染，同进程后续 App 全部安装失败。
+                        await db.rollback()
+                        try:
+                            raced = (
+                                await db.execute(
+                                    select(InstalledApp).where(InstalledApp.key == key)
+                                )
+                            ).scalar_one_or_none() is not None
+                        except Exception:
+                            raced = False
+                        if raced:
+                            log.debug("app.auto_install.raced", key=key)
+                        else:
+                            log.warning("app.auto_install_failed", key=key, error=str(e))
                     continue
                 row = by_key.get(key)
                 if row is None or row.status != "installed":
