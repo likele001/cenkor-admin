@@ -60,10 +60,13 @@ services:
 
   minio:
     # MinIO 官方镜像已不可用：社区版停止发布后，minio/minio 于 2026-09 从 Docker Hub 删除，
-    # quay.io/minio 也已无法匿名拉取（401 UNAUTHORIZED）。改用 Chainguard 维护的免费镜像
-    # （cgr.dev/chainguard/minio，持续重建、跟进安全修复）。
+    # quay.io/minio 已无法匿名拉取（401），官方二进制站 dl.min.io 亦返回 410 Gone。
+    # 默认使用 Chainguard 维护的免费重建版（持续跟进安全修复），它同时发布在两个 registry：
+    #   chainguard/minio          ← Docker Hub，国内可用 Docker Hub 加速器代理（默认）
+    #   cgr.dev/chainguard/minio  ← Chainguard 官方，与上者同一镜像（digest 相同）
+    # 换源：在 .env 里设 MINIO_IMAGE=<上面的地址>:latest
     # ⚠️ 该镜像不含 curl/wget，故健康检查改用 bash /dev/tcp（镜像内自带 bash）。
-    image: cgr.dev/chainguard/minio:latest
+    image: ${MINIO_IMAGE:-chainguard/minio:latest}
     container_name: cenkorfs-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"

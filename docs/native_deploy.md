@@ -15,7 +15,10 @@
 - Node.js 20+
 - PostgreSQL 16（宝塔软件商店或系统包）
 - Redis 7
-- MinIO（本机为 systemd 托管的原生服务，数据目录 `/var/minio/data`；见 [`deploy.md` §5.3](deploy.md#53-minio本地对象存储--双写备份)）
+- MinIO（本机为 systemd 托管的原生服务，数据目录 `/var/minio/data`）
+  ⚠️ 官方下载站 `dl.min.io` 已返回 **410**，`wget dl.min.io/...` 那套教程已失效；
+  安装步骤（GitHub Release 的 `.deb` / 裸二进制 + systemd 单元）见
+  [`deploy.md` §5.3](deploy.md#53-minio本地对象存储--双写备份) 的「安装 MinIO（宿主机）」
 
 ## 步骤
 
