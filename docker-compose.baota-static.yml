@@ -40,8 +40,9 @@ services:
       retries: 5
 
   minio:
-    # MinIO 官方镜像已不可用（详见 docker-compose.fullstack.yml 注释），改用 Chainguard 镜像
-    image: cgr.dev/chainguard/minio:latest
+    # MinIO 官方镜像已不可用（详见 docker-compose.fullstack.yml 注释），改用 Chainguard 镜像。
+    # 默认走 Docker Hub（国内可用加速器代理）；如需换源，在 .env 里设 MINIO_IMAGE。
+    image: ${MINIO_IMAGE:-chainguard/minio:latest}
     container_name: cenkor-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
