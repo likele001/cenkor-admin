@@ -50,6 +50,31 @@ bash scripts/restart-backend-host.sh
 
 参考配置片段：[`deploy/baota/reverse-proxy.conf`](../deploy/baota/reverse-proxy.conf)
 
+## 🔑 初始管理员口令怎么拿（**必读**）
+
+> **本仓库没有任何默认口令** —— 管理员口令在首次灌种子数据时**随机生成**，
+> 库里只存 bcrypt 哈希，**事后推不回来**。`admin123` 之类的是本仓库历史上泄露过、现已移除的口令。
+
+**① 灌种子时直接看终端**（`scripts/migrate-and-seed-host.sh` / `seed.py` 会打印）：
+
+```
+  已创建管理员：admin@cenkor.cn
+  初始密码    ：xxxxxxxxxxxxxxxx
+```
+
+**② 没记下来 → 重置**（本脚本会自动识别「宿主机 venv」模式，无需进容器）：
+
+```bash
+bash scripts/reset-admin-password.sh                        # 随机生成并打印新口令
+bash scripts/reset-admin-password.sh --password '你的新口令'  # 指定新口令
+```
+
+> **想一开始就自己定**：灌种子前在 `.env`（或宝塔项目的环境变量）里设置
+> `CENKOR_ADMIN_PASSWORD=你的口令` —— 设了就不再随机、也不再打印。
+>
+> ⚠️ 注意配置优先级：**宝塔面板「环境变量」> `.env` > 代码默认值**。
+> 宝塔 Python 项目的 `env_list` 只有 7 条且不含本项，所以写到 `backend/.env` 即可生效。
+
 ## systemd 服务
 
 | Unit | 说明 |

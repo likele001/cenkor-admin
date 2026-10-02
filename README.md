@@ -53,12 +53,22 @@ bash scripts/bootstrap-fullstack.sh
 | `http://<IP>:8001/api/docs` | API 文档 / Swagger |
 | `http://<IP>:8001/api/health` | 健康检查 |
 
-> **开发者门户（应用中心）不在本开源仓库中**（闭源模块，见 `.gitignore` 的
-> `frontend/developer-web/`），因此默认不部署。在源码齐全的机器上加
-> `--profile developer` 即可启用（默认端口 `5175`）。
+> ℹ️ **「应用中心」在开源仓库内** —— 管理后台自带（侧边栏「系统 → 应用中心」，
+> `/system/apps`），可查看已装 App、安装 ZIP 包、启停应用，随 `bootstrap` 一起部署。
+> **闭源的是「开发者门户」**（`frontend/developer-web/`，供开发者上架 App），
+> 被 `.gitignore` 排除，默认不部署；源码齐全的机器上加 `--profile developer` 启用（端口 `5175`）。
 
 管理员账号为 `admin@cenkor.cn`。**初始口令是随机生成的，只在首次启动时打印一次**
-（`docker compose -f docker-compose.fullstack.yml logs backend`），请登录后立即修改。
+（`docker compose -f docker-compose.fullstack.yml logs backend | grep -A3 已创建管理员`），
+请登录后立即修改。**忘了口令、或日志已被容器重建清空**时：
+
+```bash
+bash scripts/reset-admin-password.sh                        # 随机生成新口令并打印
+bash scripts/reset-admin-password.sh --password '你的新口令'  # 或指定口令
+```
+
+> ⚠️ 本仓库**没有任何默认口令**，`admin123` 之类的「常见默认密码」一律无效
+> （它是本仓库历史上真实泄露过、现已移除的口令，别再用）。
 
 > 端口全部可用 `.env` 里的 `FS_*` 变量覆盖。完整说明见
 > [`docs/fullstack_deploy.md`](docs/fullstack_deploy.md)。

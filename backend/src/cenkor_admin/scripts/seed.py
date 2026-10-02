@@ -76,6 +76,10 @@ DEFAULT_MENUS = [
     ("system:portal-users", "system", "前台会员", "users", "/system/portal-users", 94),
     ("system:roles", "system", "角色", "shield", "/system/roles", 92),
     ("system:menus", "system", "菜单", "menu", "/system/menus", 93),
+    # 应用中心：列出/安装/启停平台 App（前端 frontend/admin-web 的 AppsView.vue，
+    # 接口 /api/v1/system/apps）。此前未纳入种子 → 全新部署侧边栏没有入口，
+    # 用户「装了 App 却找不到应用中心」。seed 幂等，老库执行后会自动补挂到超管。
+    ("system:apps", "system", "应用中心", "puzzle", "/system/apps", 94),
     ("system:audit", "system", "审计日志", "history", "/system/audit", 99),
     ("system:notifications", "system", "通知管理", "bell", "/system/notifications", 95),
     ("system:settings", "system", "系统设置", "settings-2", "/system/settings", 96),
@@ -461,6 +465,87 @@ async def main() -> None:
             ))
             await db.commit()
             log.info("seed.apps.cms.installed")
+
+        # ---- 应用中心：官方应用自动上架（商店目录）----
+        # 「应用中心 → 商店」的数据来自 app_submissions ⨝ app_developers，而公开仓库里
+        # 这两张表**没有任何种子数据**（公开迁移只建表、seed 也不写）→ 全新部署商店恒为 0。
+        # 这里用「Cenkor 官方」开发者把**本地已带 manifest 的应用**补一条 installed 上架记录：
+        #   - 这些应用本地已有源码，前端 storeInstall() 检测到 app_key 在本地会直接走
+        #     系统安装（/system/apps/{key}/install），**不解压 ZIP** → file_path 允许为空；
+        #   - 幂等：按唯一约束 (app_key, version) 判重，源码 bump 版本后自动补新记录；
+        #   - 闭源商业应用（crm/erp/mes/payment/workflow）不在开源仓库里，自然不会被上架。
+        try:
+            import dataclasses
+            from datetime import datetime, timezone
+
+            from cenkor_admin.apps.system.app_registry import scan_app_manifests
+            from cenkor_admin.apps.system.store_models import AppSubmission, Developer
+
+            manifests = scan_app_manifests()
+            admin_user = (
+                await db.execute(
+                    select(auth_models.User)
+                    .where(auth_models.User.is_superuser.is_(True))
+                    .order_by(auth_models.User.id)
+                )
+            ).scalars().first()
+            if admin_user is None:  # 极端情况：没有任何超级管理员
+                admin_user = (
+                    await db.execute(select(auth_models.User).order_by(auth_models.User.id))
+                ).scalars().first()
+
+            if manifests and admin_user is not None:
+                dev = (
+                    await db.execute(select(Developer).where(Developer.user_id == admin_user.id))
+                ).scalar_one_or_none()
+                if dev is None:
+                    dev = Developer(
+                        user_id=admin_user.id,
+                        display_name="Cenkor 官方",
+                        description="平台官方应用，随平台源码分发，无需另行注册开发者账号。",
+                        status="active",
+                    )
+                    db.add(dev)
+                    await db.flush()
+
+                listed = 0
+                for key, mf in manifests.items():
+                    dup = (
+                        await db.execute(
+                            select(AppSubmission.id).where(
+                                AppSubmission.app_key == key,
+                                AppSubmission.version == mf.version,
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if dup:
+                        continue
+                    db.add(AppSubmission(
+                        developer_id=dev.id,
+                        app_key=key,
+                        name=mf.name,
+                        version=mf.version,
+                        description=mf.description or "",
+                        icon=mf.icon or "📦",
+                        category=mf.category or "system",
+                        manifest_data=dataclasses.asdict(mf),
+                        status="installed",
+                        reviewed_by=admin_user.id,
+                        reviewed_at=datetime.now(timezone.utc),
+                        review_note="平台内置应用（本地已有源码），随源码分发自动上架",
+                    ))
+                    listed += 1
+                await db.commit()
+                log.info(
+                    "seed.store.done",
+                    developer=dev.display_name,
+                    listed=listed,
+                    manifests=len(manifests),
+                )
+        except Exception as e:
+            # 商店上架失败不该拖垮整个 seed（老库可能还没跑迁移）
+            await db.rollback()
+            log.warning("seed.store.failed", error=str(e))
 
     await async_engine.dispose()
     log.info("seed.done")

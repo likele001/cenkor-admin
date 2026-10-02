@@ -100,4 +100,4 @@ else
   echo "  API      https://api.cenkor.cn"
 fi
 echo ""
-info "默认账号：admin@cenkor.cn / admin123（首次登录后请修改）"
+info "管理员账号：admin@cenkor.cn（初始口令随机生成、部署时只打印一次；忘记请执行 bash scripts/reset-admin-password.sh 重置）"

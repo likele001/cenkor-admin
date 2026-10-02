@@ -214,9 +214,10 @@ curl -s http://127.0.0.1:8002/api/health
 | 字段 | 值 |
 |------|-----|
 | 邮箱 | `admin@cenkor.cn` |
-| 密码 | `admin123` |
+| 密码 | **无默认口令** —— 首次 seed 时随机生成，只打印一次（见部署终端 / 后端日志） |
 
-**上线后请立即修改密码。**
+> **忘记口令**：服务器上执行 `bash scripts/reset-admin-password.sh`（随机生成并打印），
+> 或 `bash scripts/reset-admin-password.sh --password '新口令'` 指定。登录后请立即修改。
 
 ---
 
@@ -619,7 +620,7 @@ VITE_API_BASE_URL=https://api.cenkor.cn bash scripts/build-frontends.sh
 
 ---
 
-**默认账号：** `admin@cenkor.cn` / `admin123`（上线后请修改）
+**管理员账号：** `admin@cenkor.cn`（**无默认口令**，初始口令随机生成、只打印一次；忘记可 `bash scripts/reset-admin-password.sh` 重置）
 
 
 

@@ -131,7 +131,8 @@ if [[ "$BACKEND_LOG" == *"已创建管理员"* ]]; then
   echo "  （口令只显示这一次，请立即登录并修改）"
 else
   echo "  本次日志中没有新建管理员的口令（该库的管理员此前已存在）。"
-  echo "  如需重置口令：$COMPOSE_BASE exec backend python -m cenkor_admin.scripts.seed"
+  echo "  口令只在首次初始化时打印一次；容器重建后日志会消失，此时只能重置："
+  echo "      bash scripts/reset-admin-password.sh"
 fi
 echo
 echo "常用运维："

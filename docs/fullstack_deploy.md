@@ -34,9 +34,12 @@
 | Redis | `6382` |
 | MinIO API / 控制台 | `9006` / `9007` |
 
-> ⚠️ **开发者门户（应用中心）不在本开源仓库中** —— `frontend/developer-web/` 被 `.gitignore` 排除。
-> 因此 compose 里该服务挂在 `profiles: ["developer"]` 下，**默认不构建**，公开仓库 clone 下来
-> 一条命令即可跑通。在源码齐全的机器上启用：`--profile developer`。
+> ℹ️ **「应用中心」在开源仓库内，不在开源仓库里的是「开发者门户」。**
+> 管理后台 admin-web 自带应用中心（侧边栏「系统 → 应用中心」，`/system/apps`，接口
+> `/api/v1/system/apps`），可查看已装 App、安装 ZIP 包、启停应用，**默认随 `bootstrap` 部署**。
+> 闭源的是 `frontend/developer-web/`（**开发者门户**，供开发者上架/管理自己的 App），
+> 被 `.gitignore` 排除 → compose 里挂在 `profiles: ["developer"]` 下，**默认不构建**，
+> 公开仓库 clone 下来一条命令即可跑通。在源码齐全的机器上启用：`--profile developer`。
 > `scripts/bootstrap-fullstack.sh` 会自动探测该目录是否存在并决定是否带上 profile。
 
 > 端口与宝塔 Python 项目（8000/8002/8008/8500/23789/30080/9700 等）及
@@ -106,10 +109,45 @@ docker compose -f docker-compose.fullstack.yml up -d --build
 | 灌入种子数据（幂等）→ 打印管理员初始口令 | 同上 |
 | 构建三个前端（各自内置 Nginx 托管 dist、反代 `/api` 到 `backend:8000`） | 镜像构建阶段 |
 
-管理员初始口令打印在服务端日志中：
+### 🔑 初始管理员口令怎么拿（**必读，否则登不进去**）
+
+> **本仓库没有任何默认口令。** `admin123` / `admin@123` 之类的「常见默认密码」**一律无效** ——
+> 口令在首次初始化时**随机生成**，只完整显示一次；库里只存 bcrypt 哈希，**事后推不回来**。
+
+**① 部署时直接看终端**（`bootstrap-fullstack.sh` 收尾会打印）：
+
+```
+====================================================================
+  已创建管理员：admin@cenkor.cn
+  初始密码    ：xxxxxxxxxxxxxxxx
+  ⚠️ 此口令只显示这一次，请立即登录并修改
+====================================================================
+```
+
+**② 当时没记下来 → 翻服务端日志**：
 
 ```bash
 docker compose -f docker-compose.fullstack.yml logs backend | grep -A3 已创建管理员
+```
+
+**③ 日志也没了 → 用重置脚本**（会同时递增 `token_version` 踢掉旧会话）：
+
+```bash
+bash scripts/reset-admin-password.sh                      # 随机生成并打印新口令
+bash scripts/reset-admin-password.sh --password 'YourPass'  # 指定新口令
+```
+
+> ⚠️ **注意日志不是永久的**：`docker compose down`（即使不带 `-v`，数据卷保留）也会**重建容器** →
+> 容器日志清空；而此刻 seed 发现管理员已存在会**跳过、不再打印** → 口令就此丢失，只能走 ③。
+>
+> `admin123` 是本仓库**历史上真实泄露过的默认口令**（曾被印到公网部署页上），
+> 现已彻底移除；如你在别处仍看到它，那是过期资料。
+
+**想一开始就自己定口令**：部署前写进 `.env`，`seed` 会优先取值（设了就不再随机、也不再打印）：
+
+```bash
+echo 'CENKOR_ADMIN_PASSWORD=你的口令' >> .env
+bash scripts/bootstrap-fullstack.sh
 ```
 
 > 需要跳过自动初始化时：`SEED_ON_STARTUP=0`（跳过种子数据）、`SKIP_MIGRATE=1`（跳过迁移）。
@@ -120,9 +158,13 @@ docker compose -f docker-compose.fullstack.yml logs backend | grep -A3 已创建
 |------|------|
 | `http://服务器IP:5185` | 管理后台登录页 |
 | `http://服务器IP:5192` | 门户用户中心 |
-| `http://服务器IP:5175` | 开发者门户 |
+| `http://服务器IP:5175` | 开发者门户（闭源模块，需 `--profile developer`） |
 | `http://服务器IP:8001/api/health` | 后端健康检查 |
 | `http://服务器IP:8001/api/docs` | Swagger 文档 |
+
+> 登录后侧边栏应有「**系统 → 应用中心**」（`/system/apps`）。若缺失，执行
+> `docker compose -f docker-compose.fullstack.yml exec backend python -m cenkor_admin.scripts.seed`
+> 补齐菜单（seed 幂等，会给超管补挂该菜单）。
 
 ---
 
