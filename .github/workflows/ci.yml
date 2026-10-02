@@ -110,6 +110,9 @@ jobs:
         run: cd backend && mypy src/ --ignore-missing-imports || true
         continue-on-error: true
 
+      - name: 迁移图自检（无断链 / 单 head）
+        run: python3 scripts/check-migration-graph.py --tracked-only
+
       - name: Init DB & Run migrations
         env:
           DB_NAME: ${{ matrix.db.name }}
