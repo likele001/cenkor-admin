@@ -85,13 +85,13 @@ docker compose exec backend python -m cenkor_admin.scripts.seed
 - 管理后台：<http://localhost:5173>
 - 用户中心：`npm run dev:portal` → <http://localhost:5175>
 - API 文档：<http://localhost:8000/api/docs>
-- 默认账号：`admin@cenkor.cn` / `admin123`
+- 管理员：`admin@cenkor.cn`（**无默认口令**，初始口令随机生成、只打印一次）
 
 > 后端 lifespan 会自动执行 `alembic upgrade head`，通常无需手动跑迁移。
 
-> ⚠️ **安全提示**：默认管理员密码是明文写在文档里的种子数据。
-> **任何部署到公网之前必须先做三件事**：① 改默认管理员密码；② 换 `SECRET_KEY`；
-> ③ 删除或禁用不需要的种子账号。否则任何人都能用 `admin@cenkor.cn` / `admin123` 登录。
+> ⚠️ **安全提示**：本仓库**不含任何默认口令**，管理员口令在首次初始化时随机生成、只打印一次。
+> **任何部署到公网之前必须先做三件事**：① 登录后立即把初始口令改掉；② 换 `SECRET_KEY`；
+> ③ 删除或禁用不需要的种子账号。（历史版本曾把 `admin123` 明文写进文档，已彻底移除。）
 
 ---
 

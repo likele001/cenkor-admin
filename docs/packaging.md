@@ -154,7 +154,7 @@ curl -sI https://portal.your.com/
 curl -s https://admin.your.com/api/health
 ```
 
-默认账号：`admin@cenkor.cn` / `admin123`（首次 seed 后请改密）
+管理员：`admin@cenkor.cn`（**无默认口令**，初始口令由 seed 随机生成并只打印一次；忘记可 `bash scripts/reset-admin-password.sh` 重置）
 
 ---
 

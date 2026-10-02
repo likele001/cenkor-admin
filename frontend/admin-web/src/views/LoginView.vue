@@ -12,7 +12,7 @@ const auth = useAuthStore()
 const { t } = useI18n()
 
 const username = ref('admin@cenkor.cn')
-const password = ref('admin123')
+const password = ref('')
 const loading = ref(false)
 const error = ref('')
 const captchaRef = ref<InstanceType<typeof SliderCaptcha> | null>(null)
@@ -133,9 +133,8 @@ function loginFeishu() {
           {{ t('login.feishu') }}
         </button>
 
-        <p class="text-xs text-ink-400 text-center">
-          {{ t('login.defaultHint') }} <code class="px-1.5 py-0.5 rounded bg-ink-100">admin@cenkor.cn</code> /
-          <code class="px-1.5 py-0.5 rounded bg-ink-100">admin123</code>
+        <p class="text-xs text-ink-400 text-center leading-relaxed">
+          {{ t('login.initialPasswordHint') }}
         </p>
       </form>
 

@@ -112,6 +112,7 @@ const ICON_MAP: Record<string, string> = {
   'folder': '📁',
   'tag': '🏷️',
   'package': '📦',
+  'puzzle': '🧩',
   'globe': '🌐',
   'image': '🖼️',
   'shopping-bag': '🛍️',

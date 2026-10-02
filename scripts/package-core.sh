@@ -116,7 +116,7 @@ bash scripts/deploy-baota-static.sh
 
 每个站点：伪静态见 \`deploy/baota/rewrite-*.conf\`，API 见 \`server-snippet-*-api.conf\`。
 
-默认账号：\`admin@cenkor.cn\` / \`admin123\`
+管理员账号：\`admin@cenkor.cn\`（**无默认口令**，初始口令随机生成、只打印一次；忘记可执行 \`bash scripts/reset-admin-password.sh\` 重置）
 EOF
 
 ARCHIVE="$RELEASE_DIR/${PKG_NAME}.tar.gz"
