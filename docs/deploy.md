@@ -233,6 +233,105 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9000/minio/health/live
 > CMS 上传会**双写**一份到本地 MinIO（代码路径：`apps/cms/router.py` 里的 `s3.minio` 单例）。
 > 一旦本地 MinIO 挂掉，上传链路会报错。
 
+#### 安装 MinIO（宿主机）
+
+> ⚠️ **官方下载站 `dl.min.io` 已下线**：MinIO 开源版自 2025-10 起停发社区版二进制，
+> `https://dl.min.io/server/minio/release/...` 现在返回 **410 Gone**（`mc`、`kes` 同样 410）。
+> 网上多数教程里的 `wget https://dl.min.io/...` **已经失效**。
+>
+> 官方最后一次发版是 **`RELEASE.2025-09-07T16-13-09Z`**，其二进制**仍保留在 GitHub Release 上**，可正常下载。
+> （`RELEASE.2025-10-15T17-29-55Z` 那个含安全修复的版本**从未发布任何二进制资产**。）
+
+**方式一：裸二进制 + 自定义 systemd 单元（推荐 —— 与本文档 §5.3 的布局一致）**
+
+MinIO 是**单个静态链接的 Go 二进制**（`file` 显示 `statically linked`、`ldd` 显示
+`not a dynamic executable`），不依赖任何系统库 —— **拷到任何同架构机器上直接就能跑**。
+
+```bash
+V=RELEASE.2025-09-07T16-13-09Z
+B=https://github.com/minio/minio/releases/download/$V
+curl -fLo /usr/local/bin/minio "$B/minio.linux-amd64.$V"
+curl -fsL "$B/minio.linux-amd64.$V.sha256sum"                  # 对照校验值
+sudo chmod +x /usr/local/bin/minio
+/usr/local/bin/minio --version                                 # RELEASE.2025-09-07T16-13-09Z
+```
+
+> ⚠️ 资产名是 **`minio.linux-amd64.RELEASE.…`**，**不是** `minio` ——
+> 直接访问 `.../download/<tag>/minio` 会 **404**。arm64 用 `minio.linux-arm64.RELEASE.…`。
+>
+> 命令行客户端 `mc` 同理（`mc.linux-amd64.RELEASE.2025-08-13T08-35-41Z`，取自 `minio/mc` 的 Release）。
+
+```ini
+# /etc/systemd/system/minio.service
+[Unit]
+Description=MinIO
+After=network.target
+
+[Service]
+User=www
+Group=www
+ExecStart=/usr/local/bin/minio server /var/minio/data --address :9000
+Restart=always
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo mkdir -p /var/minio/data && sudo chown -R www:www /var/minio
+sudo systemctl daemon-reload && sudo systemctl enable --now minio
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9000/minio/health/live   # 200
+```
+
+**方式二：`.deb` 包（Debian / Ubuntu）**
+
+```bash
+V=RELEASE.2025-09-07T16-13-09Z
+B=https://github.com/minio/minio/releases/download/$V
+curl -fLO "$B/minio_20250907161309.0.0_amd64.deb"
+curl -fLO "$B/minio_20250907161309.0.0_amd64.deb.sha256sum"
+sha256sum -c minio_20250907161309.0.0_amd64.deb.sha256sum      # 必须输出 OK
+sudo dpkg -i minio_20250907161309.0.0_amd64.deb
+```
+
+> ⚠️ **这个包只有两个文件**：`/usr/local/bin/minio` 和一个 systemd 单元
+> `/lib/systemd/system/minio.service`，**没有 `postinst`** —— 装完**不会**建用户、不会建配置、不会启动。
+> 而且包内那个单元写的是 `User=minio-user`、`ExecStart=… $MINIO_OPTS $MINIO_VOLUMES`
+> （依赖 `/etc/default/minio`）—— 这两样包里都没有，**直接 `systemctl enable --now minio` 会失败**。
+> 补齐前置即可：
+>
+> ```bash
+> sudo useradd -r -s /sbin/nologin minio-user
+> sudo mkdir -p /var/minio/data && sudo chown -R minio-user:minio-user /var/minio
+> sudo tee /etc/default/minio >/dev/null <<'EOF'
+> MINIO_VOLUMES="/var/minio/data"
+> MINIO_OPTS="--address :9000 --console-address :9001"
+> EOF
+> sudo systemctl daemon-reload && sudo systemctl enable --now minio
+> ```
+>
+> 若想直接用本机这套布局（`www` 用户、`/var/minio/data`、不依赖 `/etc/default/minio`），
+> 用**方式一**的自定义单元覆盖包内单元即可。
+>
+> ✅ **实测（Ubuntu 24.04）**：按「**先建用户/目录/配置 → 再装包 → 最后 `enable --now`**」
+> 这个顺序可一次成功 —— `is-active: active`、`is-enabled: enabled`、
+> `GET /minio/health/live` 返回 **200**、进程用户为 `minio-user`。
+>
+> ⚠️ **顺序搞反会撞两个坑**（先 `systemctl start` 再补用户时）：
+> 先报 **`status=217/USER`**（找不到 `minio-user`），连续失败后 systemd 触发**启动频率限制**，
+> 后续无论怎么改都只看到 `Start request repeated too quickly` —— 这**不是**配置又坏了。
+> 清掉失败计数即可：
+>
+> ```bash
+> sudo systemctl reset-failed minio && sudo systemctl start minio
+> ```
+
+> **需要更新的版本时**：官方二进制已永久停在 `2025-09-07`。若要持续的安全修复，
+> 改用 Chainguard 维护的镜像 **`chainguard/minio`** ——
+> 它同时发布在 Docker Hub（`chainguard/minio`，国内可用 Docker Hub 加速器代理）与
+> `cgr.dev/chainguard/minio`，**两处是同一个镜像（digest 相同）**，目前跟到 `RELEASE.2026-09-22`。
+
 ### 5.4 对象存储（七牛云 Kodo）
 
 | 项 | 值 |
