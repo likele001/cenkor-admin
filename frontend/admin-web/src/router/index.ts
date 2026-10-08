@@ -44,6 +44,7 @@ import MarketOverviewView from '@/views/market/MarketOverviewView.vue'
 import MarketPricingView from '@/views/market/MarketPricingView.vue'
 import MarketDevelopersView from '@/views/market/MarketDevelopersView.vue'
 import MarketWithdrawalsView from '@/views/market/MarketWithdrawalsView.vue'
+import StoreOrdersView from '@/views/market/StoreOrdersView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -101,6 +102,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'market/pricing', name: 'market-pricing', component: MarketPricingView, meta: { permission: 'rbac:role:read' } },
       { path: 'market/developers', name: 'market-developers', component: MarketDevelopersView, meta: { permission: 'rbac:role:read' } },
       { path: 'market/withdrawals', name: 'market-withdrawals', component: MarketWithdrawalsView, meta: { permission: 'rbac:role:read' } },
+      { path: 'market/orders', name: 'market-orders', component: StoreOrdersView, meta: { permission: 'rbac:role:read' } },
       // Apps
       { path: 'announcements', name: 'announcements', component: AnnouncementsView, meta: { permission: 'announcements:read' } },
       { path: 'tickets', name: 'tickets', component: TicketsView, meta: { permission: 'tickets:read' } },
