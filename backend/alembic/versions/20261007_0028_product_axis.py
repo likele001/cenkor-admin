@@ -1,19 +1,25 @@
-"""product axis: 多产品/宿主维度 + app_key 命名空间
+"""product axis（公开部分）：app_submissions 多产品维度 + app_key 命名空间
 
 统一门户 hub（portal.cenkor.cn / admin.cenkor.cn）要同时服务 cenkormes / lightmes /
 cenkor-admin 等多条产品线，必须给交易与制品模型加「目标产品」维度做目录隔离，
 并把 app_key 的唯一性从全局升级为 (product, app_key) 命名空间，避免跨产品同名 key 撞车。
 
+本迁移只处理【公开表】：
 - app_submissions  加 product；唯一约束 (app_key, version) → (product, app_key, version)
-- app_pricing      加 product；app_key 唯一索引 → (product, app_key) 唯一约束
-- app_orders / app_licenses  加 product（交易/授权按产品归属，便于过滤与对账）
-- cloud_device_codes / cloud_instances  加 product（实例绑定时上报所属产品）
+
+其余（app_pricing / app_orders / app_licenses / cloud_device_codes / cloud_instances）由闭源
+迁移 20261007_0029_product_commerce 接续，因为那些表由商业 commerce / cloud 迁移创建，
+公开仓库里不存在。
 
 存量数据全部是平台自营应用，回填 product='cenkor-admin'（server_default 兜底），
 无跨产品冲突。所有加列均 NOT NULL + server_default，可安全回滚。
 
+# 挂载点说明：本迁移只依赖公开表 app_submissions（由 20260611_1500_app_store 创建），
+# 因此挂在【公开链 head】20260925_0026_app_enabled 上。切勿改挂到 20260925_0027_workflow ——
+# 那属于闭源链，不进公开仓库，挂进去会让 clone 出来的实例在 alembic upgrade head
+# 时报 KeyError，数据库一张表都建不出来（闭源链整体已顺延挂到本迁移之后）。
 Revision ID: 20261007_0028_product_axis
-Revises: 20260925_0027_workflow
+Revises: 20260925_0026_app_enabled
 Create Date: 2026-10-07
 """
 from __future__ import annotations
@@ -22,7 +28,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20261007_0028_product_axis"
-down_revision = "20260925_0027_workflow"
+down_revision = "20260925_0026_app_enabled"
 branch_labels = None
 depends_on = None
 
@@ -43,66 +49,8 @@ def upgrade() -> None:
         ["product", "app_key", "version"],
     )
 
-    # ---------- app_pricing ----------
-    op.add_column(
-        "app_pricing",
-        sa.Column("product", sa.String(length=32), nullable=False, server_default=DEFAULT_PRODUCT),
-    )
-    op.create_index("ix_app_pricing_product", "app_pricing", ["product"])
-    # 旧：app_key 上是唯一索引 ix_app_pricing_app_key（由 unique=True,index=True 生成）
-    op.drop_index("ix_app_pricing_app_key", table_name="app_pricing")
-    # 新：app_key 保留普通索引（model index=True），唯一性改由 (product, app_key) 约束保证
-    op.create_index("ix_app_pricing_app_key", "app_pricing", ["app_key"])
-    op.create_unique_constraint("uq_app_pricing_product_key", "app_pricing", ["product", "app_key"])
-
-    # ---------- app_orders ----------
-    op.add_column(
-        "app_orders",
-        sa.Column("product", sa.String(length=32), nullable=False, server_default=DEFAULT_PRODUCT),
-    )
-    op.create_index("ix_app_orders_product", "app_orders", ["product"])
-
-    # ---------- app_licenses ----------
-    op.add_column(
-        "app_licenses",
-        sa.Column("product", sa.String(length=32), nullable=False, server_default=DEFAULT_PRODUCT),
-    )
-    op.create_index("ix_app_licenses_product", "app_licenses", ["product"])
-
-    # ---------- cloud_device_codes ----------
-    op.add_column(
-        "cloud_device_codes",
-        sa.Column("product", sa.String(length=32), nullable=False, server_default=DEFAULT_PRODUCT),
-    )
-    op.create_index("ix_cloud_device_codes_product", "cloud_device_codes", ["product"])
-
-    # ---------- cloud_instances ----------
-    op.add_column(
-        "cloud_instances",
-        sa.Column("product", sa.String(length=32), nullable=False, server_default=DEFAULT_PRODUCT),
-    )
-    op.create_index("ix_cloud_instances_product", "cloud_instances", ["product"])
-
 
 def downgrade() -> None:
-    op.drop_index("ix_cloud_instances_product", table_name="cloud_instances")
-    op.drop_column("cloud_instances", "product")
-
-    op.drop_index("ix_cloud_device_codes_product", table_name="cloud_device_codes")
-    op.drop_column("cloud_device_codes", "product")
-
-    op.drop_index("ix_app_licenses_product", table_name="app_licenses")
-    op.drop_column("app_licenses", "product")
-
-    op.drop_index("ix_app_orders_product", table_name="app_orders")
-    op.drop_column("app_orders", "product")
-
-    op.drop_constraint("uq_app_pricing_product_key", "app_pricing", type_="unique")
-    op.drop_index("ix_app_pricing_app_key", table_name="app_pricing")
-    op.create_index("ix_app_pricing_app_key", "app_pricing", ["app_key"], unique=True)
-    op.drop_index("ix_app_pricing_product", table_name="app_pricing")
-    op.drop_column("app_pricing", "product")
-
     op.drop_constraint("uq_app_submission_product_key_version", "app_submissions", type_="unique")
     op.create_unique_constraint(
         "uq_app_submission_key_version", "app_submissions", ["app_key", "version"]
