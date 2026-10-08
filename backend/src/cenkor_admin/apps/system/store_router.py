@@ -35,6 +35,9 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 APPS_DIR = Path(__file__).resolve().parent.parent
+# 外置应用目录：`cenkor_admin/apps/__init__.py` 把它追加进包的 ``__path__``，
+# 于是 `import cenkor_admin.apps.<key>` 在两处都能解析到同名应用。
+EXTERNAL_APPS_DIR = APPS_DIR.parent.parent / "apps"
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent.parent / "uploads" / "apps"
 # 前端静态资源目录（与 main.py 中的挂载点一致）
 FRONTEND_STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "apps"
@@ -468,7 +471,7 @@ async def list_submissions(
         "items": [
             {"id": s.id, "app_key": s.app_key, "name": s.name, "version": s.version,
              "description": s.description, "icon": s.icon, "category": s.category,
-             "status": s.status, "review_note": s.review_note,
+             "status": s.status, "review_note": s.review_note, "product": s.product or "cenkor-admin",
              "author": author,
              "download_count": s.download_count,
              "created_at": s.created_at.isoformat() if s.created_at else None,
@@ -787,6 +790,7 @@ async def install_submission(
         raise HTTPException(400, "ZIP 文件不存在，请重新上传")
 
     # 解压到 apps 目录（兼容 ZIP 根目录或单层子目录打包）
+    _guard_against_shadowed_source(sub.app_key)
     app_dir = APPS_DIR / sub.app_key
     try:
         with zipfile.ZipFile(sub.file_path, "r") as zf:
@@ -868,6 +872,30 @@ async def install_submission(
 
 # alembic 迁移文件目录
 ALEMBIC_VERSIONS_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "alembic" / "versions"
+
+
+def _guard_against_shadowed_source(app_key: str) -> None:
+    """安装前检查：外置目录已有同名应用源码时拒绝安装。
+
+    ``cenkor_admin.apps`` 的 ``__path__`` 是【内置目录在前、外置目录在后】，
+    而商店安装落盘到内置目录 —— 于是一份陈旧的安装副本会从此遮蔽外置那份
+    维护中的源码：改外置代码不生效，运行时拿到的是包里的旧 API。
+    实例（2026-10-08）：payment 1.0.0 装进内置目录后，外置 payment 已有的
+    ``detect_terminal`` 终端选路在 commerce 下单时报 AttributeError。
+
+    只拦「外置有源码 + 要装到内置」这一种重叠；客户实例上没手工维护的外置
+    源码，正常安装不受影响。
+    """
+    external_dir = EXTERNAL_APPS_DIR / app_key
+    if not external_dir.is_dir():
+        return
+    raise HTTPException(
+        409,
+        f"「{app_key}」的源码在外置目录 backend/src/apps/{app_key}/，"
+        f"而商店安装会写到内置目录 backend/src/cenkor_admin/apps/{app_key}/；"
+        "内置副本优先级更高，装完会遮蔽外置源码（改了不生效、运行时拿到旧 API）。"
+        "请先把外置目录改名或移除，或直接更新外置源码后重装。",
+    )
 
 
 def _extract_app_zip(zf: zipfile.ZipFile, app_dir: Path) -> None:
@@ -1041,6 +1069,7 @@ async def install_app_from_zip(
     if not zip_path.exists():
         raise HTTPException(400, "ZIP 文件不存在")
 
+    _guard_against_shadowed_source(app_key)
     app_dir = APPS_DIR / app_key
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
