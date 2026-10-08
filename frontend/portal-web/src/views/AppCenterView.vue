@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { hasPriceInfo, isFreePrice, yuanText, type AppPrice } from '@/lib/pricing'
@@ -24,6 +25,8 @@ interface StoreApp {
   installed_version?: string | null
   has_update?: boolean
   updated_at?: string | null
+  /** 所属产品（多产品轴）：cenkormes / lightmes / cenkor-admin */
+  product?: string
   /** null = 免费 / 未定价 */
   price?: AppPrice | null
 }
@@ -32,6 +35,20 @@ interface Facet { key: string; label: string; count: number }
 interface Stats { apps: number; installed: number; upgradable: number; downloads: number }
 
 const { t } = useI18n()
+const route = useRoute()
+
+/** 产品切换（统一门户多产品线）：空=全部 */
+const activeProduct = ref(String(route.query.product || '').trim())
+const PRODUCT_TABS: { key: string; label: string }[] = [
+  { key: '', label: '全部产品' },
+  { key: 'cenkormes', label: 'CenkorMES' },
+  { key: 'lightmes', label: 'LightMES' },
+  { key: 'cenkor-admin', label: 'Cenkor 平台' },
+]
+function productLabel(p?: string): string {
+  if (!p) return ''
+  return PRODUCT_TABS.find((x) => x.key === p)?.label || p
+}
 
 /** 本账号已购应用（卡片上打「已拥有」标） */
 const { isOwned, load: loadOwned } = useOwnedApps()
@@ -62,7 +79,7 @@ watch(keyword, (v) => {
   debounce = setTimeout(() => { q.value = v.trim() }, 300)
 })
 
-watch([q, activeCategory, sort], () => {
+watch([q, activeCategory, sort, activeProduct], () => {
   page.value = 1
   void load(false)
 })
@@ -81,6 +98,7 @@ async function load(append: boolean) {
     }
     if (q.value) params.q = q.value
     if (activeCategory.value) params.category = activeCategory.value
+    if (activeProduct.value) params.product = activeProduct.value
 
     const { data } = await api.get('/api/v1/store/apps', { params })
     const items: StoreApp[] = Array.isArray(data?.items) ? data.items : []
@@ -205,6 +223,19 @@ function relTime(iso?: string | null): string {
           </div>
         </div>
 
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-[#8b8e96] shrink-0">产品</span>
+          <button
+            v-for="p in PRODUCT_TABS"
+            :key="p.key"
+            class="px-3 py-1.5 text-xs rounded-full border transition-colors"
+            :class="activeProduct === p.key
+              ? 'bg-[#4f46e5] text-white border-[#4f46e5]'
+              : 'bg-white text-[#6b6e76] border-[#e5e7eb] hover:border-[#9ca3af]'"
+            @click="activeProduct = p.key"
+          >{{ p.label }}</button>
+        </div>
+
         <div class="flex flex-wrap gap-2">
           <button
             class="px-3 py-1.5 text-xs rounded-full border transition-colors"
@@ -296,6 +327,10 @@ function relTime(iso?: string | null): string {
                 <span class="inline-block mt-1.5 px-2 py-0.5 text-[10px] rounded-full bg-[#eef2ff] text-[#4f46e5]">
                   {{ categoryLabel(a) }}
                 </span>
+                <span
+                  v-if="a.product && a.product !== 'cenkor-admin'"
+                  class="inline-block mt-1.5 ml-1 px-2 py-0.5 text-[10px] rounded-full bg-[#f1f5f9] text-[#475569]"
+                >{{ productLabel(a.product) }}</span>
               </div>
             </div>
 

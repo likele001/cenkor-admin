@@ -30,6 +30,9 @@ class AppSubmission(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     developer_id: Mapped[int] = mapped_column(Integer, ForeignKey("app_developers.id"), nullable=False, index=True)
+    # 目标产品/宿主：cenkor-admin（平台内置应用）/ cenkormes / lightmes ...
+    # 多产品目录隔离与 app_key 命名空间的维度，默认平台自营。
+    product: Mapped[str] = mapped_column(String(32), default="cenkor-admin", nullable=False, index=True)
     app_key: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     version: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -52,5 +55,5 @@ class AppSubmission(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("app_key", "version", name="uq_app_submission_key_version"),
+        UniqueConstraint("product", "app_key", "version", name="uq_app_submission_product_key_version"),
     )

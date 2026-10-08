@@ -112,6 +112,7 @@ backend/src/cenkor_admin/apps/*/release/
 *.bak
 *.bak_*
 *.bak.*
+*.bak-*
 *.removed_*
 *.orig
 *.rej
