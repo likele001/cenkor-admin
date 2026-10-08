@@ -14,7 +14,7 @@
   · 平白多出一个 head               →  alembic 拒绝执行
 两种都会让「一键部署」表现为「容器全 healthy、数据库一张表都没建」。
 
-本脚本只做三件事：无断链、无重复 revision、head 恰好一个。
+本脚本只做四件事：无断链、无重复 revision、head 恰好一个、revision 不超长。
 
 用法
 ----
@@ -35,6 +35,11 @@ import subprocess
 import sys
 
 DEFAULT_DIR = "backend/alembic/versions"
+
+# alembic 把 alembic_version.version_num 建成 VARCHAR(32)（见 alembic.runtime.migration）。
+# revision 超过 32 字符时，upgrade/stamp 会在 UPDATE 那一步报 StringDataRightTruncation，
+# 而且要到跑迁移时才发现 —— 所以在提交前就拦住。
+MAX_REV_LEN = 32
 
 
 def _literal(node):
@@ -108,6 +113,13 @@ def collect(versions_dir, tracked_only):
             continue
         if rev in revs:
             errors.append("重复的 revision %r：%s 与 %s" % (rev, revs[rev], base))
+            continue
+        if len(rev) > MAX_REV_LEN:
+            errors.append(
+                "revision %r 长 %d 字符，超过 alembic_version.version_num 的 %d 字符上限："
+                "upgrade/stamp 会报 StringDataRightTruncation（%s）"
+                % (rev, len(rev), MAX_REV_LEN, base)
+            )
             continue
         revs[rev] = base
         if down is None:
