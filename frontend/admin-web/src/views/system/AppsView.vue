@@ -41,6 +41,7 @@ interface PendingApp {
   author: string
   status: string
   created_at: string
+  product?: string
 }
 
 interface StoreApp {
@@ -176,11 +177,12 @@ async function saveGrants() {
 
 async function loadPending() {
   try {
-    // 用 only_active=true：每个 app_key 只返回当前活跃的那条（避免看到 1.0.0 + 1.0.2 两条 installed）
-    // 后端会再过滤 platform_apps.status='installed'，确保"已卸载的不再显示"
+    // pending/approved 不能用 only_active：那是给「商店目录」设计的，要求 app_key 在 platform_apps 已 installed 才放行；
+    // 新提交的应用从未安装过，会被过滤掉导致审核列表为空。
+    // installed 保留 only_active=true：去重 + 隐藏已卸载。
     const [pending, approved, installed] = await Promise.all([
-      api.get('/api/v1/store/submissions', { params: { status: 'pending', only_active: true } }),
-      api.get('/api/v1/store/submissions', { params: { status: 'approved', only_active: true } }),
+      api.get('/api/v1/store/submissions', { params: { status: 'pending' } }),
+      api.get('/api/v1/store/submissions', { params: { status: 'approved' } }),
       api.get('/api/v1/store/submissions', { params: { status: 'installed', only_active: true } }),
     ])
     pendingApps.value = [
@@ -248,6 +250,8 @@ interface CloudPrice {
   enabled: boolean
   unit_price: string
   list_price: string
+  price_cents?: number | null
+  list_price_cents?: number | null
   is_discounted: boolean
   discount_label: string | null
   promo_state: string
@@ -812,7 +816,8 @@ function categoryLabel(c: string): string {
             <button class="btn-ghost text-sm text-green-600" :disabled="acting === `review-${app.id}`" @click="reviewSubmission(app.id, 'approve')">{{ t('apps.approve') }}</button>
             <button class="btn-ghost text-sm text-red-600" :disabled="acting === `review-${app.id}`" @click="reviewSubmission(app.id, 'reject')">{{ t('apps.reject') }}</button>
           </template>
-          <button v-else-if="app.status === 'approved'" class="btn-primary text-sm" :disabled="acting === `install-${app.id}`" @click="installSubmission(app.id)">{{ t('apps.install') }}</button>
+          <button v-else-if="app.status === 'approved' && (!app.product || app.product === 'cenkor-admin')" class="btn-primary text-sm" :disabled="acting === `install-${app.id}`" @click="installSubmission(app.id)">{{ t('apps.install') }}</button>
+          <span v-else-if="app.status === 'approved'" class="text-sm text-blue-600">已通过 · 产品扩展，需在对应产品实例安装</span>
           <span v-else-if="app.status === 'installed'" class="text-sm text-green-600">{{ t('apps.status_installed') }}</span>
         </div>
       </div>
