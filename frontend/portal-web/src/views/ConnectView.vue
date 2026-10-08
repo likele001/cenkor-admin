@@ -21,6 +21,17 @@ const error = ref('')
 const needsLogin = ref(false)
 const done = ref<'' | 'approved' | 'denied'>('')
 
+// 产品标识 → 友好名（多产品轴：让门户用户看清这台实例属于哪条产品线）
+const PRODUCT_LABELS: Record<string, string> = {
+  cenkormes: 'CenkorMES 制造执行系统',
+  lightmes: 'LightMES 轻量生产系统',
+  'cenkor-admin': 'Cenkor 平台应用',
+}
+function productLabel(p?: string) {
+  if (!p) return '—'
+  return PRODUCT_LABELS[p] || p
+}
+
 async function lookup() {
   const c = code.value.trim().toUpperCase()
   if (!c) return
@@ -121,6 +132,10 @@ onMounted(() => {
               <div class="flex gap-3">
                 <dt class="text-[#9ca3af] w-20 shrink-0">实例名称</dt>
                 <dd class="font-medium text-[#111827]">{{ preview.instance_name || '未命名实例' }}</dd>
+              </div>
+              <div class="flex gap-3">
+                <dt class="text-[#9ca3af] w-20 shrink-0">所属产品</dt>
+                <dd class="font-medium text-[#111827]">{{ productLabel(preview?.product) }}</dd>
               </div>
               <div class="flex gap-3">
                 <dt class="text-[#9ca3af] w-20 shrink-0">实例地址</dt>

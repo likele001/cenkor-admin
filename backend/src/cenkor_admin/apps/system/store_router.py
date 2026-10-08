@@ -181,6 +181,7 @@ async def public_store_apps(
     db: AsyncSession = Depends(get_db),
     q: str | None = Query(None, description="关键词：名称 / 描述 / 作者 / 标签 / 标识"),
     category: str | None = Query(None, description="分类过滤"),
+    product: str | None = Query(None, description="目标产品/宿主过滤：cenkormes / lightmes / cenkor-admin ...；留空=全部"),
     sort: str = Query("updated", pattern="^(updated|downloads|name)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(12, ge=1, le=100),
@@ -189,15 +190,16 @@ async def public_store_apps(
 
     支持关键词搜索、分类筛选、排序与分页；facets 供前端渲染分类计数。
     """
-    inner = (
+    inner_select = (
         select(
             store_models.AppSubmission.app_key,
             func.max(store_models.AppSubmission.id).label("max_id"),
         )
         .where(store_models.AppSubmission.status.in_(["approved", "installed"]))
-        .group_by(store_models.AppSubmission.app_key)
-        .subquery()
     )
+    if product:
+        inner_select = inner_select.where(store_models.AppSubmission.product == product)
+    inner = inner_select.group_by(store_models.AppSubmission.app_key).subquery()
     stmt = (
         select(store_models.AppSubmission, store_models.Developer.display_name)
         .join(store_models.Developer, store_models.AppSubmission.developer_id == store_models.Developer.id)
@@ -219,6 +221,7 @@ async def public_store_apps(
             "id": s.id,
             "key": s.app_key,
             "app_key": s.app_key,
+            "product": s.product,
             "name": s.name,
             "version": s.version,
             "description": s.description or "",
@@ -484,6 +487,7 @@ async def submit_app(
     version: str = Form(...),
     description: str = Form(""),
     category: str = Form("system"),
+    product: str = Form("cenkor-admin"),
     pricing: str = Form(""),
     db: AsyncSession = Depends(get_db),
     auth: dict = Depends(require_portal_or_admin),
@@ -534,46 +538,72 @@ async def submit_app(
 
     file_hash = hashlib.sha256(content).hexdigest()
 
-    # 解压校验 manifest
+    # 解压校验 manifest：按 product 分支
+    # - cenkor-admin 平台应用：manifest.py + __init__.py（模块式，装进平台自身）
+    # - 其它产品（cenkormes/lightmes 扩展包）：manifest.json（私有化交付，产品端自行安装）
+    _is_extension = (product or "cenkor-admin").strip() != "cenkor-admin"
     manifest_data = None
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
-            # 检查必要文件
             names = zf.namelist()
-            if "manifest.py" not in names:
-                raise HTTPException(400, "ZIP 包缺少 manifest.py")
-            if "__init__.py" not in names:
-                raise HTTPException(400, "ZIP 包缺少 __init__.py")
+            if _is_extension:
+                # 扩展包：根目录或单层目录下要有 manifest.json
+                manifest_name = next(
+                    (
+                        n for n in names
+                        if n == "manifest.json" or (n.endswith("/manifest.json") and n.count("/") == 1)
+                    ),
+                    None,
+                )
+                if not manifest_name:
+                    raise HTTPException(400, "扩展包缺少 manifest.json")
+                try:
+                    manifest_data = json.loads(zf.read(manifest_name).decode("utf-8"))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    raise HTTPException(400, "manifest.json 解析失败") from None
+                if not isinstance(manifest_data, dict):
+                    raise HTTPException(400, "manifest.json 结构非法（应为对象）")
+                if manifest_data.get("key") != app_key:
+                    raise HTTPException(400, f"manifest.json 中的 key ({manifest_data.get('key')}) 与提交的 app_key ({app_key}) 不一致")
+                if not manifest_data.get("version"):
+                    raise HTTPException(400, "manifest.json 缺少 version")
+            else:
+                # 检查必要文件
+                if "manifest.py" not in names:
+                    raise HTTPException(400, "ZIP 包缺少 manifest.py")
+                if "__init__.py" not in names:
+                    raise HTTPException(400, "ZIP 包缺少 __init__.py")
 
-            # 读取并解析 manifest
-            manifest_content = zf.read("manifest.py").decode("utf-8")
-            manifest_data = _parse_manifest(manifest_content)
-            if not manifest_data:
-                raise HTTPException(400, "manifest.py 解析失败")
+                # 读取并解析 manifest
+                manifest_content = zf.read("manifest.py").decode("utf-8")
+                manifest_data = _parse_manifest(manifest_content)
+                if not manifest_data:
+                    raise HTTPException(400, "manifest.py 解析失败")
 
-            # 校验 key 一致性
-            if manifest_data.get("key") != app_key:
-                raise HTTPException(400, f"manifest 中的 key ({manifest_data.get('key')}) 与提交的 app_key ({app_key}) 不一致")
+                # 校验 key 一致性
+                if manifest_data.get("key") != app_key:
+                    raise HTTPException(400, f"manifest 中的 key ({manifest_data.get('key')}) 与提交的 app_key ({app_key}) 不一致")
 
-            # 校验 router.py import 路径（常见错误：from apps.xxx）
-            router_names = [n for n in names if n.endswith("router.py")]
-            for rn in router_names:
-                router_content = zf.read(rn).decode("utf-8", errors="ignore")
-                if "from apps." in router_content or "import apps." in router_content:
-                    raise HTTPException(
-                        400,
-                        "router.py 中使用了错误的 import 路径 `apps.*`，"
-                        f"请改为 `from cenkor_admin.apps.{app_key} import models` 或 `from . import models`",
-                    )
+                # 校验 router.py import 路径（常见错误：from apps.xxx）
+                router_names = [n for n in names if n.endswith("router.py")]
+                for rn in router_names:
+                    router_content = zf.read(rn).decode("utf-8", errors="ignore")
+                    if "from apps." in router_content or "import apps." in router_content:
+                        raise HTTPException(
+                            400,
+                            "router.py 中使用了错误的 import 路径 `apps.*`，"
+                            f"请改为 `from cenkor_admin.apps.{app_key} import models` 或 `from . import models`",
+                        )
     except zipfile.BadZipFile:
         raise HTTPException(400, "ZIP 文件损坏")
     finally:
         if not manifest_data:
             zip_path.unlink(missing_ok=True)
 
-    # 检查版本唯一性
+    # 检查版本唯一性（按 (product, app_key, version) 命名空间）
     existing = (await db.execute(
         select(store_models.AppSubmission).where(
+            store_models.AppSubmission.product == (product or "cenkor-admin"),
             store_models.AppSubmission.app_key == app_key,
             store_models.AppSubmission.version == version,
         )
@@ -604,6 +634,7 @@ async def submit_app(
 
     submission = store_models.AppSubmission(
         developer_id=dev.id,
+        product=(product or "cenkor-admin").strip() or "cenkor-admin",
         app_key=app_key,
         name=name or manifest_data.get("name", app_key),
         version=version,
