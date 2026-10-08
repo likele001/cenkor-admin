@@ -2,10 +2,14 @@
 # 提交前检查：
 #   1) 防止商业应用被误提交进公开仓库      → scripts/check-app-tracking.sh
 #   2) 防止 alembic 迁移链在公开仓库断裂    → scripts/check-migration-graph.py
+#   3) 防止同名 App 内置/外置双份互相遮蔽   → scripts/check-app-shadowing.py
 #
 # 为什么要有第 2 项：迁移文件也分「开源 / 闭源」两类，闭源的被 .gitignore 排除。
 # 一旦把平台自己的迁移挂在闭源链中间，公开仓库就会断链 —— 表现为
 # 「一键部署容器全 healthy，但数据库一张表都没建」。
+#
+# 为什么要有第 3 项：内置目录优先于外置目录参与导入解析，同名双份会让外置源码
+# 被静默遮蔽（改了不生效）—— payment 1.0.0 装进内置目录后遮蔽外置新版即为此例。
 #
 # 启用（每个 clone 需执行一次）：
 #   git config core.hooksPath .githooks
@@ -27,6 +31,11 @@ fi
 # 2) 迁移图完整性（--tracked-only = 这次提交后公开仓库看到的样子）
 if [ -f "$ROOT/scripts/check-migration-graph.py" ] && command -v python3 >/dev/null 2>&1; then
   ( cd "$ROOT" && python3 scripts/check-migration-graph.py --tracked-only ) || rc=1
+fi
+
+# 3) App 目录遮蔽检查（同一 key 在内置与外置目录各有一份）
+if [ -f "$ROOT/scripts/check-app-shadowing.py" ] && command -v python3 >/dev/null 2>&1; then
+  ( cd "$ROOT" && python3 scripts/check-app-shadowing.py --quiet ) || rc=1
 fi
 
 exit $rc

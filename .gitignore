@@ -130,3 +130,6 @@ backend/alembic/versions/2026*_promo*.py
 # 应用市场云端绑定（实例凭证 / 一次性绑定码）——闭源 commerce 的迁移，
 # 源码同样在 backend/src/apps/ 被整体忽略。
 backend/alembic/versions/2026*_cloud*.py
+
+# 同名双份 App 的备份区（把陈旧副本挪出导入路径用，内容仍是闭源应用源码，绝不入库）
+backend/.stale-apps/

@@ -20,9 +20,41 @@ from cenkor_admin.core.hooks import registry, register_app_hooks
 log = get_logger(__name__)
 
 
+def _warn_shadowed_apps() -> None:
+    """同名 App 在内置与外置目录同时存在时告警。
+
+    ``cenkor_admin.apps.__path__`` 内置在前，所以【内置副本赢】：外置那份
+    维护中的源码会被静默遮蔽，改了不生效（payment 1.0.0 就踩过）。
+    安装入口已在 store_router 拦住，这里兼顾存量与手工放目录的情况。
+    """
+    import cenkor_admin.apps as apps_pkg
+
+    entries = [Path(p) for p in apps_pkg.__path__]
+    if len(entries) < 2:
+        return
+    primary = entries[0]
+    for other in entries[1:]:
+        if not other.is_dir():
+            continue
+        for item in sorted(other.iterdir()):
+            if item.name.startswith("_") or not item.is_dir():
+                continue
+            if (primary / item.name).is_dir():
+                log.warning(
+                    "app.shadowed_by_builtin",
+                    key=item.name,
+                    loaded=str(primary / item.name),
+                    shadowed=str(item),
+                    hint="内置副本优先，请把其中一份改名/删除，避免改代码不生效",
+                )
+
+
 def scan_app_manifests() -> dict[str, AppManifest]:
     """扫描所有 App 目录下的 manifest，包括内置和商店安装的。"""
     manifests: dict[str, AppManifest] = {}
+
+    # 0. 同 key 双份先告警，再继续扫描（不阻断启动）
+    _warn_shadowed_apps()
 
     # 1. 扫描内置 App (cenkor_admin.apps.*)
     import cenkor_admin.apps as apps_pkg

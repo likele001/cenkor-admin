@@ -11,6 +11,12 @@
 会在两处自动查找，外置应用因此可以直接使用
 ``from cenkor_admin.apps.<key> import models`` 这类绝对导入，
 写法与内置应用完全一致，也无需为每个应用单独登记忽略规则。
+
+⚠️ 优先级：``__path__`` 是【内置在前、外置在后】，子模块解析取第一个命中，
+所以同一个 ``<key>`` 在两处都有目录时是【内置赢】—— 外置那份被静默遮蔽，
+改它不会生效（商店安装落盘到内置目录时踩过：旧版副本压住外置新版源码）。
+同名双份属于配置错误，自检：``python3 scripts/check-app-shadowing.py``
+（已挂 .githooks/pre-commit，商店安装入口也会拒绝造成遮蔽的包）。
 """
 from pathlib import Path as _Path
 
