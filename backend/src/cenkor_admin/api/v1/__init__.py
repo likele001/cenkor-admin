@@ -165,7 +165,17 @@ def _load_app_router_module(app_key: str, router_file: Path, *, external: bool =
     if not spec or not spec.loader:
         return None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # 必须先登记 sys.modules 再 exec：pydantic 2.11+ 按 cls.__module__ 反查命名空间，
+    # 外置 App 的 router 普遍写 `from __future__ import annotations`，不登记则模型停在
+    # 「待补全」，直到 /api/docs 或首次请求体校验才炸 class not fully defined。
+    # _clear_app_module_cache 与本函数共用键名，卸载/更新时成对回收。
+    name = f"app_routers.{app_key}.router"
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(name, None)  # 半个模块留在 sys.modules 更糟
+        raise
     return module
 
 

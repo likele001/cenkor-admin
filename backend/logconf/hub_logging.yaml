@@ -1,0 +1,84 @@
+# uvicorn 日志配置：把 hub(8002) 的访问日志与异常 traceback 真正落盘。
+#
+# 为什么需要这个文件
+# ------------------
+# 2026-10-12 取证时，`POST /store/orders/{no}/checkout` 在 10-08 有 3 次 500，
+# 但 backend 下所有 *.log 的时间戳最晚只到 09-22 —— 崩溃现场已经查不到了，
+# 只能在 nginx access log 看到状态码。进程是 nohup 起的（PPid=1，非 systemd），
+# stdout 落哪儿不确定。
+#
+# 用法（不改代码，只换启动参数；需要重启 8002，属线上动作，由你执行）
+# --------------------------------------------------------------------
+#   cd /www/wwwroot/cenkor-admin/backend
+#   /www/server/pyporject_evn/cenkor/bin/python -m uvicorn cenkor_admin.main:app \
+#       --host 127.0.0.1 --port 8002 --log-config logconf/hub_logging.yaml
+#   验证（只读，订单号不存在，不产生数据）：
+#     curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+#       http://127.0.0.1:8002/api/v1/store/orders/NOT_EXIST/checkout
+#     tail -40 logs/hub.log        # 应能看到对应 traceback
+#
+# 轮换：单文件 20MB、留 7 个，约 140MB 上限；日志目录属主 www。
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  default:
+    "()": uvicorn.logging.DefaultFormatter
+    fmt: "%(asctime)s %(levelprefix)s %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+  access:
+    "()": uvicorn.logging.AccessFormatter
+    fmt: '%(asctime)s %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s'
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  default:
+    formatter: default
+    class: logging.StreamHandler
+    stream: ext://sys.stderr
+  error_file:
+    formatter: default
+    class: logging.handlers.RotatingFileHandler
+    filename: /www/wwwroot/cenkor-admin/backend/logs/hub.log
+    maxBytes: 20971520
+    backupCount: 7
+    encoding: utf-8
+  access_file:
+    formatter: access
+    class: logging.handlers.RotatingFileHandler
+    filename: /www/wwwroot/cenkor-admin/backend/logs/hub_access.log
+    maxBytes: 20971520
+    backupCount: 7
+    encoding: utf-8
+
+loggers:
+  uvicorn:
+    handlers: [default, error_file]
+    level: INFO
+    propagate: false
+  uvicorn.error:
+    # traceback 全栈走这里；WARNING 之下也要留，500 才有现场
+    handlers: [default, error_file]
+    level: INFO
+    propagate: false
+  uvicorn.access:
+    handlers: [access_file]
+    level: INFO
+    propagate: false
+  # 应用与商务/支付模块：payment.create_error / commerce.checkout_created
+  # 这些结构化事件原来只进 stdout，落不到文件就等于没发生过
+  cenkor_admin:
+    handlers: [default, error_file]
+    level: INFO
+    propagate: false
+  commerce:
+    handlers: [default, error_file]
+    level: INFO
+    propagate: false
+  payment:
+    handlers: [default, error_file]
+    level: INFO
+    propagate: false
+root:
+  handlers: [default, error_file]
+  level: INFO

@@ -166,14 +166,27 @@ async def lifespan(app: FastAPI):
     await redis_client.close()
 
 
+# ---- P0-4：生产环境不暴露 traceback 页与 API 目录（2026-10-12）----
+# 为什么不能直接用 settings.DEBUG：
+#   config.py 里 DEBUG 默认 True，而宝塔 Python 项目的环境文件只设了 APP_ENV=production，
+#   于是线上曾经以 debug=True 运行——任何未捕获异常都会把「源码片段 + 每帧局部变量」的
+#   HTML traceback 直接返回给访客（10-08 那三次 checkout 500 的响应体就是 17KB 的 debug 页）。
+# 为什么这里不顺手把 settings.DEBUG 改成 False：
+#   core/mail.py:65 用 settings.DEBUG 决定邮件走同步还是 Celery，而本服务没有自己的
+#   celery worker（机器上跑着的 worker 属于另一个项目）。改了会让邮件静默不发送。
+# 所以只在「构造 app」这一层收口，不动全局配置。
+_debug_enabled = settings.DEBUG and settings.APP_ENV != "production"
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=__version__,
-    debug=settings.DEBUG,
+    debug=_debug_enabled,
     lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    # 生产关文档：openapi.json 会把闭源 /api/v1/store/* 全部端点明文列出来（808KB）。
+    # 本地开发仍可用 APP_ENV=development 打开。
+    docs_url="/api/docs" if _debug_enabled else None,
+    redoc_url="/api/redoc" if _debug_enabled else None,
+    openapi_url="/api/openapi.json" if _debug_enabled else None,
 )
 
 # CORS（按环境收紧：生产禁用 allow_origins=["*"]）

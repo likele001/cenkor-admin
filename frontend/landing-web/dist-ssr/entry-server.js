@@ -378,7 +378,7 @@ const routes = [
   {
     path: "/",
     name: "Home",
-    component: () => import("./assets/Home-DFGm43MU.js")
+    component: () => import("./assets/Home-B9ombKYl.js")
   },
   {
     path: "/features",
@@ -393,7 +393,7 @@ const routes = [
   {
     path: "/deploy",
     name: "Deploy",
-    component: () => import("./assets/Deploy-B6_e8Srq.js")
+    component: () => import("./assets/Deploy-yiVMAVTS.js")
   },
   {
     path: "/docs/guide",

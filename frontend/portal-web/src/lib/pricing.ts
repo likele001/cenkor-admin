@@ -50,19 +50,25 @@ export interface AppPrice {
 }
 
 /**
- * 是否免费 / 未定价。
+ * 是否为「明确写了免费」的定价行。
  *
- * 后端把「没有定价行」与「model=free」都视作免费（见 create_order 的 model 兜底），
- * 门户据此统一显示「免费」—— 这是产品决策，不是技术推断。
+ * `price === null` 表示这一轴没有定价行，**不等于免费** —— 下单端点缺行即拒单
+ * （commerce_router.create_order 会抛 400「该应用尚未配置定价」），门户也不能把它标成
+ * 免费诱导点击。历史版本在这里做过 `!p → 免费` 的兜底，正是 0 元白送事故的同一套逻辑。
  */
 export function isFreePrice(p: AppPrice | null | undefined): boolean {
-  return !p || p.model === 'free' || !p.price_cents
+  return !!p && (p.model === 'free' || !p.price_cents)
+}
+
+/** 没有定价行（平台内置自带，或平台尚未定价）。 */
+export function isUnpriced(p: AppPrice | null | undefined): boolean {
+  return p === null
 }
 
 /**
  * 后端是否提供了价格信息。
  *
- * 两种情况下后端**不会**返回 `price` 字段（取值 `undefined`，与「免费」的 `null` 语义不同）：
+ * 两种情况下后端**不会**返回 `price` 字段（取值 `undefined`，与「缺定价行」的 `null` 语义不同）：
  * 1. 纯开源部署未安装 commerce 应用（商店接口静默降级）；
  * 2. 后端尚未升级到含价格桥的版本。
  *
@@ -72,10 +78,12 @@ export function hasPriceInfo(p: AppPrice | null | undefined): boolean {
   return p !== undefined
 }
 
-/** 是否可购买：免费即可买；付费需定价行处于上架状态 */
+/** 是否可购买：没有定价行不可买；免费行可买；付费行需处于上架状态。 */
 export function isPurchasable(p: AppPrice | null | undefined): boolean {
+  // null = 缺定价行（后端拒单）；undefined = 后端未提供价格信息（未装 commerce）。两者都不给下单入口
+  if (!p) return false
   if (isFreePrice(p)) return true
-  return p!.enabled !== false
+  return p.enabled !== false
 }
 
 /**

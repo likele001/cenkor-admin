@@ -293,6 +293,20 @@ DEFAULT_PRODUCTS = [
         ],
         False, False, None, None, None, 4, None,
     ),
+    (
+        "cenkor-process", "CenkorProcess", "食品·流程制造 MES", "批次/配方/FEFO/CCP/CoA 一体化", "manufacturing",
+        "FastAPI / Vue3 / MySQL",
+        "面向食品与流程制造（批次/配方驱动）的独立 MES 产品，覆盖销售订单(MTO)与备货(MTS)→生产计划下达→批次执行→配方缩放/FEFO 领料→CCP/CIP 合规记录→CoA 放行→成品批分配发货的全流程。与离散 MES(CenkorMES) 并行，独立部署（food.mes.cenkor.cn）。",
+        [
+            "配方与批次：配方缩放、批次执行与过账、谱系追溯",
+            "库存与效期：批次库存、FEFO 先到期先出、效期预警",
+            "食品合规：CCP 关键点、CIP 清洗、温度记录、CoA 放行",
+            "订单与计划：MTO/MTS 统一驱动、齐套缺料预检、计划下达自动生成批次",
+            "发货：成品批→订单分配与发货",
+            "付费扩展：应用中心按需安装 ext_* 扩展插件",
+        ],
+        False, False, None, None, None, 5, "https://food.mes.cenkor.cn",
+    ),
 ]
 
 DEFAULT_CASES = [
