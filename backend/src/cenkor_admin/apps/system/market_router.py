@@ -41,6 +41,9 @@ PACKAGE_TIMEOUT = 300.0      # 应用包下载（可能几十 MB）
 CATALOG_PAGE_SIZE = 100      # 官方目录单页上限
 CATALOG_MAX_PAGES = 10       # 最多翻 10 页，防官方分页异常时死循环
 CATALOG_TTL_SECONDS = 60     # 目录内存缓存，避免每次进页面都打官方云
+# 本实例自身所在的产品轴。store 侧 product 列默认值同为 "cenkor-admin"（无独立常量，
+# 那里是内联字面量）；此处只用于安装时的跨产品校验。
+SELF_PRODUCT = "cenkor-admin"
 
 _CATALOG_CACHE: dict[str, Any] = {"at": 0.0, "items": None}
 
@@ -373,8 +376,13 @@ async def market_app_detail(
 # 安装 / 升级
 # ============================================================
 
-async def _download_package(app_key: str, license_key: str) -> Path:
-    """从官方下载授权包到临时文件，返回路径（调用方负责删除）。"""
+async def _download_package(app_key: str, license_key: str) -> tuple[Path, str]:
+    """从官方下载授权包到临时文件，返回 (路径, hub 权威产品轴)。
+
+    产品轴取自响应头 ``X-App-Product``（hub 按 license.product 下发）；老 hub 无此头
+    → 空串 → 调用方按「缺值即放行」处理。返回头而不是改写包：本函数拿到的是已签名
+    的原始字节，就地重打包会破坏 file_hash 且 hub 从不重打包。
+    """
     hub = _hub_base()
     import httpx
 
@@ -402,7 +410,7 @@ async def _download_package(app_key: str, license_key: str) -> Path:
     fd, path = tempfile.mkstemp(suffix=".zip")
     with os.fdopen(fd, "wb") as f:
         f.write(content)
-    return Path(path)
+    return Path(path), (resp.headers.get("X-App-Product") or "").strip()
 
 
 @router.post("/install")
@@ -446,7 +454,15 @@ async def market_install(
             "该应用由官方分发，需要授权码：请先在官方门户购买，再把授权码填入此处",
         )
 
-    tmp_path = await _download_package(app_key, license_key)
+    tmp_path, hub_product = await _download_package(app_key, license_key)
+    # 跨产品误装闸：目录默认按 product=cenkor-admin 过滤，但 /install 只认 app_key，
+    # 手工传一个 process 侧的 key 就能走到这里。缺值（老 hub 无此头）即放行。
+    if hub_product and hub_product != SELF_PRODUCT:
+        os.unlink(tmp_path)
+        raise HTTPException(
+            400,
+            f"该应用包属于产品「{hub_product}」，与本实例「{SELF_PRODUCT}」不符",
+        )
     try:
         from cenkor_admin.apps.system.store_router import install_app_from_zip
 

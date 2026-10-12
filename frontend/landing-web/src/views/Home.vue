@@ -32,6 +32,12 @@
               私有部署
             </router-link>
           </div>
+          <div class="hero-trust">
+            <span><i class="tick">✓</i> 开源 AGPL-3.0</span>
+            <span><i class="tick">✓</i> Docker 一键部署</span>
+            <span><i class="tick">✓</i> 8 个内置应用</span>
+            <span><i class="tick">✓</i> 100% 私有化</span>
+          </div>
         </div>
         <div class="hero-visual">
           <div class="hero-card">
@@ -55,6 +61,11 @@
                 <div class="sys-item"><span class="dot"></span> 审计日志</div>
                 <div class="sys-item"><span class="dot"></span> 用户中心</div>
               </div>
+            </div>
+            <div class="card-footer">
+              <span class="pulse-dot"></span>
+              <span>系统运行中 · 应用中心已就绪</span>
+              <span class="footer-ver">v2.1</span>
             </div>
           </div>
         </div>
@@ -158,6 +169,31 @@
       </div>
     </section>
 
+    <!-- FAQ Section -->
+    <section class="section section-alt faq-section">
+      <div class="container">
+        <SectionTitle
+          tag="常见问题"
+          title="关于 Cenkor Admin 你可能想知道的"
+          description="部署方式、开源授权、权限与内容引擎…… 一站式解答"
+          :center="true"
+        />
+        <div class="faq-list">
+          <div class="faq-item" v-for="(faq, index) in faqs" :key="faq.q">
+            <button class="faq-question" @click="toggleFaq(index)">
+              <span>{{ faq.q }}</span>
+              <span class="faq-icon" :class="{ open: openIndex === index }">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </span>
+            </button>
+            <div class="faq-answer" :class="{ open: openIndex === index }">
+              <p>{{ faq.a }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- CTA Section -->
     <section class="cta-section">
       <div class="container">
@@ -177,6 +213,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import FeatureCard from '@/components/FeatureCard.vue'
 import ScrollReveal from '@/components/ScrollReveal.vue'
@@ -274,15 +311,32 @@ const apps = [
   { icon: '🔔', name: '通知', desc: '系统通知推送' },
   { icon: '📰', name: 'CMS', desc: '官网内容管理' }
 ]
+
+const openIndex = ref(-1)
+
+const toggleFaq = (index: number) => {
+  openIndex.value = openIndex.value === index ? -1 : index
+}
+
+const faqs = [
+  { q: 'Cenkor Admin 是什么？适合哪些场景？', a: 'Cenkor Admin 是一款企业级后台管理平台（FastAPI + Vue3），内置应用中心、RBAC 权限、通用内容引擎（CMS）、用户中心与审计日志。适合需要快速搭建内部管理系统、内容站点，或对既有系统做后台底座的企业与团队。' },
+  { q: '支持哪些部署方式？', a: '支持三种：Docker Compose（一条命令拉起全栈）、宝塔静态、裸机 systemd。数据部署在自己服务器，完全私有化、自主可控。' },
+  { q: '是开源的还是商业的？', a: '开源。代码托管在 GitHub（AGPL-3.0 协议），可自由下载部署使用；应用中心按需扩展，业务模块即插即用。' },
+  { q: '应用中心是怎么工作的？', a: '每个应用通过 manifest 声明内容类型、字段、分类、权限与菜单，安装时自动注册到系统，卸载时自动清理，无需改代码。' },
+  { q: '通用内容引擎（CMS）能做什么？', a: '后台即可动态增删字段，支持 21+ 字段类型、多级分类与标签，文章/页面/内容类型统一管理，官网内容也能在系统里维护。' },
+  { q: 'RBAC 权限如何隔离？', a: '角色、权限规则、数据权限三级控制；后台（运营）与前台（C 端用户）双用户体系完全隔离，各自独立登录与权限。' },
+  { q: '需要哪些基础服务？', a: 'PostgreSQL（主库）、Redis（缓存/队列）、MinIO（对象存储）以及 backend / admin-web / portal-web 三端服务，容器化一键编排。' },
+  { q: '可以独立运营、不依赖官网吗？', a: '可以。Cenkor Admin 可独立部署运营，不依赖任何官网；支持多应用并行，适合作为自己的后台底座持续扩展。' }
+]
 </script>
 
 <style lang="scss" scoped>
 // Hero
 .hero {
   position: relative;
-  padding: 140px 0 80px;
+  padding: 100px 0 64px;
   overflow: hidden;
-  min-height: 90vh;
+  min-height: 72vh;
   display: flex;
   align-items: center;
 }
@@ -376,6 +430,35 @@ const apps = [
     gap: $spacing-md;
     flex-wrap: wrap;
   }
+
+  .hero-trust {
+    display: flex;
+    gap: $spacing-lg;
+    flex-wrap: wrap;
+    margin-top: $spacing-lg;
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: $text-muted;
+
+      .tick {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: rgba($success, 0.12);
+        color: $success;
+        font-style: normal;
+        font-size: 11px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+  }
 }
 
 .hero-visual {
@@ -422,6 +505,31 @@ const apps = [
 
   .card-body {
     padding: $spacing-lg;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: $spacing-sm $spacing-lg;
+    background: $gray-50;
+    border-top: 1px solid $border-light;
+    font-size: 12px;
+    color: $text-muted;
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: $success;
+      animation: pulse 2s infinite;
+    }
+
+    .footer-ver {
+      margin-left: auto;
+      font-size: 11px;
+      color: $text-muted;
+    }
   }
 
   .app-grid {
@@ -697,6 +805,96 @@ const apps = [
     font-size: 0.85rem;
     color: $text-muted;
     margin: 0;
+  }
+}
+
+// FAQ
+.faq-section {
+  background: $bg-white;
+}
+
+.faq-list {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.faq-item {
+  background: $bg-white;
+  border: 1px solid $border-light;
+  border-radius: $radius-md;
+  overflow: hidden;
+  transition: border-color $transition-fast;
+
+  &:hover {
+    border-color: rgba($primary, 0.3);
+  }
+}
+
+.faq-question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 500;
+  color: $text-primary;
+  font-family: inherit;
+
+  &:hover {
+    color: $primary;
+  }
+}
+
+.faq-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: $radius-full;
+  background: $gray-100;
+  color: $text-secondary;
+  transition: all $transition-fast;
+
+  svg {
+    transition: transform $transition-fast;
+  }
+
+  &.open {
+    background: rgba($primary, 0.1);
+    color: $primary;
+
+    svg {
+      transform: rotate(135deg);
+    }
+  }
+}
+
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height $transition-normal;
+
+  &.open {
+    max-height: 320px;
+  }
+
+  p {
+    margin: 0;
+    padding: 0 $spacing-lg $spacing-lg;
+    color: $text-secondary;
+    font-size: 0.95rem;
+    line-height: 1.75;
   }
 }
 

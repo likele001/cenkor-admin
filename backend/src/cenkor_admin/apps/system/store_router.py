@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import io
 import os
 import shutil
 import tempfile
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +30,7 @@ from cenkor_admin.apps.system.showcase_meta import SHOWCASE
 from cenkor_admin.core import hooks
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.security import decode_token
+from cenkor_admin.core.storage import s3
 from cenkor_admin.apps.portal.auth import decode_portal_token, is_portal_token, PORTAL_JWT_ISSUER
 
 log = structlog.get_logger()
@@ -143,13 +146,34 @@ async def register_developer(
 # ============================================================
 
 CATEGORY_LABELS: dict[str, str] = {
+    # 平台通用
     "business": "业务应用",
     "productivity": "效率工具",
     "content": "内容管理",
     "system": "系统扩展",
     "ai": "AI 能力",
+    # MES / 工业域
+    "production": "生产管理",
+    "equipment": "设备管理",
+    "quality": "质量管理",
+    "warehouse": "仓储物流",
+    "purchase": "采购供应",
+    "sales": "销售营销",
+    "finance": "财务金融",
 }
-CATEGORY_ORDER = ["business", "productivity", "content", "system", "ai"]
+CATEGORY_ORDER = [
+    "business", "production", "equipment", "quality", "warehouse",
+    "purchase", "sales", "finance", "ai", "productivity", "content", "system",
+]
+
+# 允许接收应用提交的产品（= 有可安装宿主的产品线）。product 只负责「归属哪个产品 / 分发隔离」，
+# 与门户 cms 的营销产品目录（thinkmes/aisaas/...）解耦；新增产品线须同步此处与前端 products 下拉。
+ALLOWED_PRODUCTS = {"cenkor-admin", "cenkormes", "lightmes", "cenkor-process"}
+# 应用开发方式（交付安装目标）：
+#   platform   平台内置应用（装进 cenkor-admin 自身，包内含 manifest.py + __init__.py）
+#   extension  产品扩展插件（交付到对应 MES 实例热挂载，包内含 manifest.json）
+#   standalone 独立应用（私有化整包，仅门户展示/售卖，不由平台或实例热挂载）
+DEV_METHODS = {"platform", "extension", "standalone"}
 
 
 def _manifest_dict(value: Any) -> dict[str, Any]:
@@ -177,6 +201,27 @@ async def _installed_map(db: AsyncSession) -> dict[str, str]:
         )
     ).all()
     return {key: version for key, version in rows}
+
+
+async def _get_intro(db: AsyncSession, product: str, app_key: str):
+    """按 (product, app_key) 取应用富介绍旁表记录（可能为 None）。"""
+    return (await db.execute(
+        select(store_models.AppIntro).where(
+            store_models.AppIntro.product == product,
+            store_models.AppIntro.app_key == app_key,
+        )
+    )).scalar_one_or_none()
+
+
+async def _intros_map(db: AsyncSession, keys):
+    """批量取富介绍：{(product, app_key): AppIntro}。按 app_key 一次捞回再本地配对。"""
+    app_keys = {k[1] for k in keys}
+    if not app_keys:
+        return {}
+    rows = (await db.execute(
+        select(store_models.AppIntro).where(store_models.AppIntro.app_key.in_(app_keys))
+    )).scalars().all()
+    return {(r.product, r.app_key): r for r in rows}
 
 
 @router.get("/apps", response_model=dict[str, Any])
@@ -215,25 +260,28 @@ async def public_store_apps(
     # 商店照常返回，只是不带价格，接口不会因缺定价模块而失败。
     prices = await pricing_bridge.price_map(db, [s.app_key for s, _ in rows])
 
+    intros = await _intros_map(db, [(s.product, s.app_key) for s, _ in rows])
     all_items: list[dict[str, Any]] = []
     for s, author in rows:
         manifest = _manifest_dict(s.manifest_data)
         showcase = SHOWCASE.get(s.app_key, {})
+        intro = intros.get((s.product, s.app_key))
         installed_version = installed.get(s.app_key)
         all_items.append({
             "id": s.id,
             "key": s.app_key,
             "app_key": s.app_key,
             "product": s.product,
+            "dev_method": s.dev_method or ("platform" if (s.product or "cenkor-admin") == "cenkor-admin" else "extension"),
             "name": s.name,
             "version": s.version,
             "description": s.description or "",
-            "summary": manifest.get("summary") or showcase.get("summary") or (s.description or ""),
+            "summary": (intro.summary if intro else None) or manifest.get("summary") or showcase.get("summary") or (s.description or ""),
             "icon": s.icon,
             "category": s.category,
             "category_label": CATEGORY_LABELS.get(s.category, s.category),
             "author": author,
-            "tags": manifest.get("tags") or showcase.get("tags") or [],
+            "tags": (intro.tags if intro and intro.tags else None) or manifest.get("tags") or showcase.get("tags") or [],
             "download_count": s.download_count,
             "installed": installed_version is not None,
             "installed_version": installed_version,
@@ -315,6 +363,7 @@ async def public_store_app_detail(
     latest, dev = rows[0]
     manifest = _manifest_dict(latest.manifest_data)
     showcase = SHOWCASE.get(app_key, {})
+    intro = await _get_intro(db, latest.product, app_key)
     inst = await db.get(InstalledApp, app_key)
     installed_version = inst.version if inst and inst.status == "installed" else None
     # 价格视图（跨源码边界桥）：未装 commerce 时为 {}
@@ -347,13 +396,15 @@ async def public_store_app_detail(
         "id": latest.id,
         "key": app_key,
         "app_key": app_key,
+        "dev_method": latest.dev_method or ("platform" if (latest.product or "cenkor-admin") == "cenkor-admin" else "extension"),
         "name": latest.name,
         "version": latest.version,
         "description": latest.description or "",
-        "summary": manifest.get("summary") or showcase.get("summary") or (latest.description or ""),
-        "highlights": manifest.get("highlights") or showcase.get("highlights") or [],
-        "tags": manifest.get("tags") or showcase.get("tags") or [],
-        "screenshots": manifest.get("screenshots") or showcase.get("screenshots") or [],
+        "summary": (intro.summary if intro else None) or manifest.get("summary") or showcase.get("summary") or (latest.description or ""),
+        "highlights": (intro.highlights if intro and intro.highlights else None) or manifest.get("highlights") or showcase.get("highlights") or [],
+        "tags": (intro.tags if intro and intro.tags else None) or manifest.get("tags") or showcase.get("tags") or [],
+        "screenshots": (intro.screenshots if intro and intro.screenshots else None) or manifest.get("screenshots") or showcase.get("screenshots") or [],
+        "long_description": (intro.long_description if intro else None),
         "icon": latest.icon,
         "category": latest.category,
         "category_label": CATEGORY_LABELS.get(latest.category, latest.category),
@@ -472,6 +523,7 @@ async def list_submissions(
             {"id": s.id, "app_key": s.app_key, "name": s.name, "version": s.version,
              "description": s.description, "icon": s.icon, "category": s.category,
              "status": s.status, "review_note": s.review_note, "product": s.product or "cenkor-admin",
+             "dev_method": s.dev_method or ("platform" if (s.product or "cenkor-admin") == "cenkor-admin" else "extension"),
              "author": author,
              "download_count": s.download_count,
              "created_at": s.created_at.isoformat() if s.created_at else None,
@@ -491,6 +543,7 @@ async def submit_app(
     description: str = Form(""),
     category: str = Form("system"),
     product: str = Form("cenkor-admin"),
+    dev_method: str = Form("extension"),
     pricing: str = Form(""),
     db: AsyncSession = Depends(get_db),
     auth: dict = Depends(require_portal_or_admin),
@@ -518,6 +571,49 @@ async def submit_app(
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9\.\-_]{0,19}", version):
         raise HTTPException(400, "version 格式错误：字母/数字开头，仅含字母数字与 . - _，最长 20 位")
 
+    # 归一化并校验 product / dev_method（模块级白名单，避免各处硬编码漂移）
+    product = (product or "cenkor-admin").strip() or "cenkor-admin"
+    dev_method = (dev_method or "").strip()
+    if product not in ALLOWED_PRODUCTS:
+        raise HTTPException(400, f"未知产品「{product}」，允许值：{sorted(ALLOWED_PRODUCTS)}")
+    if dev_method not in DEV_METHODS:
+        raise HTTPException(400, f"未知开发方式「{dev_method}」，允许值：{sorted(DEV_METHODS)}")
+
+    # ---- 查重与版本闸门：必须在落盘之前 ----
+    # 落盘是 `UPLOAD_DIR/{app_key}-{version}.zip` 直接覆盖写。若先写盘再判重，
+    # 同版本重传会先把磁盘包换掉、再抛 409 退出，而这条 (product, app_key, version)
+    # 下已 approved 的老行 file_path 正指向这个文件、file_hash 还是旧的 —— 包内容
+    # 与指纹就此失真。这两道校验只依赖 Form 参数与库里的行，不碰包体，所以能前置。
+    existing = (await db.execute(
+        select(store_models.AppSubmission).where(
+            store_models.AppSubmission.product == product,
+            store_models.AppSubmission.app_key == app_key,
+            store_models.AppSubmission.version == version,
+        )
+    )).scalar_one_or_none()
+    if existing:
+        raise HTTPException(409, f"版本 {version} 已存在")
+
+    from cenkor_admin.apps.system.models import InstalledApp as _InstalledApp
+    from packaging.version import Version as _Version, InvalidVersion as _InvalidVersion
+    try:
+        new_v = _Version(version)
+    except _InvalidVersion:
+        raise HTTPException(400, f"version 格式非法，应为 semver（如 1.0.0）：{version}")
+    installed_row = (await db.execute(
+        select(_InstalledApp).where(_InstalledApp.key == app_key)
+    )).scalar_one_or_none()
+    if installed_row and installed_row.status == "installed":
+        try:
+            current_v = _Version(installed_row.version)
+            if new_v <= current_v:
+                raise HTTPException(
+                    400,
+                    f"新版本 {version} 必须严格大于已安装版本 {installed_row.version}",
+                )
+        except _InvalidVersion:
+            pass  # 已安装版本号解析失败时不阻塞新版本
+
     # 定价（可选）：提交时即可带价，JSON 字符串。规则由公开的 pricing_rules 统一校验，
     # 在落盘之前就拦掉非法组合，避免白传一个几百 MB 的包。
     price_payload: dict[str, Any] | None = None
@@ -541,16 +637,17 @@ async def submit_app(
 
     file_hash = hashlib.sha256(content).hexdigest()
 
-    # 解压校验 manifest：按 product 分支
-    # - cenkor-admin 平台应用：manifest.py + __init__.py（模块式，装进平台自身）
-    # - 其它产品（cenkormes/lightmes 扩展包）：manifest.json（私有化交付，产品端自行安装）
-    _is_extension = (product or "cenkor-admin").strip() != "cenkor-admin"
+    # 解压校验 manifest：按 dev_method（交付安装目标）分支
+    # - platform   平台内置应用：manifest.py + __init__.py（装进 cenkor-admin 自身）
+    # - extension  产品扩展插件：manifest.json（交付到对应 MES 实例热挂载）
+    # - standalone 独立应用：私有化整包，仅门户展示/售卖，不做安装向强校验
     manifest_data = None
+    manifest_ok = False  # 包体校验全部通过才允许留盘
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             names = zf.namelist()
-            if _is_extension:
-                # 扩展包：根目录或单层目录下要有 manifest.json
+            if dev_method == "extension":
+                # 产品扩展包：根目录或单层目录下要有 manifest.json
                 manifest_name = next(
                     (
                         n for n in names
@@ -570,12 +667,16 @@ async def submit_app(
                     raise HTTPException(400, f"manifest.json 中的 key ({manifest_data.get('key')}) 与提交的 app_key ({app_key}) 不一致")
                 if not manifest_data.get("version"):
                     raise HTTPException(400, "manifest.json 缺少 version")
-            else:
-                # 检查必要文件
+                # 一致性：扩展包 manifest 若声明 product，须与提交产品一致
+                _mp = manifest_data.get("product")
+                if _mp and _mp != product:
+                    raise HTTPException(400, f"manifest.product（{_mp}）与提交产品（{product}）不一致")
+            elif dev_method == "platform":
+                # 平台内置应用：manifest.py + __init__.py（模块式，装进平台自身）
                 if "manifest.py" not in names:
-                    raise HTTPException(400, "ZIP 包缺少 manifest.py")
+                    raise HTTPException(400, "平台应用包缺少 manifest.py")
                 if "__init__.py" not in names:
-                    raise HTTPException(400, "ZIP 包缺少 __init__.py")
+                    raise HTTPException(400, "平台应用包缺少 __init__.py")
 
                 # 读取并解析 manifest
                 manifest_content = zf.read("manifest.py").decode("utf-8")
@@ -597,47 +698,46 @@ async def submit_app(
                             "router.py 中使用了错误的 import 路径 `apps.*`，"
                             f"请改为 `from cenkor_admin.apps.{app_key} import models` 或 `from . import models`",
                         )
+            else:
+                # 独立应用（standalone）：私有化整包，仅门户展示/售卖，不做安装向强校验。
+                # 宽松要求：包内含 manifest.json 或 README 即可；有 manifest.json 则解析留档。
+                _has_readme = any(
+                    n.upper().startswith("README") or n.upper().endswith("/README.MD")
+                    for n in names
+                )
+                _mn = next(
+                    (
+                        n for n in names
+                        if n == "manifest.json" or (n.endswith("/manifest.json") and n.count("/") == 1)
+                    ),
+                    None,
+                )
+                if not _mn and not _has_readme:
+                    raise HTTPException(400, "独立应用包需包含 manifest.json 或 README")
+                if _mn:
+                    try:
+                        _md = json.loads(zf.read(_mn).decode("utf-8"))
+                        if isinstance(_md, dict):
+                            manifest_data = _md
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        pass
+                if not manifest_data:
+                    # 仅有 README：留最小占位，避免 standalone 包被后面的建单流程判成空 manifest
+                    manifest_data = {"key": app_key, "name": name or app_key, "_standalone": True}
+        manifest_ok = True
     except zipfile.BadZipFile:
         raise HTTPException(400, "ZIP 文件损坏")
     finally:
-        if not manifest_data:
+        # 判重已前置到落盘之前，所以这里的失败都是「包不合格」而非「版本撞车」；
+        # manifest_data 在 key/version 不符时也已解析成功，只靠 `not manifest_data`
+        # 会漏删孤包 —— 用显式标志兜住写盘之后的所有 4xx。
+        if not manifest_ok:
             zip_path.unlink(missing_ok=True)
-
-    # 检查版本唯一性（按 (product, app_key, version) 命名空间）
-    existing = (await db.execute(
-        select(store_models.AppSubmission).where(
-            store_models.AppSubmission.product == (product or "cenkor-admin"),
-            store_models.AppSubmission.app_key == app_key,
-            store_models.AppSubmission.version == version,
-        )
-    )).scalar_one_or_none()
-    if existing:
-        raise HTTPException(409, f"版本 {version} 已存在")
-
-    # 校验版本号：同一 app_key 的新版本必须严格大于已安装版本
-    from cenkor_admin.apps.system.models import InstalledApp as _InstalledApp
-    from packaging.version import Version as _Version, InvalidVersion as _InvalidVersion
-    try:
-        new_v = _Version(version)
-    except _InvalidVersion:
-        raise HTTPException(400, f"version 格式非法，应为 semver（如 1.0.0）：{version}")
-    installed_row = (await db.execute(
-        select(_InstalledApp).where(_InstalledApp.key == app_key)
-    )).scalar_one_or_none()
-    if installed_row and installed_row.status == "installed":
-        try:
-            current_v = _Version(installed_row.version)
-            if new_v <= current_v:
-                raise HTTPException(
-                    400,
-                    f"新版本 {version} 必须严格大于已安装版本 {installed_row.version}",
-                )
-        except _InvalidVersion:
-            pass  # 已安装版本号解析失败时不阻塞新版本
 
     submission = store_models.AppSubmission(
         developer_id=dev.id,
-        product=(product or "cenkor-admin").strip() or "cenkor-admin",
+        product=product,
+        dev_method=dev_method,
         app_key=app_key,
         name=name or manifest_data.get("name", app_key),
         version=version,
@@ -663,6 +763,9 @@ async def submit_app(
                 app_key=app_key,
                 developer_id=dev.id,
                 submission_id=submission.id,
+                # 定价行的定位键是 (product, app_key)：把这条提交的轴带上，
+                # 否则收费侧只能吃列默认值 cenkor-admin，实例按自身轴下单会算成 0 元。
+                product=submission.product,
                 pricing=price_payload,
             )
             pricing_saved = any(bool(r) for r in results)
@@ -701,6 +804,63 @@ async def submit_app(
         "status": submission.status,
         "pricing_submitted": price_payload is not None,
         "pricing_saved": pricing_saved,
+    }
+
+
+@router.post("/submissions/batch-review")
+async def batch_review_submissions(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    _: auth_models.User = Depends(require_permission("rbac:role:write")),
+):
+    """管理员批量审核应用：一次通过 / 驳回多条待审核提交。
+
+    body: ``{ids: [int], action: 'approve'|'reject', note?: str}``。
+    逐条处理，仅对处于 ``pending`` 的提交生效；不存在或非 pending 的记入 ``skipped``
+    而不中断其它条目（部分成功语义，返回明细供前端展示进度与跳过原因）。
+    """
+    ids = body.get("ids") or []
+    action = body.get("action")
+    note = body.get("note", "")
+    if action not in ("approve", "reject"):
+        raise HTTPException(400, "action 必须是 approve 或 reject")
+    # 去重 + 只保留整数 id，屏蔽畸形输入
+    try:
+        unique_ids = sorted({int(i) for i in ids})
+    except (TypeError, ValueError):
+        raise HTTPException(400, "ids 必须是提交 id 的整数数组") from None
+    if not unique_ids:
+        raise HTTPException(400, "ids 不能为空")
+
+    rows = (await db.execute(
+        select(store_models.AppSubmission).where(store_models.AppSubmission.id.in_(unique_ids))
+    )).scalars().all()
+    found = {r.id: r for r in rows}
+
+    now = datetime.now(timezone.utc)
+    updated: list[int] = []
+    skipped: list[dict] = []
+    for sid in unique_ids:
+        sub = found.get(sid)
+        if sub is None:
+            skipped.append({"id": sid, "reason": "提交记录不存在"})
+            continue
+        if sub.status != "pending":
+            skipped.append({"id": sid, "reason": f"当前状态为 {sub.status}，非待审核"})
+            continue
+        sub.status = "approved" if action == "approve" else "rejected"
+        sub.review_note = note
+        sub.reviewed_by = _.id
+        sub.reviewed_at = now
+        updated.append(sid)
+
+    await db.commit()
+    return {
+        "action": action,
+        "updated": len(updated),
+        "ids": updated,
+        "skipped": skipped,
+        "skipped_count": len(skipped),
     }
 
 
@@ -1135,6 +1295,154 @@ async def install_app_from_zip(
         "route_registered": route_registered,
         "warnings": warnings,
     }
+
+# ============================================================
+# 应用富介绍（开发者后台编辑 / 门户详情读取）
+# ============================================================
+
+_INTRO_MAX_HTML = 200_000
+_INTRO_MAX_UPLOAD = 8 * 1024 * 1024
+
+
+def _clean_str_list(value, limit=50):
+    """把用户传入的字符串数组清洗为去空、限长列表；非 list 视为未提供。"""
+    if not isinstance(value, list):
+        return None
+    out = []
+    for x in value:
+        item = str(x).strip()
+        if item:
+            out.append(item[:500])
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _clean_long_html(value):
+    """富文本 HTML 纵深防御：体积上限 + 剥离 script/iframe/on* /javascript:。
+
+    真正的 XSS 边界在渲染端（门户用 DOMPurify 净化后再 v-html）；这里的剥离只是避免
+    库内长期存着明显的可执行片段。
+    """
+    if value is None:
+        return None
+    import re as _re
+    s = str(value)
+    if len(s) > _INTRO_MAX_HTML:
+        s = s[:_INTRO_MAX_HTML]
+    s = _re.sub(r'(?is)<\\s*script.*?<\\s*/\\s*script\\s*>', '', s)
+    s = _re.sub(r'(?is)<\\s*iframe.*?<\\s*/\\s*iframe\\s*>', '', s)
+    s = _re.sub(r'(?is)\\son[a-z]+\\s*=\\s*\"[^\"]*\"', '', s)
+    s = _re.sub("(?is)"+chr(34)+"\\son[a-z]+\\s*=\\s*"+chr(39)+"[^"+chr(39)+"]*"+chr(39)+chr(34), "", s)
+    s = _re.sub(r'(?is)\\son[a-z]+\\s*=\\s*[^\\s>]+', '', s)
+    s = _re.sub(r'(?is)javascript:', '', s)
+    return s
+
+
+async def _assert_intro_access(db: AsyncSession, auth: dict, product: str, app_key: str) -> None:
+    """管理员可编辑任意应用介绍；portal 开发者只能编辑自己提交过的 (product, app_key)。"""
+    if auth["user_type"] == "admin":
+        return
+    dev = (await db.execute(
+        select(store_models.Developer).where(store_models.Developer.user_id == auth["user_id"])
+    )).scalar_one_or_none()
+    if not dev:
+        raise HTTPException(403, "请先注册为开发者")
+    has = (await db.execute(
+        select(store_models.AppSubmission.id).where(
+            store_models.AppSubmission.developer_id == dev.id,
+            store_models.AppSubmission.product == product,
+            store_models.AppSubmission.app_key == app_key,
+        ).limit(1)
+    )).scalar_one_or_none()
+    if not has:
+        raise HTTPException(403, "无权编辑该应用的介绍")
+
+
+@router.get("/intro/{app_key}", response_model=dict[str, Any])
+async def get_app_intro(
+    app_key: str,
+    product: str = Query("cenkor-admin"),
+    db: AsyncSession = Depends(get_db),
+    auth: dict = Depends(require_portal_or_admin),
+):
+    """读取某应用当前富介绍（供开发者后台编辑器回填）。"""
+    await _assert_intro_access(db, auth, product, app_key)
+    intro = await _get_intro(db, product, app_key)
+    return {
+        "product": product,
+        "app_key": app_key,
+        "summary": (intro.summary if intro else None) or "",
+        "highlights": (intro.highlights if intro and intro.highlights else []) or [],
+        "tags": (intro.tags if intro and intro.tags else []) or [],
+        "screenshots": (intro.screenshots if intro and intro.screenshots else []) or [],
+        "long_description": (intro.long_description if intro else None) or "",
+        "updated_at": _stamp(intro.updated_at) if intro else None,
+    }
+
+
+@router.put("/intro/{app_key}", response_model=dict[str, Any])
+async def put_app_intro(
+    app_key: str,
+    body: dict,
+    product: str = Query("cenkor-admin"),
+    db: AsyncSession = Depends(get_db),
+    auth: dict = Depends(require_portal_or_admin),
+):
+    """创建/更新某应用富介绍（按 (product, app_key) upsert）。"""
+    await _assert_intro_access(db, auth, product, app_key)
+    summary = (str(body.get("summary") or "").strip()[:500] or None)
+    highlights = _clean_str_list(body.get("highlights")) or []
+    tags = _clean_str_list(body.get("tags"), 10) or []
+    screenshots = _clean_str_list(body.get("screenshots")) or []
+    long_description = _clean_long_html(body.get("long_description"))
+
+    intro = await _get_intro(db, product, app_key)
+    if not intro:
+        intro = store_models.AppIntro(product=product, app_key=app_key)
+        db.add(intro)
+    intro.summary = summary
+    intro.highlights = highlights
+    intro.tags = tags
+    intro.screenshots = screenshots
+    intro.long_description = long_description
+    intro.updated_by = auth["user_id"]
+    await db.commit()
+    return {"ok": True, "product": product, "app_key": app_key}
+
+
+@router.post("/media/upload", response_model=dict[str, Any])
+async def store_media_upload(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    auth: dict = Depends(require_portal_or_admin),
+):
+    """富介绍配图上传。
+
+    cms 的 /media/upload 需要 admin token，开发者（portal token）用不了；这里给商店域
+    单独开一条接受 portal/admin token 的图片上传通道，复用统一 s3 driver。
+    """
+    if not file.filename:
+        raise HTTPException(400, "缺少文件")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "空文件")
+    if len(content) > _INTRO_MAX_UPLOAD:
+        raise HTTPException(413, "图片过大（超过 8MB 上限）")
+    ctype = file.content_type or "application/octet-stream"
+    if not ctype.startswith("image/"):
+        raise HTTPException(400, "仅支持图片文件")
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
+    if ext not in {"png", "jpg", "jpeg", "gif", "webp"}:
+        ext = "png"
+    key = "app-intro/" + uuid.uuid4().hex + "." + ext
+    bucket = await s3.public_bucket()
+    await s3.ensure_bucket(bucket)
+    await s3.upload_fileobj(bucket, key, io.BytesIO(content), ctype)
+    url = await s3.public_url(bucket, key)
+    log.info("store.intro_media_uploaded", key=key, user_type=auth["user_type"])
+    return {"url": url, "key": key, "bucket": bucket}
+
 
 # ============================================================
 # 应用市场（官方目录浏览 / 授权码一键安装）

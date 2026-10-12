@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { api } from '@/lib/api'
+import { productLabel, devMethodLabel } from '@/lib/products'
 
 interface AppItem {
   key: string
@@ -42,6 +43,7 @@ interface PendingApp {
   status: string
   created_at: string
   product?: string
+  dev_method?: 'platform' | 'extension' | 'standalone'
 }
 
 interface StoreApp {
@@ -60,6 +62,18 @@ interface StoreApp {
 
 const apps = ref<AppItem[]>([])
 const pendingApps = ref<PendingApp[]>([])
+/** 待审核多选（批量审核用）：存 submission id；仅 status==='pending' 可入集 */
+const selectedIds = ref<Set<number>>(new Set())
+const batchActing = ref(false)
+
+/** 是否平台内置（安装按钮条件）：优先 dev_method，缺省回退旧 product 规则 */
+function isPlatform(app: PendingApp): boolean {
+  if (app.dev_method) return app.dev_method === 'platform'
+  return !app.product || app.product === 'cenkor-admin'
+}
+function isStandalone(app: PendingApp): boolean {
+  return app.dev_method === 'standalone'
+}
 const loading = ref(true)
 const error = ref('')
 const acting = ref<string | null>(null)
@@ -176,6 +190,7 @@ async function saveGrants() {
 }
 
 async function loadPending() {
+  selectedIds.value = new Set()
   try {
     // pending/approved 不能用 only_active：那是给「商店目录」设计的，要求 app_key 在 platform_apps 已 installed 才放行；
     // 新提交的应用从未安装过，会被过滤掉导致审核列表为空。
@@ -204,6 +219,51 @@ async function reviewSubmission(id: number, action: 'approve' | 'reject') {
     alert(e?.response?.data?.detail || '操作失败')
   } finally {
     acting.value = null
+  }
+}
+
+/** 当前可被批量操作的待审核项（仅 status==='pending'） */
+const selectablePending = computed(() =>
+  pendingApps.value.filter(s => s.status === 'pending'),
+)
+/** 已选中且仍为 pending 的 id（自动剔除已审核 / 不存在的陈旧选中项） */
+const selectedPendingIds = computed(() =>
+  selectablePending.value.filter(s => selectedIds.value.has(s.id)).map(s => s.id),
+)
+const allSelected = computed(() =>
+  selectablePending.value.length > 0 &&
+  selectablePending.value.every(s => selectedIds.value.has(s.id)),
+)
+function toggleSelect(id: number) {
+  const s = new Set(selectedIds.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  selectedIds.value = s
+}
+function toggleSelectAll() {
+  selectedIds.value = allSelected.value
+    ? new Set()
+    : new Set(selectablePending.value.map(s => s.id))
+}
+async function batchReview(action: 'approve' | 'reject') {
+  const ids = Array.from(selectedPendingIds.value)
+  if (!ids.length) return
+  const verb = action === 'approve' ? '通过' : '驳回'
+  if (!confirm(`确认批量${verb}选中的 ${ids.length} 个应用？`)) return
+  batchActing.value = true
+  try {
+    const { data } = await api.post('/api/v1/store/submissions/batch-review', { ids, action })
+    const skipped = data.skipped || []
+    if (skipped.length) {
+      alert(`已${verb} ${data.updated} 个，跳过 ${skipped.length} 个：\n` +
+        skipped.map((s: any) => `#${s.id} ${s.reason}`).join('\n'))
+    }
+    selectedIds.value = new Set()
+    await loadPending()
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || '批量操作失败')
+  } finally {
+    batchActing.value = false
   }
 }
 
@@ -795,11 +855,32 @@ function categoryLabel(c: string): string {
           @click="subTab = 'installed'">{{ t('apps.subInstalled') }} ({{ pendingApps.filter(s => s.status === 'installed').length }})</button>
       </div>
 
+      <div
+        v-if="subTab === 'pending' && selectablePending.length"
+        class="card flex items-center gap-3 flex-wrap py-3 mb-3"
+      >
+        <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input type="checkbox" class="accent-ink-900" :checked="allSelected" @change="toggleSelectAll" />
+          全选（待审核 {{ selectablePending.length }}）
+        </label>
+        <span class="text-xs text-ink-500">已选 {{ selectedPendingIds.length }} 个</span>
+        <div class="flex-1"></div>
+        <button class="btn-ghost text-sm text-green-600" :disabled="!selectedPendingIds.length || batchActing" @click="batchReview('approve')">{{ batchActing ? '处理中…' : '批量通过' }}</button>
+        <button class="btn-ghost text-sm text-red-600" :disabled="!selectedPendingIds.length || batchActing" @click="batchReview('reject')">{{ batchActing ? '处理中…' : '批量驳回' }}</button>
+      </div>
+
       <div v-if="filteredSubmissions.length === 0" class="card text-ink-500 text-center py-12">
         {{ t('apps.emptyPending') }}
       </div>
       <div v-for="app in filteredSubmissions" :key="app.id" class="card">
         <div class="flex items-start gap-3">
+          <input
+            v-if="app.status === 'pending'"
+            type="checkbox"
+            class="mt-1.5 accent-ink-900"
+            :checked="selectedIds.has(app.id)"
+            @change="toggleSelect(app.id)"
+          />
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <h3 class="font-semibold">{{ app.name }}</h3>
@@ -809,6 +890,10 @@ function categoryLabel(c: string): string {
             </div>
             <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
             <p class="text-xs text-ink-400 mt-1">{{ t('apps.author') }}: {{ app.author }} · {{ app.created_at }}</p>
+            <div class="flex items-center gap-2 mt-1.5">
+              <span class="text-xs px-2 py-0.5 rounded bg-ink-100 text-ink-600">{{ productLabel(app.product) || app.product || 'Cenkor 平台' }}</span>
+              <span v-if="app.dev_method" class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">开发方式 · {{ devMethodLabel(app.dev_method) }}</span>
+            </div>
           </div>
         </div>
         <div class="mt-3 flex gap-2 border-t pt-3">
@@ -816,8 +901,9 @@ function categoryLabel(c: string): string {
             <button class="btn-ghost text-sm text-green-600" :disabled="acting === `review-${app.id}`" @click="reviewSubmission(app.id, 'approve')">{{ t('apps.approve') }}</button>
             <button class="btn-ghost text-sm text-red-600" :disabled="acting === `review-${app.id}`" @click="reviewSubmission(app.id, 'reject')">{{ t('apps.reject') }}</button>
           </template>
-          <button v-else-if="app.status === 'approved' && (!app.product || app.product === 'cenkor-admin')" class="btn-primary text-sm" :disabled="acting === `install-${app.id}`" @click="installSubmission(app.id)">{{ t('apps.install') }}</button>
-          <span v-else-if="app.status === 'approved'" class="text-sm text-blue-600">已通过 · 产品扩展，需在对应产品实例安装</span>
+          <button v-else-if="app.status === 'approved' && isPlatform(app)" class="btn-primary text-sm" :disabled="acting === `install-${app.id}`" @click="installSubmission(app.id)">{{ t('apps.install') }}</button>
+          <span v-else-if="app.status === 'approved' && isStandalone(app)" class="text-sm text-ink-500">已通过 · 独立应用，交付整包私有化部署</span>
+          <span v-else-if="app.status === 'approved'" class="text-sm text-blue-600">已通过 · 产品扩展，需在 {{ productLabel(app.product) || '对应产品' }} 实例安装</span>
           <span v-else-if="app.status === 'installed'" class="text-sm text-green-600">{{ t('apps.status_installed') }}</span>
         </div>
       </div>

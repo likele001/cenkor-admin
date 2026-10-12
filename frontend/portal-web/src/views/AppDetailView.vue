@@ -5,8 +5,10 @@ import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { useOwnedApps } from '@/lib/ownership'
-import { hasPriceInfo, isFreePrice, promoRemaining, yuanText, type AppPrice } from '@/lib/pricing'
+import { isFreePrice, isPurchasable, isUnpriced, promoRemaining, yuanText, type AppPrice } from '@/lib/pricing'
+import { productLabel, devMethodLabel } from '@/lib/products'
 import SiteHeader from '@/components/SiteHeader.vue'
+import RichTextContent from '@/components/RichTextContent.vue'
 
 interface AppVersion {
   version: string
@@ -22,6 +24,7 @@ interface AppDetail {
   name: string
   version: string
   description: string
+  long_description?: string | null
   summary: string
   highlights: string[]
   tags: string[]
@@ -29,6 +32,9 @@ interface AppDetail {
   icon: string
   category: string
   category_label: string
+  /** 所属产品 + 开发方式（交付安装目标） */
+  product?: string
+  dev_method?: 'platform' | 'extension' | 'standalone'
   download_count: number
   updated_at?: string | null
   released_at?: string | null
@@ -56,6 +62,26 @@ const loading = ref(true)
 const error = ref('')
 const showPermissions = ref(false)
 
+// ---- 应用截图图集 ----
+const shots = computed(() => detail.value?.screenshots || [])
+const shotIndex = ref(-1)
+function openShot(i: number) { shotIndex.value = i }
+function closeShot() { shotIndex.value = -1 }
+function prevShot() {
+  const n = shots.value.length
+  if (n) shotIndex.value = (shotIndex.value - 1 + n) % n
+}
+function nextShot() {
+  const n = shots.value.length
+  if (n) shotIndex.value = (shotIndex.value + 1) % n
+}
+function onShotKeydown(e: KeyboardEvent) {
+  if (shotIndex.value < 0) return
+  if (e.key === 'Escape') closeShot()
+  else if (e.key === 'ArrowLeft') prevShot()
+  else if (e.key === 'ArrowRight') nextShot()
+}
+
 // ---- 定价与购买 ----
 const router = useRouter()
 const auth = useAuthStore()
@@ -73,8 +99,9 @@ watch(() => route.params.key, () => { buyError.value = '' })
 
 const price = computed(() => detail.value?.price ?? null)
 const isFree = computed(() => isFreePrice(price.value))
-// 定价行已下架：能看不能买
-const notOnSale = computed(() => !!price.value && !isFree.value && price.value.enabled === false)
+// 缺定价行：平台内置应用随 cenkor-admin 一同交付、装好就有，本就不该出现购买入口
+const unpriced = computed(() => isUnpriced(price.value))
+const builtin = computed(() => unpriced.value && detail.value?.dev_method === 'platform')
 const promoLeft = computed(() => promoRemaining(price.value?.promo_end_at, tickNow.value))
 const modelHint = computed(() => {
   const p = price.value
@@ -176,8 +203,12 @@ async function load() {
 
 onMounted(() => {
   tickTimer = setInterval(() => { tickNow.value = Date.now() }, 30_000)
+  window.addEventListener('keydown', onShotKeydown)
 })
-onBeforeUnmount(() => clearInterval(tickTimer))
+onBeforeUnmount(() => {
+  clearInterval(tickTimer)
+  window.removeEventListener('keydown', onShotKeydown)
+})
 
 onMounted(() => {
   void load()
@@ -255,6 +286,8 @@ function fmtDate(iso?: string | null): string {
 
               <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[#8b8e96]">
                 <span class="px-2 py-0.5 rounded-full bg-[#eef2ff] text-[#4f46e5]">{{ detail.category_label }}</span>
+                <span v-if="detail.product" class="px-2 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569]">{{ productLabel(detail.product) }}</span>
+                <span v-if="detail.dev_method" class="px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#b45309]">{{ devMethodLabel(detail.dev_method) }}</span>
                 <span>{{ t('appDetail.author') }}：{{ detail.developer.name }}</span>
                 <span>{{ t('appDetail.downloads') }}：{{ detail.download_count }}</span>
                 <span>{{ t('appDetail.updated') }}：{{ fmtDate(detail.updated_at) }}</span>
@@ -270,9 +303,10 @@ function fmtDate(iso?: string | null): string {
             </div>
 
             <div class="shrink-0 flex flex-col items-stretch gap-3 lg:w-56">
-              <!-- 价格（price 为 undefined 时后端未提供价格信息，整块不展示） -->
+              <!-- 价格：只有真实定价行才渲染。price 为 null（缺行）或 undefined（未装 commerce）都不显示，
+                   缺行不等于免费，标成「免费」会诱导点击后拿 400 -->
               <div
-                v-if="hasPriceInfo(detail.price)"
+                v-if="detail.price"
                 class="rounded-xl border border-[#eef0f4] bg-[#fbfcfd] px-4 py-3.5"
               >
                 <template v-if="isFree">
@@ -303,7 +337,6 @@ function fmtDate(iso?: string | null): string {
                   </div>
                   <div class="mt-1.5 text-[11px] text-[#8b8e96]">{{ modelHint }}</div>
                 </template>
-                <div v-else class="text-sm text-[#6b6e76]">{{ t('price.free') }}</div>
               </div>
 
               <!-- 席位选择（仅「按席位」计费） -->
@@ -328,11 +361,20 @@ function fmtDate(iso?: string | null): string {
                 class="px-4 py-2.5 text-sm text-center rounded-lg bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0] hover:bg-[#d1fae5] transition-colors"
               >{{ t('price.owned') }}</RouterLink>
               <button
-                v-else-if="!detail.installed"
-                :disabled="buying || notOnSale"
+                v-else-if="!detail.installed && isPurchasable(price)"
+                :disabled="buying"
                 class="px-4 py-2.5 text-sm rounded-lg bg-[#4f46e5] text-white hover:bg-[#4338ca] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 @click="buy"
-              >{{ notOnSale ? t('price.notOnSale') : (buying ? t('price.buying') : t('price.buy')) }}</button>
+              >{{ buying ? t('price.buying') : t('price.buy') }}</button>
+              <!-- 不可购买：平台内置自带（本来就不卖）/ 已下架或未配价（不给下单入口）。
+                   后端缺定价行会拒单，这里挂按钮只会让用户点了拿 400 -->
+              <div
+                v-else-if="!detail.installed"
+                class="px-4 py-2.5 text-sm rounded-lg bg-[#f8f9fb] border border-[#eef0f4] text-[#6b6e76]"
+              >
+                <div>{{ builtin ? t('price.builtin') : t('price.notOnSale') }}</div>
+                <p v-if="builtin" class="mt-1 text-[11px] leading-relaxed text-[#8b8e96]">{{ t('price.builtinHint') }}</p>
+              </div>
               <a
                 v-else
                 :href="ADMIN_CONSOLE"
@@ -361,10 +403,36 @@ function fmtDate(iso?: string | null): string {
               </ul>
             </div>
 
-            <!-- 应用介绍 -->
-            <div v-if="detail.description" class="bg-white rounded-xl border border-[#e5e7eb] p-6">
+            <!-- 应用截图 -->
+            <div v-if="shots.length" class="bg-white rounded-xl border border-[#e5e7eb] p-6">
+              <h2 class="font-semibold text-[#111827]">应用截图</h2>
+              <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  v-for="(s, i) in shots"
+                  :key="s"
+                  type="button"
+                  class="group relative overflow-hidden rounded-lg border border-[#eef0f4] bg-[#f8f9fb] aspect-video"
+                  @click="openShot(i)"
+                >
+                  <img
+                    :src="s"
+                    :alt="`${detail.name} 截图 ${i + 1}`"
+                    loading="lazy"
+                    class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  />
+                </button>
+              </div>
+            </div>
+
+            <!-- 应用介绍：优先富文本长介绍，回落纯文本描述 -->
+            <div v-if="detail.long_description || detail.description" class="bg-white rounded-xl border border-[#e5e7eb] p-6">
               <h2 class="font-semibold text-[#111827]">{{ t('appDetail.overview') }}</h2>
-              <p class="mt-3 text-sm text-[#6b6e76] leading-relaxed whitespace-pre-line">{{ detail.description }}</p>
+              <RichTextContent
+                v-if="detail.long_description"
+                :content="detail.long_description"
+                class="mt-3 text-sm text-[#374151]"
+              />
+              <p v-else class="mt-3 text-sm text-[#6b6e76] leading-relaxed whitespace-pre-line">{{ detail.description }}</p>
             </div>
 
             <!-- 版本历史 -->
@@ -437,6 +505,14 @@ function fmtDate(iso?: string | null): string {
                   <dt class="text-[#8b8e96]">{{ t('appDetail.labelCategory') }}</dt>
                   <dd class="text-[#374151] text-right">{{ detail.category_label }}</dd>
                 </div>
+                <div v-if="detail.product" class="flex justify-between gap-3">
+                  <dt class="text-[#8b8e96]">产品类型</dt>
+                  <dd class="text-[#374151] text-right">{{ productLabel(detail.product) }}</dd>
+                </div>
+                <div v-if="detail.dev_method" class="flex justify-between gap-3">
+                  <dt class="text-[#8b8e96]">开发方式</dt>
+                  <dd class="text-[#374151] text-right">{{ devMethodLabel(detail.dev_method) }}</dd>
+                </div>
                 <div class="flex justify-between gap-3">
                   <dt class="text-[#8b8e96]">{{ t('appDetail.labelVersion') }}</dt>
                   <dd class="text-[#374151] text-right">v{{ detail.version }}</dd>
@@ -497,6 +573,44 @@ function fmtDate(iso?: string | null): string {
             </div>
           </div>
         </div>
+
+        <!-- 截图大图预览 -->
+        <Teleport to="body">
+          <div
+            v-if="shotIndex >= 0"
+            class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+            @click.self="closeShot"
+          >
+            <button
+              type="button"
+              class="absolute top-4 right-5 text-white/80 hover:text-white text-2xl leading-none"
+              aria-label="关闭"
+              @click="closeShot"
+            >✕</button>
+            <button
+              v-if="shots.length > 1"
+              type="button"
+              class="absolute left-4 text-white/80 hover:text-white text-4xl leading-none px-2 py-1"
+              aria-label="上一张"
+              @click.stop="prevShot"
+            >‹</button>
+            <img
+              :src="shots[shotIndex]"
+              :alt="`${detail?.name} 截图 ${shotIndex + 1}`"
+              class="max-h-[90vh] max-w-[92vw] rounded-lg shadow-2xl"
+            />
+            <button
+              v-if="shots.length > 1"
+              type="button"
+              class="absolute right-4 text-white/80 hover:text-white text-4xl leading-none px-2 py-1"
+              aria-label="下一张"
+              @click.stop="nextShot"
+            >›</button>
+            <div v-if="shots.length > 1" class="absolute bottom-4 text-white/70 text-xs">
+              {{ shotIndex + 1 }} / {{ shots.length }}
+            </div>
+          </div>
+        </Teleport>
       </template>
     </section>
   </div>
