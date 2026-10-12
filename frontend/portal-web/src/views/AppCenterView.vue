@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { hasPriceInfo, isFreePrice, yuanText, type AppPrice } from '@/lib/pricing'
+import { PRODUCT_KEYS, productLabel, devMethodLabel } from '@/lib/products'
 import SiteHeader from '@/components/SiteHeader.vue'
 import { useOwnedApps } from '@/lib/ownership'
 
@@ -25,8 +26,10 @@ interface StoreApp {
   installed_version?: string | null
   has_update?: boolean
   updated_at?: string | null
-  /** 所属产品（多产品轴）：cenkormes / lightmes / cenkor-admin */
+  /** 所属产品（多产品轴）：cenkormes / lightmes / cenkor-admin / cenkor-process */
   product?: string
+  /** 开发方式（交付安装目标）：platform / extension / standalone */
+  dev_method?: 'platform' | 'extension' | 'standalone'
   /** null = 免费 / 未定价 */
   price?: AppPrice | null
 }
@@ -41,14 +44,8 @@ const route = useRoute()
 const activeProduct = ref(String(route.query.product || '').trim())
 const PRODUCT_TABS: { key: string; label: string }[] = [
   { key: '', label: '全部产品' },
-  { key: 'cenkormes', label: 'CenkorMES' },
-  { key: 'lightmes', label: 'LightMES' },
-  { key: 'cenkor-admin', label: 'Cenkor 平台' },
+  ...PRODUCT_KEYS.map((k) => ({ key: k, label: productLabel(k) })),
 ]
-function productLabel(p?: string): string {
-  if (!p) return ''
-  return PRODUCT_TABS.find((x) => x.key === p)?.label || p
-}
 
 /** 本账号已购应用（卡片上打「已拥有」标） */
 const { isOwned, load: loadOwned } = useOwnedApps()
@@ -331,6 +328,10 @@ function relTime(iso?: string | null): string {
                   v-if="a.product && a.product !== 'cenkor-admin'"
                   class="inline-block mt-1.5 ml-1 px-2 py-0.5 text-[10px] rounded-full bg-[#f1f5f9] text-[#475569]"
                 >{{ productLabel(a.product) }}</span>
+                <span
+                  v-if="a.dev_method && a.dev_method !== 'platform'"
+                  class="inline-block mt-1.5 ml-1 px-2 py-0.5 text-[10px] rounded-full bg-[#fef3c7] text-[#92400e]"
+                >{{ devMethodLabel(a.dev_method) }}</span>
               </div>
             </div>
 
@@ -367,6 +368,11 @@ function relTime(iso?: string | null): string {
                   class="px-1.5 py-0.5 text-[10px] rounded bg-[#fef3c7] text-[#b45309]"
                 >{{ t('price.promo') }}</span>
               </template>
+              <!-- price 为 null = 这一轴没有定价行。缺行不等于免费：内置应用安装即用，
+                   外部包则是尚未开售，都不该显示「免费」字样 -->
+              <span v-else class="text-xs text-[#8b8e96]">
+                {{ a.dev_method === 'platform' ? t('price.builtin') : t('price.notOnSale') }}
+              </span>
             </div>
 
             <div class="mt-4 pt-3 border-t border-[#f3f4f6] flex items-center justify-between text-[11px] text-[#9ca3af]">

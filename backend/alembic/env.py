@@ -41,7 +41,11 @@ if os.path.isdir(_EXTERNAL_APPS_DIR):
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False：本进程在 uvicorn --log-config 之后才跑迁移，
+    # 默认(True)会按 alembic.ini 重排 logging、把 uvicorn.error 等已有 logger 连同
+    # 它们的 RotatingFileHandler 一起禁用 —— backend/logs/hub.log 就再也写不进东西，
+    # 500 的 traceback 又只剩 stdout。别把这个参数“顺手清理”掉。
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # 用 .env 的同步 URL 覆盖
 config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL_SYNC)

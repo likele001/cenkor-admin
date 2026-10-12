@@ -405,3 +405,45 @@ git config core.hooksPath .githooks     # ⚠️ 新 clone 后必须执行一次
 - `apps/announcements/` — 公告管理
 - `apps/tickets/` — 工单系统
 - `apps/links/` — 链接收藏
+
+## 十一、产品类型与开发方式（product / dev_method）
+
+统一门户 / 商店 / 审核 / manifest 四处必须对以下两个维度取值一致，真相源是后端
+`store_router.ALLOWED_PRODUCTS` 与 `store_router.DEV_METHODS`，前端各 app 收敛到 `src/lib/products.ts`。
+
+### 11.1 产品类型 product（归属哪个产品 / 分发隔离）
+允许值（slug 全链路必须完全一致）：
+
+| slug | 含义 |
+|---|---|
+| `cenkor-admin` | Cenkor 平台（自营） |
+| `cenkormes` | CenkorMES 离散制造 |
+| `lightmes` | LightMES |
+| `cenkor-process` | CenkorProcess 食品/流程制造（food.mes.cenkor.cn） |
+
+### 11.2 应用开发方式 dev_method（交付安装目标，取代旧的 `product != cenkor-admin` 隐式判定）
+
+| 取值 | 交付安装目标 | 包内必需 | 安装去向 |
+|---|---|---|---|
+| `platform` | 平台内置应用 | `manifest.py` + `__init__.py` | 装进 cenkor-admin 自身，审核通过后可直接「安装」 |
+| `extension` | 产品扩展插件 | `manifest.json`（`key` 与提交一致） | 热挂载到对应 MES 实例；审核端不显示安装按钮，提示「需在 {产品} 实例安装」 |
+| `standalone` | 独立应用 | `manifest.json` 或 `README` | 私有化整包，仅门户展示 / 售卖，不做安装向强校验 |
+
+### 11.3 扩展包 manifest.json 字段规范
+产品扩展（`dev_method=extension`）的 `manifest.json` 除 `key/name/version/permissions/menus` 外，
+应携带：
+
+```json
+{
+  "product": "cenkor-process",
+  "dev_method": "extension"
+}
+```
+
+后端 `submit_app` 会校验：
+- `product ∈ ALLOWED_PRODUCTS`、`dev_method ∈ DEV_METHODS`，否则 400；
+- 扩展包若 `manifest.json` 声明了 `product`，必须等于提交时所选 `product`，否则 400
+  （避免「提交归 A 产品、包内写 B 产品」的漂移）。
+
+> MES 宿主（cenkor-process / cenkormes）的 `extension_host/manifest.py load_manifest()`
+> 为白名单解析、忽略未知键，因此新增 `product`/`dev_method` 不影响宿主加载。

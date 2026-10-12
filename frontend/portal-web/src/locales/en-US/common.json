@@ -142,6 +142,8 @@
     "owned": "Owned · My apps",
     "free": "Free",
     "freeHint": "No charge — install and use it right away",
+    "builtin": "Included with the platform",
+    "builtinHint": "Shipped as part of the platform — no purchase needed. An admin enables it under System → App management.",
     "buy": "Buy now",
     "buying": "Processing…",
     "buyError": "Checkout failed, please retry later",
