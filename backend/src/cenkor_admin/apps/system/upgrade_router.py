@@ -156,8 +156,8 @@ async def upgrade_dry_run(
     source = (body or {}).get("source", "url")
     payload = (body or {}).get("payload", {}) or {}
     notes = (body or {}).get("notes")
-    if source not in ("url", "tar_upload"):
-        raise HTTPException(400, "source 必须是 url / tar_upload")
+    if source not in ("git",):
+        raise HTTPException(400, "source 必须是 git")
     return await upgrade_service.run_upgrade(
         db, user, source=source, payload=payload, dry_run=True, notes=notes,
     )
@@ -177,16 +177,9 @@ async def upgrade_run(
     source = (body or {}).get("source", "url")
     payload = (body or {}).get("payload", {}) or {}
     notes = (body or {}).get("notes")
-    if source not in ("url", "tar_upload"):
-        raise HTTPException(400, "source 必须是 url / tar_upload")
-    if source == "url":
-        url = (payload.get("url") or "").strip()
-        if not url or not re.match(r"^https?://", url):
-            raise HTTPException(400, "url 必须是 http(s):// 开头的 URL")
-    if source == "tar_upload":
-        local = (payload.get("local_path") or "").strip()
-        if not local:
-            raise HTTPException(400, "source=tar_upload 需传 payload.local_path")
+    if source not in ("git",):
+        raise HTTPException(400, "source 必须是 git")
+    # git 模式无需额外校验
     # notes 长度软限制（避免把乱七八糟的大文本写进 announcements）
     if notes and len(notes) > 8000:
         raise HTTPException(400, "notes 太长（> 8000 字符）")
