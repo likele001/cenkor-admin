@@ -1,7 +1,13 @@
 # Cenkor Admin 应用开发规范
 
-> 版本：1.0.0  
-> 更新日期：2026-06-11
+> 版本：1.1.0  
+> 更新日期：2026-10-12
+>
+> **本文覆盖两类交付形态**（真相源：后端 `store_router.DEV_METHODS`）：
+> - **第壹部分 · 平台内置应用**（`dev_method=platform`）：装进 cenkor-admin 自身，用 `manifest.py` + SQLAlchemy 模型 + alembic 迁移 → 第二～十节。
+> - **第贰部分 · 产品扩展包**（`dev_method=extension`）：热挂载到 MES 实例（cenkormes / cenkor-process），用 `manifest.json` + `router.py` + `migrations.sql` + `frontend/plugin.js` → 第十二～十八节。
+>
+> 若你开发的是**卖给 MES 客户的付费扩展**，直接跳到【第贰部分】。第十一节（product / dev_method）是两类共用的取值口径，先看它。
 
 ## 一、概述
 
@@ -12,6 +18,10 @@ Cenkor Admin 支持通过应用（App）扩展平台功能。每个应用是一�
 - 注册 API 路由
 - 添加菜单和权限
 - 提供公共 API
+
+## 第壹部分 · 平台内置应用（dev_method=platform）
+
+> 面向把功能装进 cenkor-admin 平台自身的内置应用。产品扩展包请看第贰部分。
 
 ## 二、应用结构
 

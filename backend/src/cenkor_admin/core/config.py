@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     # 检查结果缓存时长（小时），避免每次进工作台都打中心
     RELEASE_CHECK_TTL_HOURS: int = 6
 
+    # ---- 核心升级资源库（后台「在线升级 > 资源库」下拉用）----
+    # 远程 releases.json 清单（结构 [{version, channel, released_at, pkg_url, size, notes}, ...]）
+    CORE_RELEASES_URL: str = "https://cenkor.cn/api/releases.json"
+    # 远程清单鉴权 token（走 Authorization: Bearer <token>）；空 = 不带鉴权
+    CORE_RELEASES_TOKEN: str = ""
+    # 远程清单缓存时长（秒），避免每次进升级页都打远程
+    CORE_RELEASES_TTL_SECONDS: int = 300
+    # 「下载到本地」的目标目录
+    CORE_RELEASES_DOWNLOAD_DIR: str = "/www/wwwroot/cenkor-admin/release"
+
     # ---- 安全 ----
     SECRET_KEY: str = "dev-secret-change-me-32-bytes-min"
     # 历史 SECRET_KEY 列表（用于轮换：旧 token 仍可解码，但新 token 用新 key）

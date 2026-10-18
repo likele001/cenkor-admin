@@ -41,6 +41,9 @@ DEFAULT_PERMISSIONS = [
     ("media:upload", "API", "上传媒体"),
     # 系统
     ("system:audit:read", "API", "查看审计日志"),
+    # 应用商店：审核链专用码。以前复用 rbac:role:write，于是「能改角色」与
+    # 「能过审/装应用」是同一道闸 —— 授权一个运营岗去审应用，顺手就把 RBAC 交出去了。
+    ("store:review", "API", "审核应用商店提交并安装"),
     # 通知
     ("notification:read", "API", "查看通知列表"),
     ("notification:write", "API", "管理通知"),

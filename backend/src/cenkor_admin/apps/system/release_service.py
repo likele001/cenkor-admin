@@ -19,6 +19,7 @@ from typing import Any
 import structlog
 
 from cenkor_admin import __version__ as CURRENT_VERSION
+from cenkor_admin.apps.system.versioning import ver_tuple
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.redis import redis_client
 
@@ -29,18 +30,6 @@ _CACHE_KEY = "release:check:latest"
 # release.json 随包分发（在 cenkor_admin 包根目录），中心端据此对外声明最新版本
 # 本文件位于 cenkor_admin/apps/system/，parents[2] 即 cenkor_admin 包根
 _RELEASE_FILE = Path(__file__).resolve().parents[2] / "release.json"
-
-
-def _ver_tuple(v: str) -> tuple[int, ...]:
-    """语义化版本转可比较元组；非数字段按 0 处理，预发布后缀忽略。"""
-    core = (v or "").strip().split("+")[0].split("-")[0]
-    parts: list[int] = []
-    for seg in core.split(".")[:3]:
-        num = "".join(ch for ch in seg if ch.isdigit())
-        parts.append(int(num) if num else 0)
-    while len(parts) < 3:
-        parts.append(0)
-    return tuple(parts)
 
 
 def load_local_release() -> dict[str, Any]:
@@ -115,7 +104,7 @@ async def check_latest(force: bool = False) -> dict[str, Any]:
         result["core_pkg_url"] = latest.get("core_pkg_url")
         result["released_at"] = latest.get("released_at")
         result["has_update"] = bool(
-            latest_version and _ver_tuple(latest_version) > _ver_tuple(current)
+            latest_version and ver_tuple(latest_version) > ver_tuple(current)
         )
     except Exception as e:  # noqa: BLE001 - 任何网络/解析异常都降级，不影响可用性
         log.warning("release.check_failed", error=str(e))

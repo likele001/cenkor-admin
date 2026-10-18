@@ -34,17 +34,22 @@ const pluginManager = new PluginManager({ router, i18n })
 // 激活 auth store（确保 plugin.js 注入 __PLUGIN_TOKEN__ 时能读到 token）
 import('@/stores/auth').then(({ useAuthStore }) => useAuthStore())
 
-// 启动 locale 双向同步（Pinia store <-> vue-i18n）
-setupLocaleWatcher().then(async () => {
-  // 先加载插件路由，再安装 router 并挂载应用。
-  // 关键：app.use(router) 会触发 vue-router 的初始导航（用当前 URL 匹配路由表），
-  // 必须在插件路由注册完成之后执行，否则硬刷新 /cloud_storage 等插件 URL 时，
-  // 初始导航会在路由注册前完成 → 落到 not-found（404）。
-  try {
-    await pluginManager.loadInstalledPlugins()
-  } catch {
-    // 插件加载失败不影响核心应用启动
+// 硬刷新直接访问插件路由（如 /erp/...、/cloud_storage）时，初始导航会先落到 not-found；
+// 此时等待插件注册完成，再按原路径重新解析一次 — 保证插件深链可用。
+// 普通页面不受影响：不等待插件、立即渲染。
+router.beforeEach(async (to) => {
+  if (to.matched.some((r) => r.name === 'not-found') && !pluginManager.isReady()) {
+    await pluginManager.whenReady()
+    return { path: to.path, query: to.query, hash: to.hash, replace: true }
   }
+  return true
+})
+
+// 启动 locale 双向同步（Pinia store <-> vue-i18n）
+setupLocaleWatcher().then(() => {
+  // 先启动插件加载（不 await）：plugin.js 在后台注册插件路由/菜单/i18n。
+  // 之前实现是「等全部插件下载完才 mount」，慢网络下首屏白屏可达数十秒，故改为非阻塞。
+  pluginManager.loadInstalledPlugins().catch(() => {})
   app.use(router)
   app.mount('#app')
 })

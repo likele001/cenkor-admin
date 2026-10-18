@@ -22,6 +22,7 @@ from cenkor_admin.apps.system.app_registry import (
     update_permissions_grants,
 )
 from cenkor_admin.apps.system.models import InstalledApp
+from cenkor_admin.apps.system.codegen_router import router as codegen_router
 from cenkor_admin.apps.system.settings_router import router as settings_router
 from cenkor_admin.apps.system.tasks_router import router as tasks_router
 
@@ -35,6 +36,12 @@ router = APIRouter()
 # 子路由：定时任务
 router.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 router.include_router(settings_router, prefix="/settings", tags=["settings"])
+from cenkor_admin.apps.system.upgrade_router import router as upgrade_router
+# 子路由：核心平台在线升级（后台「系统 > 在线升级」页）
+router.include_router(upgrade_router, prefix="/upgrade", tags=["upgrade"])
+
+# 子路由：CRUD 代码生成器（后台「系统 > 代码生成」页）
+router.include_router(codegen_router, prefix="/codegen", tags=["codegen"])
 
 
 # 公开路由（无需鉴权）— 供前端插件加载器使用

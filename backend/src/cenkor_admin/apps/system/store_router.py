@@ -27,6 +27,7 @@ from cenkor_admin.apps.system import pricing_rules
 from cenkor_admin.apps.system import store_models
 from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.apps.system.showcase_meta import SHOWCASE
+from cenkor_admin.apps.system.versioning import ver_gt, ver_tuple
 from cenkor_admin.core import hooks
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.security import decode_token
@@ -193,6 +194,11 @@ def _stamp(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
+def _ver_key(sub: store_models.AppSubmission) -> tuple:
+    """发布行按版本号排序的 key；同版本号重复提交时用 id 兜底，取后提交的那条。"""
+    return (ver_tuple(sub.version), sub.id or 0)
+
+
 async def _installed_map(db: AsyncSession) -> dict[str, str]:
     """平台已安装应用：{app_key: version}"""
     rows = (
@@ -238,31 +244,32 @@ async def public_store_apps(
 
     支持关键词搜索、分类筛选、排序与分页；facets 供前端渲染分类计数。
     """
-    inner_select = (
-        select(
-            store_models.AppSubmission.app_key,
-            func.max(store_models.AppSubmission.id).label("max_id"),
-        )
-        .where(store_models.AppSubmission.status.in_(["approved", "installed"]))
-    )
-    if product:
-        inner_select = inner_select.where(store_models.AppSubmission.product == product)
-    inner = inner_select.group_by(store_models.AppSubmission.app_key).subquery()
     stmt = (
         select(store_models.AppSubmission, store_models.Developer.display_name)
         .join(store_models.Developer, store_models.AppSubmission.developer_id == store_models.Developer.id)
-        .where(store_models.AppSubmission.id.in_(select(inner.c.max_id)))
+        .where(store_models.AppSubmission.status.in_(["approved", "installed"]))
         .where(store_models.Developer.status == "active")
     )
+    if product:
+        stmt = stmt.where(store_models.AppSubmission.product == product)
     rows = (await db.execute(stmt)).all()
+
+    # 每个 app_key 对外只留一行：取「版本号最大」的那条，不是 id 最大的那条。
+    # 按 id 选会踩坑——开发者先上 2.0、再补一版 1.9 修现场问题，目录就长期停在旧版本号上，
+    # 而 has_update 又据此催用户去「升级」到一个更旧的包。
+    grouped: dict[str, list] = {}
+    for r in rows:
+        grouped.setdefault(r[0].app_key, []).append(r)
+    picks = [max(g, key=lambda r: _ver_key(r[0])) for g in grouped.values()]
+
     installed = await _installed_map(db)
     # 批量取价格视图（跨源码边界桥）：未装 commerce 时为空 dict ——
     # 商店照常返回，只是不带价格，接口不会因缺定价模块而失败。
-    prices = await pricing_bridge.price_map(db, [s.app_key for s, _ in rows])
+    prices = await pricing_bridge.price_map(db, [s.app_key for s, _ in picks])
 
-    intros = await _intros_map(db, [(s.product, s.app_key) for s, _ in rows])
+    intros = await _intros_map(db, [(s.product, s.app_key) for s, _ in picks])
     all_items: list[dict[str, Any]] = []
-    for s, author in rows:
+    for s, author in picks:
         manifest = _manifest_dict(s.manifest_data)
         showcase = SHOWCASE.get(s.app_key, {})
         intro = intros.get((s.product, s.app_key))
@@ -275,6 +282,9 @@ async def public_store_apps(
             "dev_method": s.dev_method or ("platform" if (s.product or "cenkor-admin") == "cenkor-admin" else "extension"),
             "name": s.name,
             "version": s.version,
+            # 目录每个 app_key 只剩一行，version 即对外声明的最新版本；
+            # 单列一个 latest_version 是给实例侧（老 hub 无此字段则退回 version）的显式口径。
+            "latest_version": s.version,
             "description": s.description or "",
             "summary": (intro.summary if intro else None) or manifest.get("summary") or showcase.get("summary") or (s.description or ""),
             "icon": s.icon,
@@ -285,7 +295,7 @@ async def public_store_apps(
             "download_count": s.download_count,
             "installed": installed_version is not None,
             "installed_version": installed_version,
-            "has_update": bool(installed_version and installed_version != s.version),
+            "has_update": bool(installed_version and ver_gt(s.version, installed_version)),
             "updated_at": _stamp(s.updated_at),
             # None = 免费 / 未定价（前端据此展示「免费」）
             "price": prices.get(s.app_key),
@@ -360,7 +370,9 @@ async def public_store_app_detail(
     if not rows:
         raise HTTPException(404, "应用不存在或尚未上架")
 
-    latest, dev = rows[0]
+    # 详情页同样按版本号取最新，与目录口径一致；SQL 里的 id 排序只是给并列版本兜底。
+    ordered = sorted(rows, key=lambda r: _ver_key(r[0]), reverse=True)
+    latest, dev = ordered[0]
     manifest = _manifest_dict(latest.manifest_data)
     showcase = SHOWCASE.get(app_key, {})
     intro = await _get_intro(db, latest.product, app_key)
@@ -377,7 +389,7 @@ async def public_store_app_detail(
             "download_count": s.download_count,
             "is_current": s.id == latest.id,
         }
-        for s, _dev in rows
+        for s, _dev in ordered
     ]
     # 平台已安装但已不在上架记录里的版本，同样作为历史项展示
     if installed_version and not any(h["version"] == installed_version for h in history):
@@ -399,6 +411,7 @@ async def public_store_app_detail(
         "dev_method": latest.dev_method or ("platform" if (latest.product or "cenkor-admin") == "cenkor-admin" else "extension"),
         "name": latest.name,
         "version": latest.version,
+        "latest_version": latest.version,
         "description": latest.description or "",
         "summary": (intro.summary if intro else None) or manifest.get("summary") or showcase.get("summary") or (latest.description or ""),
         "highlights": (intro.highlights if intro and intro.highlights else None) or manifest.get("highlights") or showcase.get("highlights") or [],
@@ -418,7 +431,7 @@ async def public_store_app_detail(
         },
         "installed": installed_version is not None,
         "installed_version": installed_version,
-        "has_update": bool(installed_version and installed_version != latest.version),
+        "has_update": bool(installed_version and ver_gt(latest.version, installed_version)),
         "has_frontend": bool(inst.has_frontend) if inst else False,
         # None = 免费 / 未定价
         "price": prices.get(app_key),
@@ -627,13 +640,11 @@ async def submit_app(
         except pricing_rules.PriceRuleError as exc:
             raise HTTPException(400, f"定价不合法：{exc}") from None
 
-    # 保存文件并校验
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    zip_path = UPLOAD_DIR / f"{app_key}-{version}.zip"
+    # 读包 → 内存校验 → 校验通过才落盘。落盘早于校验时，失败路径只能靠 finally 删盘
+    # 补救，而 key 不符这类失败包体本身是合法 zip，判据稍不留神就会漏删孤包。
     content = await file.read(MAX_APP_UPLOAD_BYTES + 1)
     if len(content) > MAX_APP_UPLOAD_BYTES:
         raise HTTPException(413, f"应用包过大（超过 {MAX_APP_UPLOAD_BYTES // 1024 // 1024}MB 上限）")
-    zip_path.write_bytes(content)
 
     file_hash = hashlib.sha256(content).hexdigest()
 
@@ -642,9 +653,8 @@ async def submit_app(
     # - extension  产品扩展插件：manifest.json（交付到对应 MES 实例热挂载）
     # - standalone 独立应用：私有化整包，仅门户展示/售卖，不做安装向强校验
     manifest_data = None
-    manifest_ok = False  # 包体校验全部通过才允许留盘
     try:
-        with zipfile.ZipFile(zip_path, "r") as zf:
+        with zipfile.ZipFile(io.BytesIO(content), "r") as zf:
             names = zf.namelist()
             if dev_method == "extension":
                 # 产品扩展包：根目录或单层目录下要有 manifest.json
@@ -724,15 +734,13 @@ async def submit_app(
                 if not manifest_data:
                     # 仅有 README：留最小占位，避免 standalone 包被后面的建单流程判成空 manifest
                     manifest_data = {"key": app_key, "name": name or app_key, "_standalone": True}
-        manifest_ok = True
     except zipfile.BadZipFile:
-        raise HTTPException(400, "ZIP 文件损坏")
-    finally:
-        # 判重已前置到落盘之前，所以这里的失败都是「包不合格」而非「版本撞车」；
-        # manifest_data 在 key/version 不符时也已解析成功，只靠 `not manifest_data`
-        # 会漏删孤包 —— 用显式标志兜住写盘之后的所有 4xx。
-        if not manifest_ok:
-            zip_path.unlink(missing_ok=True)
+        raise HTTPException(400, "ZIP 文件损坏") from None
+
+    # 包体校验全部通过，此刻才允许占住 UPLOAD_DIR/{app_key}-{version}.zip
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    zip_path = UPLOAD_DIR / f"{app_key}-{version}.zip"
+    zip_path.write_bytes(content)
 
     submission = store_models.AppSubmission(
         developer_id=dev.id,
@@ -772,12 +780,12 @@ async def submit_app(
         except Exception as _pe:  # noqa: BLE001 - 定价落库失败不影响提交
             log.warning("store.submit_pricing_fail", app_key=app_key, error=str(_pe))
 
-    # 通知所有有审核权限的管理员
+    # 通知所有有审核权限的管理员（闸门与审核端点用同一个码，不再借 rbac:role:write）
     try:
         from cenkor_admin.apps.rbac.models import RolePermission, UserRole, Permission
         from cenkor_admin.apps.notification.models import Notification
         _pid = (await db.execute(
-            select(Permission.id).where(Permission.code == "rbac:role:write")
+            select(Permission.id).where(Permission.code == "store:review")
         )).scalar_one_or_none()
         if _pid:
             _role_ids = (await db.execute(
@@ -811,7 +819,7 @@ async def submit_app(
 async def batch_review_submissions(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _: auth_models.User = Depends(require_permission("rbac:role:write")),
+    _: auth_models.User = Depends(require_permission("store:review")),
 ):
     """管理员批量审核应用：一次通过 / 驳回多条待审核提交。
 
@@ -869,7 +877,7 @@ async def review_submission(
     submission_id: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _: auth_models.User = Depends(require_permission("rbac:role:write")),
+    _: auth_models.User = Depends(require_permission("store:review")),
 ):
     """管理员审核应用"""
     sub = await db.get(store_models.AppSubmission, submission_id)
@@ -933,7 +941,7 @@ async def withdraw_submission(
 async def install_submission(
     submission_id: int,
     db: AsyncSession = Depends(get_db),
-    _: auth_models.User = Depends(require_permission("rbac:role:write")),
+    _: auth_models.User = Depends(require_permission("store:review")),
 ):
     """安装已审核通过（或曾安装过）的应用。
 
@@ -975,6 +983,7 @@ async def install_submission(
     _copy_migration_files(app_dir, sub.app_key)
 
     # 立即执行数据库迁移（安装时建表，无需重启）
+    warnings: list[str] = []
     try:
         from alembic.config import Config
         from alembic import command
@@ -984,13 +993,14 @@ async def install_submission(
         command.upgrade(_alembic_cfg, "head")
         log.info("store.migration_upgrade_ok", app_key=sub.app_key)
     except Exception as e:
-        log.warning("store.migration_upgrade_fail", app_key=sub.app_key, error=str(e))
+        # 迁移失败 == 表没建出来，不能当装成功（理由同 install_app_from_zip）。
+        log.error("store.migration_upgrade_fail", app_key=sub.app_key, error=str(e))
+        warnings.append(f"数据库迁移失败，数据表可能未创建：{e}")
 
     # 更新状态
     sub.status = "installed"
 
     # 自动安装（注册权限/菜单）
-    warnings: list[str] = []
     try:
         from cenkor_admin.apps.system.app_registry import install_app
         await install_app(db, sub.app_key)
@@ -1143,11 +1153,64 @@ def _read_migration_revision(path: Path) -> str | None:
     return m.group(1) if m else None
 
 
+def _read_migration_down_revision(path: Path) -> str | None:
+    """读取迁移声明的 down_revision（父节点）；未声明或为 None 时返回 None。"""
+    import re
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.search(
+        r"""down_revision(?:\s*:\s*[^=\n]+)?\s*=\s*['\"]([^'\"]+)['\"]""", content
+    )
+    return m.group(1) if m else None
+
+
+def _rewrite_migration_down_revision(content: str, head: str) -> str:
+    """把迁移源码里的 down_revision 改写为 head（只改第一处赋值）。"""
+    import re
+    pattern = re.compile(
+        r"""(down_revision(?:\s*:\s*[^=\n]+)?\s*=\s*)(?:['\"][^'\"]*['\"]|None)"""
+    )
+    return pattern.sub(lambda m: m.group(1) + repr(head), content, count=1)
+
+
+def _current_migration_head() -> str | None:
+    """返回平台迁移目录当前的唯一 head；无迁移或链条已分叉（多个 head）时返回 None。
+
+    用 alembic 自身的 ScriptDirectory 解析，避免正则漏判 depends_on / 多值 down_revision。
+    直接传绝对路径的 script_location（即 alembic/ 目录），不读 alembic.ini —— 因为其
+    script_location=alembic 是相对 CWD 解析的，进程 CWD 不同会取错目录。
+    """
+    try:
+        from alembic.script import ScriptDirectory
+        heads = ScriptDirectory(str(ALEMBIC_VERSIONS_DIR.parent)).get_heads()
+    except Exception as e:
+        log.warning("store.migration_head_failed", error=str(e))
+        return None
+    if len(heads) == 1:
+        return heads[0]
+    log.warning("store.migration_head_ambiguous", heads=list(heads))
+    return None
+
+
 def _copy_migration_files(app_dir: Path, app_key: str) -> None:
-    """将 ZIP 中 alembic/versions/*.py 拷贝到平台的迁移目录（跳过已存在的 revision）。"""
+    """将 ZIP 中 alembic/versions/*.py 拷贝到平台迁移目录（跳过已存在的 revision）。
+
+    App 迁移在开发期生成时记录的 down_revision 是「当时的平台 head」。若原样拷贝，
+    多个 App 会各自挂到同一个旧 head 上 → 迁移链分叉出多个 head，alembic upgrade
+    会失败（且该异常会被安装流程 try/except 吞掉）。故在拷贝时把「指向 App 外部」的
+    down_revision 重定向到「安装时刻的平台当前 head」：
+      · App 内部自己串起来的链（down_revision 指向同一 App 的另一条迁移）保持不变；
+      · 指向 App 外部（平台迁移 / None）的那一条，改写为当前 head。
+    """
     migration_src = app_dir / "alembic" / "versions"
     if not migration_src.exists():
         return
+
+    # 1) 先筛出本次要落盘的迁移（已存在 revision 的跳过）—— 必须在拷贝前完成
+    files: list[Path] = []
+    app_revisions: set[str] = set()
     for f in sorted(migration_src.iterdir()):
         if f.suffix != ".py" or f.name.startswith("_"):
             continue
@@ -1155,9 +1218,29 @@ def _copy_migration_files(app_dir: Path, app_key: str) -> None:
         if revision_id and _migration_revision_exists(revision_id):
             log.info("store.migration_skipped", revision=revision_id, app_key=app_key)
             continue
+        files.append(f)
+        if revision_id:
+            app_revisions.add(revision_id)
+    if not files:
+        return
+
+    # 2) 取「拷贝之前」平台链的当前 head，作为这批迁移的新挂载点
+    head = _current_migration_head()
+
+    # 3) 落盘，必要时重定向 down_revision
+    for f in files:
+        content = None
+        down = _read_migration_down_revision(f)
+        if head and down not in app_revisions and down != head:
+            content = _rewrite_migration_down_revision(
+                f.read_text(encoding="utf-8"), head
+            )
         dst = ALEMBIC_VERSIONS_DIR / f"{datetime.now():%Y%m%d_%H%M%S}_{app_key}_{f.name}"
-        shutil.copy2(f, dst)
-        log.info("store.migration_copied", src=f.name, dst=dst.name)
+        if content is None:
+            shutil.copy2(f, dst)
+        else:
+            dst.write_text(content, encoding="utf-8")
+        log.info("store.migration_copied", src=f.name, dst=dst.name, rebased_to=head)
 
 
 def _parse_manifest(content: str) -> dict | None:
@@ -1251,6 +1334,7 @@ async def install_app_from_zip(
 
     # 数据库迁移文件
     _copy_migration_files(app_dir, app_key)
+    warnings: list[str] = []
     try:
         from alembic import command
         from alembic.config import Config
@@ -1259,10 +1343,13 @@ async def install_app_from_zip(
             str(Path(__file__).resolve().parent.parent.parent.parent.parent / "alembic.ini")
         )
         command.upgrade(_alembic_cfg, "head")
+        log.info("store.migration_upgrade_ok", app_key=app_key)
     except Exception as e:  # noqa: BLE001
-        log.warning("store.migration_upgrade_fail", app_key=app_key, error=str(e))
+        # 迁移失败 == 表没建出来。绝不能只 warning 就当装成功：否则界面显示「已安装」，
+        # 而接口一访问就报 relation does not exist。故用 error 级日志并显式回报给调用方。
+        log.error("store.migration_upgrade_fail", app_key=app_key, error=str(e))
+        warnings.append(f"数据库迁移失败，数据表可能未创建：{e}")
 
-    warnings: list[str] = []
     try:
         from cenkor_admin.apps.system.app_registry import install_app
 

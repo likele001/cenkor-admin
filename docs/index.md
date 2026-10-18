@@ -9,6 +9,7 @@ Cenkor Admin 文档目录。按用途选择。
 | [**deploy.md**](deploy.md) | **部署方案（权威）** —— 架构拓扑 · 端口台账 · 配置五落点与优先级 · 依赖服务 · 发布 · 验证 · 备份回滚 · 排障手册 |
 | [**dev_guide.md**](dev_guide.md) | **开发者指南** —— 创建 App、字段定义、模板开发 |
 | [**apps/development_guide.md**](apps/development_guide.md) | 应用开发规范（结构 / 字段类型 / 路由 / 迁移 / 打包 / 安全） |
+| [**apps/market_ai_extensions.md**](apps/market_ai_extensions.md) | AI 体系扩展应用上架说明（cenkormes 首批三包：清单 / 发布链路 / 商店取数 / 边界） |
 | [**core_platform.md**](core_platform.md) | 核心平台组成 · 域名规划 · 宝塔建站 |
 | [**architecture.md**](../architecture.md) | V2 架构设计（内容引擎 / 双用户体系 / 模板引擎 / App 中心 / 安全） |
 | [**roadmap.md**](roadmap.md) | 路线图与规划（V2 改造 / 平台重构 / 平台升级 三合一） |

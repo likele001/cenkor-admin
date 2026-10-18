@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.system.models import InstalledApp
+from cenkor_admin.apps.system.versioning import ver_gt
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
 
@@ -75,18 +76,6 @@ def _is_free(price: Any) -> bool:
     if not isinstance(price, dict):
         return True
     return not price.get("enabled")
-
-
-def _ver_tuple(v: Any) -> tuple:
-    parts = []
-    for seg in str(v or "").split("."):
-        seg = seg.strip()
-        parts.append(int(seg) if seg.isdigit() else 0)
-    return tuple(parts)
-
-
-def _ver_gt(a: Any, b: Any) -> bool:
-    return _ver_tuple(a) > _ver_tuple(b)
 
 
 async def _hub_get(
@@ -194,12 +183,16 @@ def _decorate(
     if row is not None and getattr(row, "status", "installed") == "installed":
         installed_version = str(row.version or "") or None
     remote_version = str(item.get("version") or "") or None
+    # 「有没有新版本」以 latest_version 为准：hub 目录里它是同轴已上架行中版本号最大的一条。
+    # 老 hub 不带该字段时退回 version —— 缺值即放行，不催升级也不报错。
+    latest_version = str(item.get("latest_version") or "") or remote_version
     price = item.get("price")
 
     return {
         "key": key,
         "name": item.get("name") or (manifest.name if manifest is not None else key),
         "version": remote_version,
+        "latest_version": latest_version,
         "summary": item.get("summary") or item.get("description") or "",
         "description": item.get("description") or "",
         "icon": item.get("icon") or "",
@@ -216,8 +209,8 @@ def _decorate(
         "installed_version": installed_version,
         "has_update": bool(
             installed_version
-            and remote_version
-            and _ver_gt(remote_version, installed_version)
+            and latest_version
+            and ver_gt(latest_version, installed_version)
         ),
     }
 
@@ -331,7 +324,7 @@ async def market_updates(
                 "key": d["key"],
                 "name": d["name"],
                 "local_version": d["installed_version"],
-                "remote_version": d["version"],
+                "remote_version": d["latest_version"],
                 "has_local_code": d["has_local_code"],
                 "is_free": d["is_free"],
             })
@@ -406,6 +399,26 @@ async def _download_package(app_key: str, license_key: str) -> tuple[Path, str]:
     content = resp.content
     if content[:2] != b"PK":
         raise HTTPException(502, "官方返回的不是有效的 ZIP 应用包")
+
+    # 包体指纹校验。hub 随包下发**发布当时**算好的 SHA256（见 commerce 下载端点），
+    # 这里比对收到的字节。缺值（老 hub 无此头）即放行，与 X-App-Product 同口径；
+    # 有值而不等，说明落到磁盘的这份与目录里那条发布记录不是同一个东西 —— 拒装。
+    expected = (resp.headers.get("X-Package-Sha256") or "").strip().lower()
+    if expected:
+        actual = hashlib.sha256(content).hexdigest()
+        if actual != expected:
+            log.error(
+                "market.package_sha256_mismatch",
+                app=app_key,
+                expected=expected,
+                actual=actual,
+                size=len(content),
+            )
+            raise HTTPException(
+                502,
+                f"应用包校验失败：SHA256 与发布记录不一致"
+                f"（期望 {expected[:12]}…，实得 {actual[:12]}…），已拒绝安装",
+            )
 
     fd, path = tempfile.mkstemp(suffix=".zip")
     with os.fdopen(fd, "wb") as f:

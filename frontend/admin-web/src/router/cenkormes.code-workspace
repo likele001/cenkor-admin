@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../cenkormes"
+		},
+		{
+			"path": "../../../.."
+		},
+		{
+			"path": "../../../../../cenkor-process"
+		},
+		{
+			"path": "../../../../../process-extensions"
+		}
+	],
+	"settings": {}
+}
