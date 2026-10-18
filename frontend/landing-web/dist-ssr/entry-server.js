@@ -398,7 +398,7 @@ const routes = [
   {
     path: "/docs/guide",
     name: "Guide",
-    component: () => import("./assets/Guide-Dhv65LrA.js")
+    component: () => import("./assets/Guide-Bgs5yje8.js")
   }
 ];
 const scrollBehavior = () => ({ top: 0 });

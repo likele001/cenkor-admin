@@ -14,16 +14,16 @@
       <div class="container">
         <div class="guide-content">
           <div class="guide-nav">
-            <div
+            <button
+              type="button"
               class="guide-nav-item"
               v-for="(sec, i) in sections"
               :key="sec.title"
               :class="{ active: activeSection === i }"
-              @click="activeSection = i"
             >
               <span class="nav-icon">{{ sec.icon }}</span>
               <span>{{ sec.title }}</span>
-            </div>
+            </button>
           </div>
 
           <div class="guide-body">
@@ -60,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { SITE_URLS } from '@/config/site'
 
 const urls = SITE_URLS
@@ -122,6 +122,16 @@ const sections = [
     tip: '建议定期备份 PostgreSQL 数据库，并配置异地备份保障数据安全。'
   }
 ]
+
+// 手动绑定点击事件（绕过 hydration mismatch 导致的 @click 绑定失败）
+onMounted(() => {
+  const items = document.querySelectorAll<HTMLElement>('.guide-nav-item')
+  items.forEach((item, i) => {
+    item.addEventListener('click', () => {
+      activeSection.value = i
+    })
+  })
+})
 </script>
 
 <style lang="scss" scoped>
@@ -191,8 +201,8 @@ const sections = [
 
   @include mobile {
     position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
+    flex-wrap: nowrap;
   }
 }
 
@@ -200,12 +210,20 @@ const sections = [
   display: flex;
   align-items: center;
   gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
+  padding: 12px $spacing-md;
+  min-height: 48px;
   border-radius: $radius-sm;
   cursor: pointer;
   font-size: 0.9rem;
   color: $text-secondary;
   transition: all $transition-fast;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 
   &:hover {
     background: $gray-50;

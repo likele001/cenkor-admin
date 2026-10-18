@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/lib/api'
+import { pluginMenus } from '@/core/plugin'
 import NotificationBell from '@/components/NotificationBell.vue'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import WsStatus from '@/components/WsStatus.vue'
@@ -30,15 +31,15 @@ interface MenuItem {
 
 const flatMenus = computed(() => {
   const backend = me.value?.menus ?? []
-  const pluginMenus = window.__pluginMenus ?? []
-  if (!pluginMenus.length) return backend
+  const plugins = pluginMenus.value
+  if (!plugins.length) return backend
   // 将插件菜单转换为与后端菜单相同的格式合并
   // 按 (key, path) 去重：后端优先（已绑定角色权限），插件仅作补充
   const seen = new Set<string>()
   for (const m of backend) seen.add(`${m.key}::${m.path ?? ''}`)
   const pluginItems: MenuItem[] = []
-  for (let i = 0; i < pluginMenus.length; i++) {
-    const m = pluginMenus[i]
+  for (let i = 0; i < plugins.length; i++) {
+    const m = plugins[i]
     const dedup = `${m.key}::${m.path ?? ''}`
     if (seen.has(dedup)) continue
     seen.add(dedup)

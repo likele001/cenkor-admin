@@ -2,16 +2,24 @@
  * PluginManager — 动态加载 App 前端的插件管理器
  *
  * 工作流程:
- * 1. 应用启动时调用 loadInstalledPlugins()
+ * 1. 应用挂载后（不阻塞首屏）调用 loadInstalledPlugins()
  * 2. 请求 /api/v1/system/apps/plugins → 获取有前端资源的已安装 App
  * 3. 对每个 App，动态注入 <script> 加载 /.app-assets/{key}/plugin.js
  * 4. 每个 plugin.js 调用 window.__registerPlugin() 注册自身
  * 5. PluginManager 收集注册信息，合并路由/菜单/i18n
+ * 6. 硬刷新直接访问插件路由时，router 守卫会等待插件注册完成后再解析
  */
+import { shallowRef, type ShallowRef } from 'vue'
 import { type Router } from 'vue-router'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import type { PluginDefinition, InstalledPlugin } from './plugin.types'
+import type { PluginDefinition, InstalledPlugin, PluginMenuItem } from './plugin.types'
+
+/**
+ * 插件菜单的响应式镜像 — AppLayout 合并侧边栏时使用。
+ * 插件在应用挂载后异步加载，菜单到达时通过该 ref 触发界面更新。
+ */
+export const pluginMenus: ShallowRef<PluginMenuItem[]> = shallowRef([])
 
 // 全局注册函数 — plugin.js 调用此函数
 declare global {
@@ -33,7 +41,10 @@ export class PluginManager {
   private router: Router
   private i18n: I18nLike
   private plugins: Map<string, PluginDefinition> = new Map()
+  /** 是否已完成一次插件加载（无论成败，完成后置 true） */
   private loaded = false
+  /** 进行中的加载任务（并发调用共享同一 Promise） */
+  private loading: Promise<void> | null = null
 
   constructor({ router, i18n }: { router: Router; i18n: I18nLike }) {
     this.router = router
@@ -75,18 +86,36 @@ export class PluginManager {
       }
     }
 
-    // 3. 菜单项 — 存储在 window 上供 AppLayout 合并使用
+    // 3. 菜单项 — 存储在 window 上 + 响应式镜像供 AppLayout 合并使用
     if (def.menus) {
       const existing = window.__pluginMenus || []
       window.__pluginMenus = [...existing, ...def.menus]
+      pluginMenus.value = window.__pluginMenus
     }
   }
 
-  /** 加载所有已安装的 App 前端插件 */
-  async loadInstalledPlugins(): Promise<void> {
-    if (this.loaded) return
-    this.loaded = true
+  /** 插件是否已加载完成（成功或失败均视为完成） */
+  isReady(): boolean {
+    return this.loaded
+  }
 
+  /** 等待插件加载完成；若尚未开始加载则立即返回 */
+  async whenReady(): Promise<void> {
+    if (this.loading) await this.loading
+  }
+
+  /**
+   * 加载所有已安装的 App 前端插件。
+   * 非阻塞启动：调用方不 await 也不会影响应用挂载；
+   * 并发调用共享同一加载任务。
+   */
+  loadInstalledPlugins(): Promise<void> {
+    if (this.loading) return this.loading
+    this.loading = this.doLoad()
+    return this.loading
+  }
+
+  private async doLoad(): Promise<void> {
     // 向 plugin.js 注入运行时工具：当前 token + 一个带 auth 的 api fetch 包装
     // 这样 plugin.js 不需要自己 import admin-web 的依赖，也不必 hack localStorage
     const auth = useAuthStore()
@@ -112,25 +141,39 @@ export class PluginManager {
     try {
       const { data } = await api.get('/api/v1/system/apps/plugins')
       const plugins: InstalledPlugin[] = data.items
-      if (!plugins.length) return
 
       // 并行加载所有 plugin.js
-      await Promise.allSettled(
-        plugins.map(p => this.loadScript(p.script_url))
-      )
+      if (plugins.length) {
+        await Promise.allSettled(
+          plugins.map(p => this.loadScript(p.script_url))
+        )
+      }
     } catch {
       // 静默失败 — 插件加载不影响核心功能
+    } finally {
+      this.loaded = true
     }
   }
 
-  /** 动态注入 <script> 加载 JS */
+  /** 动态注入 <script> 加载 JS（带超时，避免单个脚本挂起拖死启动链路） */
   private loadScript(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
+      const timer = window.setTimeout(() => {
+        script.remove()
+        reject(new Error(`Timeout loading plugin: ${url}`))
+      }, 15_000)
       script.src = url
       script.async = true
-      script.onload = () => resolve()
-      script.onerror = () => reject(new Error(`Failed to load plugin: ${url}`))
+      script.onload = () => {
+        window.clearTimeout(timer)
+        resolve()
+      }
+      script.onerror = () => {
+        window.clearTimeout(timer)
+        script.remove()
+        reject(new Error(`Failed to load plugin: ${url}`))
+      }
       document.body.appendChild(script)
     })
   }

@@ -122,6 +122,26 @@ def ensure_zip(src: str, key: str, version: str, apply: bool) -> str:
     return zip_path
 
 
+def resolve_developer_id(cur, product: str, hint: int | None) -> int:
+    """首发应用时定归属开发者：显式 --developer-id 优先，其次沿用该产品历史行的归属。
+
+    app_submissions.developer_id 是外键，指向 app_developers(id)。首发时库里没有同
+    app_key 的基线行可继承，若不显式定这个值，就只能瞎填一个 —— 归属错了会连带影响
+    分账与开发者中心「我的应用」列表，所以宁可报错也不要猜。
+    """
+    if hint:
+        cur.execute("select id from app_developers where id=%s", (hint,))
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+    cur.execute(
+        """select developer_id from app_submissions
+           where product=%s order by id desc limit 1""",
+        (product,),
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row else 0
+
+
 def baseline_row(cur, product: str, key: str):
     cur.execute(
         """select developer_id, product, dev_method, app_key, name, description, icon, category,
@@ -143,7 +163,8 @@ def existing_row(cur, product: str, key: str, version: str):
     return cur.fetchone()
 
 
-def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str) -> str:
+def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str,
+              allow_new: bool = False, developer_id_hint: int | None = None) -> str:
     pkg_dir = os.path.join(src, key)
     if not os.path.isdir(pkg_dir):
         return f"SKIP {key}: 源码目录不存在 {pkg_dir}"
@@ -164,7 +185,22 @@ def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str) -> str:
     cur = conn.cursor()
     base = baseline_row(cur, product, key)
     if not base:
-        return f"SKIP {key}: hub 上该产品({product})没有该 app_key 的任何行，缺发布基线（请走开发者上传）"
+        # 首发路径：hub 上从来没出现过这个 app_key。老逻辑一律 SKIP，是因为它要靠基线行
+        # 继承 developer_id / name / icon 这些「不属于包体」的归属信息，猜错会把包发到别的
+        # 宿主或别的开发者名下。加 --allow-new 后改从 manifest 取，归属人仍必须查得到。
+        if not allow_new:
+            return (f"SKIP {key}: hub 上该产品({product})没有该 app_key 的任何行，缺发布基线"
+                    f"（首次上架需 --allow-new，或走开发者中心上传）")
+        developer_id = resolve_developer_id(cur, product, developer_id_hint)
+        if not developer_id:
+            return (f"SKIP {key}: 首发定不出 developer_id（{product} 下无任何历史行，"
+                    f"且 app_developers 查不到指定值），请显式传 --developer-id")
+        base = (developer_id, product, str(man.get("dev_method") or "extension"), key,
+                str(man.get("name") or key), man.get("description"),
+                str(man.get("icon") or "📦"), str(man.get("category") or "system"),
+                version, "pending", None)
+        print(f"  [首发] {key}: 基线行不存在，developer_id={developer_id} "
+              f"dev_method={base[2]} icon={base[6]} category={base[7]}")
     developer_id = base[0]
 
     row = existing_row(cur, product, key, version)
@@ -233,6 +269,10 @@ def main() -> int:
     g.add_argument("--keys", nargs="+", metavar="KEY", help="要发布的 app_key（可多个）")
     g.add_argument("--all", action="store_true", help="src 下全部包")
     ap.add_argument("--apply", action="store_true", help="真正写库与拷 zip；不加只打印")
+    ap.add_argument("--allow-new", action="store_true",
+                    help="允许首发：hub 上没有该 app_key 基线行时，按 manifest 建新行")
+    ap.add_argument("--developer-id", type=int, default=None,
+                    help="首发时的归属开发者 id（默认沿用同产品历史行）")
     ap.add_argument("--src", default=SRC_DEFAULT)
     ap.add_argument("--uploads", default=UPLOADS_DEFAULT)
     args = ap.parse_args()
@@ -260,7 +300,9 @@ def main() -> int:
         keys = args.keys
 
     print(f"{'[DRY-RUN] ' if not args.apply else ''}目标：{len(keys)} 个包，发布目录 {args.uploads}\n")
-    results = [publish_one(conn, args.src, k, args.apply, args.uploads) for k in keys]
+    results = [publish_one(conn, args.src, k, args.apply, args.uploads,
+                           allow_new=args.allow_new, developer_id_hint=args.developer_id)
+               for k in keys]
     print("\n".join(results))
     planned = sum(1 for r in results if r.startswith("PLANNED"))
     done = sum(1 for r in results if r.startswith("DONE"))

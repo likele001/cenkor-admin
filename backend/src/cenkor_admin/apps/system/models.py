@@ -64,3 +64,64 @@ class Redirect(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class CodegenRun(Base):
+    """代码生成执行历史（后台「系统 > 代码生成」页）。
+
+    每次「下载源码包 / 安装到本系统」写一条，成功与失败都写：失败保留后端原始报错原文；
+    成功保留当时的 spec 快照，可直接「再次执行」。只删留痕不影响已安装的 App 与其数据表。
+    """
+
+    __tablename__ = "codegen_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    app_key: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    app_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)  # generate / install
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ok")  # ok / failed
+    spec: Mapped[dict[str, Any] | None] = mapped_column(json_column(), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    operator_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+class UpgradeRun(Base):
+    """核心平台在线升级执行历史（后台「系统 > 在线升级」页）。
+
+    每次「下载核心包 / 安装 / 失败回滚 / 手动回滚」写一条。
+    - status 标识结果（pending/running/success/failed/rolled_back）
+    - backup_path 指向 /www/backup/cenkor-admin/snapshot_<时间>/（升级前快照）
+    - pkg_path 上传的核心包 / 下载的 URL → 本地路径
+    - log 完整 stdout/stderr（每行追加，截断 200KB）
+    - error 失败时的后端原始报错
+    - duration_ms / operator_id 耗时 + 操作人
+    - rollback_from_id 若是「对某次升级的手动回滚」，指向被回滚的 id
+    """
+
+    __tablename__ = "upgrade_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mode: Mapped[str] = mapped_column(String(16), nullable=False, default="core")  # core（仅主程序）
+    source: Mapped[str] = mapped_column(String(16), nullable=False)  # url | tar_upload | git
+    channel: Mapped[str] = mapped_column(String(16), nullable=False, default="stable")
+    from_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    to_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", index=True)
+    backup_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pkg_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    log: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    operator_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rollback_from_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )

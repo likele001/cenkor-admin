@@ -44,7 +44,9 @@ async def lifespan(app: FastAPI):
         command.upgrade(_alembic_cfg, "head")
         log.info("migration.ok")
     except Exception as e:
-        log.warning("migration.fail", error=str(e))
+        # 迁移失败意味着数据表可能缺失：服务虽能起来，但接口会大面积报错，
+        # 必须显式告警（error 级，而非静默的 warning），以便日志告警规则能捕获。
+        log.error("migration.fail", error=str(e), hint="数据表可能未创建，接口可能大面积失败")
 
     try:
         await redis_client.ping()
