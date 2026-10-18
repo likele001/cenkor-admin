@@ -27,6 +27,7 @@ log = structlog.get_logger()
 ROOT = Path("/www/wwwroot/cenkor-admin").resolve()
 BACKUP_DIR = Path("/www/backup/cenkor-admin")
 PYTHON_BIN = "/www/server/pyporject_evn/cenkor/bin/python3"
+PGDUMP_BIN = "/www/server/pgsql/bin/pg_dump"
 BACKEND_PORT = 8002
 
 _RUNNING_LOCK = asyncio.Lock()
@@ -166,7 +167,7 @@ async def _do_db_backup(run, db) -> str | None:
     db_user = _read_env_value("POSTGRES_USER") or "cenkor"
     db_name = _read_env_value("POSTGRES_DB") or "cenkor"
     db_pass = _read_env_value("POSTGRES_PASSWORD")
-    db_port = _read_env_value("DB_HOST_PORT") or "5433"
+    db_port = _read_env_value("POSTGRES_PORT") or "5432"
 
     await _append_log(run, db, f"▸ 备份数据库 {db_name} → {out_path}")
 
@@ -194,7 +195,7 @@ async def _do_db_backup(run, db) -> str | None:
         env = os.environ.copy()
         env["PGPASSWORD"] = db_pass
         dump = subprocess.run(
-            ["pg_dump", "-h", "127.0.0.1", "-p", db_port, "-U", db_user, db_name],
+            [PGDUMP_BIN, "-h", "127.0.0.1", "-p", db_port, "-U", db_user, db_name],
             capture_output=True, timeout=300, env=env,
         )
         if dump.returncode == 0:

@@ -217,8 +217,8 @@ async def upgrade_runs_rollback(
         raise HTTPException(404, "执行记录不存在")
     if target.status not in ("success", "failed", "rolled_back"):
         raise HTTPException(400, "只能回滚已结束（success/failed/rolled_back）的记录，当前 status=" + target.status)
-    if not target.backup_path:
-        raise HTTPException(400, "该记录没有 backup_path，无法回滚")
+    if not target.pkg_path:
+        raise HTTPException(400, "该记录没有有效的 git 回滚点（pkg_path），无法回滚")
     from cenkor_admin.core.db import AsyncSessionLocal
     async def _bg():
         async with AsyncSessionLocal() as bg_db:
