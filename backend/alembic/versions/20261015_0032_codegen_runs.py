@@ -26,7 +26,7 @@ from alembic import op
 from cenkor_admin.core.compat import alembic_json
 
 revision = "20261015_0032_codegen_runs"
-down_revision = "20261007_0029_product_commerce"
+down_revision = "20261010_0031_dev_method"
 branch_labels = None
 depends_on = None
 
