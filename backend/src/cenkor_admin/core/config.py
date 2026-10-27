@@ -1,4 +1,5 @@
 """Cenkor Admin · 配置层（从 .env 加载，跨 DB 兼容）"""
+
 from __future__ import annotations
 
 import os
@@ -149,6 +150,10 @@ class Settings(BaseSettings):
     AI_API_KEY: str = ""
     AI_CHAT_MODEL: str = "gpt-4o-mini"
     AI_EMBED_MODEL: str = "text-embedding-3-small"
+    # embedding 单独走另一家服务商（常见：chat 用 DeepSeek 省钱，embedding 用通义）。
+    # 两个都留空 = 与 chat 共用同一服务商。
+    AI_EMBED_BASE_URL: str = ""
+    AI_EMBED_API_KEY: str = ""
     # 期望维度，仅作参考；实际维度以接口返回为准（会写入 cms_embeddings.dim）
     AI_EMBED_DIM: int = 1536
     AI_TIMEOUT_SECONDS: int = 60
@@ -158,14 +163,26 @@ class Settings(BaseSettings):
     AI_EMBED_BATCH: int = 32
 
     # ---- MCP（Agent 接入）----
-    # MCP 端点鉴权密钥；留空则只允许已登录后台用户访问
+    # MCP 端点鉴权密钥；留空则拒绝外部调用（后台调试用 /mcp/tools）
     MCP_API_KEY: str = ""
     MCP_ENABLED: bool = True
+    # 写权限总闸门：false 时 Agent 只能读，create/update/publish 一律拒绝。
+    # 必须在这里定义字段 —— 只在代码里 getattr 默认值的话，.env 怎么设都不生效。
+    MCP_ALLOW_WRITE: bool = True
 
     @property
     def ai_ready(self) -> bool:
         """AI 是否真正可用（开关 + 密钥双检）"""
         return bool(self.AI_ENABLED and self.AI_API_KEY)
+
+    @property
+    def ai_embed_ready(self) -> bool:
+        """语义检索是否可用（需要 embed 模型名 + 对应密钥）"""
+        if not self.ai_ready:
+            return False
+        if not self.AI_EMBED_MODEL:
+            return False
+        return bool(self.AI_EMBED_API_KEY or self.AI_API_KEY)
 
     @property
     def db_dialect(self) -> str:
@@ -203,6 +220,7 @@ def get_settings() -> Settings:
     if env_path and os.path.exists(env_path):
         try:
             from dotenv import dotenv_values
+
             overrides = {k: v for k, v in dotenv_values(env_path).items() if v is not None}
             return Settings(**overrides)
         except ImportError:

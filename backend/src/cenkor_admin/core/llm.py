@@ -130,6 +130,8 @@ class LLMClient:
         timeout: float = 60.0,
         max_retries: int = 2,
         temperature: float = 0.3,
+        embed_base_url: str = "",
+        embed_api_key: str = "",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -139,7 +141,17 @@ class LLMClient:
         self.timeout = timeout
         self.max_retries = max(0, max_retries)
         self.temperature = temperature
+
+        # embedding 可以走另一家服务商（常见：chat 用 DeepSeek 省钱，embedding 用通义）。
+        # 留空则回退主配置——单服务商的用户完全感知不到这个参数的存在。
+        self.embed_base_url = (embed_base_url or base_url).rstrip("/")
+        self._embed_api_key = embed_api_key or api_key
+        self._embed_is_separate = bool(
+            embed_base_url and embed_base_url.rstrip("/") != self.base_url
+        )
+
         self._client: httpx.AsyncClient | None = None
+        self._embed_client: httpx.AsyncClient | None = None
         self._lock = asyncio.Lock()
         # embedding 维度缓存：不同模型维度不同，首次调用后记录
         self.detected_dim: int | None = None
@@ -150,25 +162,48 @@ class LLMClient:
     def configured(self) -> bool:
         return bool(self._api_key and self.base_url)
 
+    @property
+    def embed_configured(self) -> bool:
+        """语义检索是否可用（需要 embed 模型名 + 对应密钥）"""
+        return bool(self.embed_model and self._embed_api_key and self.embed_base_url)
+
+    def _build_client(self, base_url: str, api_key: str) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url=base_url,
+            timeout=httpx.Timeout(self.timeout, connect=15.0),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             async with self._lock:
                 if self._client is None or self._client.is_closed:
-                    self._client = httpx.AsyncClient(
-                        base_url=self.base_url,
-                        timeout=httpx.Timeout(self.timeout, connect=15.0),
-                        headers={
-                            "Authorization": f"Bearer {self._api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-                    )
+                    self._client = self._build_client(self.base_url, self._api_key)
         return self._client
+
+    async def _get_embed_client(self) -> httpx.AsyncClient:
+        # 未单独配置 embedding 服务商时，与 chat 共用同一个连接池
+        if not self._embed_is_separate:
+            return await self._get_client()
+        if self._embed_client is None or self._embed_client.is_closed:
+            async with self._lock:
+                if self._embed_client is None or self._embed_client.is_closed:
+                    self._embed_client = self._build_client(
+                        self.embed_base_url, self._embed_api_key
+                    )
+        return self._embed_client
 
     async def aclose(self) -> None:
         if self._client is not None and not self._client.is_closed:
             await self._client.aclose()
         self._client = None
+        if self._embed_client is not None and not self._embed_client.is_closed:
+            await self._embed_client.aclose()
+        self._embed_client = None
 
     def _ensure_ready(self) -> None:
         if not self.configured:
@@ -176,15 +211,16 @@ class LLMClient:
                 "AI 未配置：请在 .env 设置 AI_API_KEY（以及需要的 AI_BASE_URL / AI_CHAT_MODEL）"
             )
 
-    async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post(
+        self, path: str, payload: dict[str, Any], *, client: httpx.AsyncClient | None = None
+    ) -> dict[str, Any]:
         """带指数退避的 POST。只对可重试错误重试（429 / 5xx / 网络超时）。"""
         self._ensure_ready()
-        client = await self._get_client()
+        http = client if client is not None else await self._get_client()
         last_exc: Exception | None = None
-
         for attempt in range(self.max_retries + 1):
             try:
-                resp = await client.post(path, json=payload)
+                resp = await http.post(path, json=payload)
                 if resp.status_code in (429, 500, 502, 503, 504):
                     # 服务端限流或抖动：退避重试
                     raise _RetryableError(f"HTTP {resp.status_code}: {resp.text[:200]}")
@@ -328,7 +364,9 @@ class LLMClient:
             "model": model or self.embed_model,
             "input": cleaned,
         }
-        data = await self._post("/embeddings", payload)
+        # embedding 可能走另一家服务商，用独立连接池
+        http = await self._get_embed_client()
+        data = await self._post("/embeddings", payload, client=http)
 
         try:
             items = data["data"]
@@ -375,6 +413,9 @@ def get_llm() -> LLMClient:
             timeout=float(getattr(s, "AI_TIMEOUT_SECONDS", 60)),
             max_retries=int(getattr(s, "AI_MAX_RETRIES", 2)),
             temperature=float(getattr(s, "AI_TEMPERATURE", 0.3)),
+            # 留空则回退主配置
+            embed_base_url=getattr(s, "AI_EMBED_BASE_URL", "") or "",
+            embed_api_key=getattr(s, "AI_EMBED_API_KEY", "") or "",
         )
     return _llm
 
