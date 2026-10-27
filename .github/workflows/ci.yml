@@ -29,17 +29,6 @@ jobs:
             url_driver: postgresql+asyncpg
             url_sync: postgresql
             health_cmd: pg_isready -U cenkor
-          - name: MySQL
-            image: mysql:8.0
-            env:
-              MYSQL_DATABASE: cenkor_test
-              MYSQL_USER: cenkor
-              MYSQL_PASSWORD: test_pwd
-              MYSQL_ROOT_PASSWORD: root_pwd
-            port: 3306
-            url_driver: mysql+aiomysql
-            url_sync: mysql+pymysql
-            health_cmd: mysqladmin ping -h 127.0.0.1 -uroot -proot_pwd
 
     services:
       db:
@@ -80,8 +69,6 @@ jobs:
             "sqlalchemy[asyncio]>=2.0" \
             "alembic>=1.13" \
             "asyncpg>=0.29" \
-            "aiomysql>=0.2" \
-            "pymysql>=1.1" \
             "psycopg2-binary>=2.9" \
             "redis>=5.0" \
             "celery[redis]>=5.3" \
@@ -120,16 +107,8 @@ jobs:
           DB_URL_SYNC: ${{ matrix.db.url_sync }}
         run: |
           cd backend
-          if [ "$DB_NAME" = "PostgreSQL" ]; then
-            DATABASE_URL_SYNC="postgresql+psycopg2://cenkor:test_pwd@localhost:5432/cenkor_test" \
-            alembic upgrade heads
-          else
-            apt-get update -qq && apt-get install -y -qq default-mysql-client > /dev/null
-            mysql -h 127.0.0.1 -P 3306 -u root -proot_pwd -e \
-              "CREATE DATABASE IF NOT EXISTS cenkor_test; GRANT ALL ON cenkor_test.* TO 'cenkor'@'%'; FLUSH PRIVILEGES;"
-            DATABASE_URL_SYNC="mysql+pymysql://cenkor:test_pwd@127.0.0.1:3306/cenkor_test" \
-            alembic upgrade heads
-          fi
+          DATABASE_URL_SYNC="postgresql+psycopg2://cenkor:test_pwd@localhost:5432/cenkor_test" \
+          alembic upgrade heads
 
       - name: Run tests
         env:
@@ -138,13 +117,8 @@ jobs:
           DB_URL_SYNC: ${{ matrix.db.url_sync }}
         run: |
           cd backend
-          if [ "$DB_NAME" = "PostgreSQL" ]; then
-            export DATABASE_URL="postgresql+asyncpg://cenkor:test_pwd@localhost:5432/cenkor_test"
-            export DATABASE_URL_SYNC="postgresql+psycopg2://cenkor:test_pwd@localhost:5432/cenkor_test"
-          else
-            export DATABASE_URL="mysql+aiomysql://cenkor:test_pwd@127.0.0.1:3306/cenkor_test"
-            export DATABASE_URL_SYNC="mysql+pymysql://cenkor:test_pwd@127.0.0.1:3306/cenkor_test"
-          fi
+          export DATABASE_URL="postgresql+asyncpg://cenkor:test_pwd@localhost:5432/cenkor_test"
+          export DATABASE_URL_SYNC="postgresql+psycopg2://cenkor:test_pwd@localhost:5432/cenkor_test"
           export SECRET_KEY="ci-test-secret-key-32-bytes-min"
           export REDIS_URL="redis://localhost:6379/0"
           export S3_ENDPOINT="http://127.0.0.1:9000"

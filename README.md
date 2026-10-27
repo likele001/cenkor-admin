@@ -171,8 +171,9 @@ bash scripts/package-core.sh    # → release/cenkor-admin-core-*.tar.gz
 
 ## 数据库
 
-- 生产默认 **PostgreSQL 16**
-- 兼容 **MySQL 5.7+**（CI 双库验证）
+- **PostgreSQL 16**（生产与 CI 均以此为准）
+- 不支持 MySQL：迁移链与 app schema 依赖 `JSONB`、`CREATE OR REPLACE VIEW`、
+  `to_regclass()`、`TIMESTAMPTZ`、`TEXT[]` 等 PostgreSQL 专有特性
 
 ## 备份
 
