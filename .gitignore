@@ -144,3 +144,23 @@ _rollback_bak_*/
 *.before.*
 *.orig
 dist.bak.*/
+
+# ===== 闭源应用迁移（2026-10-27 迁移分入子目录后新增）=====
+# 与 apps/{crm,erp,mes} 代码同源，属商业实现，绝不进入公开仓库。
+backend/alembic/versions/crm/
+backend/alembic/versions/erp/
+backend/alembic/versions/mes/
+# commerce 是混合目录：3 个平台级迁移公开，6 个商业模块闭源
+backend/alembic/versions/commerce/*
+!backend/alembic/versions/commerce/20261007_0028_product_axis.py
+!backend/alembic/versions/commerce/20261009_0030_app_intro.py
+!backend/alembic/versions/commerce/20261010_0031_dev_method.py
+# 应用自带 schema（方案 D）同样属商业实现，双保险
+backend/src/cenkor_admin/apps/*/schema.sql
+
+# ext 目录是混合的：7 个平台级迁移公开，以下 4 个属闭源模块，逐个登记。
+# 新增闭源 ext 迁移时，必须在此追加，否则 git add -A 会直接带入。
+backend/alembic/versions/ext/20260924_0025_cloud.py
+backend/alembic/versions/ext/20260925_0027_workflow.py
+backend/alembic/versions/ext/20261020_0035_app_publish.py
+backend/alembic/versions/ext/20261027_0100_app_schema.py
