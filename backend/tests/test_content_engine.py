@@ -12,11 +12,21 @@
 - 模板渲染 (render / validate)
 - 路由级隔离 (portal token → admin API 返回 403)
 """
+import os
 import time
 
+import pytest
 import requests
 
 BASE_URL = "http://localhost:8002"
+
+# 集成测试：直接请求真实 uvicorn（默认 8002），会写入真实数据。
+# 默认跳过；需要时显式开启：
+#   RUN_INTEGRATION_TESTS=1 uvicorn ... & RUN_INTEGRATION_TESTS=1 pytest tests/
+pytestmark = pytest.mark.skipif(
+    os.getenv("RUN_INTEGRATION_TESTS", "").lower() not in ("1", "true", "yes"),
+    reason="集成测试需显式开启 RUN_INTEGRATION_TESTS=1，且目标服务已在运行",
+)
 
 
 def get_admin_token():
