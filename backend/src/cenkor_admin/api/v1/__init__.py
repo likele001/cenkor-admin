@@ -18,6 +18,8 @@ from cenkor_admin.apps.auth.schemas import UserBrief
 from cenkor_admin.apps.cms.content_engine_router import router as content_engine_router
 from cenkor_admin.apps.cms.public_router import router as cms_public_router
 from cenkor_admin.apps.cms.router import router as cms_router
+from cenkor_admin.apps.cms.ai.router import router as cms_ai_router
+from cenkor_admin.apps.cms.mcp.router import router as cms_mcp_router
 from cenkor_admin.apps.cms.template_router import router as template_router
 from cenkor_admin.apps.notification.router import router as notification_router
 from cenkor_admin.apps.portal.admin_router import router as portal_admin_router
@@ -74,6 +76,13 @@ api_v1_router.include_router(
     cms_router, prefix="/cms", tags=["cms"],
     dependencies=[Depends(get_current_user)],
 )
+# CMS AI 能力（对话式建模 / AI 起草 / 翻译 / SEO / 语义检索）
+api_v1_router.include_router(
+    cms_ai_router, prefix="/cms", tags=["cms-ai"],
+    dependencies=[Depends(get_current_user)],
+)
+# CMS MCP（Agent 接入）：鉴权走 MCP_API_KEY，绝不能套登录依赖，否则 Agent 进不来
+api_v1_router.include_router(cms_mcp_router, prefix="/cms", tags=["cms-mcp"])
 api_v1_router.include_router(
     rbac_router, prefix="/rbac", tags=["rbac"],
     dependencies=[Depends(get_current_user)],

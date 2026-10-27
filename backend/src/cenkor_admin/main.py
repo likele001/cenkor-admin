@@ -71,6 +71,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.error("app.schema.sync_fail", error=str(e), hint="应用表可能缺失")
 
+    # CMS AI 层表（条目向量 / AI 生成溯源）
+    # 幂等建表，失败只告警：AI 是可选增强，不能因为它拖垮主链路
+    try:
+        from cenkor_admin.apps.cms.ai.bootstrap import ensure_cms_ai_schema
+
+        if not ensure_cms_ai_schema():
+            log.warning(
+                "cms_ai.schema.not_ready",
+                hint="语义检索与 AI 溯源不可用，CMS 其他功能不受影响",
+            )
+    except Exception as e:
+        log.warning("cms_ai.schema.bootstrap_failed", error=str(e))
+
     try:
         await redis_client.ping()
         log.info("redis.ok")

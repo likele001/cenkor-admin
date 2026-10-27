@@ -138,6 +138,35 @@ class Settings(BaseSettings):
     # 心跳间隔（小时）
     LICENSE_HEARTBEAT_HOURS: int = 24
 
+    # ---- AI（OpenAI 兼容协议，可指向 DeepSeek / 通义 / Moonshot / vLLM 等）----
+    # 总开关：关闭时 AI 相关路由不注册，前端也拿不到入口。
+    # 真正的可用条件 = AI_ENABLED 且 AI_API_KEY 非空（见 core.llm.ai_enabled）
+    AI_ENABLED: bool = False
+    # 仅用于溯源标注，不影响协议（协议永远是 OpenAI 兼容）
+    AI_PROVIDER: str = "openai"
+    AI_BASE_URL: str = "https://api.openai.com/v1"
+    # 密钥一律从 .env 注入，禁止写进代码或默认值
+    AI_API_KEY: str = ""
+    AI_CHAT_MODEL: str = "gpt-4o-mini"
+    AI_EMBED_MODEL: str = "text-embedding-3-small"
+    # 期望维度，仅作参考；实际维度以接口返回为准（会写入 cms_embeddings.dim）
+    AI_EMBED_DIM: int = 1536
+    AI_TIMEOUT_SECONDS: int = 60
+    AI_MAX_RETRIES: int = 2
+    AI_TEMPERATURE: float = 0.3
+    # 单次向量化批大小（embedding 接口通常有批量上限，过大易 400）
+    AI_EMBED_BATCH: int = 32
+
+    # ---- MCP（Agent 接入）----
+    # MCP 端点鉴权密钥；留空则只允许已登录后台用户访问
+    MCP_API_KEY: str = ""
+    MCP_ENABLED: bool = True
+
+    @property
+    def ai_ready(self) -> bool:
+        """AI 是否真正可用（开关 + 密钥双检）"""
+        return bool(self.AI_ENABLED and self.AI_API_KEY)
+
     @property
     def db_dialect(self) -> str:
         """返回当前数据库方言（postgresql | mysql | sqlite | unknown）"""
