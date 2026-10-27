@@ -493,7 +493,10 @@ async def test_provider(
 
 
 @router.get("/capabilities", summary="能力绑定总览", dependencies=[_READ])
-async def list_capabilities(db: AsyncSession = Depends(get_db)) -> list[dict[str, Any]]:
+async def list_capabilities(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    # 返回 {capabilities: [...], providers: [...]} 而不是裸列表：
+    # 前端绑定卡片同时需要「可选服务商下拉」。此前注解写成 list[...] 而实际返回
+    # dict，FastAPI 拿注解当 response_model 校验，直接 500（响应体校验失败）。
     rows = (await db.execute(select(CmsAiCapability))).scalars().all()
     by_cap = {row.capability: row for row in rows}
     reg = await registry.load(db)

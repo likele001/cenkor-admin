@@ -6,13 +6,16 @@ from cenkor_admin.apps.base import AppManifest
 MANIFEST = AppManifest(
     key="cms",
     name="辰科官网 CMS",
-    version="0.3.1",
+    version="0.4.0",
     author="Cenkor",
-    description="通用内容管理：内容类型 / 字段定义 / 分类标签 / Liquid 模板 / 公共 API",
+    description="通用内容管理：内容类型 / 字段定义 / 分类标签 / Liquid 模板 / AI 能力 / 公共 API",
     icon="📰",
     category="content",
     min_platform_version="0.1.0",
     dependencies=[],
+    # 权限点必须在这里声明：install_app() 会按此清单建 rbac_permissions，
+    # 角色页的权限树只渲染库里存在的码。漏声明 = 该权限永远无法授予非超管，
+    # 页面前端守卫 meta.permission 也就永远拦死（只能靠 is_superuser 兜底）。
     permissions_required=[
         "cms:content_types:read",
         "cms:content_types:write",
@@ -24,6 +27,9 @@ MANIFEST = AppManifest(
         "cms:tags:write",
         "cms:entries:read",
         "cms:entries:write",
+        "cms:entry:review",    # 审核动作独立于编辑：编辑能提交，审核才能通过
+        "cms:ai:read",         # AI 配置/用量查看
+        "cms:ai:manage",       # AI 服务商密钥、能力绑定（高危，只给管理员）
         "cms:product:read",
         "cms:product:write",
         "cms:case:read",
@@ -95,16 +101,23 @@ MANIFEST = AppManifest(
             "icon": "newspaper",
             "sort": 50,
             "children": [
-                {"key": "cms:content-types", "title": "内容类型", "path": "/cms/content-types"},
-                {"key": "cms:categories", "title": "分类管理", "path": "/cms/categories"},
-                {"key": "cms:tags", "title": "标签管理", "path": "/cms/tags"},
-                {"key": "cms:entries", "title": "通用内容", "path": "/cms/entries"},
-                {"key": "cms:templates", "title": "模板预览", "path": "/cms/templates"},
-                {"key": "cms:products", "title": "产品", "path": "/cms/entries?ct=product"},
-                {"key": "cms:cases",    "title": "案例", "path": "/cms/cases"},
-                {"key": "cms:news",     "title": "新闻", "path": "/cms/news"},
-                {"key": "cms:site",     "title": "站点配置", "path": "/cms/site"},
-                {"key": "cms:media",    "title": "媒体库", "path": "/cms/media"},
+                # AI 能力配置放组内第一项：它是内容生产链的上游开关，
+                # 找不到它 = 整个 AI 功能等于没上线。
+                {"key": "cms:ai-settings", "title": "AI 能力配置", "icon": "sparkles",
+                 "path": "/cms/ai-settings", "sort": 46},
+                {"key": "cms:search", "title": "内容搜索", "icon": "search",
+                 "path": "/cms/search", "sort": 47},
+                {"key": "cms:content-types", "title": "内容类型", "path": "/cms/content-types", "sort": 48},
+                {"key": "cms:languages", "title": "语言管理", "path": "/cms/languages", "sort": 49},
+                {"key": "cms:categories", "title": "分类管理", "path": "/cms/categories", "sort": 50},
+                {"key": "cms:tags", "title": "标签管理", "path": "/cms/tags", "sort": 51},
+                {"key": "cms:entries", "title": "通用内容", "path": "/cms/entries", "sort": 52},
+                {"key": "cms:templates", "title": "模板预览", "path": "/cms/templates", "sort": 53},
+                {"key": "cms:products", "title": "产品", "path": "/cms/products", "sort": 54},
+                {"key": "cms:cases",    "title": "案例", "path": "/cms/cases", "sort": 55},
+                {"key": "cms:news",     "title": "新闻", "path": "/cms/news", "sort": 56},
+                {"key": "cms:site",     "title": "站点配置", "path": "/cms/site", "sort": 57},
+                {"key": "cms:media",    "title": "媒体库", "path": "/cms/media", "sort": 58},
             ],
         },
     ],

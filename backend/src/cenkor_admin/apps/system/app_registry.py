@@ -319,13 +319,18 @@ async def _register_menu_tree(
     existing_menu = existing.scalar_one_or_none()
 
     if not existing_menu:
+        # 显式声明 sort 时以声明为准（新菜单要能插到组内指定位置，
+        # 例如 AI 配置页必须排在内容管理组最前面）；未声明才退化到 50+序号。
+        # 已存在菜单一律不改 sort/title/path —— 运营在「菜单管理」里调过的
+        # 顺序和标题不能被重新安装覆盖。
+        declared_sort = menu_def.get("sort")
         menu = rbac_models.Menu(
             key=key,
             title=menu_def.get("title", key),
             icon=menu_def.get("icon"),
             path=menu_def.get("path"),
             parent_id=parent.id if parent else None,
-            sort=menu_def.get("sort", 50) + sort_offset,
+            sort=declared_sort if declared_sort is not None else 50 + sort_offset,
         )
         db.add(menu)
         await db.flush()

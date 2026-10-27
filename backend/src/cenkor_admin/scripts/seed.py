@@ -21,7 +21,23 @@ log = structlog.get_logger()
 
 # ---- 种子数据 ----
 DEFAULT_PERMISSIONS = [
-    # CMS
+    # CMS —— 内容引擎（V2）。这些码此前只在前端路由守卫里出现、
+    # 从未进库，导致「角色里找不到」，非超管一律进不去。
+    ("cms:content_types:read", "API", "查看内容类型"),
+    ("cms:content_types:write", "API", "编辑内容类型"),
+    ("cms:field_definitions:read", "API", "查看字段定义"),
+    ("cms:field_definitions:write", "API", "编辑字段定义"),
+    ("cms:categories:read", "API", "查看分类"),
+    ("cms:categories:write", "API", "编辑分类"),
+    ("cms:tags:read", "API", "查看标签"),
+    ("cms:tags:write", "API", "编辑标签"),
+    ("cms:entries:read", "API", "查看通用内容"),
+    ("cms:entries:write", "API", "编辑通用内容"),
+    ("cms:entry:review", "API", "审核通用内容（发布/驳回）"),
+    # CMS —— AI 能力。read 只看得见配置概览和用量；manage 能改服务商与密钥。
+    ("cms:ai:read", "API", "查看 AI 能力配置"),
+    ("cms:ai:manage", "API", "管理 AI 服务商与密钥"),
+    # CMS —— 旧三条线（产品/案例/新闻）
     ("cms:product:read", "API", "查看产品"),
     ("cms:product:write", "API", "编辑产品"),
     ("cms:case:read", "API", "查看案例"),
@@ -74,11 +90,20 @@ DEFAULT_MENUS = [
     # (key, parent, title, icon, path, sort)
     ("dashboard", None, "Dashboard", "layout-dashboard", "/", 10),
     ("cms", None, "内容管理", "newspaper", None, 50),
-    ("cms:products", "cms", "产品", "package", "/cms/products", 51),
-    ("cms:cases", "cms", "案例", "briefcase", "/cms/cases", 52),
-    ("cms:news", "cms", "新闻", "file-text", "/cms/news", 53),
-    ("cms:site", "cms", "站点配置", "settings", "/cms/site", 54),
-    ("cms:media", "cms", "媒体库", "image", "/cms/media", 55),
+    # AI 能力配置放在组内最前：内容生产链的上游开关，藏在深层等于没上线
+    ("cms:ai-settings", "cms", "AI 能力配置", "sparkles", "/cms/ai-settings", 46),
+    ("cms:search", "cms", "内容搜索", "search", "/cms/search", 47),
+    ("cms:content-types", "cms", "内容类型", "layers", "/cms/content-types", 48),
+    ("cms:languages", "cms", "语言管理", "languages", "/cms/languages", 49),
+    ("cms:categories", "cms", "分类管理", "folder-tree", "/cms/categories", 50),
+    ("cms:tags", "cms", "标签管理", "tags", "/cms/tags", 51),
+    ("cms:entries", "cms", "通用内容", "file-stack", "/cms/entries", 52),
+    ("cms:templates", "cms", "模板预览", "layout-template", "/cms/templates", 53),
+    ("cms:products", "cms", "产品", "package", "/cms/products", 54),
+    ("cms:cases", "cms", "案例", "briefcase", "/cms/cases", 55),
+    ("cms:news", "cms", "新闻", "file-text", "/cms/news", 56),
+    ("cms:site", "cms", "站点配置", "settings", "/cms/site", 57),
+    ("cms:media", "cms", "媒体库", "image", "/cms/media", 58),
     ("system", None, "系统", "settings-2", None, 90),
     ("system:users", "system", "用户", "users", "/system/users", 91),
     ("system:portal-users", "system", "前台会员", "users", "/system/portal-users", 94),
@@ -102,14 +127,25 @@ DEFAULT_ROLES = [
     ),
     (
         "cms_editor", "内容编辑", "可管理 CMS 内容", False,
-        ["cms:product:read", "cms:product:write", "cms:case:read", "cms:case:write",
-         "cms:news:read", "cms:news:write", "cms:site:read", "media:upload"],
-        ["dashboard", "cms", "cms:products", "cms:cases", "cms:news", "cms:site", "cms:media"],
+        ["cms:content_types:read", "cms:field_definitions:read",
+         "cms:categories:read", "cms:categories:write",
+         "cms:tags:read", "cms:tags:write",
+         "cms:entries:read", "cms:entries:write",
+         "cms:product:read", "cms:product:write", "cms:case:read", "cms:case:write",
+         "cms:news:read", "cms:news:write", "cms:site:read", "media:upload",
+         # AI 只读：编辑能看到当前绑了哪个模型、额度够不够，但不能碰密钥
+         "cms:ai:read"],
+        ["dashboard", "cms", "cms:ai-settings", "cms:search", "cms:content-types",
+         "cms:languages", "cms:categories", "cms:tags", "cms:entries", "cms:templates",
+         "cms:products", "cms:cases", "cms:news", "cms:site", "cms:media"],
     ),
     (
         "viewer", "访客", "只读权限", False,
-        ["cms:product:read", "cms:case:read", "cms:news:read", "cms:site:read"],
-        ["dashboard"],
+        ["cms:content_types:read", "cms:field_definitions:read", "cms:categories:read",
+         "cms:tags:read", "cms:entries:read",
+         "cms:product:read", "cms:case:read", "cms:news:read", "cms:site:read"],
+        ["dashboard", "cms", "cms:search", "cms:content-types", "cms:categories",
+         "cms:tags", "cms:entries", "cms:products", "cms:cases", "cms:news", "cms:site"],
     ),
 ]
 
