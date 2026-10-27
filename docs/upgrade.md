@@ -25,7 +25,7 @@
 
 ```bash
 docker compose -f docker-compose.baota.yml pull      # 拉取最新镜像（:latest 或指定版本 tag）
-docker compose -f docker-compose.baota.yml up -d      # 滚动更新，启动时自动 alembic upgrade head
+docker compose -f docker-compose.baota.yml up -d      # 滚动更新，启动时自动 alembic upgrade heads
 ```
 
 回滚：把镜像 tag 换回旧版本号再 `up -d` 即可。
@@ -55,8 +55,8 @@ bash scripts/backup.sh
 # 2. 更新代码（git pull 或解压核心包覆盖，保留 .env）
 # 3. 依赖
 cd backend && pip install -r requirements.txt
-# 4. 迁移（其实重启后端时 lifespan 会自动 upgrade head）
-PYTHONPATH=src alembic upgrade head
+# 4. 迁移（其实重启后端时 lifespan 会自动 upgrade heads）
+PYTHONPATH=src alembic upgrade heads
 # 5. 重启
 bash scripts/restart-backend-host.sh
 ```
@@ -166,6 +166,7 @@ gunzip -c /www/backup/cenkor-admin/pg_<STAMP>.sql.gz | \
 ## 六、注意事项
 
 - **迁移只前进**：核心发版的 alembic 迁移务必向后兼容或提供 downgrade；升级前一定先备份。
+  迁移图的「公开链 / 闭源链 / 挂载点」规则与新增迁移顺序见 [migrations.md](migrations.md)。
 - **不要手改 VERSION / release.json 不一致**：统一用 `scripts/release.sh`。
 - **开源版无 commerce 模块**：`/store` 定价/授权/分成等闭源能力缺失时会自动静默跳过，不影响升级与启动。
 - 生产环境 `RELEASE_CHECK_ENABLED` 可按需关闭横幅检查。

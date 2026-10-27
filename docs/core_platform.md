@@ -78,7 +78,7 @@ VITE_API_BASE_URL=https://api.example.com bash scripts/build-frontends.sh
 ```bash
 cp .env.example .env
 docker compose up -d                  # 起 PG / Redis / MinIO / backend / admin-web dev
-docker compose exec backend alembic upgrade head
+docker compose exec backend alembic upgrade heads
 docker compose exec backend python -m cenkor_admin.scripts.seed
 ```
 
@@ -87,7 +87,7 @@ docker compose exec backend python -m cenkor_admin.scripts.seed
 - API 文档：<http://localhost:8000/api/docs>
 - 管理员：`admin@cenkor.cn`（**无默认口令**，初始口令随机生成、只打印一次）
 
-> 后端 lifespan 会自动执行 `alembic upgrade head`，通常无需手动跑迁移。
+> 后端 lifespan 会自动执行 `alembic upgrade heads`（迁移图含公开链与商业应用闭源链），通常无需手动跑迁移。
 
 > ⚠️ **安全提示**：本仓库**不含任何默认口令**，管理员口令在首次初始化时随机生成、只打印一次。
 > **任何部署到公网之前必须先做三件事**：① 登录后立即把初始口令改掉；② 换 `SECRET_KEY`；

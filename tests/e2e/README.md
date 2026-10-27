@@ -14,7 +14,7 @@
 # 1. 启动后端
 cd backend
 DATABASE_URL=sqlite+aiosqlite:///./e2e.db \
-  python -m alembic upgrade head
+  python -m alembic upgrade heads
 DATABASE_URL=sqlite+aiosqlite:///./e2e.db \
   python -m cenkor_admin.scripts.seed
 uvicorn cenkor_admin.main:app --port 8000

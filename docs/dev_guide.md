@@ -43,7 +43,7 @@ cd backend
 pip install -r requirements.txt
 cp ../.env.example .env
 # 编辑 .env 填入 DB/Redis/MinIO 等配置
-alembic upgrade head
+alembic upgrade heads
 python -m cenkor_admin.scripts.seed
 uvicorn cenkor_admin.main:app --host 0.0.0.0 --port 8000
 
@@ -497,9 +497,12 @@ SMTP_PASSWORD="..."
 
 ### 数据库迁移
 
+> 迁移图分「公开链 / 商业应用闭源链」，靠挂载点串联；新增迁移的顺序有硬性要求，
+> 详见 [migrations.md](migrations.md)。
+
 ```bash
 # 升级
-alembic upgrade head
+alembic upgrade heads
 
 # 降级一步
 alembic downgrade -1

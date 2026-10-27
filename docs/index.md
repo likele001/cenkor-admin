@@ -8,6 +8,7 @@ Cenkor Admin 文档目录。按用途选择。
 |------|------|
 | [**deploy.md**](deploy.md) | **部署方案（权威）** —— 架构拓扑 · 端口台账 · 配置五落点与优先级 · 依赖服务 · 发布 · 验证 · 备份回滚 · 排障手册 |
 | [**dev_guide.md**](dev_guide.md) | **开发者指南** —— 创建 App、字段定义、模板开发 |
+| [**migrations.md**](migrations.md) | **数据库迁移规则（必读）** —— 公开链 / 闭源链、挂载点、新增迁移顺序、事故与排查 |
 | [**apps/development_guide.md**](apps/development_guide.md) | 应用开发规范（结构 / 字段类型 / 路由 / 迁移 / 打包 / 安全） |
 | [**apps/market_ai_extensions.md**](apps/market_ai_extensions.md) | AI 体系扩展应用上架说明（cenkormes 首批三包：清单 / 发布链路 / 商店取数 / 边界） |
 | [**core_platform.md**](core_platform.md) | 核心平台组成 · 域名规划 · 宝塔建站 |
@@ -46,10 +47,11 @@ Cenkor Admin 文档目录。按用途选择。
 3. 了解 V2 架构设计 → `architecture.md`
 4. 了解下一步要做什么 → `roadmap.md`
 5. 新开发者 → `dev_guide.md` + `apps/development_guide.md`
-6. 打包给别人 → `packaging.md`
-7. 发版 / 升级 → `upgrade.md`
-8. 接官网 → `addons/website_cms.md`
-9. **要上手用某个应用（发起 / 审批单据）** → `05-用户手册/` 里挑对应那份
+6. **动数据库 / 加迁移** → `migrations.md`（先读，再动手）
+7. 打包给别人 → `packaging.md`
+8. 发版 / 升级 → `upgrade.md`
+9. 接官网 → `addons/website_cms.md`
+10. **要上手用某个应用（发起 / 审批单据）** → `05-用户手册/` 里挑对应那份
 
 ## 文档维护约定
 
@@ -76,4 +78,5 @@ Cenkor Admin 文档目录。按用途选择。
 | `scripts/upgrade.sh` | 升级 | [upgrade.md](upgrade.md) |
 | `scripts/deploy.sh` | Docker 部署（`--mode docker\|baota\|baota-static`） | [fullstack_deploy.md](fullstack_deploy.md) |
 | `scripts/install-native.sh` | systemd 安装 | [native_deploy.md](native_deploy.md) |
+| `scripts/check-migration-graph.py` | 迁移图自检（断链 / 重复 / head 数量） | [migrations.md](migrations.md) |
 | `scripts/setup-domain.sh` | 域名与证书辅助 | [domain_setup.md](domain_setup.md) |

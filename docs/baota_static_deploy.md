@@ -185,7 +185,7 @@ cd /www/wwwroot/cenkor-admin
 docker compose -f docker-compose.baota-static.yml --env-file .env.prod up -d
 
 # 迁移 + 初始数据
-docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade head
+docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade heads
 docker compose -f docker-compose.baota-static.yml exec -T backend python -m cenkor_admin.scripts.seed
 ```
 
@@ -241,7 +241,7 @@ docker compose -f docker-compose.baota-static.yml --env-file .env.prod restart b
 
 ```bash
 docker compose -f docker-compose.baota-static.yml --env-file .env.prod up -d --build backend
-docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade head
+docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade heads
 ```
 
 ---
@@ -489,7 +489,7 @@ bash scripts/build-frontends.sh
 
 ```bash
 docker compose -f docker-compose.baota-static.yml --env-file .env.prod up -d --build backend
-docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade head
+docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade heads
 ```
 
 **宝塔 Python 方案 B：**

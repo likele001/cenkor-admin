@@ -10,6 +10,7 @@
 | **后端** | Python 3.11 + FastAPI + SQLAlchemy 2.0 async |
 
 📖 **文档索引**：[`docs/index.md`](docs/index.md)
+🧭 **数据库迁移规则（动迁移前必读）**：[`docs/migrations.md`](docs/migrations.md)
 📦 **打包交付**：[`docs/packaging.md`](docs/packaging.md)
 
 ## 一键部署（Docker，推荐）
@@ -87,7 +88,7 @@ docker compose up -d
 - API：http://localhost:8000/api/docs
 - 管理员账号：`admin@cenkor.cn`（**初始口令随机生成，不写死在源码与文档里**）
 
-> 后端启动时 lifespan 会自动执行 `alembic upgrade head` 建表，**无需手动跑迁移**。
+> 后端启动时 lifespan 会自动执行 `alembic upgrade heads` 建表，**无需手动跑迁移**（迁移图含公开链与商业应用闭源链，统一用 `heads` 升级）。
 > 种子数据经 `docker compose exec backend python -m cenkor_admin.scripts.seed` 生成；
 > 未设置环境变量 `CENKOR_ADMIN_PASSWORD` 时会生成随机口令并**只打印一次**。
 

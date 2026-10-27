@@ -83,7 +83,11 @@ const editingGrants = ref<{ key: string; grants: Record<string, string[]> }>({ k
 const newRoleKey = ref('')
 const newPermCode = ref('')
 const activeTab = ref<'installed' | 'store' | 'pending' | 'cloud'>('installed')
-const subTab = ref<'pending' | 'approved' | 'installed'>('pending')
+const subTab = ref<'pending' | 'approved' | 'published' | 'installed' | 'yanked'>('pending')
+/** 审核包：manifest 契约 / 权限清单 / 迁移静态扫描 / 包 SHA（按需拉取） */
+const bundle = ref<any | null>(null)
+const showBundle = ref(false)
+const bundleLoading = ref(false)
 const categoryFilter = ref('')
 const storeCatalog = ref<StoreApp[]>([])
 const storeLoaded = ref(false)
@@ -195,15 +199,21 @@ async function loadPending() {
     // pending/approved 不能用 only_active：那是给「商店目录」设计的，要求 app_key 在 platform_apps 已 installed 才放行；
     // 新提交的应用从未安装过，会被过滤掉导致审核列表为空。
     // installed 保留 only_active=true：去重 + 隐藏已卸载。
-    const [pending, approved, installed] = await Promise.all([
+    // 上架与审核是两条状态：approved=审核通过未上架，published=已上架可分发，
+    // yanked=撤回上架（只拦新下载，已装实例不受影响）。
+    const [pending, approved, published, installed, yanked] = await Promise.all([
       api.get('/api/v1/store/submissions', { params: { status: 'pending' } }),
       api.get('/api/v1/store/submissions', { params: { status: 'approved' } }),
+      api.get('/api/v1/store/submissions', { params: { status: 'published' } }),
       api.get('/api/v1/store/submissions', { params: { status: 'installed', only_active: true } }),
+      api.get('/api/v1/store/submissions', { params: { status: 'yanked' } }),
     ])
     pendingApps.value = [
       ...(pending.data.items || []),
       ...(approved.data.items || []),
+      ...(published.data.items || []),
       ...(installed.data.items || []),
+      ...(yanked.data.items || []),
     ]
   } catch (e: any) {
     console.error('load pending submissions fail', e)
@@ -219,6 +229,45 @@ async function reviewSubmission(id: number, action: 'approve' | 'reject') {
     alert(e?.response?.data?.detail || '操作失败')
   } finally {
     acting.value = null
+  }
+}
+
+async function publishSubmission(id: number, republish = false) {
+  acting.value = `publish-${id}`
+  try {
+    await api.post(`/api/v1/store/submissions/${id}/publish`, { republish })
+    await loadPending()
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || '上架失败')
+  } finally {
+    acting.value = null
+  }
+}
+
+async function yankSubmission(id: number) {
+  const reason = prompt('撤回上架原因（可选；只阻止新下载，已安装实例不受影响）') || ''
+  acting.value = `yank-${id}`
+  try {
+    await api.post(`/api/v1/store/submissions/${id}/yank`, { reason })
+    await loadPending()
+  } catch (e: any) {
+    alert(e?.response?.data?.detail || '撤回失败')
+  } finally {
+    acting.value = null
+  }
+}
+
+async function openBundle(id: number) {
+  bundleLoading.value = true
+  showBundle.value = true
+  bundle.value = null
+  try {
+    const { data } = await api.get(`/api/v1/store/submissions/${id}/review-bundle`)
+    bundle.value = data
+  } catch (e: any) {
+    bundle.value = { error: e?.response?.data?.detail || '加载审核材料失败' }
+  } finally {
+    bundleLoading.value = false
   }
 }
 
@@ -851,8 +900,14 @@ function categoryLabel(c: string): string {
           :class="subTab === 'approved' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
           @click="subTab = 'approved'">{{ t('apps.subApproved') }} ({{ pendingApps.filter(s => s.status === 'approved').length }})</button>
         <button class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
+          :class="subTab === 'published' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
+          @click="subTab = 'published'">已上架 ({{ pendingApps.filter(s => s.status === 'published').length }})</button>
+        <button class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
           :class="subTab === 'installed' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
           @click="subTab = 'installed'">{{ t('apps.subInstalled') }} ({{ pendingApps.filter(s => s.status === 'installed').length }})</button>
+        <button class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
+          :class="subTab === 'yanked' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
+          @click="subTab = 'yanked'">已撤回 ({{ pendingApps.filter(s => s.status === 'yanked').length }})</button>
       </div>
 
       <div
@@ -886,14 +941,21 @@ function categoryLabel(c: string): string {
               <h3 class="font-semibold">{{ app.name }}</h3>
               <code class="text-xs text-ink-400">{{ app.app_key }} @ {{ app.version }}</code>
               <span class="text-xs px-2 py-0.5 rounded-full"
-                :class="app.status === 'pending' ? 'bg-yellow-50 text-yellow-700' : app.status === 'approved' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'">{{ app.status }}</span>
+                :class="app.status === 'pending' ? 'bg-yellow-50 text-yellow-700'
+                  : app.status === 'approved' ? 'bg-blue-50 text-blue-700'
+                  : app.status === 'yanked' ? 'bg-red-50 text-red-700'
+                  : 'bg-green-50 text-green-700'">{{ app.status }}</span>
             </div>
             <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
             <p class="text-xs text-ink-400 mt-1">{{ t('apps.author') }}: {{ app.author }} · {{ app.created_at }}</p>
             <div class="flex items-center gap-2 mt-1.5">
               <span class="text-xs px-2 py-0.5 rounded bg-ink-100 text-ink-600">{{ productLabel(app.product) || app.product || 'Cenkor 平台' }}</span>
               <span v-if="app.dev_method" class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">开发方式 · {{ devMethodLabel(app.dev_method) }}</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">schema v{{ app.schema_version ?? '-' }}</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">最低宿主 {{ app.min_core_version || '-' }}</span>
+              <span v-if="app.published_at" class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">上架 {{ app.published_at.slice(0, 10) }}</span>
             </div>
+            <p v-if="app.changelog" class="text-xs text-ink-500 mt-1 whitespace-pre-line">{{ app.changelog }}</p>
           </div>
         </div>
         <div class="mt-3 flex gap-2 border-t pt-3">
@@ -902,9 +964,75 @@ function categoryLabel(c: string): string {
             <button class="btn-ghost text-sm text-red-600" :disabled="acting === `review-${app.id}`" @click="reviewSubmission(app.id, 'reject')">{{ t('apps.reject') }}</button>
           </template>
           <button v-else-if="app.status === 'approved' && isPlatform(app)" class="btn-primary text-sm" :disabled="acting === `install-${app.id}`" @click="installSubmission(app.id)">{{ t('apps.install') }}</button>
-          <span v-else-if="app.status === 'approved' && isStandalone(app)" class="text-sm text-ink-500">已通过 · 独立应用，交付整包私有化部署</span>
-          <span v-else-if="app.status === 'approved'" class="text-sm text-blue-600">已通过 · 产品扩展，需在 {{ productLabel(app.product) || '对应产品' }} 实例安装</span>
+          <template v-else-if="app.status === 'approved' && isStandalone(app)">
+            <span class="text-sm text-ink-500">已通过 · 独立应用，交付整包私有化部署</span>
+            <button class="btn-primary text-sm" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id)">上架</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+          </template>
+          <template v-else-if="app.status === 'approved'">
+            <span class="text-sm text-blue-600">已通过 · 产品扩展，需在 {{ productLabel(app.product) || '对应产品' }} 实例安装</span>
+            <button class="btn-primary text-sm" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id)">上架</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+          </template>
+          <template v-else-if="app.status === 'published'">
+            <button class="btn-ghost text-sm text-red-600" :disabled="acting === `yank-${app.id}`" @click="yankSubmission(app.id)">撤回上架</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+          </template>
+          <template v-else-if="app.status === 'yanked'">
+            <button class="btn-ghost text-sm text-green-600" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id, true)">重新上架</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+          </template>
           <span v-else-if="app.status === 'installed'" class="text-sm text-green-600">{{ t('apps.status_installed') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showBundle" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showBundle = false">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-auto p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">审核材料</h3>
+          <button class="btn-ghost text-sm" @click="showBundle = false">关闭</button>
+        </div>
+        <p v-if="bundleLoading" class="text-sm text-ink-500">加载中…</p>
+        <p v-else-if="bundle?.error" class="text-sm text-red-600">{{ bundle.error }}</p>
+        <div v-else-if="bundle" class="space-y-4 text-sm">
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-ink-600">
+            <span>key：{{ bundle.app_key }}</span>
+            <span>版本：{{ bundle.version }}</span>
+            <span>产品：{{ bundle.product }}</span>
+            <span>状态：{{ bundle.status }}</span>
+            <span>schema_version：{{ bundle.schema_version ?? '-' }}</span>
+            <span>最低宿主：{{ bundle.min_core_version || '-' }}</span>
+            <span>上架时间：{{ bundle.published_at || '-' }}</span>
+            <span>撤回时间：{{ bundle.yanked_at || '-' }}</span>
+            <span class="col-span-2 break-all">SHA256：{{ bundle.file_sha256 }}</span>
+            <span class="col-span-2" :class="bundle.file_hash_ok ? 'text-green-700' : 'text-red-600'">
+              盘上包体指纹：{{ bundle.file_hash_ok ? '与提交一致' : '不一致（包体可能被替换）' }} · {{ bundle.file_size }} 字节
+            </span>
+          </div>
+          <div>
+            <p class="font-medium mb-1">权限清单（{{ (bundle.permissions || []).length }}）</p>
+            <ul class="text-ink-600 space-y-0.5">
+              <li v-for="p in bundle.permissions" :key="p.code"><code class="text-xs">{{ p.code }}</code> · {{ p.name }}</li>
+              <li v-if="!(bundle.permissions || []).length" class="text-ink-400">无</li>
+            </ul>
+          </div>
+          <div>
+            <p class="font-medium mb-1">数据策略</p>
+            <p class="text-ink-600">保留策略：{{ bundle.data?.retention || 'keep' }}；自有表：{{ (bundle.data?.tables || []).filter(t => t.mode === 'own').map(t => t.name).join(', ') || '无' }}</p>
+          </div>
+          <div>
+            <p class="font-medium mb-1">迁移静态扫描</p>
+            <p class="text-ink-600">文件：{{ (bundle.scan?.migrations || []).join(', ') || '无' }}</p>
+            <p v-if="(bundle.scan?.blocked || []).length" class="text-red-600">阻断项：{{ (bundle.scan.blocked || []).join('；') }}</p>
+            <p v-else class="text-green-700">未发现破坏性 DDL</p>
+            <p v-if="(bundle.scan?.dirty_files || []).length" class="text-amber-700">脏文件：{{ (bundle.scan.dirty_files || []).join(', ') }}</p>
+          </div>
+          <div>
+            <p class="font-medium mb-1">与上一版对比（{{ bundle.manifest_diff?.prev_version || '无' }}）</p>
+            <p class="text-ink-600">新增权限：{{ (bundle.manifest_diff?.added_permissions || []).join(', ') || '无' }}</p>
+            <p class="text-ink-600">移除权限：{{ (bundle.manifest_diff?.removed_permissions || []).join(', ') || '无' }}</p>
+          </div>
         </div>
       </div>
     </div>

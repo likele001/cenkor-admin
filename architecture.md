@@ -498,7 +498,7 @@ cd backend
 pip install -r requirements.txt
 
 # 2. 数据库迁移（生产环境由后端 lifespan 自动执行）
-alembic upgrade head
+alembic upgrade heads
 
 # 3. 本地开发启动
 uvicorn cenkor_admin.main:app --host 0.0.0.0 --port 8000

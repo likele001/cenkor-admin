@@ -30,7 +30,7 @@ docker compose -f docker-compose.baota-static.yml --env-file .env.prod build bac
 docker compose -f docker-compose.baota-static.yml --env-file .env.prod up -d
 
 info "③ 数据库迁移 + seed..."
-docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade head
+docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade heads
 docker compose -f docker-compose.baota-static.yml exec -T backend python -m cenkor_admin.scripts.seed || true
 
 info "④ 等待后端..."

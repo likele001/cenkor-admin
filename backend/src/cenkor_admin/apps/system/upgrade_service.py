@@ -2,7 +2,7 @@
 
 设计：
   1. 检查更新：git fetch origin → 对比 HEAD..origin/main → 返回待更新提交列表
-  2. 执行升级：git pull --ff-only origin main → alembic upgrade head → 提示用户手动重启
+  2. 执行升级：git pull --ff-only origin main → alembic upgrade heads → 提示用户手动重启
   3. 不自动重启后端（部署方式各异：宝塔/systemd/docker/supervisor，重启命令不同）
   4. 回滚：git reset --hard <旧commit> → 提示用户手动重启
   5. 升级前自动备份数据库（pg_dump），代码回滚靠 git
@@ -216,10 +216,10 @@ async def _do_db_backup(run, db) -> str | None:
 # ── Alembic 迁移 ────────────────────────────────────────────────────────────
 
 async def _alembic_upgrade(run, db) -> tuple[bool, str]:
-    """跑 alembic upgrade head。"""
-    await _append_log(run, db, "▸ alembic upgrade head（数据库迁移）")
+    """跑 alembic upgrade heads（单 head 时与 head 等价；挂载点漏顺延时不至于全链失败）。"""
+    await _append_log(run, db, "▸ alembic upgrade heads（数据库迁移）")
     proc = await asyncio.create_subprocess_exec(
-        PYTHON_BIN, "-m", "alembic", "upgrade", "head",
+        PYTHON_BIN, "-m", "alembic", "upgrade", "heads",
         cwd=str(ROOT / "backend"),
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         env={**os.environ, "PYTHONPATH": "src"},
@@ -366,7 +366,7 @@ async def run_upgrade(db, user, source: str = "git", payload: dict | None = None
                     await _append_log(run, db, f"    {c['sha']} {c['date']} {c['message']}")
             else:
                 await _append_log(run, db, f"  fetch 失败：{msg}")
-            await _append_log(run, db, "  将执行：git pull --ff-only → alembic upgrade head → 提示手动重启")
+            await _append_log(run, db, "  将执行：git pull --ff-only → alembic upgrade heads → 提示手动重启")
             run.status = "success"
             await db.commit()
             return run

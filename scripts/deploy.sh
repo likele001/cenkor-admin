@@ -69,7 +69,7 @@ docker compose -f "$COMPOSE_FILE" --env-file .env.prod up -d
 
 # 5. migration
 info "运行数据库迁移..."
-docker compose -f "$COMPOSE_FILE" exec -T backend alembic upgrade head
+docker compose -f "$COMPOSE_FILE" exec -T backend alembic upgrade heads
 
 # 6. seed
 info "初始化种子数据..."

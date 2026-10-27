@@ -50,7 +50,7 @@ echo "▸ DATABASE_URL → ${DB_HOST}:${DB_PORT}/${DB_NAME}"
 echo "▸ REDIS_URL    → ${REDIS_HOST}:${REDIS_PORT}"
 
 cd "$BACKEND_DIR"
-alembic upgrade head
+alembic upgrade heads
 python3 -m cenkor_admin.scripts.seed
 
 echo "✓ 完成。重启后端: bash scripts/restart-backend-host.sh"
