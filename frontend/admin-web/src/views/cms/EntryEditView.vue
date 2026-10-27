@@ -6,6 +6,8 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/lib/api'
 import DynamicFieldRenderer from '@/components/cms/DynamicFieldRenderer.vue'
+import AiRewriteDialog from '@/components/cms/AiRewriteDialog.vue'
+import EntryAiPanel from '@/components/cms/EntryAiPanel.vue'
 
 interface FieldDef {
   id: number; field_key: string; label: string; field_type: string
@@ -99,6 +101,100 @@ async function restoreVersion(v: any) {
   error.value = ''
 }
 
+// ---- AI 内嵌（标题/正文改写 + 侧栏助手） ----
+// 只改表单，保存才落库；模型不直接写内容，人要过一眼。
+const rewriteTarget = ref<'title' | 'content' | null>(null)
+const rewriteOpen = computed({
+  get: () => rewriteTarget.value !== null,
+  set: (v: boolean) => {
+    if (!v) rewriteTarget.value = null
+  },
+})
+const rewriteValue = computed(() => {
+  if (rewriteTarget.value === 'title') return activeForm.value.title || ''
+  if (rewriteTarget.value === 'content') return activeForm.value.content?.text || ''
+  return ''
+})
+const rewriteTitle = computed(() =>
+  rewriteTarget.value === 'content' ? 'AI 改写正文' : 'AI 改写标题',
+)
+// 正文纯文本：给摘要与 SEO 当输入，避免把 HTML 标签喂给模型
+const bodyText = computed(() => {
+  const html = activeForm.value.content?.text || ''
+  if (!html) return ''
+  const el = document.createElement('div')
+  el.innerHTML = html
+  return (el.textContent || '').replace(/\s+/g, ' ').trim()
+})
+// 内容类型里有「摘要」类字段就填它，没有就让用户自己贴
+const summaryFieldKey = computed(() => {
+  const fields = ct.value?.field_definitions || []
+  const hit = fields.find(
+    (f) => /^(summary|excerpt|digest|abstract|description)$/i.test(f.field_key) || /摘要|简介|导语/.test(f.label),
+  )
+  return hit?.field_key || null
+})
+const rewriteContext = computed(() => {
+  const parts: string[] = []
+  if (ct.value?.name) parts.push(`内容类型：${ct.value.name}`)
+  if (activeForm.value.title && rewriteTarget.value === 'content') {
+    parts.push(`当前标题：${activeForm.value.title}`)
+  }
+  return parts.join('；')
+})
+const translatableLangs = computed(() =>
+  languages.value.filter((l) => !l.is_default).map((l) => ({ code: l.code, name: l.name, flag: l.flag })),
+)
+const savedEntryId = computed(() => {
+  const id = Number(route.params.id)
+  return Number.isFinite(id) && id > 0 ? id : null
+})
+
+const REWRITE_PRESETS = [
+  { key: 'polish', label: '润色' },
+  { key: 'shorten', label: '精简' },
+  { key: 'expand', label: '扩写' },
+  { key: 'formal', label: '正式' },
+  { key: 'plain', label: '口语' },
+  { key: 'custom', label: '自定义' },
+]
+
+const TITLE_PRESETS = [
+  { key: 'title', label: '拟标题' },
+  { key: 'polish', label: '润色' },
+  { key: 'shorten', label: '缩短' },
+  { key: 'formal', label: '正式' },
+  { key: 'custom', label: '自定义' },
+]
+
+function applyRewrite(v: string) {
+  const target = rewriteTarget.value
+  if (!target) return
+  if (target === 'title') activeForm.value.title = v
+  else activeForm.value.content.text = v
+  rewriteTarget.value = null
+}
+
+function applySummary(v: string) {
+  if (summaryFieldKey.value) {
+    form.value.custom_fields[summaryFieldKey.value] = v
+    return
+  }
+  // 没有摘要字段时退化成正文导语，仍由用户保存决定
+  const cur = activeForm.value.content?.text || ''
+  const esc = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  activeForm.value.content.text = `<p>${esc}</p>${cur}`
+}
+
+function applySlug(v: string) {
+  activeForm.value.slug = v
+}
+
+async function onAiTranslated() {
+  if (isNew.value) return
+  await loadTranslations(Number(route.params.id))
+}
+
 // ---- M2·P1 发布工作流 ----
 async function submitReview() {
   await api.post(`/api/v1/cms/entries/${route.params.id}/submit-review`, { comment: '提交审核' })
@@ -131,20 +227,27 @@ const groups = computed(() => {
 })
 
 async function loadContentTypes() {
-  const { data } = await api.get('/api/v1/cms/content-types')
-  // 详情数据更全
-  const items: ContentType[] = []
-  for (const ct of data.items) {
-    const { data: detail } = await api.get(`/api/v1/cms/content-types/${ct.id}`)
-    items.push(detail)
-  }
-  contentTypes.value = items
-  if (!selectedCtKey.value && items.length) selectedCtKey.value = items[0].key
+  // 列表接口已返回完整的 field_groups / field_definitions（含选项），
+  // 没必要再逐个拉详情。原来那套 N+1 要发 6 个请求，跨境网络下就是十几秒白屏。
+  // 这里不设默认类型——由 onMounted 决定：有条目就按条目类型，没有才取第一个。
+  const { data } = await api.get('/api/v1/cms/content-types?page=1&page_size=200')
+  contentTypes.value = (data.items || []).filter((c: any) => c.status !== 'archived')
 }
 
-async function loadEntryDetail(id: number) {
-  const { data } = await api.get(`/api/v1/cms/entries/${id}`)
-  // 合并历史 custom_fields + 新增字段定义的默认值
+/** 只取条目原始数据，不写表单（类型还没定之前没法补默认字段） */
+async function fetchEntry(id: number): Promise<any | null> {
+  try {
+    const { data } = await api.get(`/api/v1/cms/entries/${id}`)
+    return data
+  } catch (e: any) {
+    error.value = e?.response?.data?.detail || '条目加载失败'
+    return null
+  }
+}
+
+/** 把条目数据写进表单，用当前内容类型的字段定义补默认值 */
+function applyEntry(data: any) {
+  if (!data) return
   const defaults: Record<string, any> = {
     text: '', longtext: '', richtext: '', markdown: '', url: '', email: '', phone: '',
     image: '', file: '', select: '', color: '#000000', json: null,
@@ -167,41 +270,46 @@ async function loadEntryDetail(id: number) {
     category_id: data.category_id,
     status: data.status || 'draft',
     sort: data.sort || 0,
-    tag_ids: [],
+    tag_ids: (data.tag_ids as number[]) || [],
   }
   entry.value = data
 }
 
+async function loadEntryDetail(id: number) {
+  applyEntry(await fetchEntry(id))
+}
+
 async function loadCtAndOptions() {
   if (!selectedCtKey.value) return
-  const { data } = await api.get(`/api/v1/cms/content-types?page=1&page_size=200`)
-  const found = data.items.find((c: any) => c.key === selectedCtKey.value)
-  if (!found) return
-  const { data: detail } = await api.get(`/api/v1/cms/content-types/${found.id}`)
-  ct.value = detail
+  const found = contentTypes.value.find((c) => c.key === selectedCtKey.value)
+  if (!found) {
+    error.value = `内容类型 ${selectedCtKey.value} 不存在或已归档`
+    return
+  }
+  ct.value = found
 
-  // 加载分类和标签
-  const { data: catData } = await api.get(`/api/v1/cms/categories?content_type_key=${selectedCtKey.value}`)
-  categories.value = catData.items || []
-  const { data: tagData } = await api.get(`/api/v1/cms/tags?content_type_key=${selectedCtKey.value}`)
-  allTags.value = tagData.items || []
+  // 分类与标签互不依赖，并行拉
+  const [catRes, tagRes] = await Promise.all([
+    api.get('/api/v1/cms/categories', { params: { content_type_key: selectedCtKey.value } }).catch(() => null),
+    api.get('/api/v1/cms/tags', { params: { content_type_key: selectedCtKey.value } }).catch(() => null),
+  ])
+  categories.value = catRes?.data?.items || []
+  allTags.value = tagRes?.data?.items || []
 
   // 初始化 custom_fields：确保所有字段 key 存在，方便 v-model 绑定
-  if (ct.value) {
-    const defaults: Record<string, any> = {
-      text: '', longtext: '', richtext: '', markdown: '', url: '', email: '', phone: '',
-      image: '', file: '', select: '', color: '#000000', json: null,
-      number: null, boolean: false, date: null, datetime: null,
-      images: [], files: [], multiselect: [], repeater: [], relation: null,
-    }
-    const cf = { ...form.value.custom_fields }
-    for (const fd of ct.value.field_definitions) {
-      if (!(fd.field_key in cf)) {
-        cf[fd.field_key] = fd.default_value ?? defaults[fd.field_type] ?? ''
-      }
-    }
-    form.value.custom_fields = cf
+  const defaults: Record<string, any> = {
+    text: '', longtext: '', richtext: '', markdown: '', url: '', email: '', phone: '',
+    image: '', file: '', select: '', color: '#000000', json: null,
+    number: null, boolean: false, date: null, datetime: null,
+    images: [], files: [], multiselect: [], repeater: [], relation: null,
   }
+  const cf = { ...form.value.custom_fields }
+  for (const fd of ct.value.field_definitions) {
+    if (!(fd.field_key in cf)) {
+      cf[fd.field_key] = fd.default_value ?? defaults[fd.field_type] ?? ''
+    }
+  }
+  form.value.custom_fields = cf
 
   if (groups.value.length) activeGroup.value = groups.value[0].id
 }
@@ -256,7 +364,11 @@ function toggleTag(tid: number) {
   else form.value.tag_ids.push(tid)
 }
 
+// 启动阶段会自己设一次 selectedCtKey，别让 watch 再跑一遍（会重复拉分类/标签）
+let bootstrapping = true
+
 watch(selectedCtKey, async () => {
+  if (bootstrapping) return
   // 切换内容类型时重置多语言草稿
   drafts.value = {}
   activeLang.value = 'default'
@@ -285,13 +397,37 @@ watch(selectedCtKey, async () => {
 })
 
 onMounted(async () => {
-  await loadLanguages()
-  await loadContentTypes()
-  await loadCtAndOptions()
-  if (!isNew.value) {
-    await loadEntryDetail(Number(route.params.id))
-    await loadTranslations(Number(route.params.id))
-    await loadVersions(Number(route.params.id))
+  try {
+    await loadLanguages()
+
+    // 条目数据先拿到手（同时用于反查内容类型），类型定了之后才补默认字段
+    const rawEntry = isNew.value ? null : await fetchEntry(Number(route.params.id))
+
+    await loadContentTypes()
+
+    // URL 没带 ?ct= 时（直接访问、刷新、从工作台跳来），用条目自己的类型；
+    // 都没有才退回第一个类型。
+    if (!selectedCtKey.value && rawEntry?.content_type_id) {
+      const hit = contentTypes.value.find((c) => c.id === rawEntry.content_type_id)
+      if (hit) selectedCtKey.value = hit.key
+    }
+    if (!selectedCtKey.value && contentTypes.value.length) {
+      selectedCtKey.value = contentTypes.value[0].key
+    }
+
+    await loadCtAndOptions()
+    if (rawEntry) applyEntry(rawEntry)
+
+    if (!isNew.value) {
+      await loadTranslations(Number(route.params.id))
+      await loadVersions(Number(route.params.id))
+    }
+  } catch (e: any) {
+    // 初始化任何一步挂了都要让人看见原因，而不是永远转圈
+    console.error('[cms.entry_edit.init_failed]', e)
+    error.value = `页面初始化失败：${e?.message || e}`
+  } finally {
+    bootstrapping = false
   }
 })
 </script>
@@ -326,7 +462,16 @@ onMounted(async () => {
             >{{ l.flag || '🌍' }} {{ l.name }}<span v-if="l.is_default" class="text-xs text-ink-400 ml-1">(默认)</span></button>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">{{ t('newsList.标题_ij5d') }} <span class="text-red-500">*</span></label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-sm font-medium">{{ t('newsList.标题_ij5d') }} <span class="text-red-500">*</span></label>
+              <button
+                type="button"
+                class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
+                :disabled="!activeForm.title?.trim()"
+                title="用 AI 改写标题"
+                @click="rewriteTarget = 'title'"
+              >✨ AI</button>
+            </div>
             <input v-model="activeForm.title" type="text" class="input" :placeholder="t('newsList.标题_ij5d')" />
           </div>
           <div>
@@ -334,7 +479,16 @@ onMounted(async () => {
             <input v-model="activeForm.slug" type="text" class="input" placeholder="url-friendly-key" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">{{ t('entryEdit.内容_aduoyw') }}</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-sm font-medium">{{ t('entryEdit.内容_aduoyw') }}</label>
+              <button
+                type="button"
+                class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
+                :disabled="!activeForm.content?.text?.trim()"
+                title="用 AI 改写正文（保留排版格式）"
+                @click="rewriteTarget = 'content'"
+              >✨ AI</button>
+            </div>
             <RichTextEditor v-model="activeForm.content.text" placeholder="t('entryEdit.富文本内_72xjm1')" />
           </div>
         </div>
@@ -383,6 +537,19 @@ onMounted(async () => {
             <input v-model.number="form.sort" type="number" class="input" />
           </div>
         </div>
+
+        <!-- AI 助手：摘要 / SEO / 翻译 -->
+        <EntryAiPanel
+          :entry-id="savedEntryId"
+          :title="activeForm.title || ''"
+          :body-text="bodyText"
+          :slug="activeForm.slug || ''"
+          :summary-key="summaryFieldKey"
+          :translatable-langs="translatableLangs"
+          @apply-slug="applySlug"
+          @apply-summary="applySummary"
+          @translated="onAiTranslated"
+        />
 
         <!-- 版本历史（M1·P0） -->
         <div v-if="!isNew" class="card space-y-2">
@@ -471,5 +638,15 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    <!-- AI 改写弹层：标题用纯文本模式，正文用 HTML 分块模式 -->
+    <AiRewriteDialog
+      v-model:open="rewriteOpen"
+      :value="rewriteValue"
+      :html="rewriteTarget === 'content'"
+      :title="rewriteTitle"
+      :context="rewriteContext"
+      :presets="rewriteTarget === 'title' ? TITLE_PRESETS : REWRITE_PRESETS"
+      @apply="applyRewrite"
+    />
   </div>
 </template>

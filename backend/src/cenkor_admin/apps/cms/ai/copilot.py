@@ -42,6 +42,7 @@ _KIND_CT = "content_type_from_nl"
 _KIND_DRAFT = "entry_draft"
 _KIND_TRANSLATE = "translate"
 _KIND_SEO = "seo"
+_KIND_REWRITE = "text_rewrite"
 
 
 def _digest(text_value: str) -> str:
@@ -785,6 +786,175 @@ async def suggest_seo(
     )
 
     return {"seo": seo, "_meta": result.meta()}
+
+
+# ---------------------------------------------------------------------------
+# 6) 字段级改写（编辑页内嵌用）
+# ---------------------------------------------------------------------------
+# 与「AI 起草」的区别：起草是生成新内容，这里改的是**用户已经写下的东西**。
+# 所以铁律是三不：不落库、不新增事实、不动结构。
+# 正文是 HTML，但模型**永远不产出 HTML** —— 前端把 HTML 拆成纯文本块送过来，
+# 模型只回文本块，前端按序回填。这样标签结构由浏览器 DOM 保证，
+# 既不会出现半截标签，也没有 XSS 面。
+
+REWRITE_ACTIONS: dict[str, str] = {
+    "polish": "润色：修正语病、调整用词，保持原意，长度与原文相近",
+    "expand": "扩写：补充细节与论证，长度为原文的 1.5~2 倍",
+    "shorten": "精简：删掉冗余与重复，长度约为原文的一半",
+    "formal": "改写为正式书面语，适合官网、白皮书、商务函件",
+    "plain": "改写为通俗口语，让不懂行的人也能看懂",
+    "title": "据此拟一个标题：不超过 30 字，不堆关键词，不加引号与句号，不要「浅谈」「解析」这类空话",
+    "summary": "概括为一段摘要：80~120 字，只陈述原文意思，不添加新信息，不要「本文」「这篇文章」",
+    "custom": "按用户给出的具体要求改写",
+}
+
+_REWRITE_SYSTEM = """你是资深文字编辑。按用户指定的动作改写给定文本。
+
+输出规则：
+- 单块模式只输出：{"text": "改写后的文本"}
+- 多块模式只输出：{"blocks": ["第一块改写", "第二块改写", ...]}
+
+硬性规则：
+1. **块数与顺序必须与输入完全一致**，不得合并、拆分或增删
+2. 只改文字表达，**不得新增原文没有的事实、数字、人名、日期、结论**
+3. 输入里的 HTML 标签、Markdown 标记、URL、图片地址、型号原样保留，不要改写它们
+4. 输入中的「（待补充）」占位符原样保留，不要编造内容去填充
+5. 空输入块返回空字符串
+6. 只输出 JSON，不要任何解释性文字、前言或收尾"""
+
+# 单次改写的上限：模型不是用来改整篇长文的，超了说明用错了地方
+_MAX_TEXT_CHARS = 8000
+_MAX_BLOCKS = 80
+_MAX_BLOCK_CHARS = 4000
+_MAX_TOTAL_BLOCK_CHARS = 12000
+
+
+def _rewrite_user_msg(
+    action: str,
+    lang: str,
+    text: str | None,
+    blocks: list[str] | None,
+    context: str | None,
+    instruction: str | None,
+) -> str:
+    parts = [f"动作：{REWRITE_ACTIONS[action]}（{action}）", f"输出语言：{lang}"]
+    if context:
+        parts.append(f"上下文（仅供理解，不要改写）：{context[:1000]}")
+    if instruction:
+        parts.append(f"用户具体要求：{instruction[:1000]}")
+    if blocks is not None:
+        payload = json.dumps(blocks, ensure_ascii=False)
+        parts.append(f"多块模式，共 {len(blocks)} 块，输入 JSON 数组：\n{payload}")
+    else:
+        parts.append(f"单块模式，输入：\n{text}")
+    return "\n\n".join(parts)
+
+
+async def rewrite_text(
+    session: AsyncSession,
+    *,
+    action: str = "polish",
+    text: str | None = None,
+    blocks: list[str] | None = None,
+    instruction: str | None = None,
+    lang: str = "zh-CN",
+    context: str | None = None,
+    created_by: int | None = None,
+) -> dict[str, Any]:
+    """改写一段文本（text）或多块文本（blocks）。**不写业务表，只留一条溯源。**
+
+    返回 {"text": ...} 或 {"blocks": [...]}，附 _meta。
+    模型漏掉的块用原文补，绝不返回空串覆盖用户内容。
+    """
+    if action not in REWRITE_ACTIONS:
+        raise ValueError(f"不支持的改写动作：{action}")
+
+    if blocks is not None:
+        if not blocks:
+            raise ValueError("blocks 不能为空")
+        if len(blocks) > _MAX_BLOCKS:
+            raise ValueError(f"最多 {_MAX_BLOCKS} 个文本块，当前 {len(blocks)}")
+        blocks = [str(b) for b in blocks]
+        if any(len(b) > _MAX_BLOCK_CHARS for b in blocks):
+            raise ValueError(f"单个文本块不能超过 {_MAX_BLOCK_CHARS} 字")
+        if sum(len(b) for b in blocks) > _MAX_TOTAL_BLOCK_CHARS:
+            raise ValueError(f"文本总量超出 {_MAX_TOTAL_BLOCK_CHARS} 字，请分次改写")
+    else:
+        text = (text or "").strip()
+        if not text:
+            raise ValueError("text 不能为空")
+        if len(text) > _MAX_TEXT_CHARS:
+            raise ValueError(f"文本不能超过 {_MAX_TEXT_CHARS} 字，请分次改写")
+
+    llm = get_llm()
+    user_msg = _rewrite_user_msg(action, lang, text, blocks, context, instruction)
+    messages = [
+        {"role": "system", "content": _REWRITE_SYSTEM},
+        {"role": "user", "content": user_msg},
+    ]
+    target = f"action:{action}"
+
+    try:
+        raw, result = await llm.chat_json(messages, temperature=0.5, max_tokens=4000)
+    except Exception as exc:
+        await _record(
+            session,
+            kind=_KIND_REWRITE,
+            target=target,
+            result=None,
+            params={"action": action, "mode": "blocks" if blocks is not None else "text"},
+            status="failed",
+            error=str(exc),
+            created_by=created_by,
+            prompt=user_msg,
+        )
+        raise
+
+    if not isinstance(raw, dict):
+        raise LLMError("改写输出不是对象结构")
+
+    out: dict[str, Any] = {"action": action}
+    if blocks is not None:
+        got = raw.get("blocks")
+        if isinstance(got, dict):
+            # 有些模型会回 {"0": "...", "1": "..."}
+            got = [got.get(str(i)) for i in range(len(blocks))]
+        if not isinstance(got, list):
+            raise LLMError("多块改写缺少 blocks 数组")
+        merged: list[str] = []
+        for idx, original in enumerate(blocks):
+            val = got[idx] if idx < len(got) else None
+            merged.append(str(val) if isinstance(val, str) and val.strip() else original)
+        out["blocks"] = merged
+        # 模型漏块是可诊断的信号：记下来，别静默
+        missed = sum(
+            1
+            for i, o in enumerate(blocks)
+            if o.strip() and not (i < len(got) and str(got[i] or "").strip())
+        )
+    else:
+        val = raw.get("text")
+        if not isinstance(val, str) or not val.strip():
+            raise LLMError("改写结果为空")
+        out["text"] = val.strip()
+        missed = 0
+
+    await _record(
+        session,
+        kind=_KIND_REWRITE,
+        target=target,
+        result=result,
+        params={
+            "action": action,
+            "mode": "blocks" if blocks is not None else "text",
+            "blocks": len(blocks) if blocks is not None else None,
+            "missed": missed,
+        },
+        created_by=created_by,
+        prompt=user_msg,
+    )
+    out["_meta"] = result.meta()
+    return out
 
 
 # ---------------------------------------------------------------------------

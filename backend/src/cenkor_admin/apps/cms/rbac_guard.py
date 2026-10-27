@@ -78,6 +78,9 @@ _PERM_RULES: tuple[tuple[str, str | None, str | None], ...] = (
     # ---------------- AI 业务：产出的是内容，按内容权限管 ----------------
     ("/ai/content-types", "cms:content_types:read", "cms:content_types:write"),
     ("/ai/entries", "cms:entries:read", "cms:entries:write"),
+    # 字段级改写（编辑页内嵌）：改的是条目正文，按条目写权限管；
+    # 故意不挂 cms:ai:*，否则能给 AI 配 key 的人才有权润色一段话，说不通。
+    ("/ai/text", "cms:entries:read", "cms:entries:write"),
     ("/ai/search", "cms:entries:read", None),
     # ---------------- 内容引擎：建模三件套 ----------------
     # 字段组 / 字段定义 / 选项统一归 field_definitions。

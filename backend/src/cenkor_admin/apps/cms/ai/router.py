@@ -208,6 +208,47 @@ async def suggest_seo(
 
 
 # ---------------------------------------------------------------------------
+# 字段级改写（编辑页内嵌）
+# ---------------------------------------------------------------------------
+@router.post("/text/rewrite", summary="字段级 AI 改写（润色/扩写/精简/标题/摘要）")
+async def rewrite_text(
+    body: dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """改写用户已写下的文字，**不落库**。
+
+    - 单块：`{"text": "...", "action": "polish"}`
+    - 多块（HTML 正文由前端拆好）：`{"blocks": ["...", "..."], "action": "polish"}`
+
+    正文之所以走多块，是为了让模型不产出 HTML —— 标签结构由前端 DOM 负责，
+    模型只回文本，既不会破坏格式也没有 XSS 面。
+    """
+    _require_ai()
+    action = str(body.get("action") or "polish")
+    blocks = body.get("blocks")
+    if blocks is not None and not isinstance(blocks, list):
+        raise HTTPException(status_code=400, detail="blocks 必须是字符串数组")
+
+    try:
+        return await copilot.rewrite_text(
+            db,
+            action=action,
+            text=(str(body.get("text")) if body.get("text") is not None else None),
+            blocks=([str(b) for b in blocks] if blocks is not None else None),
+            instruction=(str(body.get("instruction")) if body.get("instruction") else None),
+            lang=str(body.get("lang") or "zh-CN"),
+            context=(str(body.get("context"))[:1000] if body.get("context") else None),
+            created_by=user.id,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise _map_llm_error(exc) from exc
+
+
+# ---------------------------------------------------------------------------
 # 语义检索
 # ---------------------------------------------------------------------------
 @router.get("/search", summary="语义 + 关键词混合检索")
