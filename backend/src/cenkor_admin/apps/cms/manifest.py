@@ -103,9 +103,9 @@ MANIFEST = AppManifest(
             "children": [
                 # AI 能力配置放组内第一项：它是内容生产链的上游开关，
                 # 找不到它 = 整个 AI 功能等于没上线。
-                {"key": "cms:ai-settings", "title": "AI 能力配置", "icon": "sparkles",
+                {"key": "cms:ai-settings", "title": "AI 能力配置", "icon": "✨",
                  "path": "/cms/ai-settings", "sort": 46},
-                {"key": "cms:search", "title": "内容搜索", "icon": "search",
+                {"key": "cms:search", "title": "内容搜索", "icon": "🔍",
                  "path": "/cms/search", "sort": 47},
                 {"key": "cms:content-types", "title": "内容类型", "path": "/cms/content-types", "sort": 48},
                 {"key": "cms:languages", "title": "语言管理", "path": "/cms/languages", "sort": 49},
