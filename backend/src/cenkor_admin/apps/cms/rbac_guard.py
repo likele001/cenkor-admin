@@ -46,15 +46,16 @@
 
 from __future__ import annotations
 
-import logging
-
+import structlog
 from fastapi import Depends, HTTPException, Request
 
 from cenkor_admin.api.deps import get_current_user, user_has_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.core.config import get_settings
 
-log = logging.getLogger(__name__)
+# 必须用 structlog：守卫里的日志带结构化 kwargs（path/method/perm），
+# 标准库 Logger 不支持，会 TypeError -> 403 变成 500。
+log = structlog.get_logger(__name__)
 
 # CMS 的挂载前缀（main.py 挂 /api/v1，api/v1/__init__.py 再挂 /cms）
 _MOUNT_MARK = "/cms/"

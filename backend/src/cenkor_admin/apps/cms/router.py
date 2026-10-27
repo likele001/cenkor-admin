@@ -1,11 +1,11 @@
 """CMS App · 后台管理路由（需要鉴权 - MVP 阶段先放开）"""
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import datetime
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
@@ -26,7 +26,7 @@ from cenkor_admin.core.repository import (
 from cenkor_admin.core.storage import s3
 
 settings = get_settings()
-log = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 router = APIRouter()
 
 

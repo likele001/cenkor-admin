@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import Text, cast, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,7 @@ from cenkor_admin.core.repository import apply_filters, paginate
 # router 级挂细分权限守卫：一次覆盖全部内容引擎端点。
 # 规则表见 apps/cms/rbac_guard.py；未命中规则的路径放行并告警。
 router = APIRouter(dependencies=[Depends(cms_permission_guard)])
-log = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 
 def _parse_dt(v: Any) -> datetime | None:

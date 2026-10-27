@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import importlib
 import inspect
-import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-log = logging.getLogger(__name__)
+import structlog
+
+log = structlog.get_logger(__name__)
 
 # 同步或异步处理函数
 HookHandler = Callable[..., Awaitable[None] | None]
