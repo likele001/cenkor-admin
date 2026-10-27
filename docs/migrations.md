@@ -86,13 +86,15 @@ python3 scripts/check-migration-graph.py --tracked-only # 开源视图：必须 
 仓库被切成两半：**公开链**（进 git）和**闭源链**（不进 git，只在完整部署里有）。
 
 ```
-公开链 38 个：0001_initial → … → 0034_upgrade_notes → gen_inventory（公开 head）
-                                                          ↓
-闭源链 44 个：                                    0035_app_publish
-                                                          ↓
-                                                   erp_init → … → crm/mes/commerce/ext
-                                                          ↓
-                                             20261027_0100_app_schema（全集 head）
+公开链 39 个：0001_initial → … → 0034_upgrade_notes → gen_inventory
+                                                            ↓
+                                    20261014_124200_schema_versions（公开 head）
+                                                            ↓
+闭源链 44 个：                                      0035_app_publish
+                                                            ↓
+                                            erp_init → … → 0029_product_commerce
+                                                            ↓
+                                   20261027_0100_app_schema（全集 head，空实现）
 ```
 
 **核心规则：公开迁移绝对不能依赖闭源 revision。**
@@ -108,30 +110,60 @@ KeyError: '20261020_0035_app_publish'
 `alembic upgrade heads || echo "[entrypoint] 迁移未成功，交由应用内 lifespan 重试"`
 —— 报错被吞、服务照常启动，然后所有接口 500。**别人 clone 下来会以为装好了，实际一张表都没建。**
 
-### 5.2 正确做法：公开链自己闭合
+同一个坑当天踩了第二次：`20261027_0100_app_schema` 最初把父节点设成闭源的
+`0029_product_commerce`，又造出一次「公开迁移依赖闭源」。是
+`scripts/check-migration-graph.py --tracked-only` 当场把它拦下来的。
+**建在闭源链尾的公开迁移，等于没建 —— 开源仓库里看不到它。**
 
-公开链收在 `gen_inventory`，闭源挂在它后面：
+### 5.2 正确做法：公开链自己闭合，闭源挂在公开 head 之后
 
-| 文件 | down_revision |
-|---|---|
-| `ext/20261014_124126_create_inventory.py` | `20261018_0034_upgrade_notes` ← 公开 |
-| `ext/20261020_0035_app_publish.py` | `20261014_124126_gen_inventory` ← 公开 head |
-| `erp/20260831_0001_erp_init.py` | `20261020_0035_app_publish` ← 闭源 |
+| 文件 | down_revision | 归属 |
+|---|---|---|
+| `ext/20261014_124126_create_inventory.py` | `20261018_0034_upgrade_notes` | 公开 |
+| `core/20261014_124200_schema_versions.py` | `20261014_124126_gen_inventory` | **公开 head**，建 `app_schema_versions` |
+| `ext/20261020_0035_app_publish.py` | `20261014_124200_schema_versions` | 闭源挂载点，顺延到这里 |
+| `erp/20260831_0001_erp_init.py` | `20261020_0035_app_publish` | 闭源 |
 
-以后**新增公开迁移**：接在 `gen_inventory` 后面，然后把这个新迁移的 revision
-填到 `0035_app_publish.down_revision` 里（顺延的是**闭源的挂载点**，不是公开的）。
+`app_schema_versions` 为什么必须在公开链：它是 `core/app_schema.py`（方案 D）的记账表，
+属于平台核心，开源部署同样要用（`sync_builtin_apps()` 直接读写它）。
+
+`ext/20261027_0100_app_schema.py` 已改为**空实现** —— 它当初建的正是这张表，
+前移到公开链之后，这里只保留 revision 占位。已部署环境的 `alembic_version` 指向它，
+删掉会报「未知 revision」。空实现对任何环境都无副作用：
+新装时公开链已建好表，已部署的环境早已执行过、不会重跑。
+
+以后**新增公开迁移**：接在 `20261014_124200_schema_versions` 后面，然后把这个新 revision
+填进 `0035_app_publish.down_revision`（顺延的是**闭源的挂载点**，不是公开的）。
 
 以后**新增闭源迁移**：正常接在当前闭源 head 后面，不用动公开链。
 
-### 5.3 实测验证（2026-10-27）
+> 判断标准只有一条：**这个迁移要不要出现在开源仓库里？** 要 → 挂公开 head；
+> 不要 → 挂闭源 head。别靠目录名判断，目录只是分类，不决定归属。
+
+### 5.3 实测验证（2026-10-27，从 GitHub 公开地址 clone 后真装）
 
 | 场景 | 迁移数 | head | 建表数 | 结果 |
 |---|---:|---|---:|---|
-| 只有公开链（模拟 clone 开源仓库） | 38 | `gen_inventory` | **58** | ✅ 退出码 0，crm/erp/mes 表 **0 张** |
-| 公开 + 闭源（完整部署） | 82 | `0100_app_schema` | 81 核心 + 107 应用 + 20 视图 | ✅ |
+| 只有公开链（`git clone` 公开仓库） | 39 | `20261014_124200_schema_versions` | **59** | ✅ 退出码 0，闭源表 **0 张** |
+| 公开 + 闭源（完整部署） | 83 | `0100_app_schema` | 81 核心 + 107 应用 + 20 视图 | ✅ 单 head |
 
-开源版建出的 58 张表全是平台核心：`auth_*` / `rbac_*` / `cms_*` / `portal_*` /
-`notifications` / `cloud_storage_*` / `app_*`（商店）/ `codegen_runs` / `inventory_*` / `links` / `my_todo_items`。
+公开链 39 个 = 原有 38 个 + `20261014_124200_schema_versions`。
+
+开源版建出的 59 张表全是平台核心：`auth_*` / `rbac_*` / `cms_*` / `portal_*` /
+`notifications` / `cloud_storage_*` / `app_*`（商店）/ `codegen_runs` / `inventory_*` /
+`links` / `my_todo_items` / `app_schema_versions`。
+
+复现命令：
+
+```bash
+git clone https://github.com/likele001/cenkor-admin /tmp/x && cd /tmp/x/backend
+CENKOR_DATABASE_URL="postgresql+psycopg2://cenkor:PW@127.0.0.1:5432/testdb" \
+  PYTHONPATH=src python -m alembic upgrade head     # 39 步，59 张表
+```
+
+`alembic.ini` 的 `version_locations` 列了 6 个目录，公开仓库里只有
+`core` / `commerce` / `ext` 三个 —— **alembic 对不存在的版本目录不报错**（已实测），
+不需要为缺目录做特殊处理。
 
 ### 5.4 命令
 
