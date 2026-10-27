@@ -13,7 +13,9 @@ import NewsListView from '@/views/cms/NewsListView.vue'
 import NewsEditView from '@/views/cms/NewsEditView.vue'
 import MediaView from '@/views/cms/MediaView.vue'
 import SiteConfigView from '@/views/cms/SiteConfigView.vue'
+import AiBuilderView from '@/views/cms/AiBuilderView.vue'
 import AiSettingsView from '@/views/cms/AiSettingsView.vue'
+import AiWorkbenchView from '@/views/cms/AiWorkbenchView.vue'
 import ContentTypeListView from '@/views/cms/ContentTypeListView.vue'
 import FieldDefinitionsView from '@/views/cms/FieldDefinitionsView.vue'
 import CategoriesView from '@/views/cms/CategoriesView.vue'
@@ -84,6 +86,9 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/news/new', name: 'cms-news-new', component: NewsEditView, meta: { permission: 'cms:news:write' } },
       { path: 'cms/news/:id', name: 'cms-news-edit', component: NewsEditView, meta: { permission: 'cms:news:write' } },
       { path: 'cms/site', name: 'cms-site', component: SiteConfigView, meta: { permission: 'cms:site:read' } },
+      // AI 交互面板：建模向导（内容类型权限）+ 内容工作台（条目权限）
+      { path: 'cms/ai-builder', name: 'cms-ai-builder', component: AiBuilderView, meta: { permission: 'cms:content_types:write' } },
+      { path: 'cms/ai-workbench', name: 'cms-ai-workbench', component: AiWorkbenchView, meta: { permission: 'cms:entries:write' } },
       { path: 'cms/ai-settings', name: 'cms-ai-settings', component: AiSettingsView, meta: { permission: 'cms:ai:read' } },
       { path: 'cms/media', name: 'cms-media', component: MediaView, meta: { permission: 'media:upload' } },
       // System

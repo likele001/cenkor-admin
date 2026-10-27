@@ -103,7 +103,9 @@ ROLE_PERMISSION_PRESETS: dict[str, tuple[str, ...]] = {
 # 角色可见的菜单（key）。菜单不给全，只给跟权限匹配的。
 ROLE_MENU_PRESETS: dict[str, tuple[str, ...]] = {
     "cms_editor": (
-        "cms", "cms:ai-settings", "cms:search", "cms:content-types", "cms:languages",
+        # 只给工作台：cms_editor 有 entries:write 但没有 content_types:write，
+        # 给建模向导菜单等于给一个点进去就被守卫拦的入口。
+        "cms", "cms:ai-workbench", "cms:ai-settings", "cms:search", "cms:content-types", "cms:languages",
         "cms:categories", "cms:tags", "cms:entries", "cms:templates",
         "cms:products", "cms:cases", "cms:news", "cms:site", "cms:media",
     ),

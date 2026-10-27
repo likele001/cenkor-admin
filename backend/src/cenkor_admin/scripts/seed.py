@@ -90,7 +90,9 @@ DEFAULT_MENUS = [
     # (key, parent, title, icon, path, sort)
     ("dashboard", None, "Dashboard", "layout-dashboard", "/", 10),
     ("cms", None, "内容管理", "newspaper", None, 50),
-    # AI 能力配置放在组内最前：内容生产链的上游开关，藏在深层等于没上线
+    # AI 三项排组首：建模 → 生产 → 配置，藏在深层等于没上线
+    ("cms:ai-builder", "cms", "AI 建模向导", "🤖", "/cms/ai-builder", 44),
+    ("cms:ai-workbench", "cms", "AI 内容工作台", "🪄", "/cms/ai-workbench", 45),
     ("cms:ai-settings", "cms", "AI 能力配置", "✨", "/cms/ai-settings", 46),
     ("cms:search", "cms", "内容搜索", "🔍", "/cms/search", 47),
     ("cms:content-types", "cms", "内容类型", "layers", "/cms/content-types", 48),

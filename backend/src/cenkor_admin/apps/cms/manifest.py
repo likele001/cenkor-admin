@@ -101,8 +101,12 @@ MANIFEST = AppManifest(
             "icon": "newspaper",
             "sort": 50,
             "children": [
-                # AI 能力配置放组内第一项：它是内容生产链的上游开关，
-                # 找不到它 = 整个 AI 功能等于没上线。
+                # AI 三项排组首，按「建模 → 生产 → 配置」的使用顺序。
+                # 藏在深层等于没上线：用户根本不会去翻。
+                {"key": "cms:ai-builder", "title": "AI 建模向导", "icon": "🤖",
+                 "path": "/cms/ai-builder", "sort": 44},
+                {"key": "cms:ai-workbench", "title": "AI 内容工作台", "icon": "🪄",
+                 "path": "/cms/ai-workbench", "sort": 45},
                 {"key": "cms:ai-settings", "title": "AI 能力配置", "icon": "✨",
                  "path": "/cms/ai-settings", "sort": 46},
                 {"key": "cms:search", "title": "内容搜索", "icon": "🔍",
