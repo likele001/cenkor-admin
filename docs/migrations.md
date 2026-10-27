@@ -665,3 +665,119 @@ git add -A --dry-run | grep -E 'versions/(crm|erp|mes|commerce)/|schema\.sql'
 | 从 GitHub clone 后 `ext/` 文件数 | 7（全部公开） |
 | 模拟新增 `versions/erp/fake.py` 后 `git add -A` | 零产出 |
 | 公开链 head | `20261014_124200_schema_versions`（唯一） |
+
+---
+
+## 14. 数据库兼容性边界：仅 PostgreSQL（2026-10-27）
+
+README 曾写「兼容 MySQL 5.7+（CI 双库验证）」，与事实不符，已更正。本节保留结论与依据，
+避免以后有人误以为改几行配置就能换库。
+
+### 14.1 结论
+
+| 项 | 状态 |
+|---|---|
+| PostgreSQL 16 | ✅ 生产 16.10，CI 用 `postgres:16-alpine` |
+| MySQL / MariaDB | ❌ **不支持**，从迁移链第 1 步就失败 |
+
+### 14.2 为什么跑不了
+
+用 MySQL 方言离线执行迁移（不需要真实连库，编译期就会炸）：
+
+```bash
+CENKOR_DATABASE_URL='mysql+pymysql://u:p@127.0.0.1:3306/x' \
+  alembic upgrade heads --sql
+```
+
+```
+sqlalchemy.exc.CompileError:
+  (in table 'cms_products', column 'features'):
+  Compiler can't render element of type JSONB
+```
+
+`cms_products` 出自 `core/20260107_0001_initial.py` —— 迁移链**第 1 步**。
+
+### 14.3 不兼容特性清单
+
+| 特性 | 用在哪 | MySQL 现状 |
+|---|---|---|
+| `JSONB` | 21 个列，分布在 12 个公开迁移 | 只有 `JSON`，无 `JSONB` |
+| `TIMESTAMPTZ` | 1 个迁移 | 只有 `TIMESTAMP` / `DATETIME`，无时区类型 |
+| `TEXT[]` 数组 | ERP schema | 无数组类型 |
+| `DO $$ ... $$` 匿名块 | 三份 `schema.sql` 的约束守卫 | 需 `DELIMITER` + 存储过程 |
+| `to_regclass()` | 跨应用外键守卫 | 无此函数 |
+| `CREATE OR REPLACE VIEW` | ERP 的 20 个视图 | 不支持 `OR REPLACE` |
+| `pg_constraint` | 约束存在性检查 | 对应 `information_schema.TABLE_CONSTRAINTS` |
+| `setval()` / SEQUENCE | 74 个序列 | 8.0 无独立 SEQUENCE 对象 |
+| `ADD CONSTRAINT ... IF NOT EXISTS` | 幂等建表 | MySQL 无此语法 |
+
+仅 `JSONB` 一项就无法用配置绕过 —— 需要把 21 个列的定义改成 `JSON`，
+而这会丢失索引能力（`JSONB` 支持 GIN 索引，MySQL 的 `JSON` 只能建生成列再索引）。
+
+### 14.4 若确实要支持 MySQL
+
+按代价从低到高：
+
+1. **只保留 PG**（当前选择）—— 改 README，删 CI matrix，零代码风险
+2. **降级为「实验性」表述** —— 保留宣传点，但 CI 不会绿，懂行的人一看便知
+3. **真做兼容** —— 21 个 `JSONB` → `JSON`、9 处 `op.execute` 原生 SQL 改双分支、
+   三份 `schema.sql` 重写、CI 加真跑。工作量约 2-3 天，且每一处改动都可能引入回归
+
+### 14.5 CI 侧改动
+
+```diff
+  matrix:
+    db:
+      - name: PostgreSQL
+        image: postgres:16-alpine
+-     - name: MySQL
+-       image: mysql:8.0
+```
+
+同时移除了 `aiomysql` / `pymysql` 依赖，以及迁移与测试步骤里按 `DB_NAME` 分叉的 if/else。
+代码里本来就没有任何 MySQL 驱动引用，删除无副作用。
+
+### 14.6 CI 仍然全红的原因（同批排查）
+
+移除 MySQL 只是消除了一半的必然失败。其余 job 的问题单独记录：
+
+| Job | 状态 | 原因 |
+|---|---|---|
+| Backend (PostgreSQL) | ✗ failure | `ruff check .` 报 **4685** 个错误 |
+| Frontend (portal-web) | ✗ failure | 无 `package-lock.json`，`npm install` 依赖漂移 |
+| Frontend (admin-web) | ⊘ cancelled | 前端 matrix 未设 `fail-fast: false`，被上一个失败连带取消 |
+| Integration | ⊘ skipped | 依赖前两者 |
+
+**ruff 错误分布**（`select = ["E","F","I","N","W","UP","B","C4","SIM","RUF"]`）：
+
+| 规则 | 数量 | 说明 |
+|---|---:|---|
+| RUF002 | 1907 | docstring 里的全角标点 |
+| RUF001 | 1086 | 字符串里的全角标点 |
+| RUF003 | 996 | 注释里的全角标点 |
+| UP031 | 195 | `%` 格式化建议改 f-string |
+| I001 | 146 | import 排序 |
+| UP017 | 63 | `datetime.utcnow()` 建议改 `datetime.UTC` |
+| F401 | 60 | 未使用的 import |
+| 其余 | 200+ | RUF100 / BLE001 / B904 / E701 等 |
+
+中文项目里 RUF001/2/3 共 3989 个是必然的（全角 `，：；` 被判定为「易与 ASCII 混淆」），
+标准做法是在配置里豁免：
+
+```toml
+ignore = ["E501", "B008", "RUF001", "RUF002", "RUF003"]
+```
+
+豁免后剩 696 个，其中 390 个可 autofix（涉及 138 个文件）。
+
+**前端补 lock**：
+
+```bash
+cd frontend/admin-web && npm install --package-lock-only
+cd frontend/portal-web && npm install --package-lock-only
+```
+
+并把 CI 的 `npm install` 改为 `npm ci`，否则 lock 文件形同虚设。
+
+> 结论：README 的「CI 双库验证」不只是 MySQL 的问题 —— 整个 CI 从来没绿过。
+> 移除 MySQL 是必要条件，不是充分条件。
