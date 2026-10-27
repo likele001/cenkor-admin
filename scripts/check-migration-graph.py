@@ -10,11 +10,20 @@
 
 如果把「平台自己的迁移」挂在「闭源链」的正中间，公开仓库被 gitignore 掉闭源部分后，
 那个迁移就成了孤儿，后果是：
-  · 引用到仓库里不存在的 revision  →  alembic upgrade head 直接 KeyError
+  · 引用到仓库里不存在的 revision  →  alembic 直接 KeyError
   · 平白多出一个 head               →  alembic 拒绝执行
 两种都会让「一键部署」表现为「容器全 healthy、数据库一张表都没建」。
 
 本脚本只做四件事：无断链、无重复 revision、head 恰好一个、revision 不超长。
+
+两个迁移图靠「挂载点」接成单 head：
+  · 公开/基础链    ... → 0035_app_publish → gen_inventory（挂载迁移）
+  · 商业应用闭源链  gen_inventory → erp → crm → commerce → 0029（闭源 head）
+新增公开迁移时，必须把挂载迁移（如 gen_inventory）的 down_revision 顺延到新的
+公开 head —— 否则两链各留一个 head，hub 启动的 `alembic upgrade` 会抛
+MultipleHeads，新迁移永远不执行。
+
+完整规则、新增迁移的执行顺序与事故复盘：docs/migrations.md
 
 用法
 ----
@@ -84,9 +93,14 @@ def collect(versions_dir, tracked_only):
     """返回 (maps, files, errors)。"""
     files = []
     if os.path.isdir(versions_dir):
-        for name in sorted(os.listdir(versions_dir)):
-            if name.endswith(".py") and not name.startswith("__"):
-                files.append(os.path.join(versions_dir, name))
+        # 迁移已按应用分到子目录（core / erp / crm / mes / commerce / ext），
+        # 必须递归，否则只在根目录找 .py 会一个都找不到。
+        for root, _dirs, names in os.walk(versions_dir):
+            if "__pycache__" in root:
+                continue
+            for name in sorted(names):
+                if name.endswith(".py") and not name.startswith("__"):
+                    files.append(os.path.join(root, name))
 
     if tracked_only:
         try:
@@ -203,8 +217,9 @@ def main():
         for h in heads:
             print("    - %s  (%s)" % (h, revs.get(h, "?")))
         print()
-        print("  可能原因：两条互不相交的迁移链同时存在（典型是闭源链与公开链各一个 head）。")
-        print("  修法：把公开链的 head 挂到闭源链的尾端，或反之。")
+        print("  可能原因：公开链新增了迁移，但没把闭源链的挂载点（如")
+        print("  gen_inventory.down_revision）顺延到新的公开 head。")
+        print("  修法：把挂载迁移改挂到最新公开迁移上；公开迁移不要依赖闭源 revision。")
         print()
 
     if ok:
