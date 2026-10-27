@@ -561,3 +561,107 @@ export CENKOR_DATABASE_URL="postgresql+psycopg2://cenkor:口令@127.0.0.1:5432/�
   意味着回退到旧版本不会删应用表。这是有意的 —— 删数据比不删危险。
 - **`pay_channels_bak_leakfix20260925`** 是 2026-09 一次泄漏修复留下的手工备份表，
   还躺在生产库里，与本次改造无关，观察期后单独清理。
+
+---
+
+## 13. 闭源隔离：.gitignore 规则（2026-10-27）
+
+迁移按应用分入子目录后，原有的一条规则失效了：
+
+```gitignore
+backend/alembic/versions/2026*_mes_*.py   # 老的扁平布局，文件移进 mes/ 后匹配不到
+```
+
+结果 40 个闭源迁移重新暴露在 `git add -A` 的扫描范围内 —— 这些文件含完整的
+ERP / MES / CRM 表结构，一次误提交就是商业实现外泄。
+
+### 13.1 当前规则
+
+```gitignore
+# 整目录闭源
+backend/alembic/versions/crm/
+backend/alembic/versions/erp/
+backend/alembic/versions/mes/
+
+# 混合目录：默认屏蔽，! 反选回平台级公开迁移
+backend/alembic/versions/commerce/*
+!backend/alembic/versions/commerce/20261007_0028_product_axis.py
+!backend/alembic/versions/commerce/20261009_0030_app_intro.py
+!backend/alembic/versions/commerce/20261010_0031_dev_method.py
+
+# ext/ 逐个登记（7 公开 : 4 闭源）
+backend/alembic/versions/ext/20260924_0025_cloud.py
+backend/alembic/versions/ext/20260925_0027_workflow.py
+backend/alembic/versions/ext/20261020_0035_app_publish.py
+backend/alembic/versions/ext/20261027_0100_app_schema.py
+
+# 应用自带 schema，双保险
+backend/src/cenkor_admin/apps/*/schema.sql
+```
+
+`apps/{crm,erp,mes}/` 整目录在更早的规则里已经屏蔽（第 67、68、83 行），无需重复。
+
+### 13.2 三个必须知道的细节
+
+**1. `.gitignore` 对已跟踪文件无效。**
+
+```bash
+git add -f <file>              # 强制加入，忽略规则形同虚设
+git rm -r --cached <path>      # 已经进过索引的，必须先这样退出索引
+```
+
+`git ls-tree -r HEAD` 里的文件不受任何 ignore 规则约束。判断有没有闭源文件已经被
+跟踪，用这一条：
+
+```bash
+git ls-tree -r HEAD --name-only | while read f; do
+  git check-ignore -q "$f" && echo "已跟踪却被忽略: $f"
+done
+```
+
+输出为空才安全。
+
+**2. 目录被整体排除时，`!` 反选不生效。**
+
+```gitignore
+backend/alembic/versions/commerce/      # ✗ 父目录被排除，下面的 ! 全部失效
+!backend/alembic/versions/commerce/xxx.py
+```
+
+必须写成 `commerce/*`（排除目录内的条目，但目录本身仍可进入），反选才起作用。
+
+**3. `--tracked-only` 自检是技术兜底，不是替代品。**
+
+`.githooks/pre-commit` 会跑 `scripts/check-migration-graph.py --tracked-only`，
+校验的是**暂存区**里的迁移能否闭合。它能抓住「公开迁移依赖闭源 revision」
+（表现为 `✗ 断链：xxx 缺失的 down = yyy`），但抓不住「闭源迁移被误提交且拓扑自洽」。
+
+所以两类机制要同时存在：`.gitignore` 负责堵源头，自检负责兜语义。
+
+### 13.3 新增迁移时怎么做
+
+| 类型 | 操作 |
+|---|---|
+| 公开迁移 | 直接放在 `core/` 或 `ext/`（`commerce/` 需确认不在屏蔽名单） |
+| 闭源迁移 | 放 `crm/` `erp/` `mes/` 自动屏蔽；放 `ext/` 必须往 `.gitignore` 追加一行 |
+
+提交前自查：
+
+```bash
+git add -A --dry-run | grep -E 'versions/(crm|erp|mes|commerce)/|schema\.sql'
+# 输出为空才提交
+```
+
+### 13.4 实测记录
+
+| 检查项 | 结果 |
+|---|---|
+| 46 个闭源文件中被忽略 | 43 个（另 3 个是公开的 commerce 迁移，符合预期） |
+| HEAD 已跟踪文件误中忽略规则 | 0 |
+| `git add -A` 在迁移目录的产出 | 0 |
+| 从 GitHub clone 后 `apps/{crm,erp,mes}` 目录数 | 0 |
+| 从 GitHub clone 后 `versions/{crm,erp,mes}` 目录数 | 0 |
+| 从 GitHub clone 后 `commerce/` 文件数 | 3（全部公开） |
+| 从 GitHub clone 后 `ext/` 文件数 | 7（全部公开） |
+| 模拟新增 `versions/erp/fake.py` 后 `git add -A` | 零产出 |
+| 公开链 head | `20261014_124200_schema_versions`（唯一） |
