@@ -84,8 +84,8 @@ class Settings(BaseSettings):
         return keys
 
     # ---- 数据库 ----
-    DATABASE_URL: str = "postgresql+asyncpg://cenkor:li123456@localhost:5432/cenkor"
-    DATABASE_URL_SYNC: str = "postgresql+psycopg2://cenkor:li123456@localhost:5432/cenkor"
+    DATABASE_URL: str = "postgresql+asyncpg://cenkor:change-me-in-env@localhost:5432/cenkor"
+    DATABASE_URL_SYNC: str = "postgresql+psycopg2://cenkor:change-me-in-env@localhost:5432/cenkor"
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_ECHO: bool = False

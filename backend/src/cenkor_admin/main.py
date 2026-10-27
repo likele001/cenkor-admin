@@ -37,16 +37,38 @@ async def lifespan(app: FastAPI):
 
     # 启动时自动应用所有待执行的数据库迁移
     # 安装 App 时拷贝的迁移文件会在下次重启时自动生效
+    # 用 "heads" 而非 "head"：公开链与商业应用闭源链靠挂载点串成单 head，
+    # 万一挂载点漏顺延出现双 head，heads 仍能各升各的；"head" 会抛 MultipleHeads 整条失败。
     try:
         from alembic.config import Config
         from alembic import command
         _alembic_cfg = Config(Path(__file__).resolve().parent.parent.parent / "alembic.ini")
-        command.upgrade(_alembic_cfg, "head")
+        command.upgrade(_alembic_cfg, "heads")
         log.info("migration.ok")
     except Exception as e:
         # 迁移失败意味着数据表可能缺失：服务虽能起来，但接口会大面积报错，
         # 必须显式告警（error 级，而非静默的 warning），以便日志告警规则能捕获。
         log.error("migration.fail", error=str(e), hint="数据表可能未创建，接口可能大面积失败")
+
+    # 应用自带的 schema.sql（方案 D / 2026-10-27）
+    # crm / erp / mes 的表已从 alembic 主链剥离，改由各应用目录下的 schema.sql 创建。
+    # 幂等执行：checksum 没变就跳过；CENKOR_APPS 控制装哪些
+    # （未设置=全部内置，空字符串=只有核心表，逗号分隔=指定）。
+    # 必须在迁移之后、install_app 之前 —— install_app 要注册 content_types，依赖表存在。
+    try:
+        from cenkor_admin.apps.system.app_registry import scan_app_manifests as _scan_apps
+        from cenkor_admin.core.app_schema import sync_builtin_apps, summarize
+
+        _apps_dir = Path(__file__).resolve().parent / "apps"
+        _results = sync_builtin_apps(_apps_dir, _scan_apps())
+        log.info("app.schema.sync", detail=summarize(_results))
+        _failed = [r.key for r in _results if r.status == "failed"]
+        if _failed:
+            # 单个应用建表失败不该拖垮整个平台，但必须显式告警，
+            # 否则接口大面积 500 时无从查起。
+            log.error("app.schema.partial_fail", keys=_failed)
+    except Exception as e:  # noqa: BLE001
+        log.error("app.schema.sync_fail", error=str(e), hint="应用表可能缺失")
 
     try:
         await redis_client.ping()
