@@ -134,3 +134,13 @@ backend/alembic/versions/2026*_cloud*.py
 # 同名双份 App 的备份区（把陈旧副本挪出导入路径用，内容仍是闭源应用源码，绝不入库）
 backend/.stale-apps/
 _rollback_bak_20261014/20261014_124126_create_inventory.py
+
+# ============ 回滚备份 / 构建产物副本（不入库） ============
+_rollback_bak_*/
+*.bak
+*.bak_*
+*.bak.*
+*.before
+*.before.*
+*.orig
+dist.bak.*/
