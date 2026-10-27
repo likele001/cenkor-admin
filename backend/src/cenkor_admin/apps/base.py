@@ -47,6 +47,13 @@ class AppManifest:
     categories_seed: list[dict[str, Any]] = field(default_factory=list)
     public_routes_prefix: str = ""
 
+    # ---- 数据 schema（方案 D / 2026-10-27）----
+    # True：本 App 的表由 apps/<key>/schema.sql 管理，alembic 主链不再建这些表，
+    #       也不把它们纳入 diff。新部署靠启动流程执行 schema.sql。
+    # 开启前必须先把该 App 的历史迁移改成 no-op（保留 revision 占位以维持链完整）。
+    schema_managed: bool = False
+    schema_file: str = "schema.sql"
+
     # ---- 插件框架（M1·P0）----
     # 声明本 App 提供的钩子模块（dotted path），启动时自动 import 并注册其 @hook 处理器。
     # 缺省会尝试 cenkor_admin.apps.{key}.hooks。

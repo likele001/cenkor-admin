@@ -9,6 +9,10 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "20261014_124126_gen_inventory"
+# 本条是「闭源/商业应用链」的挂载点：闭源链从本节点继续（erp → crm → commerce → 0029）。
+# 公开链每新增一条迁移，必须把它顺延到新的公开 head —— 否则公开链与闭源链
+# 各留一个 head，hub 启动的 alembic upgrade 会抛 MultipleHeads，新迁移永远不执行。
+# 20261020_0035 就是漏了这一步导致门户目录 500 的直接原因。
 down_revision = "20261018_0034_upgrade_notes"
 branch_labels = None
 depends_on = None
