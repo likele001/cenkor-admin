@@ -45,6 +45,17 @@ class AppSubmission(Base):
     manifest_data: Mapped[Any] = mapped_column(json_column(), nullable=True)  # manifest 解析后的数据
     file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)  # ZIP 文件路径
     file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)  # SHA256
+    # manifest v2 契约快照：数据契约版本 / 宿主最低版本 / 本版更新日志。
+    # 门户与实例侧都据此判断「这个包能不能装进我这台宿主」。
+    schema_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    min_core_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    changelog: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 审核与上架分离：审核通过（status=published）不等于自动上架，
+    # published_at 有值且 yanked_at 为空才出现在目录/可下载。
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    yanked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), default="pending", index=True
     )  # pending / approved / rejected / installed
@@ -60,6 +71,16 @@ class AppSubmission(Base):
     __table_args__ = (
         UniqueConstraint("product", "app_key", "version", name="uq_app_submission_product_key_version"),
     )
+
+    @property
+    def is_yanked(self) -> bool:
+        """已撤回上架：只阻止新下载/新安装，已装实例不受影响。"""
+        return self.yanked_at is not None
+
+    @property
+    def is_published(self) -> bool:
+        """可对外分发：审核通过或已上架，且未被撤回。"""
+        return self.status in ("approved", "published", "installed") and not self.is_yanked
 
 
 class AppIntro(Base):

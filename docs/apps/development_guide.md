@@ -228,6 +228,11 @@ class MyItem(Base):
 
 ## 六、数据库迁移
 
+> 迁移图分公开链与商业应用闭源链，靠挂载点串联。**会进开源仓库的迁移必须插在
+> 挂载点 `gen_inventory` 之前**；`alembic revision --autogenerate` 生成的
+> `down_revision` 默认是当前 head（闭源部署里是闭源 head），必须手工改成公开 revision。
+> 完整规则与执行顺序见 [migrations.md](../migrations.md)。
+
 ### 6.1 创建迁移文件
 
 ```bash

@@ -156,7 +156,8 @@ def baseline_row(cur, product: str, key: str):
 
 def existing_row(cur, product: str, key: str, version: str):
     cur.execute(
-        """select id, status, file_hash, file_path, developer_id
+        """select id, status, file_hash, file_path, developer_id,
+                  published_at, schema_version, min_core_version, changelog
            from app_submissions where product=%s and app_key=%s and version=%s""",
         (product, key, version),
     )
@@ -203,9 +204,24 @@ def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str,
               f"dev_method={base[2]} icon={base[6]} category={base[7]}")
     developer_id = base[0]
 
+    schema_version = man.get("schema_version")
+    min_core_version = man.get("min_core_version")
+    changelog = man.get("changelog")
+
     row = existing_row(cur, product, key, version)
-    if row and row[2] == file_hash and row[1] in ("approved", "installed"):
-        return f"OK   {key} {product}@{version} 已发布且内容一致（id={row[0]}），跳过"
+    # 0035 起「审核通过」与「上架」分离：目录只认 published_at 非空的行。
+    # 老版本脚本只写 status=approved，新包会审核通过却不出现在商店，所以这里连同
+    # manifest v2 契约字段一起补齐；已上架且内容一致的才跳过。
+    if (
+        row
+        and row[2] == file_hash
+        and row[1] in ("approved", "installed")
+        and row[5] is not None
+        and row[6] == schema_version
+        and row[7] == min_core_version
+        and row[8] == changelog
+    ):
+        return f"OK   {key} {product}@{version} 已上架且内容一致（id={row[0]}），跳过"
 
     if not apply:
         action = "更新已有行" if row else "新增行"
@@ -230,11 +246,14 @@ def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str,
                 """update app_submissions
                    set file_path=%s, file_hash=%s, manifest_data=%s::json,
                        status='approved', reviewed_at=now(), review_note=%s,
+                       schema_version=%s, min_core_version=%s, changelog=%s,
+                       published_at=COALESCE(published_at, now()),
                        updated_at=now()
                    where id=%s""",
                 (
                     target_zip, file_hash, manifest_json,
-                    f"publish_extension.py 于 {now:%Y-%m-%d %H:%M} 同步发布", row[0],
+                    f"publish_extension.py 于 {now:%Y-%m-%d %H:%M} 同步发布",
+                    schema_version, min_core_version, changelog, row[0],
                 ),
             )
             note = f"UPDATE id={row[0]}"
@@ -243,13 +262,16 @@ def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str,
                 """insert into app_submissions
                    (developer_id, product, dev_method, app_key, name, version, description,
                     icon, category, manifest_data, file_path, file_hash, status,
+                    schema_version, min_core_version, changelog, published_at,
                     review_note, reviewed_at, updated_at)
-                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::json,%s,%s,'approved',%s,now(),now())""",
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::json,%s,%s,'approved',
+                           %s,%s,%s,now(),%s,now(),now())""",
                 (
                     developer_id, product, base[2], key, base[4] or man.get("name", key), version,
                     base[5] if base[5] is not None else man.get("description"),
                     base[6] or man.get("icon", "📦"), base[7] or man.get("category", "system"),
                     manifest_json, target_zip, file_hash,
+                    schema_version, min_core_version, changelog,
                     f"publish_extension.py 于 {now:%Y-%m-%d %H:%M} 发布",
                 ),
             )

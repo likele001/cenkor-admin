@@ -17,7 +17,7 @@ cd ../portal-web && npm ci && npm run build
 
 echo "▸ 数据库迁移..."
 cd ../../backend
-PYTHONPATH=src alembic upgrade head
+PYTHONPATH=src alembic upgrade heads
 PYTHONPATH=src python3 -m cenkor_admin.scripts.seed || true
 
 echo "▸ 安装 systemd units..."

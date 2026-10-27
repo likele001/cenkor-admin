@@ -132,7 +132,7 @@ bash scripts/deploy-baota-static.sh
 
 ```bash
 docker compose -f docker-compose.baota-static.yml --env-file .env.prod up -d
-docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade head
+docker compose -f docker-compose.baota-static.yml exec -T backend alembic upgrade heads
 docker compose -f docker-compose.baota-static.yml exec -T backend python -m cenkor_admin.scripts.seed
 ```
 

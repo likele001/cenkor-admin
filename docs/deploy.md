@@ -399,14 +399,16 @@ bash scripts/build-frontends.sh
 
 ### 6.3 数据库迁移
 
-**通常不需要手动跑** —— 后端启动时 lifespan 会自动执行 `alembic upgrade head`。
+> 两条链、挂载点、新增迁移的执行顺序与排障，见 [migrations.md](migrations.md)。
+
+**通常不需要手动跑** —— 后端启动时 lifespan 会自动执行 `alembic upgrade heads`（迁移图含公开链与商业应用闭源链）。
 
 手动执行（在宿主机、用生产 venv）：
 
 ```bash
 cd /www/wwwroot/cenkor-admin/backend
 APP_ENV=production PYTHONPATH=src \
-  /www/server/pyporject_evn/cenkor/bin/python3 -m alembic upgrade head
+  /www/server/pyporject_evn/cenkor/bin/python3 -m alembic upgrade heads
 ```
 
 查看当前版本：

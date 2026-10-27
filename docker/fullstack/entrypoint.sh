@@ -1,7 +1,7 @@
 #!/bin/sh
 # Cenkor Admin · 后端容器入口
 #
-#   1. 应用数据库迁移（alembic upgrade head）
+#   1. 应用数据库迁移（alembic upgrade heads：公开链 + 商业应用链）
 #   2. 首次启动自动灌入种子数据（幂等，已存在即跳过）→ 管理员初始口令打印在容器日志里
 #
 # 关闭方式：
@@ -13,8 +13,8 @@
 set -e
 
 if [ "${SKIP_MIGRATE:-0}" != "1" ]; then
-  echo "[entrypoint] 应用数据库迁移：alembic upgrade head"
-  alembic upgrade head || echo "[entrypoint] 迁移未成功，交由应用内 lifespan 重试"
+  echo "[entrypoint] 应用数据库迁移：alembic upgrade heads"
+  alembic upgrade heads || echo "[entrypoint] 迁移未成功，交由应用内 lifespan 重试"
 fi
 
 case "${1:-}" in

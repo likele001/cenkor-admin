@@ -105,7 +105,7 @@ docker compose -f docker-compose.fullstack.yml up -d --build
 | 阶段 | 由谁完成 |
 |---|---|
 | 拉取/构建镜像；拉起 PostgreSQL / Redis / MinIO（含健康检查） | `docker compose` |
-| 数据库迁移 `alembic upgrade head` | 容器入口 `docker/fullstack/entrypoint.sh` |
+| 数据库迁移 `alembic upgrade heads` | 容器入口 `docker/fullstack/entrypoint.sh` |
 | 灌入种子数据（幂等）→ 打印管理员初始口令 | 同上 |
 | 构建三个前端（各自内置 Nginx 托管 dist、反代 `/api` 到 `backend:8000`） | 镜像构建阶段 |
 

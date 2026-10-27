@@ -122,13 +122,13 @@ jobs:
           cd backend
           if [ "$DB_NAME" = "PostgreSQL" ]; then
             DATABASE_URL_SYNC="postgresql+psycopg2://cenkor:test_pwd@localhost:5432/cenkor_test" \
-            alembic upgrade head
+            alembic upgrade heads
           else
             apt-get update -qq && apt-get install -y -qq default-mysql-client > /dev/null
             mysql -h 127.0.0.1 -P 3306 -u root -proot_pwd -e \
               "CREATE DATABASE IF NOT EXISTS cenkor_test; GRANT ALL ON cenkor_test.* TO 'cenkor'@'%'; FLUSH PRIVILEGES;"
             DATABASE_URL_SYNC="mysql+pymysql://cenkor:test_pwd@127.0.0.1:3306/cenkor_test" \
-            alembic upgrade head
+            alembic upgrade heads
           fi
 
       - name: Run tests

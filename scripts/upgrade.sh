@@ -13,7 +13,7 @@
 #
 # Docker 部署请勿用本脚本，改用：
 #   docker compose -f docker-compose.baota.yml pull && \
-#   docker compose -f docker-compose.baota.yml up -d   （启动会自动 alembic upgrade head）
+#   docker compose -f docker-compose.baota.yml up -d   （启动会自动 alembic upgrade heads）
 # =============================================================
 set -euo pipefail
 
@@ -124,8 +124,8 @@ info "pip install -r backend/requirements.txt …"
   || warn "依赖安装报错，若为已满足依赖可忽略"
 
 # ---------- 4. 数据库迁移（启动也会自动跑，这里提前跑以便暴露错误）----------
-info "alembic upgrade head …"
-( cd backend && PYTHONPATH=src "$PYBIN" -m alembic upgrade head ) \
+info "alembic upgrade heads …"
+( cd backend && PYTHONPATH=src "$PYBIN" -m alembic upgrade heads ) \
   || die "迁移失败！数据库可能需回滚：$BACKUP_DIR/pg_${STAMP}.sql.gz"
 
 # ---------- 5. 重启后端 ----------

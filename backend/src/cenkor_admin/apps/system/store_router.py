@@ -5,6 +5,7 @@ import hashlib
 import json
 import io
 import os
+import re
 import shutil
 import tempfile
 import uuid
@@ -19,7 +20,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.api.deps import require_permission
+from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.portal import models as portal_models
 from cenkor_admin.apps.system import pricing_bridge
@@ -199,6 +200,195 @@ def _ver_key(sub: store_models.AppSubmission) -> tuple:
     return (ver_tuple(sub.version), sub.id or 0)
 
 
+# ============================================================
+# manifest v2 发布校验（与实例侧 extension_host/manifest.py 同源）
+# ============================================================
+
+KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$")
+TABLE_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+RETENTIONS = {"keep", "ask"}
+TABLE_MODES = {"own", "read", "write"}
+
+# 包内迁移一旦出现这些形态直接 400：实例侧重装会重跑迁移，破坏性 DDL 等于删客户数据
+MIG_BLOCK_RES = [
+    (re.compile(r"\bdrop\s+table\b", re.I), "DROP TABLE"),
+    (re.compile(r"\btruncate\b", re.I), "TRUNCATE"),
+    (re.compile(r"\brename\s+(?:table|column)\b", re.I), "RENAME"),
+    (re.compile(r"\balter\s+table\b[^\"']*\bdrop\b", re.I), "ALTER ... DROP"),
+    (re.compile(r"\balter\s+table\b[^\"']*\b(?:modify|change)\b", re.I), "ALTER 改列类型"),
+]
+ZIP_BLOCK_PARTS = {"__MACOSX", ".git", "node_modules", "__pycache__", ".state"}
+ZIP_BLOCK_SUFFIX = (".bak", ".pyc", ".pyo", ".orig", ".rej", ".swp")
+
+
+def _semver_ok(value: Any) -> bool:
+    return bool(SEMVER_RE.match(str(value or "").strip()))
+
+
+def manifest_is_v2(data: dict[str, Any]) -> bool:
+    """v2 = 显式 manifest_version>=2、或声明了 schema_version（与宿主推断一致）。"""
+    try:
+        if int(data.get("manifest_version") or 0) >= 2:
+            return True
+    except (TypeError, ValueError):
+        return True
+    try:
+        return int(data.get("schema_version") or 0) >= 1
+    except (TypeError, ValueError):
+        return True
+
+
+def validate_manifest_v2(
+    app_key: str, data: dict[str, Any], product: str, dev_method: str
+) -> list[str]:
+    """发布前把宿主会拒装的 v2 包挡在 400：写错了不该等到客户实例上才炸。"""
+    errs: list[str] = []
+    if not KEY_RE.match(app_key):
+        errs.append(f"key 不符合 ^[a-z][a-z0-9_]{{1,63}}$：{app_key}")
+    version = str(data.get("version") or "")
+    if not _semver_ok(version):
+        errs.append(f"version 不是 semver：{version!r}")
+    min_core = data.get("min_core_version")
+    if min_core is not None and not _semver_ok(min_core):
+        errs.append(f"min_core_version 不是 semver：{min_core!r}")
+    if data.get("max_core_version") is not None and not _semver_ok(data.get("max_core_version")):
+        errs.append(f"max_core_version 不是 semver：{data.get('max_core_version')!r}")
+    try:
+        if int(data.get("schema_version") or 0) < 1:
+            errs.append("schema_version 必须是 >=1 的整数")
+    except (TypeError, ValueError):
+        errs.append(f"schema_version 不是整数：{data.get('schema_version')!r}")
+    if (data.get("product") or product) != product:
+        errs.append(f"manifest.product（{data.get('product')}）与提交产品（{product}）不一致")
+    if (data.get("dev_method") or dev_method) != dev_method:
+        errs.append(f"manifest.dev_method（{data.get('dev_method')}）与提交方式（{dev_method}）不一致")
+
+    perms = data.get("permissions") or []
+    if not isinstance(perms, list):
+        errs.append("permissions 必须是数组")
+        perms = []
+    seen: set[str] = set()
+    for item in perms:
+        code = str((item or {}).get("code") or "") if isinstance(item, dict) else ""
+        if not code:
+            errs.append(f"permission 缺 code：{item!r}")
+            continue
+        if not code.startswith(f"ext.{app_key}."):
+            errs.append(f"权限码越界：{code} 必须以 ext.{app_key}. 开头")
+        if code in seen:
+            errs.append(f"权限码重复：{code}")
+        seen.add(code)
+
+    menus = data.get("menus") or []
+    if not isinstance(menus, list):
+        errs.append("menus 必须是数组")
+        menus = []
+    for m in menus:
+        if not isinstance(m, dict):
+            errs.append(f"menu 必须是对象：{m!r}")
+            continue
+        path = str(m.get("path") or "")
+        slug = app_key.replace("_", "-")
+        if not path.startswith("/ext/"):
+            errs.append(f"菜单路径越界：{path!r} 必须以 /ext/ 开头")
+        elif not path.startswith((f"/ext/{app_key}", f"/ext/{slug}")):
+            errs.append(f"菜单路径越界：{path!r} 必须以 /ext/{app_key} 或 /ext/{slug} 开头")
+        perm = m.get("permission")
+        if perm and perm not in seen:
+            errs.append(f"菜单权限 {perm} 未在 permissions 里声明")
+
+    data_block = data.get("data") or {}
+    if data_block and not isinstance(data_block, dict):
+        errs.append("data 必须是对象")
+        data_block = {}
+    retention = str(data_block.get("retention") or "keep")
+    if retention not in RETENTIONS:
+        errs.append(f"data.retention 只允许 keep/ask（彻底清除永远由用户二次确认），得到 {retention!r}")
+    tables = data_block.get("tables") or []
+    if not isinstance(tables, list):
+        errs.append("data.tables 必须是数组")
+        tables = []
+    own: set[str] = set()
+    for t in tables:
+        if not isinstance(t, dict):
+            errs.append(f"data.tables 项必须是对象：{t!r}")
+            continue
+        name = str(t.get("name") or "")
+        mode = str(t.get("mode") or "")
+        if not TABLE_RE.match(name):
+            errs.append(f"表名非法：{name!r}")
+            continue
+        if mode not in TABLE_MODES:
+            errs.append(f"表 {name} 的 mode 只允许 own/read/write，得到 {mode!r}")
+        if mode == "own":
+            if not name.startswith("ext_"):
+                errs.append(f"自有表 {name} 必须以 ext_ 开头（核心表不允许声明为 own）")
+            if name in own:
+                errs.append(f"自有表重复声明：{name}")
+            own.add(name)
+
+    deps = data.get("dependencies") or []
+    if not isinstance(deps, list):
+        errs.append("dependencies 必须是数组")
+    else:
+        for d in deps:
+            if not isinstance(d, str) or not KEY_RE.match(d):
+                errs.append(f"依赖项必须是扩展 key（小写+下划线）：{d!r}")
+
+    tasks = data.get("tasks") or {}
+    if tasks and not isinstance(tasks, dict):
+        errs.append("tasks 必须是对象")
+    return errs
+
+
+def scan_package(names: list[str], reader) -> dict[str, Any]:
+    """静态扫描包内迁移与脏文件，供审核页展示（不执行任何代码）。"""
+    blocked: list[str] = []
+    dirty: list[str] = []
+    migrations: list[str] = []
+    for name in names:
+        parts = set(name.split("/"))
+        if parts & ZIP_BLOCK_PARTS or name.endswith(ZIP_BLOCK_SUFFIX):
+            dirty.append(name)
+            continue
+        low = name.lower()
+        if low == "migrations.sql" or (low.endswith("/migrations.sql") and low.count("/") == 1):
+            migrations.append(name)
+            text = reader(name).decode("utf-8", errors="replace")
+            for rx, label in MIG_BLOCK_RES:
+                if rx.search(text):
+                    blocked.append(f"{name}: {label}")
+        elif low.endswith(".py") and (
+            low.startswith("migrations/") or "/migrations/" in low
+        ):
+            migrations.append(name)
+            text = reader(name).decode("utf-8", errors="replace")
+            for rx, label in MIG_BLOCK_RES:
+                if rx.search(text):
+                    blocked.append(f"{name}: {label}")
+            if "def apply(" not in text:
+                blocked.append(f"{name}: 迁移文件缺少 apply(db, ctx)")
+    return {
+        "migrations": sorted(migrations),
+        "blocked": sorted(set(blocked)),
+        "dirty_files": sorted(dirty)[:50],
+        "ok": not blocked and not dirty,
+    }
+
+
+def _require_any(*codes: str):
+    """任一权限码通过即可（用于兼容旧码 store:review 与新码 app.store.*）。"""
+    from cenkor_admin.api.deps import user_has_permission
+
+    async def checker(user: auth_models.User = Depends(get_current_user)) -> auth_models.User:
+        if not any(user_has_permission(user, c) for c in codes):
+            raise HTTPException(403, f"无权限：需要 {list(codes)} 之一")
+        return user
+
+    return checker
+
+
 async def _installed_map(db: AsyncSession) -> dict[str, str]:
     """平台已安装应用：{app_key: version}"""
     rows = (
@@ -247,7 +437,14 @@ async def public_store_apps(
     stmt = (
         select(store_models.AppSubmission, store_models.Developer.display_name)
         .join(store_models.Developer, store_models.AppSubmission.developer_id == store_models.Developer.id)
-        .where(store_models.AppSubmission.status.in_(["approved", "installed"]))
+        .where(store_models.AppSubmission.status.in_(["approved", "published", "installed"]))
+        .where(store_models.AppSubmission.yanked_at.is_(None))
+        # 上架才是对外可见的开关：审核通过(approved)但未上架(published_at 为空)不进目录。
+        # 已安装行永远可见（老客户要能看到自己装着什么），撤回上架(yanked)则直接隐藏。
+        .where(
+            (store_models.AppSubmission.published_at.is_not(None))
+            | (store_models.AppSubmission.status == "installed")
+        )
         .where(store_models.Developer.status == "active")
     )
     if product:
@@ -274,6 +471,18 @@ async def public_store_apps(
         showcase = SHOWCASE.get(s.app_key, {})
         intro = intros.get((s.product, s.app_key))
         installed_version = installed.get(s.app_key)
+        versions = [
+            {
+                "version": r[0].version,
+                "status": r[0].status,
+                "published_at": _stamp(r[0].published_at),
+                "changelog": r[0].changelog,
+                "schema_version": r[0].schema_version,
+                "min_core_version": r[0].min_core_version,
+                "yanked": r[0].is_yanked,
+            }
+            for r in sorted(grouped.get(s.app_key, []), key=lambda x: _ver_key(x[0]), reverse=True)
+        ]
         all_items.append({
             "id": s.id,
             "key": s.app_key,
@@ -298,6 +507,13 @@ async def public_store_apps(
             "has_update": bool(installed_version and ver_gt(s.version, installed_version)),
             "updated_at": _stamp(s.updated_at),
             # None = 免费 / 未定价（前端据此展示「免费」）
+            # manifest v2 契约：实例侧按 min_core_version 判「能不能装」，
+            # 按 schema_version 判「要不要跑升级迁移」；changelog 供更新弹窗展示。
+            "schema_version": s.schema_version,
+            "min_core_version": s.min_core_version,
+            "changelog": s.changelog,
+            "published_at": _stamp(s.published_at),
+            "versions": versions,
             "price": prices.get(s.app_key),
         })
 
@@ -362,7 +578,12 @@ async def public_store_app_detail(
         select(store_models.AppSubmission, store_models.Developer)
         .join(store_models.Developer, store_models.AppSubmission.developer_id == store_models.Developer.id)
         .where(store_models.AppSubmission.app_key == app_key)
-        .where(store_models.AppSubmission.status.in_(["approved", "installed"]))
+        .where(store_models.AppSubmission.status.in_(["approved", "published", "installed"]))
+        .where(store_models.AppSubmission.yanked_at.is_(None))
+        .where(
+            (store_models.AppSubmission.published_at.is_not(None))
+            | (store_models.AppSubmission.status == "installed")
+        )
         .where(store_models.Developer.status == "active")
         .order_by(store_models.AppSubmission.id.desc())
     )
@@ -385,8 +606,11 @@ async def public_store_app_detail(
         {
             "version": s.version,
             "status": s.status,
-            "released_at": _stamp(s.reviewed_at or s.created_at),
+            "released_at": _stamp(s.published_at or s.reviewed_at or s.created_at),
             "download_count": s.download_count,
+            "changelog": s.changelog,
+            "schema_version": s.schema_version,
+            "min_core_version": s.min_core_version,
             "is_current": s.id == latest.id,
         }
         for s, _dev in ordered
@@ -439,6 +663,9 @@ async def public_store_app_detail(
         "permission_count": len(permissions),
         "menu_count": len(menus),
         "min_platform_version": manifest.get("min_platform_version"),
+        "min_core_version": latest.min_core_version or manifest.get("min_core_version"),
+        "schema_version": latest.schema_version or manifest.get("schema_version"),
+        "changelog": latest.changelog or manifest.get("changelog"),
         "dependencies": manifest.get("dependencies") or [],
         "versions": history,
         "install_hint": "管理员可在「系统 → 应用管理」中安装或升级该应用",
@@ -539,11 +766,100 @@ async def list_submissions(
              "dev_method": s.dev_method or ("platform" if (s.product or "cenkor-admin") == "cenkor-admin" else "extension"),
              "author": author,
              "download_count": s.download_count,
+             # 上架/撤回与 manifest v2 契约：审核页与开发者中心据此展示状态与兼容性
+             "schema_version": s.schema_version,
+             "min_core_version": s.min_core_version,
+             "changelog": s.changelog,
+             "published_at": _stamp(s.published_at),
+             "yanked_at": _stamp(s.yanked_at),
+             "is_published": s.is_published,
+             "file_hash": s.file_hash,
              "created_at": s.created_at.isoformat() if s.created_at else None,
              "reviewed_at": s.reviewed_at.isoformat() if s.reviewed_at else None}
             for s, author in rows
         ],
         "total": count,
+    }
+
+
+@router.post("/submissions/precheck")
+async def precheck_package(
+    file: UploadFile = File(...),
+    app_key: str = Form(""),
+    product: str = Form("cenkor-admin"),
+    dev_method: str = Form("extension"),
+    db: AsyncSession = Depends(get_db),
+    auth: dict = Depends(require_portal_or_admin),
+):
+    """上传前体检：manifest 摘要 + 迁移静态扫描 + 包 SHA256。
+
+    与 submit_app 用同一套校验函数，所以「这里绿了、提交被 400」不会发生；
+    开发者不必先提交一次再回来读报错。
+    """
+    if not file.filename or not file.filename.endswith(".zip"):
+        raise HTTPException(400, "请上传 ZIP 文件")
+    content = await file.read(MAX_APP_UPLOAD_BYTES + 1)
+    if len(content) > MAX_APP_UPLOAD_BYTES:
+        raise HTTPException(413, "应用包过大")
+    sha256 = hashlib.sha256(content).hexdigest()
+    try:
+        with zipfile.ZipFile(io.BytesIO(content), "r") as zf:
+            names = zf.namelist()
+            manifest_name = next(
+                (n for n in names
+                 if n == "manifest.json" or (n.endswith("/manifest.json") and n.count("/") == 1)),
+                None,
+            )
+            if not manifest_name:
+                raise HTTPException(400, "扩展包缺少 manifest.json")
+            try:
+                manifest = json.loads(zf.read(manifest_name).decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                raise HTTPException(400, "manifest.json 解析失败") from None
+            if not isinstance(manifest, dict):
+                raise HTTPException(400, "manifest.json 结构非法")
+            scan = scan_package(names, zf.read)
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "ZIP 文件损坏") from None
+
+    key = (app_key or str(manifest.get("key") or "")).strip()
+    errors: list[str] = []
+    if key and manifest.get("key") != key:
+        errors.append(f"manifest.key（{manifest.get('key')}）与表单 app_key（{key}）不一致")
+    v2 = manifest_is_v2(manifest)
+    if v2:
+        errors += validate_manifest_v2(key or str(manifest.get("key") or ""), manifest, product, dev_method)
+    if not scan["ok"]:
+        errors += scan["blocked"] + scan["dirty_files"][:5]
+
+    perms = [p for p in (manifest.get("permissions") or []) if isinstance(p, dict)]
+    data = manifest.get("data") or {}
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "app_key": manifest.get("key"),
+        "name": manifest.get("name"),
+        "version": manifest.get("version"),
+        "manifest_version": 2 if v2 else 1,
+        "schema_version": manifest.get("schema_version"),
+        "min_core_version": manifest.get("min_core_version"),
+        "product": manifest.get("product") or product,
+        "dev_method": manifest.get("dev_method") or dev_method,
+        "sha256": sha256,
+        "size": len(content),
+        "permissions": perms,
+        "menus": manifest.get("menus") or [],
+        "data_policy": {
+            "retention": data.get("retention") or "keep",
+            "own_tables": [t.get("name") for t in (data.get("tables") or [])
+                           if isinstance(t, dict) and t.get("mode") == "own"],
+            "read_tables": [t.get("name") for t in (data.get("tables") or [])
+                            if isinstance(t, dict) and t.get("mode") == "read"],
+            "files": data.get("files") or [],
+        },
+        "tasks": manifest.get("tasks") or {},
+        "dependencies": manifest.get("dependencies") or [],
+        "scan": scan,
     }
 
 
@@ -558,6 +874,7 @@ async def submit_app(
     product: str = Form("cenkor-admin"),
     dev_method: str = Form("extension"),
     pricing: str = Form(""),
+    changelog: str = Form("", description="本版更新日志，门户详情与实例更新弹窗展示"),
     db: AsyncSession = Depends(get_db),
     auth: dict = Depends(require_portal_or_admin),
 ):
@@ -653,6 +970,7 @@ async def submit_app(
     # - extension  产品扩展插件：manifest.json（交付到对应 MES 实例热挂载）
     # - standalone 独立应用：私有化整包，仅门户展示/售卖，不做安装向强校验
     manifest_data = None
+    pkg_scan: dict[str, Any] = {}
     try:
         with zipfile.ZipFile(io.BytesIO(content), "r") as zf:
             names = zf.namelist()
@@ -681,6 +999,17 @@ async def submit_app(
                 _mp = manifest_data.get("product")
                 if _mp and _mp != product:
                     raise HTTPException(400, f"manifest.product（{_mp}）与提交产品（{product}）不一致")
+                # manifest v2：宿主会拒装的字段必须在发布前 400（存量 v1 包继续放行）
+                if manifest_is_v2(manifest_data):
+                    _errs = validate_manifest_v2(app_key, manifest_data, product, dev_method)
+                    if _errs:
+                        raise HTTPException(400, "manifest v2 校验不通过：" + "；".join(_errs[:8]))
+                # 静态扫描迁移与脏文件：破坏性 DDL 进包等于在客户库上删数据
+                pkg_scan = scan_package(names, zf.read)
+                if not pkg_scan["ok"]:
+                    bad = (pkg_scan["blocked"] + pkg_scan["dirty_files"])[:8]
+                    raise HTTPException(400, "包内存在被禁止的文件或破坏性迁移：" + "；".join(bad))
+                manifest_data["_scan"] = pkg_scan
             elif dev_method == "platform":
                 # 平台内置应用：manifest.py + __init__.py（模块式，装进平台自身）
                 if "manifest.py" not in names:
@@ -739,8 +1068,27 @@ async def submit_app(
 
     # 包体校验全部通过，此刻才允许占住 UPLOAD_DIR/{app_key}-{version}.zip
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    zip_path = UPLOAD_DIR / f"{app_key}-{version}.zip"
-    zip_path.write_bytes(content)
+    zip_dir = UPLOAD_DIR / product / app_key / version
+    zip_path = zip_dir / f"{file_hash}.zip"
+    if zip_path.exists():
+        if hashlib.sha256(zip_path.read_bytes()).hexdigest() != file_hash:
+            raise HTTPException(409, "同版本已存在不同内容的包，拒绝覆盖")
+    else:
+        zip_dir.mkdir(parents=True, exist_ok=True)
+        if any(zip_dir.glob("*.zip")):
+            raise HTTPException(409, f"{product}/{app_key}/{version} 已有另一份包体，同一版本只允许一份内容")
+        zip_path.write_bytes(content)
+
+    try:
+        _schema_version = int(manifest_data.get("schema_version") or 0) or None
+    except (TypeError, ValueError):
+        _schema_version = None
+    _min_core_version = str(manifest_data.get("min_core_version") or "").strip() or None
+    _changelog = (
+        (changelog or "").strip()
+        or str(manifest_data.get("changelog") or "").strip()
+        or None
+    )
 
     submission = store_models.AppSubmission(
         developer_id=dev.id,
@@ -755,6 +1103,9 @@ async def submit_app(
         manifest_data=manifest_data,
         file_path=str(zip_path),
         file_hash=file_hash,
+        schema_version=_schema_version,
+        min_core_version=_min_core_version,
+        changelog=_changelog,
         status="pending",
     )
     db.add(submission)
@@ -819,7 +1170,7 @@ async def submit_app(
 async def batch_review_submissions(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _: auth_models.User = Depends(require_permission("store:review")),
+    _: auth_models.User = Depends(_require_any("app.store.review", "store:review")),
 ):
     """管理员批量审核应用：一次通过 / 驳回多条待审核提交。
 
@@ -877,7 +1228,7 @@ async def review_submission(
     submission_id: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _: auth_models.User = Depends(require_permission("store:review")),
+    _: auth_models.User = Depends(_require_any("app.store.review", "store:review")),
 ):
     """管理员审核应用"""
     sub = await db.get(store_models.AppSubmission, submission_id)
@@ -899,6 +1250,147 @@ async def review_submission(
     sub.reviewed_at = datetime.now(timezone.utc)
     await db.commit()
     return {"id": sub.id, "status": sub.status}
+
+
+@router.post("/submissions/{submission_id}/publish")
+async def publish_submission(
+    submission_id: int,
+    body: dict | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: auth_models.User = Depends(_require_any("app.store.publish", "store:review")),
+):
+    """上架：把「审核通过」的包放入对外目录并可被授权下载。
+
+    审核与上架分离 —— 审核只判内容合规，上架才决定对外可见与可下载。
+    上架同时可带 changelog（本版更新日志），门户详情页与实例更新弹窗共用。
+    """
+    body = body or {}
+    sub = await db.get(store_models.AppSubmission, submission_id)
+    if not sub:
+        raise HTTPException(404, "提交记录不存在")
+    if sub.status not in ("approved", "published"):
+        raise HTTPException(400, f"只有审核通过(approved)的提交可以上架，当前为 {sub.status}")
+    if not sub.file_path or not os.path.exists(sub.file_path):
+        raise HTTPException(409, "包文件缺失，无法上架；请重新提交或联系开发者")
+    if sub.yanked_at is not None and body.get("republish") is not True:
+        raise HTTPException(400, "该版本已被撤回上架，如需重新上架请带 republish=true")
+
+    note = str(body.get("changelog") or "").strip()
+    if note:
+        sub.changelog = note
+    sub.status = "published"
+    sub.yanked_at = None
+    if sub.published_at is None:
+        sub.published_at = datetime.now(timezone.utc)
+    log.info("store.app_published", app=sub.app_key, version=sub.version, product=sub.product)
+    await db.commit()
+    return {
+        "id": sub.id, "app_key": sub.app_key, "version": sub.version,
+        "product": sub.product, "status": sub.status,
+        "published_at": _stamp(sub.published_at),
+    }
+
+
+@router.post("/submissions/{submission_id}/yank")
+async def yank_submission(
+    submission_id: int,
+    body: dict | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: auth_models.User = Depends(_require_any("app.store.publish", "store:review")),
+):
+    """撤回上架：只阻止**新的**下载/安装，已装实例继续运行、不再收到该版本更新。
+
+    不删包、不删行、不动历史版本：撤回后仍可用 republish=true 复原，
+    且一旦有客户已装，审计链必须保留「谁在什么时候撤回了哪一版」。
+    """
+    body = body or {}
+    sub = await db.get(store_models.AppSubmission, submission_id)
+    if not sub:
+        raise HTTPException(404, "提交记录不存在")
+    if sub.yanked_at is not None:
+        raise HTTPException(409, "该版本已撤回上架")
+    reason = str(body.get("reason") or "").strip()
+    sub.yanked_at = datetime.now(timezone.utc)
+    sub.status = "yanked"
+    if reason:
+        sub.review_note = ((sub.review_note or "") + f"\n[撤回上架] {reason}").strip()
+    log.warning("store.app_yanked", app=sub.app_key, version=sub.version, reason=reason)
+    await db.commit()
+    return {
+        "id": sub.id, "app_key": sub.app_key, "version": sub.version,
+        "status": sub.status, "yanked_at": _stamp(sub.yanked_at), "reason": reason,
+    }
+
+
+@router.get("/submissions/{submission_id}/review-bundle")
+async def submission_review_bundle(
+    submission_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: auth_models.User = Depends(_require_any("app.store.review", "store:review")),
+):
+    """审核材料：manifest 关键契约 + 权限/菜单清单 + 迁移静态扫描 + 包指纹。
+
+    审核页不再需要人工解压：这里一次性给出「这个包会往客户库写什么、
+    要哪些权限、包体是不是提交时那份」。
+    """
+    sub = await db.get(store_models.AppSubmission, submission_id)
+    if not sub:
+        raise HTTPException(404, "提交记录不存在")
+    manifest = _manifest_dict(sub.manifest_data)
+    size = os.path.getsize(sub.file_path) if sub.file_path and os.path.exists(sub.file_path) else None
+    # 包若还在盘上，重算一次 SHA 与库里的 file_hash 比对（落盘后被替换这件事必须能发现）
+    sha_now = None
+    if size is not None:
+        h = hashlib.sha256()
+        with open(sub.file_path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                h.update(chunk)
+        sha_now = h.hexdigest()
+    prev = (await db.execute(
+        select(store_models.AppSubmission)
+        .where(
+            store_models.AppSubmission.product == sub.product,
+            store_models.AppSubmission.app_key == sub.app_key,
+            store_models.AppSubmission.id != sub.id,
+        )
+        .order_by(store_models.AppSubmission.id.desc())
+    )).scalars().first()
+    prev_manifest = _manifest_dict(prev.manifest_data) if prev else {}
+    prev_perms = {
+        (p or {}).get("code") for p in (prev_manifest.get("permissions") or []) if isinstance(p, dict)
+    }
+    perms = [p for p in (manifest.get("permissions") or []) if isinstance(p, dict)]
+    return {
+        "id": sub.id,
+        "app_key": sub.app_key,
+        "product": sub.product,
+        "version": sub.version,
+        "status": sub.status,
+        "schema_version": sub.schema_version,
+        "min_core_version": sub.min_core_version,
+        "changelog": sub.changelog,
+        "file_sha256": sub.file_hash,
+        "file_sha256_now": sha_now,
+        "file_hash_ok": bool(sub.file_hash and sha_now and sub.file_hash == sha_now),
+        "file_size": size,
+        "published_at": _stamp(sub.published_at),
+        "yanked_at": _stamp(sub.yanked_at),
+        "permissions": perms,
+        "menus": manifest.get("menus") or [],
+        "data": manifest.get("data") or {},
+        "tasks": manifest.get("tasks") or {},
+        "dependencies": manifest.get("dependencies") or [],
+        "scan": manifest.get("_scan") or {},
+        "manifest_diff": {
+            "prev_version": prev.version if prev else None,
+            "added_permissions": sorted(
+                {p.get("code") for p in perms} - {c for c in prev_perms if c}
+            ),
+            "removed_permissions": sorted(
+                {c for c in prev_perms if c} - {p.get("code") for p in perms}
+            ),
+        },
+    }
 
 
 @router.delete("/submissions/{submission_id}", status_code=204)
@@ -941,7 +1433,7 @@ async def withdraw_submission(
 async def install_submission(
     submission_id: int,
     db: AsyncSession = Depends(get_db),
-    _: auth_models.User = Depends(require_permission("store:review")),
+    _: auth_models.User = Depends(_require_any("app.store.review", "store:review")),
 ):
     """安装已审核通过（或曾安装过）的应用。
 
@@ -950,7 +1442,7 @@ async def install_submission(
     保持一致 —— 否则商店里显示「可安装」的条目点下去会被这里 400 拒绝。
     """
     sub = await db.get(store_models.AppSubmission, submission_id)
-    if not sub or sub.status not in ("approved", "installed"):
+    if not sub or sub.status not in ("approved", "published", "installed"):
         raise HTTPException(400, "应用未审核通过")
 
     # 检查 ZIP 文件存在
