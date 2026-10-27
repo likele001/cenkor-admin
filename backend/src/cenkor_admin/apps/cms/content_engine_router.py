@@ -15,11 +15,14 @@ from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import models, schemas
 from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS
+from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.core.repository import apply_filters, paginate
 
-router = APIRouter()
+# router 级挂细分权限守卫：一次覆盖全部内容引擎端点。
+# 规则表见 apps/cms/rbac_guard.py；未命中规则的路径放行并告警。
+router = APIRouter(dependencies=[Depends(cms_permission_guard)])
 log = logging.getLogger(__name__)
 
 

@@ -17,6 +17,7 @@ from cenkor_admin.apps.auth.router import router as auth_router
 from cenkor_admin.apps.auth.schemas import UserBrief
 from cenkor_admin.apps.cms.content_engine_router import router as content_engine_router
 from cenkor_admin.apps.cms.public_router import router as cms_public_router
+from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.apps.cms.router import router as cms_router
 from cenkor_admin.apps.cms.ai.router import router as cms_ai_router
 from cenkor_admin.apps.cms.mcp.router import router as cms_mcp_router
@@ -74,12 +75,12 @@ api_v1_router.include_router(
 # 旧 CMS 路由（优先注册，避免被 V2 覆盖）
 api_v1_router.include_router(
     cms_router, prefix="/cms", tags=["cms"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
 )
 # CMS AI 能力（对话式建模 / AI 起草 / 翻译 / SEO / 语义检索）
 api_v1_router.include_router(
     cms_ai_router, prefix="/cms", tags=["cms-ai"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
 )
 # CMS MCP（Agent 接入）：鉴权走 MCP_API_KEY，绝不能套登录依赖，否则 Agent 进不来
 api_v1_router.include_router(cms_mcp_router, prefix="/cms", tags=["cms-mcp"])
@@ -126,14 +127,14 @@ try:
     from cenkor_admin.apps.cms.graphql import graphql_router
     api_v1_router.include_router(
         graphql_router, prefix="/cms", tags=["graphql"],
-        dependencies=[Depends(get_current_user)],
+        dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
     )
 except Exception as e:
     import structlog
     structlog.get_logger().warning("graphql.mount_failed", error=str(e))
 api_v1_router.include_router(
     template_router, prefix="/cms", tags=["templates"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
 )
 
 # Portal 后台管理
@@ -244,6 +245,10 @@ def register_app_router(app_key: str) -> bool:
             dependencies=[
                 Depends(get_current_user),
                 Depends(app_enabled_dependency(app_key)),
+                # cms 在上方已手动注册过一份（保留是为了让旧路由优先于 V2 匹配），
+                # 自动发现这里会 getattr 到同名模块并再 import 一次，形成同路径两份。
+                # 两份都必须挂守卫，否则「谁先注册谁生效」就成了隐式安全边界。
+                *([Depends(cms_permission_guard)] if app_key == "cms" else []),
             ],
         )
         log.info("app.route_registered", key=app_key, prefix=prefix)

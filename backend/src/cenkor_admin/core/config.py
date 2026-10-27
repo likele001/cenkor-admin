@@ -180,6 +180,9 @@ class Settings(BaseSettings):
     # 写权限总闸门：false 时 Agent 只能读，create/update/publish 一律拒绝。
     # 必须在这里定义字段 —— 只在代码里 getattr 默认值的话，.env 怎么设都不生效。
     MCP_ALLOW_WRITE: bool = True
+    # 内容引擎端点的细分权限校验（apps/cms/rbac_guard.py）。
+    # 默认开启；出问题置 false 可退回「登录即可」。
+    CMS_RBAC_ENFORCE: bool = True
 
     @property
     def ai_ready(self) -> bool:

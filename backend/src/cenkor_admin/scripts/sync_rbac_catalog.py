@@ -67,6 +67,52 @@ PERMISSION_LABELS: dict[str, str] = {
     "media:upload": "上传媒体",
 }
 
+# 现网已有角色的「合理默认」，只在启用细分鉴权后才会暴露缺口。
+#
+# 为什么不放进 manifest：权限点属于 App，权限**授予**属于租户的 RBAC 决策，
+# 不该由 App 决定。但 cms_editor 的语义就是「内容编辑」，不给它条目读写
+# 等于这个角色是空的 —— 所以这里给一份兜底预设。
+#
+# 只 insert 缺失项，从不 delete：运营手工去掉过的权限不会被加回来的反向操作也没有。
+ROLE_PERMISSION_PRESETS: dict[str, tuple[str, ...]] = {
+    "cms_editor": (
+        # 建模只读：要看得懂字段才能填内容，但不该改 schema
+        "cms:content_types:read",
+        "cms:field_definitions:read",
+        # 分类标签要能维护，否则新条目归不了类
+        "cms:categories:read",
+        "cms:categories:write",
+        "cms:tags:read",
+        "cms:tags:write",
+        # 主战场
+        "cms:entries:read",
+        "cms:entries:write",
+        # AI 只读：看得到当前绑的模型与额度，碰不到密钥
+        "cms:ai:read",
+        # 注意不含 cms:entry:review —— 审核独立于编辑，是另一道闸
+    ),
+    "viewer": (
+        "cms:content_types:read",
+        "cms:field_definitions:read",
+        "cms:categories:read",
+        "cms:tags:read",
+        "cms:entries:read",
+    ),
+}
+
+# 角色可见的菜单（key）。菜单不给全，只给跟权限匹配的。
+ROLE_MENU_PRESETS: dict[str, tuple[str, ...]] = {
+    "cms_editor": (
+        "cms", "cms:ai-settings", "cms:search", "cms:content-types", "cms:languages",
+        "cms:categories", "cms:tags", "cms:entries", "cms:templates",
+        "cms:products", "cms:cases", "cms:news", "cms:site", "cms:media",
+    ),
+    "viewer": (
+        "cms", "cms:search", "cms:content-types", "cms:categories",
+        "cms:tags", "cms:entries", "cms:products", "cms:cases", "cms:news", "cms:site",
+    ),
+}
+
 
 async def _ensure_permission(
     db: Any, code: str, dry_run: bool, created: list[str]
@@ -127,13 +173,20 @@ async def _ensure_menu_tree(
     return row
 
 
-async def sync(dry_run: bool, bind_super: bool, only: set[str] | None) -> dict[str, Any]:
+async def sync(
+    dry_run: bool,
+    bind_super: bool,
+    only: set[str] | None,
+    role_presets: bool = True,
+) -> dict[str, Any]:
     manifests = scan_app_manifests()
     stats: dict[str, Any] = {
         "apps": [],
         "permissions_created": [],
         "menus_created": [],
         "super_bound": 0,
+        "role_perms_added": {},
+        "role_menus_added": {},
         "dry_run": dry_run,
     }
 
@@ -208,6 +261,89 @@ async def sync(dry_run: bool, bind_super: bool, only: set[str] | None) -> dict[s
                     if not dry_run:
                         db.add(rbac_models.RoleMenu(role_id=sa_role.id, menu_id=m.id))
 
+        # 非超管角色的兜底预设：只补缺，不删不改
+        if role_presets:
+            stats["role_perms_added"] = {}
+            for role_code, codes in ROLE_PERMISSION_PRESETS.items():
+                role = (
+                    await db.execute(
+                        select(rbac_models.Role).where(rbac_models.Role.code == role_code)
+                    )
+                ).scalar_one_or_none()
+                if role is None:
+                    continue
+                have = {
+                    row[0]
+                    for row in (
+                        await db.execute(
+                            select(rbac_models.RolePermission.permission_id).where(
+                                rbac_models.RolePermission.role_id == role.id
+                            )
+                        )
+                    ).all()
+                }
+                added: list[str] = []
+                for code in codes:
+                    perm = (
+                        await db.execute(
+                            select(rbac_models.Permission).where(
+                                rbac_models.Permission.code == code
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if perm is None:
+                        # 权限点应该已被 manifest 那段补上；没有说明规则表引用了未声明的码
+                        log.warning("sync_rbac.unknown_permission", role=role_code, code=code)
+                        continue
+                    if perm.id in have:
+                        continue
+                    added.append(code)
+                    if not dry_run:
+                        db.add(
+                            rbac_models.RolePermission(
+                                role_id=role.id, permission_id=perm.id
+                            )
+                        )
+                if added:
+                    stats["role_perms_added"][role_code] = added
+
+            stats["role_menus_added"] = {}
+            for role_code, keys in ROLE_MENU_PRESETS.items():
+                role = (
+                    await db.execute(
+                        select(rbac_models.Role).where(rbac_models.Role.code == role_code)
+                    )
+                ).scalar_one_or_none()
+                if role is None:
+                    continue
+                have = {
+                    row[0]
+                    for row in (
+                        await db.execute(
+                            select(rbac_models.RoleMenu.menu_id).where(
+                                rbac_models.RoleMenu.role_id == role.id
+                            )
+                        )
+                    ).all()
+                }
+                added_m: list[str] = []
+                for key in keys:
+                    menu = (
+                        await db.execute(
+                            select(rbac_models.Menu).where(rbac_models.Menu.key == key)
+                        )
+                    ).scalar_one_or_none()
+                    if menu is None:
+                        log.warning("sync_rbac.unknown_menu", role=role_code, key=key)
+                        continue
+                    if menu.id in have:
+                        continue
+                    added_m.append(key)
+                    if not dry_run:
+                        db.add(rbac_models.RoleMenu(role_id=role.id, menu_id=menu.id))
+                if added_m:
+                    stats["role_menus_added"][role_code] = added_m
+
         if dry_run:
             await db.rollback()
         else:
@@ -223,6 +359,11 @@ def main() -> None:
         "--no-bind-super", action="store_true", help="不把全部权限绑定给 super_admin"
     )
     parser.add_argument(
+        "--no-role-presets",
+        action="store_true",
+        help="不给 cms_editor / viewer 补兜底权限（只补缺，不会删）",
+    )
+    parser.add_argument(
         "--only", action="append", default=None, metavar="APP_KEY",
         help="只同步指定 App（可多次传，如 --only cms）",
     )
@@ -233,6 +374,7 @@ def main() -> None:
             dry_run=args.dry_run,
             bind_super=not args.no_bind_super,
             only=set(args.only) if args.only else None,
+            role_presets=not args.no_role_presets,
         )
     )
 
@@ -245,6 +387,12 @@ def main() -> None:
     for key in stats["menus_created"]:
         print(f"    + {key}")
     print(f"{tag}super_admin 补绑权限 {stats['super_bound']} 条")
+    for role_code, codes in (stats.get("role_perms_added") or {}).items():
+        print(f"{tag}角色 {role_code} 补 {len(codes)} 条权限")
+        for c in codes:
+            print(f"    + {c}")
+    for role_code, keys in (stats.get("role_menus_added") or {}).items():
+        print(f"{tag}角色 {role_code} 补 {len(keys)} 个菜单: {', '.join(keys)}")
 
 
 if __name__ == "__main__":
