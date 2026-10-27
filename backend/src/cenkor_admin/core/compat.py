@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from sqlalchemy import JSON, case
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped
 from sqlalchemy.sql.elements import ColumnElement
 
 from cenkor_admin.core.config import get_settings

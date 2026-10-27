@@ -1,17 +1,20 @@
 """Notification App · 路由（站内信）"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.api.deps import require_permission
+from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.notification import models
-from cenkor_admin.apps.notification.service import create_notification, create_system_notification_to_all
+from cenkor_admin.apps.notification.service import (
+    create_notification,
+    create_system_notification_to_all,
+)
 from cenkor_admin.core.db import get_db
 
 router = APIRouter()
@@ -73,7 +76,7 @@ async def mark_read(
     if not n:
         raise HTTPException(404, "通知不存在")
     if not n.read_at:
-        n.read_at = datetime.now(timezone.utc)
+        n.read_at = datetime.now(UTC)
         await db.commit()
     return {"id": n.id, "read_at": n.read_at.isoformat()}
 

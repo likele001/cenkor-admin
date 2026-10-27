@@ -137,8 +137,7 @@ def validate_field_value(field_type: str, value: Any, validation: dict[str, Any]
         if not isinstance(value, str) or not re.match(r"^#[0-9a-fA-F]{6}$", value):
             errors.append(f"Invalid color format: {value}")
 
-    elif field_type == "repeater":
-        if not isinstance(value, list):
-            errors.append(f"Field type 'repeater' expects list value, got {type(value).__name__}")
+    elif field_type == "repeater" and not isinstance(value, list):
+        errors.append(f"Field type 'repeater' expects list value, got {type(value).__name__}")
 
     return errors

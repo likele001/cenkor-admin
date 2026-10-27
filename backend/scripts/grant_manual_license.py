@@ -34,7 +34,7 @@ import asyncio
 import os
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # 先定数据库再 import 应用模块：settings 是进程级单例，晚改环境变量没用。
@@ -52,14 +52,16 @@ if not os.getenv("DATABASE_URL"):
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from sqlalchemy import select  # noqa: E402
+from cenkor_admin.apps.commerce import (
+    ledger,
+    pricing,
+)
+from cenkor_admin.apps.commerce import models as cm
+from cenkor_admin.apps.commerce.commerce_router import _issue_license
+from sqlalchemy import select
 
-from cenkor_admin.core.db import AsyncSessionLocal  # noqa: E402
-from cenkor_admin.apps.commerce import ledger  # noqa: E402
-from cenkor_admin.apps.commerce import models as cm  # noqa: E402
-from cenkor_admin.apps.commerce import pricing  # noqa: E402
-from cenkor_admin.apps.commerce.commerce_router import _issue_license  # noqa: E402
-from cenkor_admin.apps.system import store_models  # noqa: E402
+from cenkor_admin.apps.system import store_models
+from cenkor_admin.core.db import AsyncSessionLocal
 
 
 def mask(url: str) -> str:
@@ -67,7 +69,7 @@ def mask(url: str) -> str:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def resolve_buyer(db, product: str, hint: int | None) -> tuple[int, str | None, str]:

@@ -1,14 +1,10 @@
 """又拍云 — REST API 协议"""
 from __future__ import annotations
 
-import asyncio
 import base64
 import hashlib
 import hmac
-import json
 import time
-from typing import Any
-from urllib.parse import quote
 
 import aiohttp
 
@@ -46,7 +42,7 @@ class UpyunDriver:
 
     @property
     def _base(self) -> str:
-        return f"{self._endpoint}/{$self._bucket}" if False else f"{self._endpoint}/{self._bucket}"
+        return f"{self._endpoint}/{self._bucket}"
 
     async def health_check(self) -> dict:
         if not self._operator or not self._password or not self._bucket:
@@ -109,25 +105,24 @@ class UpyunDriver:
     async def list_objects(self, bucket: str, prefix: str = "", max_keys: int = 1000) -> list[dict]:
         # 又拍：GET /<bucket>/?list
         items: list[dict] = []
-        async with aiohttp.ClientSession() as s:
-            async with s.get(
-                f"{self._endpoint}/{bucket}/",
-                params={"list": "", "prefix": prefix} if prefix else {"list": ""},
-                headers=self._sign("GET", f"/{bucket}/", 0),
-            ) as r:
-                if r.status != 200:
-                    return []
-                body = await r.json()
-                for it in body.get("items", []):
-                    items.append({
-                        "key": it["name"],
-                        "size": it.get("size", 0),
-                        "last_modified": it.get("time"),
-                        "type": it.get("type"),
-                    })
-                    if len(items) >= max_keys:
-                        break
-                return items
+        async with aiohttp.ClientSession() as s, s.get(
+            f"{self._endpoint}/{bucket}/",
+            params={"list": "", "prefix": prefix} if prefix else {"list": ""},
+            headers=self._sign("GET", f"/{bucket}/", 0),
+        ) as r:
+            if r.status != 200:
+                return []
+            body = await r.json()
+            for it in body.get("items", []):
+                items.append({
+                    "key": it["name"],
+                    "size": it.get("size", 0),
+                    "last_modified": it.get("time"),
+                    "type": it.get("type"),
+                })
+                if len(items) >= max_keys:
+                    break
+            return items
 
     async def copy_object(self, src_bucket: str, src_key: str, dst_bucket: str, dst_key: str) -> None:
         uri = f"/{dst_bucket}/{dst_key}"

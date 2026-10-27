@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """CRUD 代码生成器 API（后台「系统 > 代码生成」页）—— /api/v1/system/codegen
 
 端点：
@@ -23,6 +22,7 @@ yaml / builder 都是**惰性导入**（放到函数内），因为本模块会�
 """
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import time
@@ -73,7 +73,7 @@ def _read_spec(body: Any) -> Any:
         try:
             return yaml.safe_load(body["yaml"]) or {}
         except yaml.YAMLError as exc:
-            raise HTTPException(400, "YAML 解析失败：%s" % exc) from exc
+            raise HTTPException(400, f"YAML 解析失败：{exc}") from exc
     if body.get("spec") is not None:
         return body["spec"]
     return body
@@ -142,11 +142,9 @@ async def _record_run(
             duration_ms=duration_ms, operator_id=operator_id,
         ))
         await db.commit()
-    except Exception:  # noqa: BLE001 —— 留痕是旁路，不能因为写历史把生成 / 安装搞挂
-        try:
+    except Exception:
+        with contextlib.suppress(Exception):
             await db.rollback()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def _run_brief(r: CodegenRun) -> dict:
@@ -316,7 +314,7 @@ async def _do_generate(raw: Any, db: AsyncSession, user: auth_models.User) -> Re
         raise
     spec, files, B = got["spec"], got["files"], got["builder"]
     blob = B.zip_bytes(files)
-    filename = "%s-%s.zip" % (spec["key"], spec["version"])
+    filename = "{}-{}.zip".format(spec["key"], spec["version"])
     await _record_run(
         db, app_key=spec["key"], app_name=spec["name"], action="generate", status="ok",
         spec=raw, summary="%d 个文件 · %d 字节" % (len(files), len(blob)),
@@ -325,7 +323,7 @@ async def _do_generate(raw: Any, db: AsyncSession, user: auth_models.User) -> Re
     return Response(
         content=blob,
         media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="%s"' % filename},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -360,10 +358,10 @@ async def _do_install(raw: Any, db: AsyncSession, user: auth_models.User) -> dic
         with os.fdopen(fd, "wb") as fh:
             fh.write(blob)
         result = await install_app_from_zip(db, spec["key"], Path(tmp_path))
-    except Exception as exc:  # noqa: BLE001 —— 记下原始报错后原样抛回
+    except Exception as exc:
         await _record_run(
             db, app_key=spec["key"], app_name=spec["name"], action="install", status="failed",
-            spec=raw, error="%s: %s" % (type(exc).__name__, exc),
+            spec=raw, error=f"{type(exc).__name__}: {exc}",
             duration_ms=_ms(t0), operator_id=user.id,
         )
         raise

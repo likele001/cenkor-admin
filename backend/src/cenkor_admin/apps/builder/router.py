@@ -1,7 +1,7 @@
 """Builder App · 管理路由（受保护，自动挂载于 /builder）"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -58,7 +58,7 @@ async def publish_page(page_id: int, db: AsyncSession = Depends(get_db)):
     if not obj:
         raise HTTPException(404, "Page not found")
     obj.status = "published"
-    obj.published_at = obj.published_at or datetime.now(timezone.utc)
+    obj.published_at = obj.published_at or datetime.now(UTC)
     await db.commit()
     await db.refresh(obj)
     return _page_dict(obj)

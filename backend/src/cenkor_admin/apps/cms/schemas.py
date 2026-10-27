@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from cenkor_admin.apps.cms.field_types import FIELD_TYPES
 
-
 # ============================================================
 # Content Type
 # ============================================================
@@ -240,7 +239,7 @@ class CategoryOut(BaseModel):
 
 
 class CategoryTreeOut(CategoryOut):
-    children: list["CategoryTreeOut"] = Field(default_factory=list)
+    children: list[CategoryTreeOut] = Field(default_factory=list)
 
 
 # ============================================================

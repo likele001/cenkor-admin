@@ -22,6 +22,7 @@ down_revision: f6a8b0c2d4e6
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "20260925_0026_app_enabled"

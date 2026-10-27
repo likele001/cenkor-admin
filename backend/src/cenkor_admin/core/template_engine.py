@@ -13,9 +13,8 @@ from datetime import datetime
 from typing import Any
 
 import markdown as md
-from liquid import Environment, StrictUndefined
+from liquid import Environment
 from liquid.exceptions import LiquidError
-
 
 # ============================================================
 # 引擎实例（单例）
@@ -364,9 +363,9 @@ def inject_globals(data: dict, *, site: dict | None = None, current_user: dict |
 
 
 __all__ = [
+    "get_env",
+    "inject_globals",
     "render_template",
     "render_template_safe",
     "validate_template",
-    "inject_globals",
-    "get_env",
 ]

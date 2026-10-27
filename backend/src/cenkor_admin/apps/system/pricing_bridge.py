@@ -25,7 +25,8 @@ provider **只能**返回买家可见的字段（价格、折扣、促销展示�
 """
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from typing import Any
 
 import structlog
 
@@ -83,7 +84,7 @@ async def price_map(db: Any, app_keys: Sequence[str]) -> dict[str, dict[str, Any
         return {}
     try:
         got = await _provider(db, keys)
-    except Exception:  # noqa: BLE001 - 展示数据，失败不得影响主流程
+    except Exception:
         log.warning("pricing_bridge.price_map_failed", count=len(keys), exc_info=True)
         return {}
     return {str(k): dict(v) for k, v in (got or {}).items()}
@@ -91,8 +92,8 @@ async def price_map(db: Any, app_keys: Sequence[str]) -> dict[str, dict[str, Any
 
 __all__ = [
     "PriceMapProvider",
-    "register_price_map_provider",
-    "unregister_price_map_provider",
     "is_registered",
     "price_map",
+    "register_price_map_provider",
+    "unregister_price_map_provider",
 ]

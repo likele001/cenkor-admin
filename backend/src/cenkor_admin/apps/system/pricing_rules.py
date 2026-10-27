@@ -23,7 +23,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 # 与 apps/commerce/models.py 的 PRICING_MODELS 同源（那边 import 本模块）
@@ -79,7 +79,7 @@ def _as_dt(v: Any, field: str) -> datetime | None:
         raise PriceRuleError(f"{field}格式不对")
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=LOCAL_TZ)
-    return dt.astimezone(timezone.utc)
+    return dt.astimezone(UTC)
 
 
 def normalize_price_fields(body: dict) -> dict:

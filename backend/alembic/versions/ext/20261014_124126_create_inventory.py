@@ -5,8 +5,9 @@ Revises: 20261007_0029_product_commerce
 Create Date: 2026-10-14 12:41:26.873410
 
 """
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "20261014_124126_gen_inventory"
 # 本条是「闭源/商业应用链」的挂载点：闭源链从本节点继续（erp → crm → commerce → 0029）。

@@ -21,10 +21,11 @@ import hashlib
 import importlib
 import json
 import socket
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-from typing import Any, Callable
+from typing import Any
 
 import structlog
 from fastapi import Depends, HTTPException
@@ -224,7 +225,7 @@ def _parse_dt(value: Any) -> datetime | None:
     if not value:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     try:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except Exception:
@@ -269,11 +270,11 @@ async def _refresh_from_cloud(db: AsyncSession, app_key: str, cache: dict[str, A
             log.warning("licensing.heartbeat_http", app=app_key, code=resp.status_code)
             return None
         data = resp.json()
-    except Exception as e:  # noqa: BLE001 - 网络异常一律走离线宽限
+    except Exception as e:
         log.warning("licensing.heartbeat_failed", app=app_key, error=str(e))
         return None
 
-    checked_at = datetime.now(timezone.utc).isoformat()
+    checked_at = datetime.now(UTC).isoformat()
     if not data.get("valid"):
         return {
             "license_key": license_key,
@@ -311,7 +312,7 @@ async def get_license_state(
     due = force_refresh
     if not is_hub and cache.get("checked_at"):
         last = _parse_dt(cache["checked_at"])
-        if last and datetime.now(timezone.utc) - last > timedelta(hours=s.LICENSE_HEARTBEAT_HOURS):
+        if last and datetime.now(UTC) - last > timedelta(hours=s.LICENSE_HEARTBEAT_HOURS):
             due = True
 
     if due and not is_hub:
@@ -345,7 +346,7 @@ async def get_license_state(
         state.reason = "授权与本实例不匹配，请在授权中心换绑"
         return state
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if state.expires_at and state.expires_at < now:
         state.status = "expired"
         state.reason = f"授权已于 {state.expires_at.date()} 到期，请续费"

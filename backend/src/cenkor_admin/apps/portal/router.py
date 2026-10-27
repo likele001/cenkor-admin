@@ -1,27 +1,27 @@
 """Portal App · 前台用户认证 API（/api/v1/public/portal/）"""
 from __future__ import annotations
 
+import contextlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
+import httpx
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import httpx
-from cenkor_admin.apps.portal import models, schemas
 from cenkor_admin.apps.auth.models import SystemSetting
-
+from cenkor_admin.apps.portal import models, schemas
 from cenkor_admin.apps.portal.auth import (
+    JWTError,
     create_portal_access_token,
     create_portal_refresh_token,
     decode_portal_token,
     hash_password,
     verify_password,
-    JWTError,
 )
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
@@ -254,7 +254,7 @@ async def portal_login(
     if user.status != "active":
         raise HTTPException(403, f"账号已{user.status}")
 
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     user.last_login_ip = ip
     db.add(models.PortalLoginLog(
         user_id=user.id, ip=ip, user_agent=ua, success=True, provider="local",
@@ -443,7 +443,7 @@ async def portal_forgot_password(
 
     token = secrets.token_urlsafe(48)[:64]
     from cenkor_admin.apps.notification.models import PasswordReset
-    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires = datetime.now(UTC) + timedelta(hours=1)
     db.add(PasswordReset(
         user_id=user.id, token=token, expires_at=expires,
         ip=request.client.host if request.client else None,
@@ -453,14 +453,12 @@ async def portal_forgot_password(
     frontend_base = body.frontend_base or settings.PUBLIC_BASE_URL
     reset_link = f"{frontend_base.rstrip('/')}/reset-password?token={token}"
 
-    try:
+    with contextlib.suppress(Exception):
         send_email(
             email,
             "【Cenkor】重置您的密码",
             f"您好，\n\n请点击下方链接在 1 小时内重置密码：\n\n  {reset_link}\n\n—— Cenkor",
         )
-    except Exception:
-        pass
 
     return {"ok": True, "message": "如果该邮箱已注册，重置链接已发送"}
 
@@ -482,8 +480,8 @@ async def portal_reset_password(
         raise HTTPException(400, "重置链接无效或已过期")
     expires_at = reset.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at < datetime.now(timezone.utc):
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at < datetime.now(UTC):
         raise HTTPException(400, "重置链接已过期")
 
     user = await db.get(models.PortalUser, reset.user_id)
@@ -492,7 +490,7 @@ async def portal_reset_password(
 
     user.password_hash = hash_password(body.new_password)
     user.token_version = (user.token_version or 0) + 1
-    reset.used_at = datetime.now(timezone.utc)
+    reset.used_at = datetime.now(UTC)
     await db.commit()
     return {"ok": True}
 
@@ -546,7 +544,6 @@ async def portal_feishu_callback(
             raise HTTPException(400, "绑定的用户不存在")
     else:
         # 创建新用户
-        from python_slugify import slugify
         username = f"portal_fs_{fs_user['open_id'][:12]}"
         user = models.PortalUser(
             username=username,

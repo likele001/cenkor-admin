@@ -1,12 +1,12 @@
 """CMS App · 公开接口（公网站点读取，无需鉴权）"""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
-from sqlalchemy import select, update, func, or_, cast, Text
+from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import models
@@ -527,13 +527,13 @@ async def get_public_news_detail(
 
 async def _resolve_preview_entry(db: AsyncSession, token: str):
     """解析预览 token → entry；已过期/已发布/不存在返回 None。"""
-    from datetime import datetime, timezone as _tz
+    from datetime import datetime
     pv = (await db.execute(
         select(models.EntryPreview).where(models.EntryPreview.token == token)
     )).scalar_one_or_none()
     if not pv:
         return None, "预览不存在"
-    if pv.expires_at and pv.expires_at < datetime.now(_tz.utc):
+    if pv.expires_at and pv.expires_at < datetime.now(UTC):
         return None, "预览已过期"
     entry = await db.get(models.Entry, pv.entry_id)
     if not entry or entry.deleted_at:
@@ -562,7 +562,6 @@ async def preview_entry_json(token: str, db: AsyncSession = Depends(get_db)):
 def _render_preview_html(entry: models.Entry) -> str:
     """把条目渲染成完整 HTML 文档（彩排页，顶部带预览横幅）。"""
     import html as _h
-    from datetime import datetime, timezone as _tz
 
     item = {"title": entry.title, "slug": entry.slug, "content": entry.content or {},
             "custom_fields": entry.custom_fields or {}, "seo": entry.seo or {}}
@@ -641,7 +640,7 @@ async def media_thumbnail(
         raise HTTPException(400, "非图片类型")
     try:
         data = await s3.download(media.bucket, media.key)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(404, "文件缺失或不可读") from e
     try:
         img = Image.open(io.BytesIO(data))
@@ -657,7 +656,7 @@ async def media_thumbnail(
             media_type=f"image/{fmt.lower()}",
             headers={"Cache-Control": "public, max-age=86400"},
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(500, "缩略图生成失败") from e
 
 

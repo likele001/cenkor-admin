@@ -2,27 +2,24 @@
 
 from __future__ import annotations
 
-
-
 from datetime import datetime
-
 from typing import Any
 
-
-
-from sqlalchemy import String, Text, Integer, Boolean, DateTime, ForeignKey, func, Index, UniqueConstraint
-
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-
-
 from cenkor_admin.core.compat import json_column
-
 from cenkor_admin.core.db import Base
-
-
-
-
 
 # ============================================================
 
@@ -74,13 +71,13 @@ class ContentType(Base):
 
 
 
-    field_groups: Mapped[list["FieldGroup"]] = relationship(
+    field_groups: Mapped[list[FieldGroup]] = relationship(
 
         "FieldGroup", back_populates="content_type", cascade="all, delete-orphan", lazy="selectin"
 
     )
 
-    field_definitions: Mapped[list["FieldDefinition"]] = relationship(
+    field_definitions: Mapped[list[FieldDefinition]] = relationship(
 
         "FieldDefinition", back_populates="content_type", cascade="all, delete-orphan", lazy="selectin"
 
@@ -116,7 +113,7 @@ class FieldGroup(Base):
 
 
 
-    content_type: Mapped["ContentType"] = relationship("ContentType", back_populates="field_groups")
+    content_type: Mapped[ContentType] = relationship("ContentType", back_populates="field_groups")
 
 
 
@@ -182,11 +179,11 @@ class FieldDefinition(Base):
 
 
 
-    content_type: Mapped["ContentType"] = relationship("ContentType", back_populates="field_definitions")
+    content_type: Mapped[ContentType] = relationship("ContentType", back_populates="field_definitions")
 
-    field_group: Mapped["FieldGroup | None"] = relationship("FieldGroup")
+    field_group: Mapped[FieldGroup | None] = relationship("FieldGroup")
 
-    field_options: Mapped[list["FieldOption"]] = relationship(
+    field_options: Mapped[list[FieldOption]] = relationship(
 
         "FieldOption", back_populates="definition", cascade="all, delete-orphan", lazy="selectin"
 
@@ -230,7 +227,7 @@ class FieldOption(Base):
 
 
 
-    definition: Mapped["FieldDefinition"] = relationship("FieldDefinition", back_populates="field_options")
+    definition: Mapped[FieldDefinition] = relationship("FieldDefinition", back_populates="field_options")
 
 
 
@@ -282,7 +279,7 @@ class Category(Base):
 
 
 
-    parent: Mapped["Category | None"] = relationship("Category", remote_side="Category.id", backref="children")
+    parent: Mapped[Category | None] = relationship("Category", remote_side="Category.id", backref="children")
 
 
 
@@ -412,9 +409,9 @@ class Entry(Base):
 
 
 
-    category: Mapped["Category | None"] = relationship("Category")
+    category: Mapped[Category | None] = relationship("Category")
 
-    tags: Mapped[list["ContentTag"]] = relationship(
+    tags: Mapped[list[ContentTag]] = relationship(
 
         "ContentTag", primaryjoin="Entry.id == foreign(ContentTag.content_id)", cascade="all, delete-orphan"
 

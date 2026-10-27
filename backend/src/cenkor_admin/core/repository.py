@@ -8,7 +8,8 @@
 """
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -128,6 +129,6 @@ async def stream_for_csv(
             break
         for row in rows:
             yield row
-        last_id = getattr(rows[-1], "id")
+        last_id = rows[-1].id
         if len(rows) < batch_size:
             break

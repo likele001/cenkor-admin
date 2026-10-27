@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
 
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.portal.auth import is_portal_token
-from cenkor_admin.apps.rbac.models import Role, UserRole, RolePermission, Permission, RoleMenu, Menu
+from cenkor_admin.apps.rbac.models import Role, RoleMenu, RolePermission, UserRole
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.security import decode_token
 
@@ -35,7 +35,7 @@ async def get_current_user(
         payload = decode_token(creds.credentials)
     except JWTError:
         try:
-            from cenkor_admin.apps.portal.auth import decode_portal_token, PORTAL_JWT_ISSUER
+            from cenkor_admin.apps.portal.auth import PORTAL_JWT_ISSUER, decode_portal_token
             portal_payload = decode_portal_token(creds.credentials)
             if portal_payload.get("iss") == PORTAL_JWT_ISSUER:
                 raise HTTPException(403, "前台用户无法访问后台管理接口")
@@ -90,9 +90,7 @@ def permission_matches(have: str, need: str) -> bool:
     """精确匹配或通配符：cms:* 匹配 cms:product:read。"""
     if have == need:
         return True
-    if have.endswith(":*") and need.startswith(have[:-1]):
-        return True
-    return False
+    return bool(have.endswith(":*") and need.startswith(have[:-1]))
 
 
 def user_has_permission(user: auth_models.User, code: str) -> bool:

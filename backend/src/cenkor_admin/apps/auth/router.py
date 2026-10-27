@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import structlog
-from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from jose import JWTError
@@ -16,18 +16,16 @@ from sqlalchemy.orm import selectinload
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models, schemas
 from cenkor_admin.apps.auth.oauth import feishu
-from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.apps.notification.models import PasswordReset
 from cenkor_admin.apps.rbac.models import (
     Role,
-    UserRole,
-    Permission,
-    RolePermission,
-    Menu,
     RoleMenu,
+    RolePermission,
+    UserRole,
 )
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
+from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.core.mail import send_email
 from cenkor_admin.core.security import (
     create_access_token,
@@ -250,7 +248,7 @@ async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession =
         raise HTTPException(status_code=403, detail=f"账号已{user.status}")
 
     # 更新最后登录
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     user.last_login_ip = ip
     # 成功登录日志
     db.add(models.LoginLog(
@@ -349,7 +347,7 @@ async def forgot_password(body: dict, request: Request, db: AsyncSession = Depen
 
     # 生成 token + 失效时间
     token = secrets.token_urlsafe(48)[:64]
-    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires = datetime.now(UTC) + timedelta(hours=1)
     db.add(PasswordReset(
         user_id=user.id, token=token, expires_at=expires,
         ip=request.client.host if request.client else None,
@@ -366,15 +364,6 @@ async def forgot_password(body: dict, request: Request, db: AsyncSession = Depen
         f"  {reset_link}\n\n"
         f"如果这不是您本人的操作，请忽略此邮件。\n\n"
         f"—— Cenkor Admin"
-    )
-    body_html = (
-        f"<p>您好，</p>"
-        f"<p>我们收到了重置 <b>{email}</b> 账户密码的请求。</p>"
-        f"<p><a href=\"{reset_link}\" "
-        f"style=\"display:inline-block;padding:10px 18px;background:#0f172a;color:white;"
-        f"border-radius:8px;text-decoration:none;font-weight:500;\">重置密码</a></p>"
-        f"<p style=\"color:#64748b;font-size:13px;\">链接 1 小时内有效。如果不是您本人的操作，请忽略此邮件。</p>"
-        f"<hr><p style=\"color:#94a3b8;font-size:11px;\">Cenkor Admin</p>"
     )
     try:
         result = send_email(email, subject, body_text)
@@ -406,8 +395,8 @@ async def reset_password(body: dict, db: AsyncSession = Depends(get_db)):
         raise HTTPException(400, "重置链接已被使用")
     expires_at = reset.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at < datetime.now(timezone.utc):
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at < datetime.now(UTC):
         raise HTTPException(400, "重置链接已过期")
 
     user = await db.get(models.User, reset.user_id)
@@ -416,7 +405,7 @@ async def reset_password(body: dict, db: AsyncSession = Depends(get_db)):
 
     user.password_hash = hash_password(new_password)
     user.token_version = (user.token_version or 0) + 1  # 旧 token 全部失效
-    reset.used_at = datetime.now(timezone.utc)
+    reset.used_at = datetime.now(UTC)
     await db.commit()
     log.info("auth.reset.ok", user_id=user.id)
     return {"ok": True}
@@ -469,7 +458,6 @@ async def feishu_callback(
         user = await _load_user_with_perms(db, oauth.user_id)
     else:
         # 创建新用户
-        from python_slugify import slugify
         username = f"fs_{fs_user['open_id'][:12]}"
         user = models.User(
             username=username,
@@ -502,7 +490,6 @@ async def feishu_callback(
     }
 
 
-import secrets  # noqa: E402
 
 
 # ===== Users 管理 =====
@@ -515,8 +502,9 @@ async def list_users(
     page_size: int = Query(20, ge=1, le=100),
 ):
     """用户列表（含角色 ID）"""
-    from cenkor_admin.core.repository import apply_filters, paginate
     from sqlalchemy import and_
+
+    from cenkor_admin.core.repository import apply_filters
 
     base_filters = apply_filters(
         models.User,
@@ -562,9 +550,11 @@ async def export_users_csv(
     search: str | None = None,
 ):
     """导出用户 CSV（流式分块）"""
-    from cenkor_admin.core.repository import apply_filters, stream_for_csv
     from datetime import datetime as _dt
+
     from fastapi.responses import StreamingResponse
+
+    from cenkor_admin.core.repository import apply_filters, stream_for_csv
 
     base_filters = apply_filters(
         models.User,
@@ -609,8 +599,9 @@ async def get_user_login_history(
 ):
     """用户登录历史（最近 90 天）"""
     from datetime import timedelta
+
     from cenkor_admin.core.repository import paginate
-    since = datetime.now(timezone.utc) - timedelta(days=90)
+    since = datetime.now(UTC) - timedelta(days=90)
     stmt = (
         select(models.LoginLog)
         .where(models.LoginLog.user_id == user_id, models.LoginLog.created_at >= since)
@@ -737,6 +728,6 @@ async def delete_user(
     user = await db.get(models.User, user_id)
     if not user or user.deleted_at:
         raise HTTPException(404, "User not found")
-    user.deleted_at = datetime.now(timezone.utc)
+    user.deleted_at = datetime.now(UTC)
     user.token_version = (user.token_version or 0) + 1
     await db.commit()

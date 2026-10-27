@@ -38,7 +38,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 SRC_DEFAULT = "/www/wwwroot/mes-extensions"
 UPLOADS_DEFAULT = "/www/wwwroot/cenkor-admin/backend/src/uploads/apps"
@@ -69,7 +69,7 @@ def find_dsn() -> str:
                 for kv in raw.split("\0"):
                     if kv.startswith("DATABASE_URL="):
                         return kv.split("=", 1)[1]
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"  读进程环境失败：{e}", file=sys.stderr)
     for f in ENV_FILES:
         if os.path.isfile(f):
@@ -239,7 +239,7 @@ def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str,
     shutil.copy2(zip_path, target_zip)
 
     manifest_json = json.dumps(man, ensure_ascii=False)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     try:
         if row:
             cur.execute(
@@ -277,7 +277,7 @@ def publish_one(conn, src: str, key: str, apply: bool, uploads_dir: str,
             )
             note = "INSERT"
         conn.commit()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         conn.rollback()
         return f"FAIL {key}: {type(e).__name__}: {e}"
     finally:

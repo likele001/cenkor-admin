@@ -2,12 +2,12 @@
 import pytest
 
 from cenkor_admin.apps.cms.field_types import (
-    FIELD_TYPES,
+    ARRAY_VALUE_TYPES,
     FIELD_DEFAULTS,
-    VALIDATION_RULES,
+    FIELD_TYPES,
     NEEDS_OPTIONS,
     SINGLE_VALUE_TYPES,
-    ARRAY_VALUE_TYPES,
+    VALIDATION_RULES,
     validate_field_value,
 )
 
@@ -37,11 +37,11 @@ class TestFieldTypes:
         assert "multiselect" in ARRAY_VALUE_TYPES
         assert "repeater" in ARRAY_VALUE_TYPES
         # 不重叠
-        assert SINGLE_VALUE_TYPES & ARRAY_VALUE_TYPES == set()
+        assert set() == SINGLE_VALUE_TYPES & ARRAY_VALUE_TYPES
 
     def test_needs_options(self):
         """只有 select/multiselect 需要选项"""
-        assert NEEDS_OPTIONS == {"select", "multiselect"}
+        assert {"select", "multiselect"} == NEEDS_OPTIONS
 
 
 class TestFieldDefaults:
@@ -166,8 +166,9 @@ class TestFieldTypeSchemas:
     """Pydantic schemas 校验"""
 
     def test_content_type_key_pattern(self):
-        from cenkor_admin.apps.cms.schemas import ContentTypeCreate
         from pydantic import ValidationError
+
+        from cenkor_admin.apps.cms.schemas import ContentTypeCreate
 
         # 合法 key
         ct = ContentTypeCreate(key="my_type", name="My Type")
@@ -186,8 +187,9 @@ class TestFieldTypeSchemas:
             ContentTypeCreate(key="my-type", name="Bad")
 
     def test_field_definition_validates_field_type(self):
-        from cenkor_admin.apps.cms.schemas import FieldDefinitionCreate
         from pydantic import ValidationError
+
+        from cenkor_admin.apps.cms.schemas import FieldDefinitionCreate
 
         # 合法
         fd = FieldDefinitionCreate(
@@ -202,8 +204,9 @@ class TestFieldTypeSchemas:
             )
 
     def test_field_definition_invalid_field_type_via_update(self):
-        from cenkor_admin.apps.cms.schemas import FieldDefinitionUpdate
         from pydantic import ValidationError
+
+        from cenkor_admin.apps.cms.schemas import FieldDefinitionUpdate
 
         # 合法
         fd = FieldDefinitionUpdate(field_type="text")

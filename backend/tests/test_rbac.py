@@ -1,4 +1,3 @@
-import time
 """RBAC 模块测试"""
 
 

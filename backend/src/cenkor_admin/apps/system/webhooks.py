@@ -10,9 +10,9 @@ import asyncio
 import hashlib
 import hmac
 import json
-import urllib.request
 import urllib.error
-from datetime import datetime, timezone
+import urllib.request
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -44,7 +44,7 @@ async def _notify(event: str, payload: dict) -> None:
             body = json.dumps(
                 {
                     "event": event,
-                    "occurred_at": datetime.now(timezone.utc).isoformat(),
+                    "occurred_at": datetime.now(UTC).isoformat(),
                     "payload": payload,
                 },
                 ensure_ascii=False,
@@ -53,7 +53,7 @@ async def _notify(event: str, payload: dict) -> None:
             secret = (w.secret or "").encode()
             sig = hmac.new(secret, body.encode(), hashlib.sha256).hexdigest()
             asyncio.create_task(_post(w.url, body, sig))
-    except Exception as e:  # noqa: BLE001 - 推送失败不阻塞主流程
+    except Exception as e:
         log.warning("webhook.notify_failed", event=event, error=str(e))
 
 
@@ -71,7 +71,7 @@ async def _post(url: str, body: str, sig: str) -> None:
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             log.info("webhook.delivered", url=url, status=r.status)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("webhook.post_failed", url=url, error=str(e))
 
 

@@ -1,19 +1,20 @@
 """CMS 内容引擎路由（Content Types / Field Groups / Field Definitions / Field Options / Categories / Tags / Entries）"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import contextlib
+import logging
+from datetime import UTC, datetime
 from typing import Any
 
-import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, update, delete, or_, cast, Text
+from sqlalchemy import Text, cast, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import models, schemas
-from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS, validate_field_value
+from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.core.repository import apply_filters, paginate
@@ -780,8 +781,7 @@ async def create_entry(
 
     tag_ids = body.pop("tag_ids", [])
 
-    if "content_type_key" in body:
-        del body["content_type_key"]
+    body.pop("content_type_key", None)
 
     obj = models.Entry(
         content_type_id=ct_id,
@@ -943,7 +943,7 @@ async def restore_entry_version(
         if k in data:
             setattr(entry, k, data[k])
     for k in ("published_at", "scheduled_at", "expire_at"):
-        if k in data and data[k]:
+        if data.get(k):
             from datetime import datetime as _dt
             try:
                 setattr(entry, k, _dt.fromisoformat(data[k]))
@@ -1117,10 +1117,8 @@ async def import_entries(
                         setattr(existing, k, _parse_dt(item[k]))
                 await db.commit()
                 await db.refresh(existing)
-                try:
+                with contextlib.suppress(Exception):
                     await _snapshot_version(db, existing, current.id, note="批量导入更新")
-                except Exception:
-                    pass
                 updated += 1
                 results.append({"row": i, "ok": True, "action": "updated", "id": existing.id})
             else:
@@ -1142,13 +1140,11 @@ async def import_entries(
                 db.add(obj)
                 await db.commit()
                 await db.refresh(obj)
-                try:
+                with contextlib.suppress(Exception):
                     await _snapshot_version(db, obj, current.id, note="批量导入创建")
-                except Exception:
-                    pass
                 created += 1
                 results.append({"row": i, "ok": True, "action": "created", "id": obj.id})
-        except Exception as e:  # noqa: BLE001 - 逐行隔离
+        except Exception as e:
             failed += 1
             results.append({"row": i, "ok": False, "error": str(e)[:200]})
     return {
@@ -1213,7 +1209,7 @@ async def review_entry(
     if action == "approve":
         entry.status = "published"
         if not entry.published_at:
-            entry.published_at = datetime.now(timezone.utc)
+            entry.published_at = datetime.now(UTC)
     else:
         entry.status = "draft"
     await _write_review_log(
@@ -1410,7 +1406,7 @@ async def create_entry_preview(
         raise HTTPException(404, "Entry not found")
     if entry.status == "published":
         raise HTTPException(400, "内容已发布，无需预览（请直接访问正式页面）")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     existing = (await db.execute(
         select(models.EntryPreview).where(
             models.EntryPreview.entry_id == entry_id,
@@ -1456,7 +1452,7 @@ async def revoke_entry_preview(
 # ============================================================
 @router.get("/field-types", response_model=dict[str, Any])
 async def list_field_types():
-    from cenkor_admin.apps.cms.field_types import FIELD_DEFAULTS, VALIDATION_RULES, NEEDS_OPTIONS
+    from cenkor_admin.apps.cms.field_types import FIELD_DEFAULTS, NEEDS_OPTIONS, VALIDATION_RULES
     return {
         "types": FIELD_TYPES,
         "defaults": FIELD_DEFAULTS,

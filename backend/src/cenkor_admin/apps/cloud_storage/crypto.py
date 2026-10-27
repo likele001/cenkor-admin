@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
-from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -55,7 +54,7 @@ def decrypt(token: str) -> str:
     for key in _keys():
         try:
             return AESGCM(key).decrypt(nonce, ct, associated_data=None).decode("utf-8")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             last_exc = exc
             continue
     if last_exc is not None:

@@ -20,8 +20,8 @@ Create Date: 2026-10-15
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 from cenkor_admin.core.compat import alembic_json
 
 revision = "20261015_0033_upgrade_runs"
@@ -31,7 +31,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    JSON_TYPE = alembic_json()
+    alembic_json()
     op.create_table(
         "upgrade_runs",
         sa.Column("id", sa.Integer(), nullable=False),

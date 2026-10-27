@@ -43,12 +43,12 @@ if not os.getenv("DATABASE_URL"):
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from sqlalchemy import select  # noqa: E402
+from cenkor_admin.apps.commerce import models as cm
+from cenkor_admin.apps.commerce import pricing
+from sqlalchemy import select
 
-from cenkor_admin.core.db import AsyncSessionLocal  # noqa: E402
-from cenkor_admin.apps.commerce import models as cm  # noqa: E402
-from cenkor_admin.apps.commerce import pricing  # noqa: E402
-from cenkor_admin.apps.system import store_models  # noqa: E402
+from cenkor_admin.apps.system import store_models
+from cenkor_admin.core.db import AsyncSessionLocal
 
 # 与既有在售应用同一套档位（元）：
 #   99/299 标准分析 / 单点功能；199/499 平台级能力；499/999 大型模块；
@@ -123,9 +123,9 @@ async def main_async(args) -> int:
 
             body = {
                 "model": "one_time",
-                "price_cents": int(round(price_yuan * 100)),
-                "list_price_cents": int(round(list_yuan * 100)),
-                "seat_price_cents": int(round(price_yuan * 100)),
+                "price_cents": round(price_yuan * 100),
+                "list_price_cents": round(list_yuan * 100),
+                "seat_price_cents": round(price_yuan * 100),
                 "promo_price_cents": 0,
                 "currency": "CNY",
                 "enabled": True,

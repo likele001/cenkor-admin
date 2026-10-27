@@ -5,6 +5,7 @@ import asyncio
 import os
 import secrets
 import string
+from datetime import UTC
 
 import structlog
 from sqlalchemy import select
@@ -471,9 +472,10 @@ async def main() -> None:
         log.info("seed.cases.done", count=len(DEFAULT_CASES))
 
         # ---- 应用中心：默认安装 CMS ----
-        from cenkor_admin.apps.system.models import InstalledApp
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from cenkor_admin.apps.cms.manifest import MANIFEST as CMS_MANIFEST
+        from cenkor_admin.apps.system.models import InstalledApp
 
         cms_app = await db.get(InstalledApp, CMS_MANIFEST.key)
         if not cms_app:
@@ -482,7 +484,7 @@ async def main() -> None:
                 name=CMS_MANIFEST.name,
                 version=CMS_MANIFEST.version,
                 status="installed",
-                installed_at=datetime.now(timezone.utc),
+                installed_at=datetime.now(UTC),
             ))
             await db.commit()
             log.info("seed.apps.cms.installed")
@@ -497,7 +499,7 @@ async def main() -> None:
         #   - 闭源商业应用（crm/erp/mes/payment/workflow）不在开源仓库里，自然不会被上架。
         try:
             import dataclasses
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             from cenkor_admin.apps.system.app_registry import scan_app_manifests
             from cenkor_admin.apps.system.store_models import AppSubmission, Developer
@@ -552,7 +554,7 @@ async def main() -> None:
                         manifest_data=dataclasses.asdict(mf),
                         status="installed",
                         reviewed_by=admin_user.id,
-                        reviewed_at=datetime.now(timezone.utc),
+                        reviewed_at=datetime.now(UTC),
                         review_note="平台内置应用（本地已有源码），随源码分发自动上架",
                     ))
                     listed += 1

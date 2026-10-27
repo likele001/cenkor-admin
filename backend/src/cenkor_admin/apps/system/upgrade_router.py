@@ -17,15 +17,12 @@
 from __future__ import annotations
 
 import asyncio
-import re
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.api.deps import get_current_user, require_permission
+from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.system import upgrade_service
 from cenkor_admin.apps.system.models import UpgradeRun
@@ -190,10 +187,10 @@ async def upgrade_run(
         async with AsyncSessionLocal() as bg_db:
             try:
                 await upgrade_service.run_upgrade(bg_db, user, source=source, payload=payload, notes=notes)
-            except Exception as exc:  # noqa
+            except Exception as exc:
                 import structlog
                 structlog.get_logger().error("upgrade.bg_failed", error=str(exc))
-    task = asyncio.create_task(_bg())
+    asyncio.create_task(_bg())
     # task 完成后从 _bg 内的 session 写 status；这里我们不能立刻查 run_id。
     # 妥协：在调用 run_upgrade 之前先创建一个 pending run 让前端轮询？
     # 不行，run_upgrade 内部自己创建 run。
@@ -224,7 +221,7 @@ async def upgrade_runs_rollback(
         async with AsyncSessionLocal() as bg_db:
             try:
                 await upgrade_service.manual_rollback(bg_db, user, run_id)
-            except Exception as exc:  # noqa
+            except Exception as exc:
                 import structlog
                 structlog.get_logger().error("upgrade.rollback_bg_failed", error=str(exc))
     asyncio.create_task(_bg())

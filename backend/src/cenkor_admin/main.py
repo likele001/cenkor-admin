@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, Request
@@ -17,7 +18,6 @@ from cenkor_admin.core.db import async_engine
 from cenkor_admin.core.i18n import SUPPORTED_LOCALES, detect_locale
 from cenkor_admin.core.redis import redis_client
 from cenkor_admin.core.storage import s3
-from pathlib import Path
 
 settings = get_settings()
 log = structlog.get_logger()
@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI):
     # 万一挂载点漏顺延出现双 head，heads 仍能各升各的；"head" 会抛 MultipleHeads 整条失败。
     try:
         from alembic.config import Config
+
         from alembic import command
         _alembic_cfg = Config(Path(__file__).resolve().parent.parent.parent / "alembic.ini")
         command.upgrade(_alembic_cfg, "heads")
@@ -57,7 +58,7 @@ async def lifespan(app: FastAPI):
     # 必须在迁移之后、install_app 之前 —— install_app 要注册 content_types，依赖表存在。
     try:
         from cenkor_admin.apps.system.app_registry import scan_app_manifests as _scan_apps
-        from cenkor_admin.core.app_schema import sync_builtin_apps, summarize
+        from cenkor_admin.core.app_schema import summarize, sync_builtin_apps
 
         _apps_dir = Path(__file__).resolve().parent / "apps"
         _results = sync_builtin_apps(_apps_dir, _scan_apps())
@@ -67,7 +68,7 @@ async def lifespan(app: FastAPI):
             # 单个应用建表失败不该拖垮整个平台，但必须显式告警，
             # 否则接口大面积 500 时无从查起。
             log.error("app.schema.partial_fail", keys=_failed)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.error("app.schema.sync_fail", error=str(e), hint="应用表可能缺失")
 
     try:
@@ -89,12 +90,14 @@ async def lifespan(app: FastAPI):
     # - 已 installed 的 App → 同步 name/version（源码 bump 后对齐，避免商店"有更新"误报）
     # - 已 uninstall 的 App → 不动，必须由管理员显式安装
     try:
-        from cenkor_admin.core.db import AsyncSessionLocal
-        from cenkor_admin.apps.system.app_registry import (
-            install_app, scan_app_manifests, list_apps_with_status,
-        )
         from sqlalchemy import select
+
+        from cenkor_admin.apps.system.app_registry import (
+            install_app,
+            scan_app_manifests,
+        )
         from cenkor_admin.apps.system.models import InstalledApp
+        from cenkor_admin.core.db import AsyncSessionLocal
         async with AsyncSessionLocal() as db:
             manifests = scan_app_manifests()
             all_rows = (await db.execute(select(InstalledApp))).scalars().all()
@@ -138,7 +141,7 @@ async def lifespan(app: FastAPI):
                 try:
                     from cenkor_admin.core.hooks import register_app_hooks as _reg_hooks
                     _reg_hooks(key, list(manifest.hooks or []))
-                except Exception as _he:  # noqa: BLE001
+                except Exception as _he:
                     log.warning("app.hooks_register_failed", key=key, error=str(_he))
             if drifted:
                 await db.commit()
@@ -148,8 +151,7 @@ async def lifespan(app: FastAPI):
 
     # 注册内置钩子处理器（插件框架 M1·P0）：导入模块即触发 @hook 装饰器注册
     try:
-        from cenkor_admin.apps.system import hooks as _builtin_hooks  # noqa: F401
-        from cenkor_admin.apps.system import webhooks as _webhook_hooks
+        from cenkor_admin.apps.system import hooks as _builtin_hooks
         # 已退役 cenkormes-center 桥接：付款后发卡改由本仓 commerce 层自行签发，不再向外部仓库 auto-issue。
         # 闭源商业模块（无 manifest，由 api/v1/__init__.py 直接挂载 /api/v1/store）
         try:
@@ -163,8 +165,9 @@ async def lifespan(app: FastAPI):
     # 定时发布调度器（M2·P1 2.5）
     scheduler_task = None
     try:
-        from cenkor_admin.core.scheduler import scheduler_loop
         import asyncio as _asyncio
+
+        from cenkor_admin.core.scheduler import scheduler_loop
         scheduler_task = _asyncio.create_task(scheduler_loop())
         log.info("scheduler.started")
     except Exception as e:
@@ -173,6 +176,7 @@ async def lifespan(app: FastAPI):
     # 核心版本检查预热（升级提示）：spoke 向官方云查一次，发现新版记日志，不阻塞启动
     try:
         import asyncio as _asyncio
+
         from cenkor_admin.apps.system import release_service
         _asyncio.create_task(release_service.warm_cache())
     except Exception as e:
@@ -237,6 +241,7 @@ app.add_middleware(AuditMiddleware)
 
 # 挂载 App 前端静态资源（安装时从 ZIP 解压出来的前端 bundle）
 from fastapi.staticfiles import StaticFiles
+
 _app_static_dir = Path(__file__).resolve().parent / "static" / "apps"
 _app_static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/.app-assets", StaticFiles(directory=str(_app_static_dir)), name="app_assets")
@@ -265,10 +270,12 @@ async def locale_middleware(request: Request, call_next):
 
 # 重定向中间件（M3·P2 3.3）：GET/HEAD 命中 from_path 时 301/302
 from cenkor_admin.core.redirects import redirect_middleware
+
 app.middleware("http")(redirect_middleware)
 
 # 限流中间件（M4·P3 4.4）：公开写接口 60次/分钟/IP
 from cenkor_admin.core.ratelimit import rate_limit_middleware
+
 app.middleware("http")(rate_limit_middleware)
 
 

@@ -1,11 +1,11 @@
 """链接收集 App 路由"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import require_permission
@@ -127,5 +127,5 @@ async def delete_link(
     obj = await db.get(models.Link, link_id)
     if not obj or obj.deleted_at:
         raise HTTPException(404, "链接不存在")
-    obj.deleted_at = datetime.now(timezone.utc)
+    obj.deleted_at = datetime.now(UTC)
     await db.commit()

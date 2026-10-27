@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import secrets
-import structlog
 from urllib.parse import urlencode
 
 import httpx
+import structlog
 
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.redis import redis_client

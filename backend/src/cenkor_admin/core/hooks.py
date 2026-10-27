@@ -15,13 +15,14 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Union
+from typing import Any
 
 log = logging.getLogger(__name__)
 
 # 同步或异步处理函数
-HookHandler = Callable[..., Union[None, Awaitable[None]]]
+HookHandler = Callable[..., Awaitable[None] | None]
 
 
 @dataclass
@@ -111,7 +112,7 @@ class HookRegistry:
                 else:
                     res = h.fn(**payload)
                 results.append(res)
-            except Exception as e:  # noqa: BLE001 - 故意隔离 handler 异常
+            except Exception as e:
                 log.warning(
                     "hook.handler_failed",
                     hook=hook,
@@ -154,6 +155,6 @@ def register_app_hooks(app_key: str, module_paths: list[str] | None = None) -> i
             registered += 1
         except ModuleNotFoundError:
             continue
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("app.hooks_import_failed", key=app_key, module=mod_path, error=str(e))
     return registered

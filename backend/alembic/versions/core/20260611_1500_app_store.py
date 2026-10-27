@@ -7,6 +7,7 @@ Create Date: 2026-06-11 15:00:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 from cenkor_admin.core.compat import json_column
 

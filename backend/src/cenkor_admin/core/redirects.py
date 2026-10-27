@@ -36,7 +36,7 @@ async def _load_redirects() -> dict[str, tuple[str, int]]:
             )).scalars().all()
         _cache["map"] = {r.from_path: (r.to_path, r.code) for r in rows}
         _cache["at"] = now
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("redirects.load_failed", error=str(e))
     return _cache["map"]
 
@@ -50,6 +50,6 @@ async def redirect_middleware(request: Request, call_next):
             if hit:
                 to_path, code = hit
                 return RedirectResponse(to_path, status_code=code)
-        except Exception as e:  # noqa: BLE001 - 中间件绝不可 500
+        except Exception as e:
             log.warning("redirects.middleware_failed", error=str(e))
     return await call_next(request)

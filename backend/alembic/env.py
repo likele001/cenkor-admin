@@ -15,18 +15,20 @@ ORM 仍按 `erp_xxx` 映射，但库里同名对象是视图，autogenerate 会�
 「表缺失 → create_table」。过滤规则见 core/schema_filters.py。
 """
 import os
-from logging.config import fileConfig
-
-from alembic import context
-from sqlalchemy import engine_from_config, pool
 
 # 加载应用配置
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
+
 sys.path.insert(0, "src")
 
-from cenkor_admin.core.config import get_settings  # noqa: E402
-from cenkor_admin.core.db import Base  # noqa: E402
-from cenkor_admin.core.model_loader import load_all_models  # noqa: E402
+from cenkor_admin.core.config import get_settings
+from cenkor_admin.core.db import Base
+from cenkor_admin.core.model_loader import load_all_models
 
 # 把内置 + 外置 app 的 ORM 模型全部并入 Base.metadata。
 # 三种目录形态、routers/ 排除、显式登记清单都在 core/model_loader.py 里，
@@ -55,7 +57,7 @@ target_metadata = Base.metadata
 
 # 过滤规则放在 core 里，和 scripts/check_schema_drift.py 共用同一套 ——
 # 两边各写一份的话，体检结论和 autogenerate 结论迟早会对不上。
-from cenkor_admin.core.schema_filters import (  # noqa: E402
+from cenkor_admin.core.schema_filters import (
     fetch_view_names,
     make_include_object,
     scope_from_env,

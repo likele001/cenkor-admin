@@ -1,8 +1,9 @@
 """platform_apps 表"""
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "20260107_0004_platform_apps"
 down_revision = "20260107_0003_media_news_audit"

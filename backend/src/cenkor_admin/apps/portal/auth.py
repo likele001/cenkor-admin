@@ -1,7 +1,7 @@
 """Portal JWT 独立签发（与 admin auth 完全隔离，支持 SECRET_KEY 轮换）"""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import JWTError, jwt
@@ -46,7 +46,7 @@ def create_portal_access_token(
     expires_minutes: int | None = None,
 ) -> str:
     minutes = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(subject),
         "type": "access",
@@ -60,7 +60,7 @@ def create_portal_access_token(
 
 
 def create_portal_refresh_token(subject: str | int, token_version: int = 0) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": str(subject),
         "type": "refresh",
@@ -94,12 +94,12 @@ def is_portal_token(payload: dict[str, Any]) -> bool:
 
 
 __all__ = [
-    "hash_password",
-    "verify_password",
+    "PORTAL_JWT_ISSUER",
+    "JWTError",
     "create_portal_access_token",
     "create_portal_refresh_token",
     "decode_portal_token",
+    "hash_password",
     "is_portal_token",
-    "PORTAL_JWT_ISSUER",
-    "JWTError",
+    "verify_password",
 ]

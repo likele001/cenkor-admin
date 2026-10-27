@@ -1,6 +1,8 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, Boolean, DateTime, Text, func
+
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from cenkor_admin.core.db import Base
 
 

@@ -10,14 +10,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import subprocess
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.system.models import UpgradeRun
@@ -35,7 +35,7 @@ _LOG_HOOKS: dict[int, list] = {}
 
 
 def _now_stamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    return datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
 
 
 def _truncate_log(text: str, max_bytes: int = 200 * 1024) -> str:
@@ -54,10 +54,8 @@ async def _append_log(run, db, line: str):
         await db.rollback()
     hooks = _LOG_HOOKS.get(run.id, [])
     for h in hooks:
-        try:
+        with contextlib.suppress(Exception):
             await h(line)
-        except Exception:
-            pass
 
 
 def register_log_hook(run_id, hook):
@@ -185,7 +183,7 @@ async def _do_db_backup(run, db) -> str | None:
             if dump.returncode == 0:
                 import gzip
                 out_path.write_bytes(gzip.compress(dump.stdout))
-                await _append_log(run, db, f"  ✓ 数据库备份完成（docker）")
+                await _append_log(run, db, "  ✓ 数据库备份完成（docker）")
                 return str(out_path)
     except Exception:
         pass
@@ -201,7 +199,7 @@ async def _do_db_backup(run, db) -> str | None:
         if dump.returncode == 0:
             import gzip
             out_path.write_bytes(gzip.compress(dump.stdout))
-            await _append_log(run, db, f"  ✓ 数据库备份完成（直连）")
+            await _append_log(run, db, "  ✓ 数据库备份完成（直连）")
             return str(out_path)
         else:
             await _append_log(run, db, f"  ⚠ pg_dump 失败：{dump.stderr.decode()[:200]}")
@@ -372,7 +370,7 @@ async def run_upgrade(db, user, source: str = "git", payload: dict | None = None
             return run
 
         run.status = "running"
-        run.started_at = datetime.now(timezone.utc)
+        run.started_at = datetime.now(UTC)
         await db.commit()
 
         try:
@@ -397,7 +395,7 @@ async def run_upgrade(db, user, source: str = "git", payload: dict | None = None
                 await _append_log(run, db, "  已是最新，无需升级")
                 run.to_version = from_version
                 run.status = "success"
-                run.finished_at = datetime.now(timezone.utc)
+                run.finished_at = datetime.now(UTC)
                 await db.commit()
                 return run
 
@@ -442,7 +440,7 @@ async def run_upgrade(db, user, source: str = "git", payload: dict | None = None
             await _append_log(run, db, "════════════════════════════════════════")
 
             run.status = "success"
-            run.finished_at = datetime.now(timezone.utc)
+            run.finished_at = datetime.now(UTC)
             if run.started_at:
                 run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
             await db.commit()
@@ -479,7 +477,7 @@ async def run_upgrade(db, user, source: str = "git", payload: dict | None = None
                     return run
 
             run.status = "rolled_back"
-            run.finished_at = datetime.now(timezone.utc)
+            run.finished_at = datetime.now(UTC)
             if run.started_at:
                 run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
             await db.commit()
@@ -533,7 +531,7 @@ async def manual_rollback(db, user, run_id: int) -> UpgradeRun:
             run.status = "failed"
             await _append_log(run, db, f"✗ 回滚失败：{exc}")
 
-        run.finished_at = datetime.now(timezone.utc)
+        run.finished_at = datetime.now(UTC)
         if run.started_at:
             run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
         await db.commit()

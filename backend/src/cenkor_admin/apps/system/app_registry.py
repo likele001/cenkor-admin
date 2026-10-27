@@ -1,21 +1,21 @@
 """应用中心：扫描 manifest + 安装状态"""
 from __future__ import annotations
 
+import contextlib
 import importlib
 import importlib.util
 import pkgutil
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from structlog import get_logger
 
 from cenkor_admin.apps.base import AppManifest
 from cenkor_admin.apps.system.models import InstalledApp
-from cenkor_admin.core.hooks import registry, register_app_hooks
+from cenkor_admin.core.hooks import register_app_hooks, registry
 
 log = get_logger(__name__)
 
@@ -235,7 +235,7 @@ async def install_app(db: AsyncSession, key: str) -> InstalledApp:
     manifest = manifests[key]
     result = await db.execute(select(InstalledApp).where(InstalledApp.key == key))
     row = result.scalar_one_or_none()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if row:
         row.name = manifest.name
         row.version = manifest.version
@@ -307,8 +307,9 @@ async def _register_menu_tree(
     db: AsyncSession, menu_def: dict, parent=None, role_id: int | None = None, sort_offset: int = 0
 ) -> None:
     """递归注册菜单树"""
-    from cenkor_admin.apps.rbac import models as rbac_models
     from sqlalchemy import select as sa_select
+
+    from cenkor_admin.apps.rbac import models as rbac_models
 
     key = menu_def.get("key", "")
     # 检查是否已存在
@@ -356,10 +357,8 @@ async def uninstall_app(db: AsyncSession, key: str) -> None:
         raise ValueError(f"App 未安装: {key}")
 
     # 清理 app 注册的钩子处理器（插件框架 M1·P0）
-    try:
+    with contextlib.suppress(Exception):
         registry.clear_app(key)
-    except Exception:
-        pass
 
     # 清理 app 注册的内容数据
     if manifest:
@@ -376,7 +375,7 @@ async def uninstall_app(db: AsyncSession, key: str) -> None:
     await _uninstall_app_permissions(db, manifest)
 
     row.status = "uninstalled"
-    row.uninstalled_at = datetime.now(timezone.utc)
+    row.uninstalled_at = datetime.now(UTC)
     await db.commit()
 
 
@@ -528,8 +527,9 @@ async def _uninstall_app_menus(db: AsyncSession, key: str) -> None:
     识别规则：menu.key 以 '<key>:' 或 '<key>' 开头（即与该 app 关联）。
     顶级菜单（parent_id 为 None）也会被删除。
     """
-    from cenkor_admin.apps.rbac import models as rbac_models
     from sqlalchemy import delete as sa_delete
+
+    from cenkor_admin.apps.rbac import models as rbac_models
 
     # 找出所有属于该 app 的菜单 key（manifest.menus 中的 key）
     # 因为 _register_menu_tree 直接用 menu_def['key']，没加 app key 前缀，
@@ -574,8 +574,9 @@ async def _uninstall_app_permissions(db: AsyncSession, manifest) -> None:
     """卸载 app 时清理其声明的权限点（含角色授权）。"""
     if not manifest or not manifest.permissions_required:
         return
-    from cenkor_admin.apps.rbac import models as rbac_models
     from sqlalchemy import delete as sa_delete
+
+    from cenkor_admin.apps.rbac import models as rbac_models
 
     perms = (await db.execute(
         select(rbac_models.Permission).where(

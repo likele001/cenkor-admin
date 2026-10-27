@@ -174,6 +174,9 @@ bash scripts/package-core.sh    # → release/cenkor-admin-core-*.tar.gz
 - **PostgreSQL 16**（生产与 CI 均以此为准）
 - 不支持 MySQL：迁移链与 app schema 依赖 `JSONB`、`CREATE OR REPLACE VIEW`、
   `to_regclass()`、`TIMESTAMPTZ`、`TEXT[]` 等 PostgreSQL 专有特性
+- `core/compat.py` 保留了 `json_column` / `alembic_json` / `order_nulls_last`
+  跨库兼容层（25 处迁移在用），但迁移链中仍有直接写死的 `JSONB`，
+  MySQL 路径未完成，不可用于生产
 
 ## 备份
 

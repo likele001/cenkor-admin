@@ -1,16 +1,16 @@
 """Portal App · 前台用户后台管理 API（管理员操作 portal_users）"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.api.deps import get_current_user, require_permission
+from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.portal import models, schemas
+from cenkor_admin.apps.portal import models
 from cenkor_admin.apps.portal.auth import hash_password
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.repository import paginate
@@ -200,7 +200,7 @@ async def delete_portal_user(
     user = await db.get(models.PortalUser, user_id)
     if not user or user.deleted_at:
         raise HTTPException(404, "Portal user not found")
-    user.deleted_at = datetime.now(timezone.utc)
+    user.deleted_at = datetime.now(UTC)
     user.token_version = (user.token_version or 0) + 1
     await db.commit()
 
@@ -250,7 +250,7 @@ async def get_portal_user_login_history(
 ):
     """前台用户登录历史"""
     from datetime import timedelta
-    since = datetime.now(timezone.utc) - timedelta(days=90)
+    since = datetime.now(UTC) - timedelta(days=90)
     stmt = (
         select(models.PortalLoginLog)
         .where(
@@ -307,7 +307,7 @@ async def portal_user_stats(
     )).scalar() or 0
 
     # 最近 7 天新增
-    seven_days_ago = datetime.now(timezone.utc).replace(
+    seven_days_ago = datetime.now(UTC).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     from datetime import timedelta

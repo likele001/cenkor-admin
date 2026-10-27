@@ -21,8 +21,8 @@ Create Date: 2026-10-15
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 from cenkor_admin.core.compat import alembic_json
 
 revision = "20261015_0032_codegen_runs"

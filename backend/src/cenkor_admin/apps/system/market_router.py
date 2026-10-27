@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import socket
@@ -90,7 +91,7 @@ async def _hub_get(
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             return await client.get(f"{hub}{path}", params=params, headers=headers or {})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"官方应用市场不可达：{e}") from e
 
 
@@ -101,7 +102,7 @@ async def _hub_post(path: str, payload: dict | None = None, headers: dict | None
     try:
         async with httpx.AsyncClient(timeout=MARKET_TIMEOUT, follow_redirects=True) as client:
             return await client.post(f"{hub}{path}", json=payload or {}, headers=headers or {})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"官方应用市场不可达：{e}") from e
 
 
@@ -109,7 +110,7 @@ def _hub_detail(resp, fallback: str) -> str:
     """把官方返回的错误体转成一句可读文案。"""
     try:
         data = resp.json()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return (resp.text or fallback)[:300]
     if isinstance(data, dict) and data.get("detail"):
         detail = data["detail"]
@@ -143,7 +144,7 @@ async def _fetch_catalog(force: bool = False) -> list[dict[str, Any]]:
             raise HTTPException(502, f"官方应用市场返回异常（HTTP {resp.status_code}）")
         try:
             data = resp.json()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise HTTPException(502, f"官方应用市场返回了非 JSON 内容：{e}") from e
         batch = data.get("items") or data.get("data") or []
         if not isinstance(batch, list):
@@ -228,7 +229,7 @@ async def market_status(
         items = await _fetch_catalog()
         total = len(items)
         reachable = True
-    except HTTPException as e:  # noqa: BLE001
+    except HTTPException as e:
         error = e.detail
 
     return {
@@ -385,7 +386,7 @@ async def _download_package(app_key: str, license_key: str) -> tuple[Path, str]:
                 f"{hub}/api/v1/store/cloud/packages/{app_key}",
                 params={"license_key": license_key},
             )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"下载应用包失败：{e}") from e
 
     if resp.status_code == 404:
@@ -481,10 +482,8 @@ async def market_install(
 
         result = await install_app_from_zip(db, app_key, tmp_path)
     finally:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_path)
-        except OSError:
-            pass
 
     log.info("market.installed_package", app_key=app_key, by=user.id)
     return {"ok": True, "app_key": app_key, "mode": "package", **result}
@@ -560,5 +559,5 @@ async def market_purchases(
         )
     try:
         return resp.json()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"官方返回了非 JSON 内容：{e}") from e

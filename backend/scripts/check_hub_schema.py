@@ -17,9 +17,9 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR / "src"))
 
-from sqlalchemy import create_engine, inspect, text  # noqa: E402
+from sqlalchemy import create_engine, inspect, text
 
-from cenkor_admin.core.config import get_settings  # noqa: E402
+from cenkor_admin.core.config import get_settings
 
 # 修订 → 它应当创建的对象。列/索引按 (表, 名) 存放。
 CHECKS = [

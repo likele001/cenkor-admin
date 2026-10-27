@@ -38,5 +38,5 @@ async def audit_on_entry_saved(*, entry=None, db=None, user=None, **kwargs) -> N
             },
         ))
         await db.commit()
-    except Exception as e:  # noqa: BLE001 - 钩子失败隔离
+    except Exception as e:
         log.warning("hook.audit_on_entry_saved.failed", entry_id=getattr(entry, "id", None), error=str(e))

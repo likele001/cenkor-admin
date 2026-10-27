@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """schema 漂移体检（只读）—— ORM 声明的结构与线上真实库差多少。
 
 与 `check_hub_schema.py`（核对某几个迁移建的对象在不在）不同，本脚本做的是
@@ -44,9 +43,9 @@ if SRC not in sys.path:
 os.chdir(BACKEND)
 
 
-from cenkor_admin.core.db import Base  # noqa: E402
-from cenkor_admin.core.model_loader import load_all_models  # noqa: E402
-from cenkor_admin.core.schema_filters import fetch_view_names, make_include_object  # noqa: E402
+from cenkor_admin.core.db import Base
+from cenkor_admin.core.model_loader import load_all_models
+from cenkor_admin.core.schema_filters import fetch_view_names, make_include_object
 
 # 域归属，用于把漂移按业务线拆开看
 DOMAIN_RULES = (

@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import require_permission
@@ -119,7 +119,7 @@ async def create_ticket(
             db, user_id=obj.assignee_id, type="task",
             title=f"新工单分配给你：#{obj.id} {obj.title}",
             body=f"优先级：{obj.priority}，分类：{obj.category}",
-            link=f"/tickets",
+            link="/tickets",
         )
 
     await db.commit()
@@ -145,9 +145,9 @@ async def update_ticket(
             setattr(obj, k, body[k])
     if "status" in body:
         if body["status"] == "resolved":
-            obj.resolved_at = datetime.now(timezone.utc)
+            obj.resolved_at = datetime.now(UTC)
         elif body["status"] == "closed":
-            obj.closed_at = datetime.now(timezone.utc)
+            obj.closed_at = datetime.now(UTC)
 
     await db.flush()
 
@@ -158,7 +158,7 @@ async def update_ticket(
             db, user_id=new_assignee, type="task",
             title=f"工单分配给你：#{obj.id} {obj.title}",
             body=f"优先级：{obj.priority}，分类：{obj.category}",
-            link=f"/tickets",
+            link="/tickets",
         )
 
     # 通知：状态变更 → 通知创建者
@@ -168,7 +168,7 @@ async def update_ticket(
             db, user_id=obj.creator_id, type="task",
             title=f"工单 #{obj.id} 状态变更",
             body=f"「{obj.title}」从 {STATUS_LABEL.get(old_status, old_status)} 变为 {STATUS_LABEL.get(new_status, new_status)}",
-            link=f"/tickets",
+            link="/tickets",
         )
 
     await db.commit()
@@ -184,7 +184,7 @@ async def delete_ticket(
     obj = await db.get(models.Ticket, ticket_id)
     if not obj or obj.deleted_at:
         raise HTTPException(404, "工单不存在")
-    obj.deleted_at = datetime.now(timezone.utc)
+    obj.deleted_at = datetime.now(UTC)
     await db.commit()
 
 
@@ -215,7 +215,7 @@ async def add_comment(
             db, user_id=obj.creator_id, type="task",
             title=f"工单 #{obj.id} 有新评论",
             body=f"{current.nickname or current.username}：{content[:100]}",
-            link=f"/tickets",
+            link="/tickets",
         )
 
     # 通知：评论者不是被分配人 → 通知被分配人
@@ -224,7 +224,7 @@ async def add_comment(
             db, user_id=obj.assignee_id, type="task",
             title=f"工单 #{obj.id} 有新评论",
             body=f"{current.nickname or current.username}：{content[:100]}",
-            link=f"/tickets",
+            link="/tickets",
         )
 
     # 通知：@提及 — 从评论内容中检测 @username
@@ -240,7 +240,7 @@ async def add_comment(
                     db, user_id=mu.id, type="mention",
                     title=f"你在工单 #{obj.id} 被提及",
                     body=f"{current.nickname or current.username}：{content[:100]}",
-                    link=f"/tickets",
+                    link="/tickets",
                 )
 
     await db.commit()

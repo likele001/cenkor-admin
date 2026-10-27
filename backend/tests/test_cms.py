@@ -1,4 +1,3 @@
-import time
 """CMS 模块测试"""
 
 

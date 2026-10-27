@@ -1,7 +1,9 @@
 from datetime import datetime
-from cenkor_admin.core.db import Base
-from sqlalchemy import String, Integer, DateTime, Text, Boolean, func
+
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
+
+from cenkor_admin.core.db import Base
 
 
 class CloudStorageConfig(Base):

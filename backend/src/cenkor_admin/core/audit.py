@@ -1,7 +1,6 @@
 """Cenkor Admin · 审计日志模型 + 中间件"""
 from __future__ import annotations
 
-import json
 import time
 import uuid
 from datetime import datetime
@@ -9,7 +8,7 @@ from typing import Any
 
 import structlog
 from fastapi import Request
-from sqlalchemy import String, Integer, DateTime, func, Text
+from sqlalchemy import DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -68,8 +67,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         try:
             # 鉴权：尝试从 token 拿 user_id（不强制）
-            from cenkor_admin.core.security import decode_token
             from jose import JWTError
+
+            from cenkor_admin.core.security import decode_token
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer "):
                 try:

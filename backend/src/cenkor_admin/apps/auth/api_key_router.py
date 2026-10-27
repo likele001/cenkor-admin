@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.core.db import get_db
 
 router = APIRouter()
@@ -82,8 +82,8 @@ async def create_api_key(
     token_hash = _hash_token(raw)
     expires = None
     if body.expires_days:
-        expires = datetime.now(timezone.utc).timestamp() + body.expires_days * 86400
-        expires_dt = datetime.fromtimestamp(expires, tz=timezone.utc)
+        expires = datetime.now(UTC).timestamp() + body.expires_days * 86400
+        expires_dt = datetime.fromtimestamp(expires, tz=UTC)
     else:
         expires_dt = None
     k = auth_models.ApiKey(
@@ -112,7 +112,7 @@ async def revoke_api_key(
         raise HTTPException(404, "API Key 不存在")
     if k.revoked_at:
         return {"ok": True, "already_revoked": True}
-    k.revoked_at = datetime.now(timezone.utc)
+    k.revoked_at = datetime.now(UTC)
     await db.commit()
     return {"ok": True}
 

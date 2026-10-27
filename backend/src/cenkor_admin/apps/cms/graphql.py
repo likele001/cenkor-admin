@@ -9,13 +9,12 @@ from __future__ import annotations
 from typing import Any
 
 import strawberry
+from sqlalchemy import select
 from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
-from sqlalchemy import select
 
 from cenkor_admin.apps.cms import models
 from cenkor_admin.core.db import get_db
-
 
 # ============================================================
 # GraphQL 类型
@@ -42,7 +41,7 @@ class EntryGQL:
     custom_fields: strawberry.scalars.JSON | None = None
 
     @classmethod
-    def from_model(cls, e: models.Entry) -> "EntryGQL":
+    def from_model(cls, e: models.Entry) -> EntryGQL:
         return cls(
             id=str(e.id),
             content_type_id=e.content_type_id,

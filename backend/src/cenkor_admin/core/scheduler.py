@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select, update
@@ -23,7 +23,7 @@ DEFAULT_INTERVAL = 30  # 秒
 
 async def scheduler_tick() -> dict[str, int]:
     """执行一次调度扫描，返回本次发布/下线数量。"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     published: int = 0
     expired: int = 0
     async with AsyncSessionLocal() as db:
@@ -70,7 +70,7 @@ async def scheduler_tick() -> dict[str, int]:
         from cenkor_admin.core.hooks import dispatch
 
         await dispatch("scheduler.tick")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("scheduler.hook_failed", error=str(e))
 
     if published or expired:
@@ -83,6 +83,6 @@ async def scheduler_loop(interval: int = DEFAULT_INTERVAL) -> None:
     while True:
         try:
             await scheduler_tick()
-        except Exception as e:  # noqa: BLE001 - 调度器必须自愈
+        except Exception as e:
             log.warning("scheduler.tick_failed", error=str(e))
         await asyncio.sleep(interval)

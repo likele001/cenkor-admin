@@ -1,31 +1,30 @@
 """应用商店 API"""
 from __future__ import annotations
 
+import contextlib
 import hashlib
-import json
 import io
+import json
 import os
 import re
 import shutil
-import tempfile
 import uuid
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.portal import models as portal_models
-from cenkor_admin.apps.system import pricing_bridge
-from cenkor_admin.apps.system import pricing_rules
-from cenkor_admin.apps.system import store_models
+from cenkor_admin.apps.portal.auth import PORTAL_JWT_ISSUER, decode_portal_token, is_portal_token
+from cenkor_admin.apps.system import pricing_bridge, pricing_rules, store_models
 from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.apps.system.showcase_meta import SHOWCASE
 from cenkor_admin.apps.system.versioning import ver_gt, ver_tuple
@@ -33,7 +32,6 @@ from cenkor_admin.core import hooks
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.security import decode_token
 from cenkor_admin.core.storage import s3
-from cenkor_admin.apps.portal.auth import decode_portal_token, is_portal_token, PORTAL_JWT_ISSUER
 
 log = structlog.get_logger()
 router = APIRouter()
@@ -59,8 +57,8 @@ async def require_portal_or_admin(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """支持 portal token 或 admin token 的鉴权"""
-    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-    security_bearer = HTTPBearer(auto_error=False)
+    from fastapi.security import HTTPBearer
+    HTTPBearer(auto_error=False)
 
     if not creds or not creds.credentials:
         raise HTTPException(401, "未提供认证信息")
@@ -396,7 +394,7 @@ async def _installed_map(db: AsyncSession) -> dict[str, str]:
             select(InstalledApp.key, InstalledApp.version).where(InstalledApp.status == "installed")
         )
     ).all()
-    return {key: version for key, version in rows}
+    return dict(rows)
 
 
 async def _get_intro(db: AsyncSession, product: str, app_key: str):
@@ -691,6 +689,7 @@ async def list_submissions(
     #              且 platform_apps.status 必须为 installed（避免出现"已卸载却还在已安装列表"）。
     if only_active:
         from sqlalchemy import func as sa_func
+
         from cenkor_admin.apps.system.models import InstalledApp as _IA
         # 1) 找出当前 platform_apps 里 status=installed 的 app_key 集合
         active_keys_rows = (await db.execute(
@@ -924,8 +923,10 @@ async def submit_app(
     if existing:
         raise HTTPException(409, f"版本 {version} 已存在")
 
+    from packaging.version import InvalidVersion as _InvalidVersion
+    from packaging.version import Version as _Version
+
     from cenkor_admin.apps.system.models import InstalledApp as _InstalledApp
-    from packaging.version import Version as _Version, InvalidVersion as _InvalidVersion
     try:
         new_v = _Version(version)
     except _InvalidVersion:
@@ -1128,13 +1129,13 @@ async def submit_app(
                 pricing=price_payload,
             )
             pricing_saved = any(bool(r) for r in results)
-        except Exception as _pe:  # noqa: BLE001 - 定价落库失败不影响提交
+        except Exception as _pe:
             log.warning("store.submit_pricing_fail", app_key=app_key, error=str(_pe))
 
     # 通知所有有审核权限的管理员（闸门与审核端点用同一个码，不再借 rbac:role:write）
     try:
-        from cenkor_admin.apps.rbac.models import RolePermission, UserRole, Permission
         from cenkor_admin.apps.notification.models import Notification
+        from cenkor_admin.apps.rbac.models import Permission, RolePermission, UserRole
         _pid = (await db.execute(
             select(Permission.id).where(Permission.code == "store:review")
         )).scalar_one_or_none()
@@ -1196,7 +1197,7 @@ async def batch_review_submissions(
     )).scalars().all()
     found = {r.id: r for r in rows}
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     updated: list[int] = []
     skipped: list[dict] = []
     for sid in unique_ids:
@@ -1247,7 +1248,7 @@ async def review_submission(
 
     sub.review_note = note
     sub.reviewed_by = _.id
-    sub.reviewed_at = datetime.now(timezone.utc)
+    sub.reviewed_at = datetime.now(UTC)
     await db.commit()
     return {"id": sub.id, "status": sub.status}
 
@@ -1281,7 +1282,7 @@ async def publish_submission(
     sub.status = "published"
     sub.yanked_at = None
     if sub.published_at is None:
-        sub.published_at = datetime.now(timezone.utc)
+        sub.published_at = datetime.now(UTC)
     log.info("store.app_published", app=sub.app_key, version=sub.version, product=sub.product)
     await db.commit()
     return {
@@ -1310,7 +1311,7 @@ async def yank_submission(
     if sub.yanked_at is not None:
         raise HTTPException(409, "该版本已撤回上架")
     reason = str(body.get("reason") or "").strip()
-    sub.yanked_at = datetime.now(timezone.utc)
+    sub.yanked_at = datetime.now(UTC)
     sub.status = "yanked"
     if reason:
         sub.review_note = ((sub.review_note or "") + f"\n[撤回上架] {reason}").strip()
@@ -1419,10 +1420,8 @@ async def withdraw_submission(
 
     # 清理 ZIP 文件
     if sub.file_path and os.path.exists(sub.file_path):
-        try:
+        with contextlib.suppress(Exception):
             os.remove(sub.file_path)
-        except Exception:
-            pass
 
     await db.delete(sub)
     await db.commit()
@@ -1478,6 +1477,7 @@ async def install_submission(
     warnings: list[str] = []
     try:
         from alembic.config import Config
+
         from alembic import command
         _alembic_cfg = Config(
             str(Path(__file__).resolve().parent.parent.parent.parent.parent / "alembic.ini")
@@ -1811,7 +1811,7 @@ async def install_app_from_zip(
             _extract_app_zip(zf, app_dir)
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(500, f"解压失败: {e}") from e
 
     # 前端资源：frontend/dist → static/apps/{key}/
@@ -1828,15 +1828,16 @@ async def install_app_from_zip(
     _copy_migration_files(app_dir, app_key)
     warnings: list[str] = []
     try:
-        from alembic import command
         from alembic.config import Config
+
+        from alembic import command
 
         _alembic_cfg = Config(
             str(Path(__file__).resolve().parent.parent.parent.parent.parent / "alembic.ini")
         )
         command.upgrade(_alembic_cfg, "head")
         log.info("store.migration_upgrade_ok", app_key=app_key)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         # 迁移失败 == 表没建出来。绝不能只 warning 就当装成功：否则界面显示「已安装」，
         # 而接口一访问就报 relation does not exist。故用 error 级日志并显式回报给调用方。
         log.error("store.migration_upgrade_fail", app_key=app_key, error=str(e))
@@ -1846,7 +1847,7 @@ async def install_app_from_zip(
         from cenkor_admin.apps.system.app_registry import install_app
 
         await install_app(db, app_key)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("store.install.auto_failed", app_key=app_key, error=str(e))
         raise HTTPException(500, f"应用注册失败: {e}") from e
 
@@ -1857,7 +1858,7 @@ async def install_app_from_zip(
         route_registered = register_app_router(app_key)
         if not route_registered and (app_dir / "router.py").exists():
             warnings.append("API 路由注册失败，请检查 router.py 中的 import 路径")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("store.route_register_failed", app_key=app_key, error=str(e))
         warnings.append(f"API 路由注册异常: {e}")
 
@@ -2028,6 +2029,6 @@ async def store_media_upload(
 # 开源层实现；商业版的 commerce / cloud_router 是另一条带库表的链路。
 # 放在文件末尾 include，避免与 market_router 内部的延迟导入形成环。
 # ============================================================
-from cenkor_admin.apps.system.market_router import router as market_router  # noqa: E402
+from cenkor_admin.apps.system.market_router import router as market_router
 
 router.include_router(market_router, prefix="/official", tags=["app-official"])

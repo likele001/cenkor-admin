@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -55,7 +54,7 @@ class MenuOut(BaseModel):
     path: str | None
     sort: int
     status: str
-    children: list["MenuOut"] = []
+    children: list[MenuOut] = []
     model_config = ConfigDict(from_attributes=True)
 
 

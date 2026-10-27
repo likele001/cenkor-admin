@@ -1,7 +1,9 @@
 from datetime import datetime
-from cenkor_admin.core.db import Base
-from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, func
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
+
+from cenkor_admin.core.db import Base
 
 
 class Note(Base):

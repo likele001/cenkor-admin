@@ -27,6 +27,7 @@ async def test_jwt_round_trip():
 async def test_invalid_jwt_rejected():
     """非法 token 被拒"""
     from jose import JWTError
+
     from cenkor_admin.core.security import decode_token
     with pytest.raises(JWTError):
         decode_token("not-a-valid-token")

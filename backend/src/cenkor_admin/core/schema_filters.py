@@ -49,10 +49,7 @@ APP_SCHEMA_PREFIXES = {
 
 def is_app_managed_table(name: str) -> bool:
     """该表是否由某个应用的 schema.sql 托管。"""
-    for prefixes in APP_SCHEMA_PREFIXES.values():
-        if name.startswith(prefixes):
-            return True
-    return False
+    return any(name.startswith(prefixes) for prefixes in APP_SCHEMA_PREFIXES.values())
 
 
 # 名字前缀：泄露处置时留下的明文备份表

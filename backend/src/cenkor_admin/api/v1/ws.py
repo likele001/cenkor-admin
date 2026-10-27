@@ -9,15 +9,13 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any
 
 import structlog
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
-
-from cenkor_admin.core.db import AsyncSessionLocal
-from cenkor_admin.core.security import decode_token
-from cenkor_admin.core.redis import redis_client
 from jose import JWTError
+
+from cenkor_admin.core.redis import redis_client
+from cenkor_admin.core.security import decode_token
 
 log = structlog.get_logger()
 router = APIRouter()
@@ -101,7 +99,7 @@ async def notifications_ws(
         asyncio.create_task(notifier(), name="ws.notifier"),
     ]
     try:
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
             t.cancel()
     except WebSocketDisconnect:

@@ -48,7 +48,7 @@ async def comment_stats(db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(
         select(Comment.status, func.count()).group_by(Comment.status)
     )).all()
-    return {"by_status": {s: n for s, n in rows}, "total": sum(n for _, n in rows)}
+    return {"by_status": dict(rows), "total": sum(n for _, n in rows)}
 
 
 @router.patch("/{comment_id}", response_model=dict[str, Any])

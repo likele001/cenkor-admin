@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """builder.py — cenkor-admin CRUD 代码生成核心库
 
 从 ``scripts/gen-app.py`` 抽出的纯逻辑层，供两处调用：
@@ -89,7 +88,7 @@ def eprint(*a):
 
 def parse_migration(path: Path):
     try:
-        tree = ast.parse(io.open(path, encoding="utf-8").read())
+        tree = ast.parse(open(path, encoding="utf-8").read())
     except SyntaxError:
         return None, None
     rev = down = None
@@ -127,7 +126,7 @@ def _compute_head(files: list[Path], scope: str) -> str:
             continue
         rev, down = parse_migration(f)
         if rev is None:
-            eprint("  ! 跳过（无 revision）：%s" % f.name)
+            eprint(f"  ! 跳过（无 revision）：{f.name}")
             continue
         revs[rev] = f.name
         if down is None:
@@ -139,7 +138,7 @@ def _compute_head(files: list[Path], scope: str) -> str:
     referenced = {p for ps in downs.values() for p in ps}
     heads = sorted(r for r in revs if r not in referenced)
     if len(heads) == 0:
-        raise SystemExit("✗ %s迁移图没有 head（全是环或全断）" % scope)
+        raise SystemExit(f"✗ {scope}迁移图没有 head（全是环或全断）")
     if len(heads) > 1:
         raise SystemExit(
             "✗ %s迁移图有 %d 个 head，无法确定 down_revision：\n    %s\n"
@@ -151,11 +150,11 @@ def _compute_head(files: list[Path], scope: str) -> str:
 
 def all_migration_files(versions_dir: Path) -> list[Path]:
     if not versions_dir.is_dir():
-        raise SystemExit("✗ 迁移目录不存在：%s" % versions_dir)
+        raise SystemExit(f"✗ 迁移目录不存在：{versions_dir}")
     return sorted(f for f in versions_dir.glob("*.py"))
 
 
-def git_tracked_names(versions_dir: Path) -> "set[str] | None":
+def git_tracked_names(versions_dir: Path) -> set[str] | None:
     """git 跟踪的迁移文件名集合（= 公开仓库视图）；无 git 时返回 None。"""
     try:
         out = subprocess.run(
@@ -186,7 +185,7 @@ def tracked_head(versions_dir: Path) -> str:
     files = [f for f in all_migration_files(versions_dir) if f.name in tracked]
     if not files:
         raise SystemExit(
-            "✗ 取不到 git 跟踪的迁移（%s 未纳入版本控制？请在仓库根目录执行本脚本）" % versions_dir
+            f"✗ 取不到 git 跟踪的迁移（{versions_dir} 未纳入版本控制？请在仓库根目录执行本脚本）"
         )
     return _compute_head(files, "开源")
 
@@ -197,13 +196,12 @@ def tracked_head(versions_dir: Path) -> str:
 
 def norm_field(raw: dict, entity_key: str) -> dict:
     if not raw.get("name"):
-        raise SystemExit("✗ 字段缺少 name：%r（实体 %s）" % (raw, entity_key))
+        raise SystemExit(f"✗ 字段缺少 name：{raw!r}（实体 {entity_key}）")
     f = dict(raw)
     f["name"] = str(f["name"])
     ftype = str(f.get("type", "string"))
     if ftype not in FIELD_TYPES:
-        raise SystemExit("✗ 未知字段类型 %r（字段 %s.%s）；可用：%s"
-                         % (ftype, entity_key, f["name"], ", ".join(sorted(FIELD_TYPES))))
+        raise SystemExit("✗ 未知字段类型 {!r}（字段 {}.{}）；可用：{}".format(ftype, entity_key, f["name"], ", ".join(sorted(FIELD_TYPES))))
     f["type"] = ftype
     f["label"] = str(f.get("label") or f["name"])
     f["required"] = bool(f.get("required", False))
@@ -216,7 +214,7 @@ def norm_field(raw: dict, entity_key: str) -> dict:
     if ftype == "enum":
         choices = f.get("choices") or []
         if not choices:
-            raise SystemExit("✗ enum 字段 %s.%s 缺少 choices" % (entity_key, f["name"]))
+            raise SystemExit("✗ enum 字段 {}.{} 缺少 choices".format(entity_key, f["name"]))
         f["choices"] = [str(c) for c in choices]
     if ftype == "decimal":
         f["precision"] = int(f.get("precision") or 12)
@@ -231,7 +229,7 @@ def norm_spec(raw: dict) -> dict:
         raise SystemExit("✗ spec 必须是一个映射（YAML 根节点为 key/value）")
     key = str(raw.get("key") or "").strip()
     if not re.fullmatch(r"[a-z][a-z0-9_]*", key):
-        raise SystemExit("✗ key 必须是小写字母开头、仅含小写字母数字下划线：%r" % key)
+        raise SystemExit(f"✗ key 必须是小写字母开头、仅含小写字母数字下划线：{key!r}")
     entities = raw.get("entities") or []
     if not entities:
         raise SystemExit("✗ spec 至少需要一个 entity")
@@ -250,24 +248,24 @@ def norm_spec(raw: dict) -> dict:
     for i, ent in enumerate(entities):
         ekey = str(ent.get("key") or "").strip()
         if not re.fullmatch(r"[a-z][a-z0-9_]*", ekey):
-            raise SystemExit("✗ entity.key 非法：%r" % ekey)
+            raise SystemExit(f"✗ entity.key 非法：{ekey!r}")
         if ekey in seen:
-            raise SystemExit("✗ entity.key 重复：%r" % ekey)
+            raise SystemExit(f"✗ entity.key 重复：{ekey!r}")
         seen.add(ekey)
         fields = [norm_field(f, ekey) for f in (ent.get("fields") or [])]
         if not fields:
-            raise SystemExit("✗ entity %s 没有任何字段" % ekey)
+            raise SystemExit(f"✗ entity {ekey} 没有任何字段")
         if len({f["name"] for f in fields}) != len(fields):
-            raise SystemExit("✗ entity %s 字段名重复" % ekey)
+            raise SystemExit(f"✗ entity {ekey} 字段名重复")
         out["entities"].append({
             "key": ekey,
             "name": str(ent.get("name") or pascal(ekey)) + "管理",
             "title": str(ent.get("title") or ent.get("name") or pascal(ekey)),
             "subtitle": str(ent.get("subtitle") or ""),
-            "route": "%s/%s" % (key, ekey),          # 前端相对路由（无前导斜杠）
-            "menu_path": "/%s/%s" % (key, ekey),     # 菜单绝对路径
+            "route": f"{key}/{ekey}",          # 前端相对路由（无前导斜杠）
+            "menu_path": f"/{key}/{ekey}",     # 菜单绝对路径
             "class": pascal(ekey),
-            "table": "%s_%s" % (key, ekey),
+            "table": f"{key}_{ekey}",
             "fields": fields,
             "sort": int(ent.get("sort") or (out["sort"] + i + 1)),
         })
@@ -313,7 +311,7 @@ def py_annot(f: dict) -> str:
     base = PY_TYPES[f["type"]]
     if f["required"]:
         return base
-    return "%s | None" % base
+    return f"{base} | None"
 
 
 def models_column(f: dict) -> str:
@@ -329,14 +327,14 @@ def models_column(f: dict) -> str:
         elif f["type"] in ("int", "fk"):
             parts.append("default=%d" % int(d))
         elif f["type"] == "decimal":
-            parts.append("default=%s" % repr(float(d)))
+            parts.append(f"default={float(d)!r}")
         else:
-            parts.append("default=%r" % str(d))
+            parts.append(f"default={str(d)!r}")
     if f["unique"]:
         parts.append("unique=True")
     if f["index"] or f["type"] == "fk":
         parts.append("index=True")
-    return "    %s: Mapped[%s] = mapped_column(%s)" % (snake(f["name"]), py_annot(f), ", ".join(parts))
+    return "    {}: Mapped[{}] = mapped_column({})".format(snake(f["name"]), py_annot(f), ", ".join(parts))
 
 
 def render_models(spec: dict, rel: bool = True) -> str:
@@ -358,9 +356,9 @@ def render_models(spec: dict, rel: bool = True) -> str:
     sa_names.append("func")
     sa_names = sorted(set(sa_names))
     lines = [
-        '"""%s — ORM 模型（由代码生成器生成，可按需手改）"""' % spec["name"],
+        '"""{} — ORM 模型（由代码生成器生成，可按需手改）"""'.format(spec["name"]),
         import_line,
-        "from sqlalchemy import %s" % ", ".join(sa_names),
+        "from sqlalchemy import {}".format(", ".join(sa_names)),
     ]
     if need_jsonb:
         lines.append("from sqlalchemy.dialects.postgresql import JSONB")
@@ -372,8 +370,8 @@ def render_models(spec: dict, rel: bool = True) -> str:
         "",
     ]
     for e in spec["entities"]:
-        lines.append("class %s(Base):" % e["class"])
-        lines.append('    __tablename__ = "%s"' % e["table"])
+        lines.append("class {}(Base):".format(e["class"]))
+        lines.append('    __tablename__ = "{}"'.format(e["table"]))
         lines.append("")
         lines.append("    id: Mapped[int] = mapped_column(Integer, primary_key=True)")
         for f in e["fields"]:
@@ -391,12 +389,12 @@ def render_models(spec: dict, rel: bool = True) -> str:
 
 def _dict_value_expr(f: dict, var: str) -> str:
     """_to_dict 中某字段的序列化表达式"""
-    col = "%s.%s" % (var, snake(f["name"]))
+    col = "{}.{}".format(var, snake(f["name"]))
     t = f["type"]
     if t in ("datetime", "date"):
-        return '%s.isoformat() if %s else None' % (col, col)
+        return f'{col}.isoformat() if {col} else None'
     if t == "decimal":
-        return 'float(%s) if %s is not None else None' % (col, col)
+        return f'float({col}) if {col} is not None else None'
     return col
 
 
@@ -409,7 +407,7 @@ def render_router(spec: dict) -> str:
         sa_imports.append("or_")
 
     out = [
-        '"""%s — CRUD 路由（由代码生成器生成）' % spec["name"],
+        '"""{} — CRUD 路由（由代码生成器生成）'.format(spec["name"]),
         "",
         "约定：",
         '  · 每个端点用 require_permission("<key>:<entity>:<action>") 守卫',
@@ -421,7 +419,7 @@ def render_router(spec: dict) -> str:
         "",
         "from fastapi import APIRouter, Depends, HTTPException, Query",
         "from fastapi.responses import Response",
-        "from sqlalchemy import %s" % ", ".join(sorted(sa_imports)),
+        "from sqlalchemy import {}".format(", ".join(sorted(sa_imports))),
         "from sqlalchemy.ext.asyncio import AsyncSession",
         "",
         "from cenkor_admin.api.deps import require_permission",
@@ -441,14 +439,14 @@ def render_router(spec: dict) -> str:
         cols = [snake(f["name"]) for f in fields]
         searchable = [snake(f["name"]) for f in fields if f["search"]]
         filterable = [f for f in fields if f["filter"]]
-        required = [snake(f["name"]) for f in fields if f["required"] and f["type"] != "bool"]
+        [snake(f["name"]) for f in fields if f["required"] and f["type"] != "bool"]
 
         # _to_dict
-        out.append("def _to_dict_%s(obj: models.%s) -> dict:" % (ekey, cls))
+        out.append(f"def _to_dict_{ekey}(obj: models.{cls}) -> dict:")
         out.append("    return {")
         out.append('        "id": obj.id,')
         for f in fields:
-            out.append('        "%s": %s,' % (snake(f["name"]), _dict_value_expr(f, "obj")))
+            out.append('        "{}": {},'.format(snake(f["name"]), _dict_value_expr(f, "obj")))
         out += [
             '        "creator_id": obj.creator_id,',
             '        "created_at": obj.created_at.isoformat() if obj.created_at else None,',
@@ -459,40 +457,40 @@ def render_router(spec: dict) -> str:
         ]
 
         # list
-        out.append('@router.get("/%s")' % ekey)
-        out.append("async def list_%s(" % ekey)
+        out.append(f'@router.get("/{ekey}")')
+        out.append(f"async def list_{ekey}(")
         out.append("    db: AsyncSession = Depends(get_db),")
-        out.append('    _: auth_models.User = Depends(require_permission("%s:%s:read")),' % (key, ekey))
+        out.append(f'    _: auth_models.User = Depends(require_permission("{key}:{ekey}:read")),')
         out.append("    search: str | None = None,")
         for f in filterable:
-            out.append("    %s: %s = None," % (snake(f["name"]), _filter_param_type(f)))
+            out.append("    {}: {} = None,".format(snake(f["name"]), _filter_param_type(f)))
         out.append("    page: int = Query(1, ge=1),")
         out.append("    page_size: int = Query(20, ge=1, le=200),")
         out.append("):")
-        out.append("    stmt = select(models.%s).where(models.%s.deleted_at.is_(None))" % (cls, cls))
+        out.append(f"    stmt = select(models.{cls}).where(models.{cls}.deleted_at.is_(None))")
         if searchable:
             out.append("    if search:")
             out.append('        like = f"%{search}%"')
-            conds = " | ".join("models.%s.%s.ilike(like)" % (cls, c) for c in searchable)
+            conds = " | ".join(f"models.{cls}.{c}.ilike(like)" for c in searchable)
             if len(searchable) > 1:
-                out.append("        stmt = stmt.where(%s)" % conds)
+                out.append(f"        stmt = stmt.where({conds})")
             else:
-                out.append("        stmt = stmt.where(%s)" % conds)
+                out.append(f"        stmt = stmt.where({conds})")
         for f in filterable:
             c = snake(f["name"])
-            out.append("    if %s is not None:" % c)
+            out.append(f"    if {c} is not None:")
             if f["type"] == "string" or f["type"] == "enum":
-                out.append('        stmt = stmt.where(models.%s.%s == %s)' % (cls, c, c))
+                out.append(f'        stmt = stmt.where(models.{cls}.{c} == {c})')
             else:
-                out.append('        stmt = stmt.where(models.%s.%s == %s)' % (cls, c, c))
+                out.append(f'        stmt = stmt.where(models.{cls}.{c} == {c})')
         out.append("    total = (await db.execute(")
         out.append("        select(func.count()).select_from(stmt.subquery())")
         out.append("    )).scalar() or 0")
-        out.append("    stmt = stmt.order_by(models.%s.updated_at.desc())" % cls)
+        out.append(f"    stmt = stmt.order_by(models.{cls}.updated_at.desc())")
         out.append("    stmt = stmt.offset((page - 1) * page_size).limit(page_size)")
         out.append("    items = (await db.execute(stmt)).scalars().all()")
         out.append("    return {")
-        out.append('        "items": [_to_dict_%s(o) for o in items],' % ekey)
+        out.append(f'        "items": [_to_dict_{ekey}(o) for o in items],')
         out.append('        "total": total,')
         out.append('        "page": page,')
         out.append('        "page_size": page_size,')
@@ -501,96 +499,96 @@ def render_router(spec: dict) -> str:
         out.append("")
 
         # export (declared BEFORE /{item_id})
-        out.append('@router.get("/%s/export")' % ekey)
-        out.append("async def export_%s(" % ekey)
+        out.append(f'@router.get("/{ekey}/export")')
+        out.append(f"async def export_{ekey}(")
         out.append("    db: AsyncSession = Depends(get_db),")
-        out.append('    _: auth_models.User = Depends(require_permission("%s:%s:export")),' % (key, ekey))
+        out.append(f'    _: auth_models.User = Depends(require_permission("{key}:{ekey}:export")),')
         out.append("):")
-        out.append("    stmt = select(models.%s).where(models.%s.deleted_at.is_(None))" % (cls, cls))
-        out.append("    stmt = stmt.order_by(models.%s.updated_at.desc())" % cls)
+        out.append(f"    stmt = select(models.{cls}).where(models.{cls}.deleted_at.is_(None))")
+        out.append(f"    stmt = stmt.order_by(models.{cls}.updated_at.desc())")
         out.append("    items = (await db.execute(stmt)).scalars().all()")
-        out.append('    header = ["id"] + %r + ["creator_id", "created_at", "updated_at"]' % cols)
+        out.append(f'    header = ["id"] + {cols!r} + ["creator_id", "created_at", "updated_at"]')
         out.append('    lines = [",".join(header)]')
         out.append("    for o in items:")
-        out.append("        d = _to_dict_%s(o)" % ekey)
+        out.append(f"        d = _to_dict_{ekey}(o)")
         out.append('        lines.append(",".join(str(d.get(k, "")) for k in header))')
         out.append('    csv = "\\ufeff" + "\\n".join(lines)')
         out.append('    return Response(csv, media_type="text/csv", headers={')
-        out.append('        "Content-Disposition": \'attachment; filename="%s.csv"\'}' % ekey)
+        out.append(f'        "Content-Disposition": \'attachment; filename="{ekey}.csv"\'}}')
         out.append("    )")
         out.append("")
         out.append("")
 
         # create
-        out.append('@router.post("/%s", status_code=201)' % ekey)
-        out.append("async def create_%s(" % ekey)
+        out.append(f'@router.post("/{ekey}", status_code=201)')
+        out.append(f"async def create_{ekey}(")
         out.append("    body: dict,")
         out.append("    db: AsyncSession = Depends(get_db),")
-        out.append('    current: auth_models.User = Depends(require_permission("%s:%s:write")),' % (key, ekey))
+        out.append(f'    current: auth_models.User = Depends(require_permission("{key}:{ekey}:write")),')
         out.append("):")
         out.append("    # TODO(business): 在此补充跨 App 写 / 业务校验")
-        out.append("    obj = models.%s()" % cls)
+        out.append(f"    obj = models.{cls}()")
         for f in fields:
             c = snake(f["name"])
-            out.append('    if "%s" in body:' % c)
-            out.append('        obj.%s = body["%s"]' % (c, c))
+            out.append(f'    if "{c}" in body:')
+            out.append(f'        obj.{c} = body["{c}"]')
         for f in fields:
             if f["required"] and f["type"] != "bool":
                 c = snake(f["name"])
-                out.append('    if obj.%s in (None, ""):' % c)
-                out.append('        raise HTTPException(400, "%s is required")' % c)
+                out.append(f'    if obj.{c} in (None, ""):')
+                out.append(f'        raise HTTPException(400, "{c} is required")')
         out.append("    obj.creator_id = current.id")
         out.append("    db.add(obj)")
         out.append("    await db.commit()")
         out.append("    await db.refresh(obj)")
-        out.append("    return _to_dict_%s(obj)" % ekey)
+        out.append(f"    return _to_dict_{ekey}(obj)")
         out.append("")
         out.append("")
 
         # detail
-        out.append('@router.get("/%s/{item_id}")' % ekey)
-        out.append("async def get_%s(" % ekey)
+        out.append(f'@router.get("/{ekey}/{{item_id}}")')
+        out.append(f"async def get_{ekey}(")
         out.append("    item_id: int,")
         out.append("    db: AsyncSession = Depends(get_db),")
-        out.append('    _: auth_models.User = Depends(require_permission("%s:%s:read")),' % (key, ekey))
+        out.append(f'    _: auth_models.User = Depends(require_permission("{key}:{ekey}:read")),')
         out.append("):")
-        out.append("    obj = await db.get(models.%s, item_id)" % cls)
+        out.append(f"    obj = await db.get(models.{cls}, item_id)")
         out.append("    if not obj or obj.deleted_at:")
         out.append('        raise HTTPException(404, "not found")')
-        out.append("    return _to_dict_%s(obj)" % ekey)
+        out.append(f"    return _to_dict_{ekey}(obj)")
         out.append("")
         out.append("")
 
         # update
-        out.append('@router.patch("/%s/{item_id}")' % ekey)
-        out.append("async def update_%s(" % ekey)
+        out.append(f'@router.patch("/{ekey}/{{item_id}}")')
+        out.append(f"async def update_{ekey}(")
         out.append("    item_id: int,")
         out.append("    body: dict,")
         out.append("    db: AsyncSession = Depends(get_db),")
-        out.append('    _: auth_models.User = Depends(require_permission("%s:%s:write")),' % (key, ekey))
+        out.append(f'    _: auth_models.User = Depends(require_permission("{key}:{ekey}:write")),')
         out.append("):")
-        out.append("    obj = await db.get(models.%s, item_id)" % cls)
+        out.append(f"    obj = await db.get(models.{cls}, item_id)")
         out.append("    if not obj or obj.deleted_at:")
         out.append('        raise HTTPException(404, "not found")')
         out.append("    # TODO(business): 在此补充业务校验")
-        cols_tuple = ", ".join('"%s"' % c for c in cols)
-        out.append("    for field in (%s):" % cols_tuple)
+        cols_tuple = ", ".join(f'"{c}"' for c in cols)
+        out.append(f"    for field in ({cols_tuple}):")
         out.append("        if field in body:")
         out.append("            setattr(obj, field, body[field])")
         out.append("    await db.commit()")
         out.append("    await db.refresh(obj)")
-        out.append("    return _to_dict_%s(obj)" % ekey)
+        out.append(f"    return _to_dict_{ekey}(obj)")
         out.append("")
         out.append("")
 
         # delete (soft)
-        out.append('@router.delete("/%s/{item_id}", status_code=204)' % ekey)
-        out.append("async def delete_%s(" % ekey)
+        out.append(f'@router.delete("/{ekey}/{{item_id}}", status_code=204)')
+        out.append(f"async def delete_{ekey}(")
         out.append("    item_id: int,")
         out.append("    db: AsyncSession = Depends(get_db),")
-        out.append('    _: auth_models.User = Depends(require_permission("%s:%s:delete")),' % (key, ekey))
+        out.append(f'    _: auth_models.User = Depends(require_permission("{key}:{ekey}:delete")),')
         out.append("):")
-        out.append("    obj = await db.get(models.%s, item_id)" % cls)
+        out.append(f"    obj = await db.get(models.{cls}, item_id)")
         out.append("    if not obj or obj.deleted_at:")
         out.append('        raise HTTPException(404, "not found")')
         out.append("    obj.deleted_at = datetime.now(timezone.utc)")
@@ -652,23 +650,23 @@ def mig_column(f: dict) -> str:
         elif t in ("int", "fk"):
             sd = ", server_default=sa.text('%d')" % int(d)
         elif t == "decimal":
-            sd = ", server_default=sa.text('%s')" % str(d)
+            sd = f", server_default=sa.text('{d!s}')"
         elif t in ("string", "enum", "text"):
-            sd = ", server_default=%r" % str(d)
-    return '        sa.Column("%s", %s, nullable=%s%s),' % (name, expr, nullable, sd)
+            sd = f", server_default={str(d)!r}"
+    return f'        sa.Column("{name}", {expr}, nullable={nullable}{sd}),'
 
 
 def render_migration(spec: dict, head: str) -> tuple:
     key = spec["key"]
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    rev = ("%s_gen_%s" % (ts, key))[:32]
-    fname = "%s_create_%s.py" % (ts, key)
+    rev = (f"{ts}_gen_{key}")[:32]
+    fname = f"{ts}_create_{key}.py"
     lines = [
-        '"""create %s tables' % key,
+        f'"""create {key} tables',
         "",
-        "Revision ID: %s" % rev,
-        "Revises: %s" % head,
-        "Create Date: %s" % datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        f"Revision ID: {rev}",
+        f"Revises: {head}",
+        "Create Date: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")),
         "",
         '"""',
         "from alembic import op",
@@ -678,8 +676,8 @@ def render_migration(spec: dict, head: str) -> tuple:
         lines.append("from sqlalchemy.dialects import postgresql")
     lines += [
         "",
-        'revision = "%s"' % rev,
-        'down_revision = "%s"' % head,
+        f'revision = "{rev}"',
+        f'down_revision = "{head}"',
         "branch_labels = None",
         "depends_on = None",
         "",
@@ -688,7 +686,7 @@ def render_migration(spec: dict, head: str) -> tuple:
     ]
     for e in spec["entities"]:
         lines.append('    op.create_table(')
-        lines.append('        "%s",' % e["table"])
+        lines.append('        "{}",'.format(e["table"]))
         lines.append('        sa.Column("id", sa.Integer(), primary_key=True),')
         for f in e["fields"]:
             lines.append(mig_column(f))
@@ -697,13 +695,13 @@ def render_migration(spec: dict, head: str) -> tuple:
         lines.append('        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),')
         lines.append('        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),')
         lines.append('    )')
-        lines.append('    op.create_index("ix_%s_creator_id", "%s", ["creator_id"])' % (e["table"], e["table"]))
+        lines.append('    op.create_index("ix_{}_creator_id", "{}", ["creator_id"])'.format(e["table"], e["table"]))
         for f in e["fields"]:
             c = snake(f["name"])
             if f["unique"]:
-                lines.append('    op.create_index("uq_%s_%s", "%s", ["%s"], unique=True)' % (e["table"], c, e["table"], c))
+                lines.append('    op.create_index("uq_{}_{}", "{}", ["{}"], unique=True)'.format(e["table"], c, e["table"], c))
             elif f["index"] or f["type"] == "fk":
-                lines.append('    op.create_index("ix_%s_%s", "%s", ["%s"])' % (e["table"], c, e["table"], c))
+                lines.append('    op.create_index("ix_{}_{}", "{}", ["{}"])'.format(e["table"], c, e["table"], c))
         lines.append("")
     lines += [
         "",
@@ -713,11 +711,11 @@ def render_migration(spec: dict, head: str) -> tuple:
         for f in e["fields"]:
             c = snake(f["name"])
             if f["unique"]:
-                lines.append('    op.drop_index("uq_%s_%s", table_name="%s")' % (e["table"], c, e["table"]))
+                lines.append('    op.drop_index("uq_{}_{}", table_name="{}")'.format(e["table"], c, e["table"]))
             elif f["index"] or f["type"] == "fk":
-                lines.append('    op.drop_index("ix_%s_%s", table_name="%s")' % (e["table"], c, e["table"]))
-        lines.append('    op.drop_index("ix_%s_creator_id", table_name="%s")' % (e["table"], e["table"]))
-        lines.append('    op.drop_table("%s")' % e["table"])
+                lines.append('    op.drop_index("ix_{}_{}", table_name="{}")'.format(e["table"], c, e["table"]))
+        lines.append('    op.drop_index("ix_{}_creator_id", table_name="{}")'.format(e["table"], e["table"]))
+        lines.append('    op.drop_table("{}")'.format(e["table"]))
     return fname, rev, "\n".join(lines) + "\n"
 
 
@@ -737,7 +735,7 @@ def _rewrite_down_revision(path: Path, new_head: str) -> bool:
 
 
 def rebase_closed_chain(versions_dir: Path, old_head: str, new_rev: str,
-                        exclude: "set[str] | None" = None) -> "list[tuple[str, str]]":
+                        exclude: set[str] | None = None) -> list[tuple[str, str]]:
     """内置模式：把「挂在开源链旧 head 下的闭源迁移」顺延挂到新迁移之下。
 
     为什么必须做：闭源商业应用（erp/crm/mes/commerce…）的迁移入口挂在最靠后的开源
@@ -771,8 +769,8 @@ def render_permissions(spec: dict) -> list:
     perms = []
     for e in spec["entities"]:
         for act in ("read", "write", "delete", "export"):
-            perms.append("%s:%s:%s" % (key, e["key"], act))
-    perms.append("%s:admin" % key)
+            perms.append("{}:{}:{}".format(key, e["key"], act))
+    perms.append(f"{key}:admin")
     return perms
 
 
@@ -780,30 +778,30 @@ def render_manifest(spec: dict) -> str:
     key = spec["key"]
     perms = render_permissions(spec)
     lines = [
-        '"""%s — AppManifest（由代码生成器生成）"""' % spec["name"],
+        '"""{} — AppManifest（由代码生成器生成）"""'.format(spec["name"]),
         "from __future__ import annotations",
         "",
         "from cenkor_admin.apps.base import AppManifest",
         "",
         "",
         "MANIFEST = AppManifest(",
-        '    key="%s",' % key,
-        '    name="%s",' % spec["name"],
-        '    version="%s",' % spec["version"],
-        '    author=%r,' % spec["author"],
-        '    description=%r,' % (spec["description"] or "%s（CRUD 应用）" % spec["name"]),
-        '    icon="%s",' % spec["icon"],
-        '    category="%s",' % spec["category"],
+        f'    key="{key}",',
+        '    name="{}",'.format(spec["name"]),
+        '    version="{}",'.format(spec["version"]),
+        '    author={!r},'.format(spec["author"]),
+        '    description=%r,' % (spec["description"] or "{}（CRUD 应用）".format(spec["name"])),
+        '    icon="{}",'.format(spec["icon"]),
+        '    category="{}",'.format(spec["category"]),
         "    permissions_required=[",
     ]
     for p in perms:
-        lines.append('        "%s",' % p)
+        lines.append(f'        "{p}",')
     lines += [
         "    ],",
         "    menus=[",
         "        {",
-        '            "key": "%s",' % key,
-        '            "title": "%s",' % spec["name"],
+        f'            "key": "{key}",',
+        '            "title": "{}",'.format(spec["name"]),
         '            "icon": "%s",' % (spec.get("menu_icon") or "appstore"),
         '            "sort": %d,' % spec["sort"],
         '            "children": [',
@@ -811,9 +809,9 @@ def render_manifest(spec: dict) -> str:
     for e in spec["entities"]:
         lines += [
             "                {",
-            '                    "key": "%s:%s",' % (key, e["key"]),
-            '                    "title": "%s",' % e["title"],
-            '                    "path": "%s",' % e["menu_path"],
+            '                    "key": "{}:{}",'.format(key, e["key"]),
+            '                    "title": "{}",'.format(e["title"]),
+            '                    "path": "{}",'.format(e["menu_path"]),
             '                    "icon": "menu",',
             '                    "sort": %d,' % e["sort"],
             "                },",
@@ -822,7 +820,7 @@ def render_manifest(spec: dict) -> str:
         "            ],",
         "        },",
         "    ],",
-        '    public_routes_prefix="/api/v1/%s",' % key,
+        f'    public_routes_prefix="/api/v1/{key}",',
         ")",
         "",
     ]
@@ -830,7 +828,7 @@ def render_manifest(spec: dict) -> str:
 
 
 def render_init(spec: dict) -> str:
-    return '"""%s"""\nfrom .manifest import MANIFEST\n\n__all__ = ["MANIFEST"]\n' % spec["name"]
+    return '"""{}"""\nfrom .manifest import MANIFEST\n\n__all__ = ["MANIFEST"]\n'.format(spec["name"])
 
 
 # ---------------------------------------------------------------------------
@@ -842,51 +840,51 @@ def vue_control(f: dict) -> str:
     t = f["type"]
     label = f["label"]
     if t == "text":
-        return ('        <el-form-item label="%s" prop="%s">\n'
-                '          <el-input v-model="form.%s" type="textarea" :rows="3" />\n'
-                '        </el-form-item>' % (label, c, c))
+        return (f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-input v-model="form.{c}" type="textarea" :rows="3" />\n'
+                '        </el-form-item>')
     if t == "int":
-        return ('        <el-form-item label="%s" prop="%s">\n'
-                '          <el-input-number v-model="form.%s" :min="0" style="width: 200px" />\n'
-                '        </el-form-item>' % (label, c, c))
+        return (f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-input-number v-model="form.{c}" :min="0" style="width: 200px" />\n'
+                '        </el-form-item>')
     if t == "fk":
         return ('        <!-- TODO(business): fk 远程下拉为 P1，先用数字输入 -->\n'
-                '        <el-form-item label="%s" prop="%s">\n'
-                '          <el-input-number v-model="form.%s" :min="0" style="width: 200px" />\n'
-                '        </el-form-item>' % (label, c, c))
+                f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-input-number v-model="form.{c}" :min="0" style="width: 200px" />\n'
+                '        </el-form-item>')
     if t == "decimal":
         return ('        <el-form-item label="%s" prop="%s">\n'
                 '          <el-input-number v-model="form.%s" :precision="%d" :step="0.01" style="width: 200px" />\n'
                 '        </el-form-item>' % (label, c, c, f["scale"]))
     if t == "bool":
-        return ('        <el-form-item label="%s" prop="%s">\n'
-                '          <el-switch v-model="form.%s" />\n'
-                '        </el-form-item>' % (label, c, c))
+        return (f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-switch v-model="form.{c}" />\n'
+                '        </el-form-item>')
     if t == "date":
-        return ('        <el-form-item label="%s" prop="%s">\n'
-                '          <el-date-picker v-model="form.%s" type="date" value-format="YYYY-MM-DD" style="width: 200px" />\n'
-                '        </el-form-item>' % (label, c, c))
+        return (f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-date-picker v-model="form.{c}" type="date" value-format="YYYY-MM-DD" style="width: 200px" />\n'
+                '        </el-form-item>')
     if t == "datetime":
-        return ('        <el-form-item label="%s" prop="%s">\n'
-                '          <el-date-picker v-model="form.%s" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width: 220px" />\n'
-                '        </el-form-item>' % (label, c, c))
+        return (f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-date-picker v-model="form.{c}" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width: 220px" />\n'
+                '        </el-form-item>')
     if t == "enum":
         opts = "".join(
-            '\n            <el-option label="%s" value="%s" />' % (ch, ch) for ch in f["choices"]
+            f'\n            <el-option label="{ch}" value="{ch}" />' for ch in f["choices"]
         )
-        return ('        <el-form-item label="%s" prop="%s">\n'
-                '          <el-select v-model="form.%s" placeholder="请选择" clearable style="width: 200px">%s\n'
+        return (f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-select v-model="form.{c}" placeholder="请选择" clearable style="width: 200px">{opts}\n'
                 '          </el-select>\n'
-                '        </el-form-item>' % (label, c, c, opts))
+                '        </el-form-item>')
     if t == "json":
         return ('        <!-- json 字段：高级表单暂不生成，需要时手写 -->\n'
-                '        <el-form-item label="%s" prop="%s">\n'
-                '          <el-input v-model="form._%s_raw" type="textarea" :rows="3" placeholder=\'JSON，如 {"k": "v"}\' />\n'
-                '        </el-form-item>' % (label, c, c))
+                f'        <el-form-item label="{label}" prop="{c}">\n'
+                f'          <el-input v-model="form._{c}_raw" type="textarea" :rows="3" placeholder=\'JSON，如 {{"k": "v"}}\' />\n'
+                '        </el-form-item>')
     # string 默认
-    return ('        <el-form-item label="%s" prop="%s">\n'
-            '          <el-input v-model="form.%s" />\n'
-            '        </el-form-item>' % (label, c, c))
+    return (f'        <el-form-item label="{label}" prop="{c}">\n'
+            f'          <el-input v-model="form.{c}" />\n'
+            '        </el-form-item>')
 
 
 def vue_column(f: dict) -> str:
@@ -895,19 +893,16 @@ def vue_column(f: dict) -> str:
     t = f["type"]
     width = f.get("width") or (140 if t in ("datetime",) else 120)
     if t == "bool":
-        return ('  { prop: "%s", label: "%s", width: 90, formatter: (r) => (r.%s ? "是" : "否") },'
-                % (c, label, c))
+        return (f'  {{ prop: "{c}", label: "{label}", width: 90, formatter: (r) => (r.{c} ? "是" : "否") }},')
     if t == "enum":
-        mapping = "{" + ", ".join("'%s': '%s'" % (ch, ch) for ch in f["choices"]) + "}"
-        return ('  { prop: "%s", label: "%s", width: 110, formatter: (r) => (%s[r.%s] || r.%s || "—") },'
-                % (c, label, mapping, c, c))
+        mapping = "{" + ", ".join(f"'{ch}': '{ch}'" for ch in f["choices"]) + "}"
+        return (f'  {{ prop: "{c}", label: "{label}", width: 110, formatter: (r) => ({mapping}[r.{c}] || r.{c} || "—") }},')
     if t == "decimal":
-        return ('  { prop: "%s", label: "%s", width: 120, formatter: (r) => fmtMoney(r.%s) },' % (c, label, c))
+        return (f'  {{ prop: "{c}", label: "{label}", width: 120, formatter: (r) => fmtMoney(r.{c}) }},')
     if t in ("date", "datetime"):
-        return ('  { prop: "%s", label: "%s", width: 120, formatter: (r) => fmtDate(r.%s) },' % (c, label, c))
+        return (f'  {{ prop: "{c}", label: "{label}", width: 120, formatter: (r) => fmtDate(r.{c}) }},')
     if t == "text":
-        return ('  { prop: "%s", label: "%s", minWidth: 160, formatter: (r) => { const v = r.%s; return v && v.length > 30 ? v.slice(0, 30) + "…" : (v || "—") } },'
-                % (c, label, c))
+        return (f'  {{ prop: "{c}", label: "{label}", minWidth: 160, formatter: (r) => {{ const v = r.{c}; return v && v.length > 30 ? v.slice(0, 30) + "…" : (v || "—") }} }},')
     return '  { prop: "%s", label: "%s", width: %d },' % (c, label, width)
 
 
@@ -916,11 +911,11 @@ def vue_search_field(f: dict) -> str:
     label = f["label"]
     t = f["type"]
     if t == "enum":
-        opts = ", ".join("{ value: '%s', label: '%s' }" % (ch, ch) for ch in f["choices"])
-        return "  { prop: '%s', label: '%s', type: 'select', options: [%s] }," % (c, label, opts)
+        opts = ", ".join(f"{{ value: '{ch}', label: '{ch}' }}" for ch in f["choices"])
+        return f"  {{ prop: '{c}', label: '{label}', type: 'select', options: [{opts}] }},"
     if t == "bool":
-        return "  { prop: '%s', label: '%s', type: 'select', options: [{ value: true, label: '是' }, { value: false, label: '否' }] }," % (c, label)
-    return "  { prop: '%s', label: '%s', type: 'input', placeholder: '请输入%s' }," % (c, label, label)
+        return f"  {{ prop: '{c}', label: '{label}', type: 'select', options: [{{ value: true, label: '是' }}, {{ value: false, label: '否' }}] }},"
+    return f"  {{ prop: '{c}', label: '{label}', type: 'input', placeholder: '请输入{label}' }},"
 
 
 def vue_rules(f: dict) -> str:
@@ -930,22 +925,21 @@ def vue_rules(f: dict) -> str:
     if not f["required"] or t == "bool":
         return ""
     trigger = "change" if t in ("enum", "date", "datetime", "int", "decimal", "fk") else "blur"
-    return "  %s: [{ required: true, message: '%s必填', trigger: '%s' }],\n" % (c, label, trigger)
+    return f"  {c}: [{{ required: true, message: '{label}必填', trigger: '{trigger}' }}],\n"
 
 
 def render_page(spec: dict, e: dict) -> str:
     ekey = e["key"]
-    cls = e["class"]
-    name_l = spec["name"]
+    e["class"]
+    spec["name"]
     fields = e["fields"]
     list_cols = [f for f in fields if f["list"]]
     search_fields = [f for f in fields if f["search"]]
     form_fields = fields
-    enum_imports = []
 
     # template
     t = ['<template>']
-    t.append('  <PageShell title="%s"%s>' % (e["title"], (' subtitle="%s"' % e["subtitle"]) if e["subtitle"] else ""))
+    t.append('  <PageShell title="{}"{}>'.format(e["title"], (' subtitle="{}"'.format(e["subtitle"])) if e["subtitle"] else ""))
     t.append('    <template #actions>')
     t.append('      <el-button type="primary" :icon="Plus" @click="openCreate">新建</el-button>')
     t.append('    </template>')
@@ -986,7 +980,7 @@ def render_page(spec: dict, e: dict) -> str:
     t.append("import FormDrawer from '../components/FormDrawer.vue'")
     t.append("import { api, fmtMoney, fmtDate } from '../api'")
     t.append('')
-    t.append("const RES = '/%s'" % ekey)
+    t.append(f"const RES = '/{ekey}'")
     t.append('const rows = ref([])')
     t.append('const total = ref(0)')
     t.append('const page = ref(1)')
@@ -1022,17 +1016,17 @@ def render_page(spec: dict, e: dict) -> str:
         if f.get("default") is not None:
             d = f["default"]
             if f["type"] == "bool":
-                defaults.append("%s: %s" % (c, "true" if d else "false"))
+                defaults.append("{}: {}".format(c, "true" if d else "false"))
             elif f["type"] in ("int", "fk", "decimal"):
-                defaults.append("%s: %s" % (c, d))
+                defaults.append(f"{c}: {d}")
             else:
-                defaults.append("%s: %s" % (c, repr(str(d)).replace("'", "'")))
+                defaults.append("{}: {}".format(c, repr(str(d)).replace("'", "'")))
         elif f["type"] == "bool":
-            defaults.append("%s: false" % c)
+            defaults.append(f"{c}: false")
         else:
-            defaults.append("%s: null" % c)
+            defaults.append(f"{c}: null")
     t.append('function emptyForm() {')
-    t.append('  return { %s }' % ", ".join(defaults))
+    t.append('  return {{ {} }}'.format(", ".join(defaults)))
     t.append('}')
     t.append('const form = reactive(emptyForm())')
     t.append('')
@@ -1124,18 +1118,17 @@ def render_main_js(spec: dict) -> str:
     menus = []
     imports = []
     for e in spec["entities"]:
-        comp = "%sView" % e["class"]
-        imports.append("import %s from './pages/%sView.vue'" % (comp, e["class"]))
+        comp = "{}View".format(e["class"])
+        imports.append("import {} from './pages/{}View.vue'".format(comp, e["class"]))
         routes.append(
-            '    { path: \'%s\', name: \'%s-%s\', component: %s, meta: { permission: \'%s:%s:read\' } },'
-            % (e["route"], key, e["key"], comp, key, e["key"])
+            '    {{ path: \'{}\', name: \'{}-{}\', component: {}, meta: {{ permission: \'{}:{}:read\' }} }},'.format(e["route"], key, e["key"], comp, key, e["key"])
         )
         menus.append(
             '    { key: \'%s:%s\', title: \'%s\', path: \'%s\', icon: \'menu\', sort: %d },'
             % (key, e["key"], e["title"], e["menu_path"], e["sort"])
         )
     lines = [
-        "// %s 前端插件入口 —— 打包为 iife 单文件 plugin.js（由代码生成器生成）" % spec["name"],
+        "// {} 前端插件入口 —— 打包为 iife 单文件 plugin.js（由代码生成器生成）".format(spec["name"]),
         "import 'vue'",
         "import ElementPlusCss from 'element-plus/dist/index.css?inline'",
         "",
@@ -1145,16 +1138,16 @@ def render_main_js(spec: dict) -> str:
         "",
         "if (typeof document !== 'undefined') {",
         "  const style = document.createElement('style')",
-        "  style.setAttribute('data-%s-plugin', 'element-plus')" % key,
+        f"  style.setAttribute('data-{key}-plugin', 'element-plus')",
         "  style.textContent = ElementPlusCss",
         "  document.head.appendChild(style)",
         "}",
         "",
         "// 路由 path 必须与后端 manifest menus 的 path 一致（此处相对路径无前导斜杠）",
         "window.__registerPlugin({",
-        "  id: '%s'," % key,
-        "  version: '%s'," % spec["version"],
-        "  name: '%s'," % spec["name"],
+        f"  id: '{key}',",
+        "  version: '{}',".format(spec["version"]),
+        "  name: '{}',".format(spec["name"]),
         "  routes: [",
     ]
     lines += routes
@@ -1166,7 +1159,7 @@ def render_main_js(spec: dict) -> str:
     lines += [
         "  ],",
         "  locales: {",
-        "    'zh-CN': { %s: { title: '%s' } }" % (key, spec["name"]),
+        "    'zh-CN': {{ {}: {{ title: '{}' }} }}".format(key, spec["name"]),
         "  }",
         "})",
         "",
@@ -1182,9 +1175,9 @@ def plugin_head_source() -> str:
     p = ASSETS_DIR / PLUGIN_HEAD_NAME
     if not p.exists():
         raise SystemExit(
-            "✗ 缺少前端运行时插件资产：%s\n"
+            f"✗ 缺少前端运行时插件资产：{p}\n"
             "  生成 App 需要它（每个 App 复用同一份通用 CRUD 运行时）。"
-            "构建方式见 cenkor_admin/codegen/runtime_plugin/README。" % p
+            "构建方式见 cenkor_admin/codegen/runtime_plugin/README。"
         )
     return p.read_text(encoding="utf-8")
 
@@ -1211,13 +1204,13 @@ def app_meta(spec: dict) -> dict:
     }
 
 
-def render_plugin_js(spec: dict, bundle: "str | None" = None) -> str:
+def render_plugin_js(spec: dict, bundle: str | None = None) -> str:
     """生成 App 的 frontend/dist/plugin.js：前言（元数据）+ 通用运行时 bundle。"""
     if bundle is None:
         bundle = plugin_head_source()
-    head = "window.__CODEGEN_APP__ = %s;\n" % json.dumps(
+    head = "window.__CODEGEN_APP__ = {};\n".format(json.dumps(
         app_meta(spec), ensure_ascii=False, separators=(",", ":")
-    )
+    ))
     return head + bundle
 
 
@@ -1243,10 +1236,10 @@ def read_static(templates_dir: Path, rel_paths: list, subs: dict) -> dict:
     for rel in rel_paths:
         src = templates_dir / "frontend" / rel
         if not src.exists():
-            raise SystemExit("✗ 缺少模板文件：%s" % src)
+            raise SystemExit(f"✗ 缺少模板文件：{src}")
         text = src.read_text(encoding="utf-8")
         for k, v in subs.items():
-            text = text.replace("@@%s@@" % k, v)
+            text = text.replace(f"@@{k}@@", v)
         out["frontend/" + rel] = text
     return out
 
@@ -1261,9 +1254,9 @@ def resolve_head(versions_dir: Path, mode: str) -> str:
     return current_head(versions_dir)
 
 
-def build_files(raw: dict, mode: str = "package", versions_dir: "os.PathLike | str | None" = None,
-                templates_dir: "os.PathLike | str | None" = None,
-                plugin_bundle: "str | None" = None,
+def build_files(raw: dict, mode: str = "package", versions_dir: os.PathLike | str | None = None,
+                templates_dir: os.PathLike | str | None = None,
+                plugin_bundle: str | None = None,
                 include_plugin: bool = True) -> dict:
     """生成 App 的全部文件，返回 {相对 App 根路径: 文本}。**不写磁盘**。
 
@@ -1280,7 +1273,7 @@ def build_files(raw: dict, mode: str = "package", versions_dir: "os.PathLike | s
         templates_dir = DEFAULT_TEMPLATES_DIR
     templates_dir = Path(templates_dir)
     if mode not in ("package", "builtin"):
-        raise SystemExit("✗ 未知模式：%r（可选 package / builtin）" % mode)
+        raise SystemExit(f"✗ 未知模式：{mode!r}（可选 package / builtin）")
 
     versions_dir_p = Path(versions_dir) if versions_dir is not None else None
     if mode == "builtin":
@@ -1302,7 +1295,7 @@ def build_files(raw: dict, mode: str = "package", versions_dir: "os.PathLike | s
     files["router.py"] = render_router(spec)
 
     # 迁移（两种模式都放进映射；builtin 由 CLI 落盘到全局链，见 write 逻辑）
-    mig_name, mig_rev, mig_src = render_migration(spec, head)
+    mig_name, _mig_rev, mig_src = render_migration(spec, head)
     files["alembic/versions/" + mig_name] = mig_src
 
     # 前端模板源码（供二次开发 npm build 覆写 dist）
@@ -1310,13 +1303,13 @@ def build_files(raw: dict, mode: str = "package", versions_dir: "os.PathLike | s
         "APP_KEY": key,
         "APP_NAME": spec["name"],
         "PLUGIN_NAME": pascal(key) + "Plugin",
-        "PKG_NAME": "%s-frontend" % key,
+        "PKG_NAME": f"{key}-frontend",
     }
     files.update(read_static(templates_dir, FRONTEND_STATIC, subs))
 
     # 前端动态源码
     for e in spec["entities"]:
-        files["frontend/src/pages/%sView.vue" % e["class"]] = render_page(spec, e)
+        files["frontend/src/pages/{}View.vue".format(e["class"])] = render_page(spec, e)
     files["frontend/src/main.js"] = render_main_js(spec)
 
     # 零构建运行时插件（每个 App 复用同一份；前言带本 App 元数据）
@@ -1329,7 +1322,7 @@ def build_files(raw: dict, mode: str = "package", versions_dir: "os.PathLike | s
     return files
 
 
-def write_files(files: dict, out_dir: "os.PathLike | str") -> None:
+def write_files(files: dict, out_dir: os.PathLike | str) -> None:
     """把 build_files 的产出写到磁盘。"""
     out = Path(out_dir)
     for rel, text in files.items():
@@ -1351,14 +1344,14 @@ def zip_bytes(files: dict) -> bytes:
 # 自检
 # ---------------------------------------------------------------------------
 
-def self_check(spec: dict, files: dict, versions_dir: "os.PathLike | str | None" = None,
+def self_check(spec: dict, files: dict, versions_dir: os.PathLike | str | None = None,
                mode: str = "package") -> list:
     """对生成结果做静态自检：包结构 / 语法 / 菜单与路由一致 / 迁移链唯一 head。"""
     problems = []
     # 1) 包结构硬性要求
     for req in ("manifest.py", "__init__.py", "models.py", "router.py"):
         if req not in files:
-            problems.append("缺少必需文件：%s" % req)
+            problems.append(f"缺少必需文件：{req}")
     if "frontend/dist/plugin.js" not in files:
         problems.append("缺少 frontend/dist/plugin.js（App 安装后将无前端界面）")
     # 2) 语法编译（直接编译文本，无需落盘）
@@ -1368,18 +1361,18 @@ def self_check(spec: dict, files: dict, versions_dir: "os.PathLike | str | None"
         try:
             compile(text, rel, "exec")
         except SyntaxError as exc:
-            problems.append("语法错误 %s：%s" % (rel, exc))
+            problems.append(f"语法错误 {rel}：{exc}")
     # 3) 菜单 path 与前端路由 path 一致（源码视图）
     try:
         menu_paths = set(re.findall(r'"path":\s*"(/[^"]+)"', files.get("manifest.py", "")))
         route_paths = set(re.findall(r"path:\s*'([^']+)'", files.get("frontend/src/main.js", "")))
         for mp in menu_paths:
-            if mp == "/%s" % spec["key"]:
+            if mp == "/{}".format(spec["key"]):
                 continue  # 顶层菜单，无对应路由
             if mp.lstrip("/") not in route_paths:
-                problems.append("菜单 path %s 在前端 routes 中缺失" % mp)
-    except Exception as exc:  # noqa: BLE001
-        problems.append("菜单/路由一致性检查失败：%s" % exc)
+                problems.append(f"菜单 path {mp} 在前端 routes 中缺失")
+    except Exception as exc:
+        problems.append(f"菜单/路由一致性检查失败：{exc}")
     # 4) 运行时插件前言里的菜单 path 与 manifest 一致
     plugin_src = files.get("frontend/dist/plugin.js", "")
     if plugin_src:
@@ -1392,8 +1385,8 @@ def self_check(spec: dict, files: dict, versions_dir: "os.PathLike | str | None"
                 problems.append("运行时插件元数据菜单 path 与 spec 不一致")
             if meta["key"] != spec["key"]:
                 problems.append("运行时插件元数据 key 与 spec 不一致")
-        except Exception as exc:  # noqa: BLE001
-            problems.append("运行时插件元数据解析失败：%s" % exc)
+        except Exception as exc:
+            problems.append(f"运行时插件元数据解析失败：{exc}")
     # 5) 迁移图仍唯一 head：内置模式额外校验「开源视图」也唯一 head
     if versions_dir is not None:
         checks = [("全量", current_head)]
@@ -1403,5 +1396,5 @@ def self_check(spec: dict, files: dict, versions_dir: "os.PathLike | str | None"
             try:
                 fn(Path(versions_dir))
             except SystemExit as exc:
-                problems.append("%s视图迁移图检查失败：%s" % (scope, exc))
+                problems.append(f"{scope}视图迁移图检查失败：{exc}")
     return problems

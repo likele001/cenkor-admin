@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -27,7 +26,7 @@ class PortalTokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
-    user: "PortalUserBrief"
+    user: PortalUserBrief
 
 
 class PortalRefreshRequest(BaseModel):

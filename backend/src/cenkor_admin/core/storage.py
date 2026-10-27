@@ -5,11 +5,11 @@
 """
 from __future__ import annotations
 
-import structlog
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
-import aiobotocore.session
+import structlog
 from aiobotocore.config import AioConfig
 from aiobotocore.session import get_session
 
@@ -100,12 +100,14 @@ class _Dispatch:
             return self._driver
         try:
             import json
-            from cenkor_admin.core.db import AsyncSessionLocal
+
+            from sqlalchemy import select
+
             from cenkor_admin.apps.cloud_storage import crypto as _crypto
             from cenkor_admin.apps.cloud_storage.drivers import get_driver
             from cenkor_admin.apps.cloud_storage.models import CloudStorageConfig
             from cenkor_admin.apps.system.models import InstalledApp
-            from sqlalchemy import select
+            from cenkor_admin.core.db import AsyncSessionLocal
             async with AsyncSessionLocal() as db:
                 installed = (await db.execute(
                     select(InstalledApp).where(
@@ -187,9 +189,10 @@ class _Dispatch:
     async def keep_local_backup(self) -> bool:
         """是否开启「云端上传同时本地 MinIO 备份」（从 cloud_storage_config 读取，默认开启）。"""
         try:
-            from cenkor_admin.core.db import AsyncSessionLocal
-            from cenkor_admin.apps.cloud_storage.models import CloudStorageConfig
             from sqlalchemy import select
+
+            from cenkor_admin.apps.cloud_storage.models import CloudStorageConfig
+            from cenkor_admin.core.db import AsyncSessionLocal
             async with AsyncSessionLocal() as db:
                 cfg = (await db.execute(
                     select(CloudStorageConfig).where(CloudStorageConfig.id == 1)

@@ -1,11 +1,14 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from . import models
 from cenkor_admin.core.db import get_db
+
+from . import models
 
 router = APIRouter()
 
@@ -98,5 +101,5 @@ async def delete_note(
     obj = await db.get(models.Note, note_id)
     if not obj or obj.deleted_at:
         raise HTTPException(404, "not found")
-    obj.deleted_at = datetime.now(timezone.utc)
+    obj.deleted_at = datetime.now(UTC)
     await db.commit()

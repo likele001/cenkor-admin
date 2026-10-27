@@ -14,12 +14,11 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 
-from sqlalchemy import select, func, insert
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import models
 from cenkor_admin.core.db import AsyncSessionLocal
-
 
 # ============================================================
 # 内容类型映射
@@ -199,7 +198,7 @@ async def main():
             elif ct_key == "news":
                 count = await migrate_news(db, ct_id)
             else:
-                print(f"  跳过（无对应的旧表）")
+                print("  跳过（无对应的旧表）")
                 continue
 
             print(f"  迁移条目：{count}")

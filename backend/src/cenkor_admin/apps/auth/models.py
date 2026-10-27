@@ -4,14 +4,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import String, Integer, Boolean, DateTime, func
+from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from cenkor_admin.core.db import Base
 
 if TYPE_CHECKING:
-    from cenkor_admin.apps.rbac.models import Role, UserRole
+    from cenkor_admin.apps.rbac.models import UserRole
 
 
 class User(Base):
@@ -44,7 +44,7 @@ class User(Base):
 
     # 关联到 RBAC 的 UserRole（单向，UserRole 那边是 FK 持有者）
     # 不在 UserRole 上定义反向，避免循环导入
-    roles: Mapped[list["UserRole"]] = relationship(  # type: ignore[name-defined]
+    roles: Mapped[list[UserRole]] = relationship(  # type: ignore[name-defined]
         "UserRole",
         primaryjoin="User.id == foreign(UserRole.user_id)",
         cascade="all, delete-orphan",

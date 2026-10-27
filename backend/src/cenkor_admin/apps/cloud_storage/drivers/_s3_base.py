@@ -1,8 +1,8 @@
 """S3 协议通用基类（腾讯 COS / 阿里 OSS / 七牛 Kodo 共享）"""
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 from urllib.parse import urlparse, urlunparse
 
 import aiobotocore.session

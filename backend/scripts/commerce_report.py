@@ -58,7 +58,7 @@ def find_dsn() -> str:
                     s = kv.decode("utf-8", "ignore")
                     if s.startswith("DATABASE_URL="):
                         return s.split("=", 1)[1]
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"  （读进程环境失败，回落 .env：{e}）", file=sys.stderr)
     for p in ENV_FILES:
         if os.path.exists(p):
@@ -77,7 +77,7 @@ def has(cur, table: str) -> bool:
 def cents(v) -> str:
     try:
         return f"¥{int(v) / 100:,.2f}"
-    except Exception:  # noqa: BLE001
+    except Exception:
         return str(v)
 
 
@@ -101,7 +101,7 @@ def main() -> int:
         return 1
     try:
         c = psycopg2.connect(url, connect_timeout=5)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"连不上：{str(e)[:160]}", file=sys.stderr)
         return 1
     c.set_session(readonly=True, autocommit=True)
@@ -125,7 +125,7 @@ def main() -> int:
         return 2
 
     rep["orders_total"] = rows(f"select count(*), coalesce(sum(amount_cents),0) from app_orders{where}", arg)[0]
-    print(f"\n## 订单 app_orders")
+    print("\n## 订单 app_orders")
     print(f"  总数 {rep['orders_total'][0]}  合计 {cents(rep['orders_total'][1])}")
     for st, n, amt in rows(f"select status, count(*), coalesce(sum(amount_cents),0) from app_orders{where} group by 1 order by 2 desc", arg):
         print(f"  - {st:<8} {n:>3} 单  {cents(amt)}")

@@ -27,8 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from cenkor_admin import __version__  # noqa
@@ -77,12 +76,12 @@ async def client(engine):
 @pytest_asyncio.fixture
 async def admin_token(client, engine):
     """用 seed 创建 admin 后获取 token"""
+
     from cenkor_admin.apps.auth import models as auth_models
-    from cenkor_admin.core.security import hash_password
-    from cenkor_admin.scripts.seed import DEFAULT_PERMISSIONS, DEFAULT_ROLES, DEFAULT_USERS
     from cenkor_admin.apps.rbac import models as rbac_models
     from cenkor_admin.core.db import AsyncSessionLocal
-    from sqlalchemy import select
+    from cenkor_admin.core.security import hash_password
+    from cenkor_admin.scripts.seed import DEFAULT_PERMISSIONS, DEFAULT_ROLES
 
     # 用直接 import 的 AsyncSessionLocal 写测试数据
     async with AsyncSessionLocal() as db:
@@ -152,8 +151,9 @@ async def test_list_notifications_unauth(client):
 @pytest.mark.asyncio
 async def test_notification_lifecycle(client, admin_token, auth_headers, engine):
     """创建通知 → 列表 → 标记已读 → 全部已读"""
-    from cenkor_admin.apps.notification import models
     from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from cenkor_admin.apps.notification import models
     Session = async_sessionmaker(engine, expire_on_commit=False)
 
     # 直接写一条通知（user_id=1 是 admin）
@@ -184,7 +184,7 @@ async def test_notification_lifecycle(client, admin_token, auth_headers, engine)
 # ---- 系统设置 ----
 @pytest.mark.asyncio
 async def test_settings_upsert_and_read(client, admin_token, auth_headers):
-    test_key = f"test.unit_upsert"
+    test_key = "test.unit_upsert"
 
     r = await client.put(
         f"/api/v1/system/settings/{test_key}",
@@ -239,7 +239,7 @@ async def test_tasks_toggle(client, admin_token, auth_headers):
 async def test_api_keys_crud(client, admin_token, auth_headers):
     r0 = await client.get("/api/v1/api-keys", headers=auth_headers)
     assert r0.status_code == 200
-    before = r0.json()["total"]
+    r0.json()["total"]
 
     r1 = await client.post(
         "/api/v1/api-keys",

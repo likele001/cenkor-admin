@@ -20,7 +20,7 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int  # 秒
-    user: "UserBrief"
+    user: UserBrief
 
 
 class RefreshRequest(BaseModel):

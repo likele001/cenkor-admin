@@ -1,7 +1,9 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.my_todo import models
@@ -95,5 +97,5 @@ async def delete_todo(
     obj = await db.get(models.TodoItem, item_id)
     if not obj or obj.deleted_at:
         raise HTTPException(404, "not found")
-    obj.deleted_at = datetime.now(timezone.utc)
+    obj.deleted_at = datetime.now(UTC)
     await db.commit()

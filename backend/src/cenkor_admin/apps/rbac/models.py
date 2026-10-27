@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import String, Integer, Boolean, ForeignKey, DateTime, func, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from cenkor_admin.core.db import Base
@@ -24,9 +24,9 @@ class Role(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    permissions: Mapped[list["RolePermission"]] = relationship(back_populates="role", cascade="all, delete-orphan")
-    menus: Mapped[list["RoleMenu"]] = relationship(back_populates="role", cascade="all, delete-orphan")
-    users: Mapped[list["UserRole"]] = relationship(back_populates="role", cascade="all, delete-orphan")
+    permissions: Mapped[list[RolePermission]] = relationship(back_populates="role", cascade="all, delete-orphan")
+    menus: Mapped[list[RoleMenu]] = relationship(back_populates="role", cascade="all, delete-orphan")
+    users: Mapped[list[UserRole]] = relationship(back_populates="role", cascade="all, delete-orphan")
 
 
 # ---- 权限 ----

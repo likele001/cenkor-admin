@@ -8,11 +8,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.api.deps import get_current_user
+from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import models, schemas
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.config import get_settings
@@ -707,6 +707,7 @@ def _extract_image_metadata(content: bytes, content_type: str) -> dict:
         return {}
     try:
         from io import BytesIO
+
         from PIL import Image
         img = Image.open(BytesIO(content))
         meta = {"width": img.width, "height": img.height, "format": img.format}

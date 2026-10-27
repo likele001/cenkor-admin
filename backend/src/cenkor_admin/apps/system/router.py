@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.api.deps import get_current_user, require_permission
+from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.system.app_registry import (
     install_app,
     list_apps_with_status,
@@ -21,11 +21,10 @@ from cenkor_admin.apps.system.app_registry import (
     uninstall_app,
     update_permissions_grants,
 )
-from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.apps.system.codegen_router import router as codegen_router
+from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.apps.system.settings_router import router as settings_router
 from cenkor_admin.apps.system.tasks_router import router as tasks_router
-
 from cenkor_admin.core.audit import AuditLog
 from cenkor_admin.core.db import get_db
 
@@ -36,7 +35,10 @@ router = APIRouter()
 # 子路由：定时任务
 router.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 router.include_router(settings_router, prefix="/settings", tags=["settings"])
+from datetime import UTC
+
 from cenkor_admin.apps.system.upgrade_router import router as upgrade_router
+
 # 子路由：核心平台在线升级（后台「系统 > 在线升级」页）
 router.include_router(upgrade_router, prefix="/upgrade", tags=["upgrade"])
 
@@ -230,9 +232,9 @@ async def get_app_registered_data(
     _: auth_models.User = Depends(require_permission("rbac:role:read")),
 ):
     """查看 App 已注册到 DB 的内容/字段/分类数据"""
+
     from cenkor_admin.apps.cms import models as cms_models
     from cenkor_admin.apps.system.app_registry import scan_app_manifests
-    from sqlalchemy import func as sqlfunc
 
     manifests = scan_app_manifests()
     manifest = manifests.get(app_key)
@@ -293,8 +295,8 @@ async def audit_stats(
     _: auth_models.User = Depends(require_permission("system:audit:read")),
 ):
     """审计统计（最近 7 天）"""
-    from datetime import datetime, timedelta, timezone
-    since = datetime.now(timezone.utc) - timedelta(days=7)
+    from datetime import datetime, timedelta
+    since = datetime.now(UTC) - timedelta(days=7)
 
     # 总数
     total = (await db.execute(
@@ -307,7 +309,7 @@ async def audit_stats(
         .where(AuditLog.created_at >= since)
         .group_by(AuditLog.method)
     )).all()
-    by_method = {m: c for m, c in method_rows}
+    by_method = dict(method_rows)
 
     # 按状态码
     status_rows = (await db.execute(
@@ -315,7 +317,7 @@ async def audit_stats(
         .where(AuditLog.created_at >= since)
         .group_by(AuditLog.status_code)
     )).all()
-    by_status = {s: c for s, c in status_rows}
+    by_status = dict(status_rows)
 
     # 错误数
     errors = (await db.execute(

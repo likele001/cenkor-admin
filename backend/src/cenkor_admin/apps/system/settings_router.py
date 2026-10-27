@@ -9,8 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.api.deps import require_permission
+from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.core.db import get_db
 
 router = APIRouter()

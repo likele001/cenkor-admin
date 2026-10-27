@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import redis.asyncio as redis
+
 from cenkor_admin.core.config import get_settings
 
 settings = get_settings()

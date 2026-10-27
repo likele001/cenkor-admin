@@ -11,8 +11,9 @@
 """
 from __future__ import annotations
 
+import contextlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -77,7 +78,7 @@ async def check_latest(force: bool = False) -> dict[str, Any]:
             cached = await redis_client.get(_CACHE_KEY)
             if cached:
                 return json.loads(cached)
-        except Exception:  # noqa: BLE001 - Redis 不可用时直接实时查
+        except Exception:
             pass
 
     hub = _hub_base_url()
@@ -86,7 +87,7 @@ async def check_latest(force: bool = False) -> dict[str, Any]:
         "current": current,
         "latest": None,
         "has_update": False,
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
         "source": "self" if not hub else "hub",
     }
 
@@ -106,14 +107,12 @@ async def check_latest(force: bool = False) -> dict[str, Any]:
         result["has_update"] = bool(
             latest_version and ver_tuple(latest_version) > ver_tuple(current)
         )
-    except Exception as e:  # noqa: BLE001 - 任何网络/解析异常都降级，不影响可用性
+    except Exception as e:
         log.warning("release.check_failed", error=str(e))
         result["error"] = str(e)[:200]
 
-    try:
+    with contextlib.suppress(Exception):
         await redis_client.setex(_CACHE_KEY, s.RELEASE_CHECK_TTL_HOURS * 3600, json.dumps(result))
-    except Exception:  # noqa: BLE001
-        pass
     return result
 
 
@@ -125,5 +124,5 @@ async def warm_cache() -> None:
             log.info("release.update_available", current=data.get("current"), latest=data.get("latest"))
         else:
             log.info("release.check.ok", current=data.get("current"), latest=data.get("latest"))
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("release.warm_failed", error=str(e))

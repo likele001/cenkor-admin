@@ -91,8 +91,9 @@ def test_jwt_round_trip():
 
 
 def test_invalid_jwt_rejected():
-    from cenkor_admin.core.security import decode_token
     from jose import JWTError
+
+    from cenkor_admin.core.security import decode_token
     with pytest.raises(JWTError):
         decode_token("not-a-jwt")
 
@@ -111,7 +112,7 @@ def test_detect_locale_en():
 
 
 def test_detect_locale_default():
-    from cenkor_admin.core.i18n import detect_locale, DEFAULT_LOCALE
+    from cenkor_admin.core.i18n import DEFAULT_LOCALE, detect_locale
     assert detect_locale("") == DEFAULT_LOCALE
     assert detect_locale(None) == DEFAULT_LOCALE
     assert detect_locale("fr-FR") == DEFAULT_LOCALE  # 不支持 → 默认
@@ -127,8 +128,8 @@ def test_detect_locale_quality_weight():
 # ---- core/mail ----
 def test_send_email_no_smtp_configured():
     """未配 SMTP 时 noop，不抛异常"""
-    from cenkor_admin.core.mail import send_email_sync
     from cenkor_admin.core.config import get_settings
+    from cenkor_admin.core.mail import send_email_sync
     s = get_settings()
     if s.SMTP_HOST:
         pytest.skip("SMTP_HOST 已配置，跳过 noop 测试")
@@ -139,7 +140,6 @@ def test_send_email_no_smtp_configured():
 
 # ---- core/config  方言检测 ----
 def test_db_dialect_detects_sqlite(monkeypatch):
-    from cenkor_admin import core
     # 重置 lru_cache
     from cenkor_admin.core.config import get_settings
     get_settings.cache_clear()

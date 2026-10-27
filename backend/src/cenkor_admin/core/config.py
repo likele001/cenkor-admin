@@ -6,7 +6,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from cenkor_admin import __version__ as _PKG_VERSION

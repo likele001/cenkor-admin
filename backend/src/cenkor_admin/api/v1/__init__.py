@@ -15,15 +15,16 @@ from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.auth.api_key_router import router as api_key_router
 from cenkor_admin.apps.auth.router import router as auth_router
 from cenkor_admin.apps.auth.schemas import UserBrief
-from cenkor_admin.apps.cms.router import router as cms_router
 from cenkor_admin.apps.cms.content_engine_router import router as content_engine_router
 from cenkor_admin.apps.cms.public_router import router as cms_public_router
+from cenkor_admin.apps.cms.router import router as cms_router
 from cenkor_admin.apps.cms.template_router import router as template_router
 from cenkor_admin.apps.notification.router import router as notification_router
-from cenkor_admin.apps.portal.router import router as portal_router
 from cenkor_admin.apps.portal.admin_router import router as portal_admin_router
+from cenkor_admin.apps.portal.router import router as portal_router
 from cenkor_admin.apps.rbac.router import router as rbac_router
-from cenkor_admin.apps.system.router import router as system_router, public_router as system_public_router
+from cenkor_admin.apps.system.router import public_router as system_public_router
+from cenkor_admin.apps.system.router import router as system_router
 from cenkor_admin.apps.system.webhook_router import router as webhook_router
 from cenkor_admin.core.hooks_router import router as hooks_router
 
@@ -39,10 +40,12 @@ api_v1_router.include_router(portal_router, prefix="/public/portal", tags=["port
 # M4·P3：评论 & 表单 公共接口
 from cenkor_admin.apps.comments.public_router import router as comments_public_router
 from cenkor_admin.apps.forms.public_router import router as forms_public_router
+
 api_v1_router.include_router(comments_public_router, prefix="/public", tags=["comments"])
 api_v1_router.include_router(forms_public_router, prefix="/public", tags=["forms"])
 # M3·P2：Builder 页面公共接口
 from cenkor_admin.apps.builder.public_router import router as builder_public_router
+
 api_v1_router.include_router(builder_public_router, prefix="/public", tags=["builder"])
 
 # ============================================================
@@ -89,7 +92,7 @@ api_v1_router.include_router(
 try:
     from cenkor_admin.apps.crm.routers.openapi_router import router as crm_openapi_router
     api_v1_router.include_router(crm_openapi_router, prefix="/crm-open", tags=["crm-open"])
-except Exception as e:  # noqa: BLE001 - 缺依赖时不影响平台启动
+except Exception as e:
     log.warning("crm.openapi_mount_failed", error=str(e))
 
 # 插件框架：已注册钩子内省（受保护）
@@ -116,7 +119,7 @@ try:
         graphql_router, prefix="/cms", tags=["graphql"],
         dependencies=[Depends(get_current_user)],
     )
-except Exception as e:  # noqa: BLE001 - GraphQL 缺失依赖时不影响启动
+except Exception as e:
     import structlog
     structlog.get_logger().warning("graphql.mount_failed", error=str(e))
 api_v1_router.include_router(
@@ -268,11 +271,13 @@ _auto_register_app_routers()
 # ============================================================
 # 应用商店路由（不受 /system 的 admin-only 限制）
 # ============================================================
-from cenkor_admin.apps.system.store_router import router as store_router  # noqa: E402
+from cenkor_admin.apps.system.store_router import router as store_router
+
 api_v1_router.include_router(store_router, prefix="/store", tags=["app-store"])
 
 # 核心平台版本 / 升级检查（latest 公开，check 需登录）
-from cenkor_admin.apps.system.release_router import router as release_router  # noqa: E402
+from cenkor_admin.apps.system.release_router import router as release_router
+
 api_v1_router.include_router(release_router, prefix="/release", tags=["release"])
 
 # 生态交易层（定价 / 订单 / 授权 / 云端安装）
@@ -281,7 +286,7 @@ api_v1_router.include_router(release_router, prefix="/release", tags=["release"]
 try:
     from cenkor_admin.apps.commerce.commerce_router import router as commerce_router
     api_v1_router.include_router(commerce_router, prefix="/store", tags=["app-commerce"])
-except Exception as e:  # noqa: BLE001
+except Exception as e:
     log.warning("commerce.mount_skipped", error=str(e))
 
 # 应用市场云端绑定（实例 ↔ 官方账号）：闭源，与 commerce 同目录。
@@ -289,7 +294,7 @@ except Exception as e:  # noqa: BLE001
 try:
     from cenkor_admin.apps.commerce.cloud_router import router as cloud_router
     api_v1_router.include_router(cloud_router, prefix="/store", tags=["app-cloud"])
-except Exception as e:  # noqa: BLE001
+except Exception as e:
     log.warning("cloud.mount_skipped", error=str(e))
 
 # 支付中心公开路由（第三方回调 / 收银台 / 状态轮询，免鉴权）
@@ -300,7 +305,7 @@ try:
     api_v1_router.include_router(
         payment_public_router, prefix="/public/payment", tags=["payment-public"],
     )
-except Exception as e:  # noqa: BLE001
+except Exception as e:
     log.warning("payment.mount_skipped", error=str(e))
 
 # ============================================================

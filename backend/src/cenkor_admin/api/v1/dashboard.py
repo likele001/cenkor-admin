@@ -1,7 +1,7 @@
 """Dashboard 统计端点：总览数字 + 7 天趋势 + 方法分布。"""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 def _start_of_day_utc(days_ago: int = 0) -> datetime:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     start = (now - timedelta(days=days_ago)).replace(hour=0, minute=0, second=0, microsecond=0)
     return start
 

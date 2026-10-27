@@ -168,7 +168,7 @@ def sync_builtin_apps(apps_dir: Path, manifests: dict) -> list[SchemaResult]:
                 results.append(SchemaResult(key, "applied", f"v{version}{note}"))
                 log.info("app.schema.applied", key=key, version=version, note=note)
                 return True
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 conn.rollback()
                 msg = str(exc).strip().splitlines()[0][:200]
                 results.append(SchemaResult(key, "failed", msg))

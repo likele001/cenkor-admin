@@ -60,7 +60,7 @@ def _load_one_dir(base_dir: str, pkg_prefix: str) -> list[str]:
         for m in mods:
             try:
                 importlib.import_module(m)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 failed.append(f"{m}: {type(e).__name__}: {e}")
     return failed
 
@@ -80,7 +80,7 @@ def load_all_models(verbose: bool = False) -> list[str]:
     for m in EXTRA_MODEL_MODULES:
         try:
             importlib.import_module(m)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             failed.append(f"{m}: {type(e).__name__}: {e}")
 
     if verbose:

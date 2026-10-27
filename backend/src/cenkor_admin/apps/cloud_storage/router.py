@@ -2,21 +2,20 @@
 from __future__ import annotations
 
 import json
-import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
-
-from cenkor_admin.api.deps import get_current_user, require_permission
-from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.core.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import models, crypto
-from .drivers import get_driver, SUPPORTED_PROVIDERS
+from cenkor_admin.api.deps import require_permission
+from cenkor_admin.apps.auth import models as auth_models
+from cenkor_admin.core.db import get_db
+
+from . import crypto, models
+from .drivers import SUPPORTED_PROVIDERS, get_driver
 
 router = APIRouter()
 
@@ -152,7 +151,7 @@ async def activate(
         raise HTTPException(400, f"未知 provider: {body.provider}")
     row = await _get_config(db)
     if not _creds_for(row, body.provider):
-        raise HTTPException(400, f"该 provider 尚未配置凭据")
+        raise HTTPException(400, "该 provider 尚未配置凭据")
     row.active_provider = body.provider
     await db.commit()
     return {"ok": True, "active_provider": body.provider}
@@ -289,7 +288,7 @@ async def start_migration(
     })
 
     job = models.CloudStorageMigrationJob(
-        source="minio", target=row.active_provider, status="running", started_at=datetime.now(timezone.utc)
+        source="minio", target=row.active_provider, status="running", started_at=datetime.now(UTC)
     )
     db.add(job)
     await db.commit()
@@ -302,13 +301,13 @@ async def start_migration(
     return {"ok": True, "job_id": job.id}
 
 
-import asyncio  # noqa: E402
+import asyncio
 
 
 async def _run_migration(job_id: int, src, dst, bucket: str, prefix: str) -> None:
     """在后台跑迁移，每 50 个对象更新一次进度"""
-    from cenkor_admin.core.db import AsyncSessionLocal
     from cenkor_admin.core.config import get_settings
+    from cenkor_admin.core.db import AsyncSessionLocal
     s = get_settings()
     src_bucket = bucket or s.S3_BUCKET_PRIVATE
 
@@ -338,7 +337,7 @@ async def _run_migration(job_id: int, src, dst, bucket: str, prefix: str) -> Non
                     content_type="application/octet-stream",
                 )
                 done += 1
-            except Exception as e:
+            except Exception:
                 failed += 1
                 # 记录但不中断
             if (done + failed) % 50 == 0:
@@ -354,7 +353,7 @@ async def _run_migration(job_id: int, src, dst, bucket: str, prefix: str) -> Non
                 job.done = done
                 job.failed = failed
                 job.status = "done" if failed == 0 else "partial"
-                job.finished_at = datetime.now(timezone.utc)
+                job.finished_at = datetime.now(UTC)
                 await db.commit()
     except Exception as e:
         async with AsyncSessionLocal() as db:
@@ -362,7 +361,7 @@ async def _run_migration(job_id: int, src, dst, bucket: str, prefix: str) -> Non
             if job:
                 job.status = "failed"
                 job.error = str(e)[:500]
-                job.finished_at = datetime.now(timezone.utc)
+                job.finished_at = datetime.now(UTC)
                 await db.commit()
 
 

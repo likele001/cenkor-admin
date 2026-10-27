@@ -1,7 +1,7 @@
 """安全工具：JWT + 密码哈希（支持 SECRET_KEY 轮换）"""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import JWTError, jwt
@@ -28,7 +28,7 @@ def create_access_token(
 ) -> str:
     """创建 access token（用最新 SECRET_KEY）"""
     minutes = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(subject),
         "type": "access",
@@ -42,7 +42,7 @@ def create_access_token(
 
 
 def create_refresh_token(subject: str | int, token_version: int = 0) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": str(subject),
         "type": "refresh",
@@ -72,10 +72,10 @@ def decode_token(token: str) -> dict[str, Any]:
 
 
 __all__ = [
-    "hash_password",
-    "verify_password",
+    "JWTError",
     "create_access_token",
     "create_refresh_token",
     "decode_token",
-    "JWTError",
+    "hash_password",
+    "verify_password",
 ]

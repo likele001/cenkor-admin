@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.forms.models import Form, FormSubmission
@@ -126,7 +126,7 @@ async def export_submissions(form_id: int, db: AsyncSession = Depends(get_db)):
         yield "\ufeff"
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["id", "created_at", "ip"] + keys)
+        w.writerow(["id", "created_at", "ip", *keys])
         yield buf.getvalue()
         for s in rows:
             buf = io.StringIO()
