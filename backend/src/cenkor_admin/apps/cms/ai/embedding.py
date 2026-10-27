@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.apps.cms.ai.models import CmsEmbedding
 from cenkor_admin.apps.cms.models import Entry, EntryTranslation
 from cenkor_admin.core.config import get_settings
-from cenkor_admin.core.llm import LLMNotConfiguredError, get_llm
+from cenkor_admin.core.llm import LLMNotConfiguredError, get_llm_for
 
 # 向量化时参与的字段
 FIELD_COMBINED = "combined"
@@ -122,7 +122,7 @@ async def vectorize_entry(
     force=True  → 忽略 content_hash，强制重算（换 embedding 模型后必须用它）
     """
     settings = get_settings()
-    llm = get_llm()
+    llm = get_llm_for("embedding")
 
     # 目标：(lang, text)
     targets: list[tuple[str, str]] = [("base", entry_to_text(entry))]

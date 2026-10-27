@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms.ai import copilot
+from cenkor_admin.apps.cms.ai.admin_router import router as admin_router
 from cenkor_admin.apps.cms.ai.embedding import vectorize_entry, vectorize_pending
 from cenkor_admin.apps.cms.ai.search import semantic_search, similar_entries
 from cenkor_admin.apps.cms.models import Entry
@@ -30,6 +31,10 @@ from cenkor_admin.core.db import get_db
 from cenkor_admin.core.llm import LLMError, LLMNotConfiguredError
 
 router = APIRouter(prefix="/ai", tags=["cms-ai"])
+
+# 配置管理（服务商 / 能力绑定 / 连通性测试）拆独立模块，
+# 本文件只保留「用 AI 干活」的端点，避免一个文件越滚越大。
+router.include_router(admin_router)
 
 
 def _require_ai() -> None:

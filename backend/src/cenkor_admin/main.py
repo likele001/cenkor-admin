@@ -1,4 +1,5 @@
 """FastAPI 主入口"""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
         from alembic.config import Config
 
         from alembic import command
+
         _alembic_cfg = Config(Path(__file__).resolve().parent.parent.parent / "alembic.ini")
         command.upgrade(_alembic_cfg, "heads")
         log.info("migration.ok")
@@ -84,6 +86,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("cms_ai.schema.bootstrap_failed", error=str(e))
 
+    # AI 配置缓存预热：后台配置（服务商 / 能力绑定）读进内存，
+    # 让 get_llm_for() 这种同步调用点无需查库。预热失败不阻塞启动，
+    # registry 会在首次异步调用点自行补刷。
+    try:
+        from cenkor_admin.apps.cms.ai import registry as ai_registry
+        from cenkor_admin.core.db import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as _ai_session:
+            reg = await ai_registry.load(_ai_session, force=True)
+        log.info(
+            "ai.registry.ready",
+            providers=len(reg.providers),
+            capabilities=sorted(reg.endpoints),
+        )
+    except Exception as e:
+        log.warning("ai.registry.warm_failed", error=str(e))
+
     try:
         await redis_client.ping()
         log.info("redis.ok")
@@ -111,6 +130,7 @@ async def lifespan(app: FastAPI):
         )
         from cenkor_admin.apps.system.models import InstalledApp
         from cenkor_admin.core.db import AsyncSessionLocal
+
         async with AsyncSessionLocal() as db:
             manifests = scan_app_manifests()
             all_rows = (await db.execute(select(InstalledApp))).scalars().all()
@@ -153,6 +173,7 @@ async def lifespan(app: FastAPI):
                 # 里调用过一次 —— 已装应用重启后会静默失去全部 @hook 处理器。这里补注册。
                 try:
                     from cenkor_admin.core.hooks import register_app_hooks as _reg_hooks
+
                     _reg_hooks(key, list(manifest.hooks or []))
                 except Exception as _he:
                     log.warning("app.hooks_register_failed", key=key, error=str(_he))
@@ -165,6 +186,7 @@ async def lifespan(app: FastAPI):
     # 注册内置钩子处理器（插件框架 M1·P0）：导入模块即触发 @hook 装饰器注册
     try:
         from cenkor_admin.apps.system import hooks as _builtin_hooks
+
         # 已退役 cenkormes-center 桥接：付款后发卡改由本仓 commerce 层自行签发，不再向外部仓库 auto-issue。
         # 闭源商业模块（无 manifest，由 api/v1/__init__.py 直接挂载 /api/v1/store）
         try:
@@ -181,6 +203,7 @@ async def lifespan(app: FastAPI):
         import asyncio as _asyncio
 
         from cenkor_admin.core.scheduler import scheduler_loop
+
         scheduler_task = _asyncio.create_task(scheduler_loop())
         log.info("scheduler.started")
     except Exception as e:
@@ -191,6 +214,7 @@ async def lifespan(app: FastAPI):
         import asyncio as _asyncio
 
         from cenkor_admin.apps.system import release_service
+
         _asyncio.create_task(release_service.warm_cache())
     except Exception as e:
         log.warning("release.warm_spawn_failed", error=str(e))
@@ -258,6 +282,7 @@ from fastapi.staticfiles import StaticFiles
 _app_static_dir = Path(__file__).resolve().parent / "static" / "apps"
 _app_static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/.app-assets", StaticFiles(directory=str(_app_static_dir)), name="app_assets")
+
 
 # 健康检查
 @app.get("/api/health", tags=["meta"])

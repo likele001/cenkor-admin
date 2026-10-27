@@ -16,10 +16,14 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import json
+import mimetypes
 import re
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -132,6 +136,7 @@ class LLMClient:
         temperature: float = 0.3,
         embed_base_url: str = "",
         embed_api_key: str = "",
+        extra_headers: dict[str, str] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -144,6 +149,9 @@ class LLMClient:
 
         # embedding 可以走另一家服务商（常见：chat 用 DeepSeek 省钱，embedding 用通义）。
         # 留空则回退主配置——单服务商的用户完全感知不到这个参数的存在。
+        # 网关常要求额外鉴权头（如 X-Api-Version / api-key），一并带上
+        self.extra_headers = {k: str(v) for k, v in (extra_headers or {}).items() if k and v}
+
         self.embed_base_url = (embed_base_url or base_url).rstrip("/")
         self._embed_api_key = embed_api_key or api_key
         self._embed_is_separate = bool(
@@ -168,11 +176,14 @@ class LLMClient:
         return bool(self.embed_model and self._embed_api_key and self.embed_base_url)
 
     def _build_client(self, base_url: str, api_key: str) -> httpx.AsyncClient:
+        headers: dict[str, str] = dict(self.extra_headers.items())
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         return httpx.AsyncClient(
             base_url=base_url,
             timeout=httpx.Timeout(self.timeout, connect=15.0),
             headers={
-                "Authorization": f"Bearer {api_key}",
+                **headers,
                 "Content-Type": "application/json",
             },
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
@@ -388,6 +399,140 @@ class LLMClient:
             raise LLMError("embedding 返回为空")
         return vectors[0]
 
+    # ---------------- 视觉与图片 ----------------
+
+    async def vision_chat(
+        self,
+        prompt: str,
+        images: list[str],
+        *,
+        system: str | None = None,
+        model: str | None = None,
+        detail: str = "auto",
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+    ) -> LLMResult:
+        """看图说话。images 里每项可为 URL、data: URI 或本地文件路径。
+
+        走的是标准 chat/completions 多模态 messages，任何支持视觉的
+        OpenAI 兼容服务（GPT-4o / Qwen-VL / GLM-4V / 本地 vLLM）都能用，
+        不需要为视觉单独写一套协议。
+        """
+        if not images:
+            raise LLMError("vision_chat 需要至少一张图片")
+        if detail not in ("low", "high", "auto"):
+            detail = "auto"
+
+        parts: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for img in images:
+            parts.append(
+                {"type": "image_url", "image_url": {"url": _to_image_url(img), "detail": detail}}
+            )
+
+        messages: list[dict[str, Any]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": parts})
+
+        return await self.chat(messages, model=model, max_tokens=max_tokens, json_mode=json_mode)
+
+    async def generate_image(
+        self,
+        prompt: str,
+        *,
+        model: str | None = None,
+        size: str | None = None,
+        quality: str | None = None,
+        style: str | None = None,
+        n: int = 1,
+        response_format: str = "url",
+        extra: dict[str, Any] | None = None,
+    ) -> ImageResult:
+        """文生图（/images/generations）。
+
+        size / quality 是各家差异最大的地方：OpenAI 用 1024x1024 与 hd，
+        国内服务常见 1024*1024 与 low/medium/high。所以这两个值不写死，
+        由能力参数下发，服务商不认时会返回明确报错，界面上一眼能看出来。
+        """
+        payload: dict[str, Any] = {
+            "model": model or self.chat_model,
+            "prompt": prompt,
+            "n": max(1, min(int(n or 1), 4)),
+        }
+        if size:
+            payload["size"] = size
+        if quality:
+            payload["quality"] = quality
+        if style:
+            payload["style"] = style
+        if response_format:
+            payload["response_format"] = response_format
+        if extra:
+            payload.update(extra)
+
+        started = time.monotonic()
+        data = await self._post("/images/generations", payload)
+        latency_ms = int((time.monotonic() - started) * 1000)
+
+        items = data.get("data") or []
+        if not isinstance(items, list) or not items:
+            raise LLMError(f"图片生成响应缺少 data：{str(data)[:300]}")
+
+        urls = [str(it["url"]) for it in items if isinstance(it, dict) and it.get("url")]
+        b64 = [str(it["b64_json"]) for it in items if isinstance(it, dict) and it.get("b64_json")]
+        revised = ""
+        if isinstance(items[0], dict):
+            revised = str(items[0].get("revised_prompt") or "")
+
+        logger.info("llm.image", model=payload["model"], count=len(items), latency_ms=latency_ms)
+        return ImageResult(
+            urls=urls,
+            b64=b64,
+            revised_prompt=revised,
+            model=str(data.get("model") or payload["model"]),
+            latency_ms=latency_ms,
+            raw={k: v for k, v in data.items() if k != "data"},
+        )
+
+
+@dataclass
+class ImageResult:
+    """图片生成结果。
+
+    服务商两种返回习惯：给 URL（多数）或给 b64_json（部分国内服务）。
+    这里两个都留着，调用方按需取，不做隐式转换。
+    """
+
+    urls: list[str] = field(default_factory=list)
+    b64: list[str] = field(default_factory=list)
+    revised_prompt: str = ""
+    model: str = ""
+    latency_ms: int = 0
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def empty(self) -> bool:
+        return not self.urls and not self.b64
+
+
+def _to_image_url(src: str) -> str:
+    """把图片引用归一成 OpenAI 接受的 image_url。
+
+    支持三种形式：http(s) URL、data: URI、本地文件路径（读出来转 base64）。
+    """
+    text = (src or "").strip()
+    if not text:
+        raise LLMError("图片引用为空")
+    if text.startswith(("http://", "https://", "data:")):
+        return text
+
+    path = Path(text)
+    if not path.is_file():
+        raise LLMError(f"图片既不是 URL 也不存在于本地：{text[:120]}")
+    mime = mimetypes.guess_type(path.name)[0] or "image/png"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
 
 class _RetryableError(Exception):
     """内部标记：该错误值得重试"""
@@ -397,11 +542,69 @@ class _RetryableError(Exception):
 # 单例
 # --------------------------------------------------------------------------
 _llm: LLMClient | None = None
+# 按能力缓存的客户端。key = "<capability>:<密钥指纹>"——指纹进 key 是为了让
+# 「后台换了密钥」这件事能自动失效旧连接池，否则新 key 永远不生效，很容易踩。
+_cap_clients: dict[str, LLMClient] = {}
+
+
+def get_llm_for(capability: str) -> LLMClient:
+    """按能力取客户端（chat / embedding / vision / image ...）。
+
+    配置来源由 registry 决定：后台可视化配置优先，其次是 .env。
+    未配置时抛 LLMNotConfiguredError，让上层降级而不是 500。
+    """
+    from cenkor_admin.apps.cms.ai.registry import get_endpoint
+
+    ep = get_endpoint(capability)
+    if ep is None:
+        raise LLMNotConfiguredError(
+            f"能力「{capability}」尚未配置：请在后台 AI 设置里绑定服务商与模型"
+        )
+
+    fingerprint = hashlib.sha256((ep.api_key or "").encode("utf-8")).hexdigest()[:10]
+    sig = f"{capability}:{fingerprint}"
+    cached = _cap_clients.get(sig)
+    if cached is not None:
+        return cached
+
+    # 配置变了：先关掉该能力下的旧客户端，否则换几次 key 就攒几个连接池
+    for stale in [k for k in _cap_clients if k.startswith(f"{capability}:")]:
+        old = _cap_clients.pop(stale)
+        try:
+            asyncio.get_running_loop().create_task(old.aclose())
+        except RuntimeError:
+            # 同步上下文（脚本/CLI）里没法 await，交给 GC
+            pass
+
+    client = LLMClient(
+        base_url=ep.base_url,
+        api_key=ep.api_key,
+        chat_model=ep.model,
+        embed_model=ep.model if capability == "embedding" else "",
+        provider=ep.kind or "openai",
+        timeout=ep.timeout,
+        max_retries=ep.max_retries,
+        temperature=float(ep.params.get("temperature", 0.3)),
+        extra_headers=ep.extra_headers,
+    )
+    _cap_clients[sig] = client
+    logger.debug("llm.client_built", capability=capability, model=ep.model, source=ep.source)
+    return client
 
 
 def get_llm() -> LLMClient:
-    """按当前配置返回进程级单例。配置变更需重启进程生效。"""
+    """取对话能力客户端（保留旧签名，大量既有代码直接调用）。
+
+    有后台/环境变量配置时走 get_llm_for("chat")；全都没有时仍返回一个
+    按 .env 构造的实例，让调用方在真正发请求时收到明确的「未配置」错误，
+    而不是在取值这一步就炸。
+    """
     global _llm
+    from cenkor_admin.apps.cms.ai.registry import get_endpoint
+
+    if get_endpoint("chat") is not None:
+        return get_llm_for("chat")
+
     if _llm is None:
         s = get_settings()
         _llm = LLMClient(
@@ -413,7 +616,6 @@ def get_llm() -> LLMClient:
             timeout=float(getattr(s, "AI_TIMEOUT_SECONDS", 60)),
             max_retries=int(getattr(s, "AI_MAX_RETRIES", 2)),
             temperature=float(getattr(s, "AI_TEMPERATURE", 0.3)),
-            # 留空则回退主配置
             embed_base_url=getattr(s, "AI_EMBED_BASE_URL", "") or "",
             embed_api_key=getattr(s, "AI_EMBED_API_KEY", "") or "",
         )
@@ -421,14 +623,22 @@ def get_llm() -> LLMClient:
 
 
 def ai_enabled() -> bool:
-    """功能开关 + 密钥双检。路由层用它决定是否注册 AI 端点。"""
+    """是否有任一能力可用。后台配置或 .env 任一成立即为真。"""
+    from cenkor_admin.apps.cms.ai.registry import available_capabilities
+
+    if available_capabilities():
+        return True
+    # registry 还没预热（例如启动早期）时回退旧判断
     s = get_settings()
     return bool(getattr(s, "AI_ENABLED", False)) and bool(getattr(s, "AI_API_KEY", ""))
 
 
 async def close_llm() -> None:
-    """应用关闭时释放连接池。"""
+    """应用关闭时释放全部连接池。"""
     global _llm
     if _llm is not None:
         await _llm.aclose()
         _llm = None
+    for key in list(_cap_clients):
+        client = _cap_clients.pop(key)
+        await client.aclose()

@@ -19,7 +19,7 @@ from sqlalchemy import create_engine, text
 from cenkor_admin.core.config import get_settings
 
 APP_KEY = "cms_ai"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 # 需要落库的核心表：用于校验 schema.sql 是否真的执行成功
@@ -31,7 +31,7 @@ def _checksum(sql: str) -> str:
 
 
 def ensure_cms_ai_schema() -> bool:
-    """建 AI 层两张表。已建且 checksum 未变时直接返回 True（零 DDL）。"""
+    """建 AI 层四张表。已建且 checksum 未变时直接返回 True（零 DDL）。"""
     if not SCHEMA_PATH.exists():
         logger.warning("cms_ai.schema_missing", path=str(SCHEMA_PATH))
         return False

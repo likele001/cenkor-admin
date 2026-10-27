@@ -13,6 +13,7 @@ import NewsListView from '@/views/cms/NewsListView.vue'
 import NewsEditView from '@/views/cms/NewsEditView.vue'
 import MediaView from '@/views/cms/MediaView.vue'
 import SiteConfigView from '@/views/cms/SiteConfigView.vue'
+import AiSettingsView from '@/views/cms/AiSettingsView.vue'
 import ContentTypeListView from '@/views/cms/ContentTypeListView.vue'
 import FieldDefinitionsView from '@/views/cms/FieldDefinitionsView.vue'
 import CategoriesView from '@/views/cms/CategoriesView.vue'
@@ -83,6 +84,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/news/new', name: 'cms-news-new', component: NewsEditView, meta: { permission: 'cms:news:write' } },
       { path: 'cms/news/:id', name: 'cms-news-edit', component: NewsEditView, meta: { permission: 'cms:news:write' } },
       { path: 'cms/site', name: 'cms-site', component: SiteConfigView, meta: { permission: 'cms:site:read' } },
+      { path: 'cms/ai-settings', name: 'cms-ai-settings', component: AiSettingsView, meta: { permission: 'cms:ai:read' } },
       { path: 'cms/media', name: 'cms-media', component: MediaView, meta: { permission: 'media:upload' } },
       // System
       { path: 'system/users', name: 'system-users', component: UsersListView, meta: { permission: 'rbac:user:read' } },

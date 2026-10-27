@@ -44,6 +44,10 @@ interface PendingApp {
   created_at: string
   product?: string
   dev_method?: 'platform' | 'extension' | 'standalone'
+  schema_version?: string | null
+  min_core_version?: string | null
+  published_at?: string | null
+  changelog?: string | null
 }
 
 interface StoreApp {
@@ -1019,7 +1023,7 @@ function categoryLabel(c: string): string {
           </div>
           <div>
             <p class="font-medium mb-1">数据策略</p>
-            <p class="text-ink-600">保留策略：{{ bundle.data?.retention || 'keep' }}；自有表：{{ (bundle.data?.tables || []).filter(t => t.mode === 'own').map(t => t.name).join(', ') || '无' }}</p>
+            <p class="text-ink-600">保留策略：{{ bundle.data?.retention || 'keep' }}；自有表：{{ (bundle.data?.tables || []).filter((t: any) => t.mode === 'own').map((t: any) => t.name).join(', ') || '无' }}</p>
           </div>
           <div>
             <p class="font-medium mb-1">迁移静态扫描</p>

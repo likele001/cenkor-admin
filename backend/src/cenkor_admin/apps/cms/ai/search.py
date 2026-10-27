@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.apps.cms.ai.embedding import entry_to_text
 from cenkor_admin.apps.cms.ai.models import CmsEmbedding
 from cenkor_admin.apps.cms.models import ContentType, Entry
-from cenkor_admin.core.llm import LLMNotConfiguredError, get_llm
+from cenkor_admin.core.llm import LLMNotConfiguredError, get_llm_for
 
 try:  # 可选加速：装了 numpy 就用矩阵运算，没装退化为纯 Python
     import numpy as _np
@@ -225,7 +225,7 @@ async def semantic_search(
         content_type_id = ct.id
 
     # 1) query 向量
-    llm = get_llm()
+    llm = get_llm_for("embedding")
     try:
         query_vec = await llm.embed_one(q)
     except LLMNotConfiguredError:

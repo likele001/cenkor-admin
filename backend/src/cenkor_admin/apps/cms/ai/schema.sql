@@ -1,7 +1,7 @@
 -- CMS AI 层 · 幂等建表脚本
 --
 -- 为什么不走 alembic：
--- 这两张表属于公开模块，但当前迁移链尾是闭源 revision（0100_app_schema）。
+-- 这些表属于公开模块，但当前迁移链尾是闭源 revision（0100_app_schema）。
 -- 挂到链尾 → 公开仓库单独建图找不到 parent；插到公开链中间 → 生产已越过该点，
 -- alembic 不会回头执行。所以采用项目已有的「应用自带 schema」哲学：
 -- 启动时幂等执行，由 app_schema_versions 记录版本。
@@ -47,3 +47,44 @@ CREATE INDEX IF NOT EXISTS ix_cms_ai_generations_kind ON cms_ai_generations (kin
 CREATE INDEX IF NOT EXISTS ix_cms_ai_generations_status ON cms_ai_generations (status);
 CREATE INDEX IF NOT EXISTS ix_cms_ai_generations_created_at ON cms_ai_generations (created_at);
 CREATE INDEX IF NOT EXISTS ix_cms_ai_gen_target ON cms_ai_generations (kind, target);
+
+-- ---- 后台可视化配置：服务商通道与能力绑定 ----
+-- 密钥列存 Fernet 密文（前缀 enc:v1:），明文只在内存里出现；
+-- api_key_hint 存末四位掩码，列表页零解密即可展示。
+
+CREATE TABLE IF NOT EXISTS cms_ai_providers (
+    id              SERIAL PRIMARY KEY,
+    slug            VARCHAR(64)  NOT NULL UNIQUE,
+    name            VARCHAR(80)  NOT NULL,
+    kind            VARCHAR(32)  NOT NULL DEFAULT 'openai',
+    base_url        VARCHAR(400) NOT NULL,
+    api_key_enc     TEXT         NOT NULL DEFAULT '',
+    api_key_hint    VARCHAR(16)  NOT NULL DEFAULT '',
+    extra_headers   JSONB,
+    timeout_seconds INTEGER      NOT NULL DEFAULT 60,
+    max_retries     INTEGER      NOT NULL DEFAULT 2,
+    enabled         BOOLEAN      NOT NULL DEFAULT TRUE,
+    remark          VARCHAR(255),
+    last_test_at    TIMESTAMPTZ,
+    last_test_ok    BOOLEAN,
+    last_test_error TEXT,
+    is_builtin      BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_by      INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS ix_cms_ai_providers_enabled ON cms_ai_providers (enabled);
+
+CREATE TABLE IF NOT EXISTS cms_ai_capabilities (
+    capability  VARCHAR(32) PRIMARY KEY,
+    provider_id INTEGER REFERENCES cms_ai_providers(id) ON DELETE RESTRICT,
+    model       VARCHAR(160) NOT NULL DEFAULT '',
+    params      JSONB,
+    enabled     BOOLEAN      NOT NULL DEFAULT TRUE,
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_by  INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS ix_cms_ai_capabilities_provider_id
+    ON cms_ai_capabilities (provider_id);

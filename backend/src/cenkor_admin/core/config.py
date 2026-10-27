@@ -161,6 +161,17 @@ class Settings(BaseSettings):
     AI_TEMPERATURE: float = 0.3
     # 单次向量化批大小（embedding 接口通常有批量上限，过大易 400）
     AI_EMBED_BATCH: int = 32
+    # 视觉模型：留空 = 该能力未启用。通道与密钥继承上面的 chat 配置
+    # （绝大多数 OpenAI 兼容站 chat 与 vision 同 base_url）。
+    AI_VISION_MODEL: str = ""
+    # 图片生成：同上，留空则不具备出图能力。部分站点图片走独立 base_url。
+    AI_IMAGE_BASE_URL: str = ""
+    AI_IMAGE_API_KEY: str = ""
+    AI_IMAGE_MODEL: str = ""
+
+    # 后台可视化配置说明：
+    # 以上 AI_* 是「环境变量兜底」路径。正式用法是在后台 AI 设置里添加服务商
+    # 并按能力绑定模型，配置来源见 apps/cms/ai/registry.py（DB 优先，.env 兜底）。
 
     # ---- MCP（Agent 接入）----
     # MCP 端点鉴权密钥；留空则拒绝外部调用（后台调试用 /mcp/tools）
