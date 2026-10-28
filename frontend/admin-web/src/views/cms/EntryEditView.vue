@@ -140,6 +140,11 @@ const rewriteContext = computed(() => {
   if (activeForm.value.title && rewriteTarget.value === 'content') {
     parts.push(`当前标题：${activeForm.value.title}`)
   }
+  // 拟标题/改标题时把正文一起给模型。只送一句标题过去的话，模型没有任何素材，
+  // 很容易把原标题原样返回（「改写结果」和「修改前」一模一样）。
+  if (rewriteTarget.value === 'title' && bodyText.value) {
+    parts.push(`正文（拟标题的依据）：${bodyText.value.slice(0, 800)}`)
+  }
   return parts.join('；')
 })
 const translatableLangs = computed(() =>

@@ -17,10 +17,12 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import re
 from typing import Any
 
+import markdown as md
 from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +49,44 @@ _KIND_REWRITE = "text_rewrite"
 
 def _digest(text_value: str) -> str:
     return hashlib.sha256(text_value.encode("utf-8")).hexdigest()[:32]
+
+
+def _as_object(raw: Any, what: str) -> dict[str, Any]:
+    """把 chat_json 的产物收敛成对象。
+
+    「JSON 合法但不是对象」是模型常见的输出偏差：多包一层数组
+    ``[{...}]``、把对象再编码成字符串、或干脆只给一个键值对包装。
+    这类情况重试一次也未必能修好（模型认为自己的输出没问题），
+    所以先宽容收一次，真收不回来才报错。
+    """
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, list):
+        dicts = [x for x in raw if isinstance(x, dict)]
+        if len(dicts) == 1:
+            return dicts[0]
+    if isinstance(raw, str):
+        try:
+            return _as_object(json.loads(raw), what)
+        except (ValueError, TypeError):
+            pass
+    raise LLMError(f"{what}输出不是对象结构")
+
+
+def _md_to_html(text: str) -> str:
+    """markdown → HTML，供富文本编辑器回填。
+
+    先转义 ``<``/``>``：模型给的正文如果夹带 ``<script>`` 之类，
+    原样交给 markdown 会被当作内联 HTML 直通，落库后就是存储型 XSS。
+    markdown 语法本身只用到 ``#``/``*``/``-`` 等字符，转义尖括号不影响排版。
+    """
+    if not text or not str(text).strip():
+        return ""
+    return md.markdown(
+        html.escape(str(text)),
+        extensions=["fenced_code", "tables", "sane_lists"],
+        output_format="html",
+    )
 
 
 async def _record(
@@ -402,7 +442,7 @@ async def apply_content_type(
 # ---------------------------------------------------------------------------
 _DRAFT_SYSTEM = """你是资深内容编辑。根据用户给的素材和大纲，为指定内容类型写一条结构完整的草稿。
 
-只输出一个 JSON 对象：
+只输出一个 JSON 对象（以 { 开头、以 } 结尾），不要数组、不要任何解释文字：
 {
   "title": "标题，不超过 60 字",
   "slug": "英文小写短横线，如 customer-case-baosteel",
@@ -418,7 +458,10 @@ _DRAFT_SYSTEM = """你是资深内容编辑。根据用户给的素材和大纲�
 3. **绝不编造具体数字、客户名、日期、证书编号**——素材里没有就留空字符串或 null，
    并在 content.body 里用「（待补充）」标出缺口
 4. 正文用 markdown，段落之间空行，不用一级标题（标题在 title 里）
-5. 语气专业克制，不用「赋能」「闭环」「抓手」这类空话"""
+5. 语气专业克制，不用「赋能」「闭环」「抓手」这类空话
+6. **正文 600~1200 字**，宁可短而实，不要为凑长度注水
+7. **整段输出不要用 ``` 代码围栏包裹**；正文里确实需要代码块时用 4 空格缩进，
+   否则围栏会把外层 JSON 截断"""
 
 
 async def draft_entry(
@@ -492,8 +535,7 @@ async def draft_entry(
         )
         raise
 
-    if not isinstance(raw, dict):
-        raise LLMError("草稿输出不是对象结构")
+    raw = _as_object(raw, "草稿")
 
     # 清洗 custom_fields：只留合法 key，并按字段类型粗校验
     valid_keys = {f.field_key: f.field_type for f in fields}
@@ -564,11 +606,23 @@ async def create_entry_from_draft(
     created_by: int | None = None,
 ) -> Entry:
     """把 draft_entry 的产物真正落库为草稿条目。"""
+    content = dict(draft.get("content") or {})
+
+    # 起草给的是 markdown（content.body），编辑页读的是富文本（content.text）。
+    # 不转这一步，AI 写完点进编辑页正文是空的 —— 数据在库里，但界面读不到。
+    if not str(content.get("text") or "").strip():
+        body = content.get("body") or content.get("markdown") or content.get("md")
+        if body:
+            content["text"] = _md_to_html(str(body))
+        content.pop("body", None)  # 只留 text，避免两份正文日后各改一半而漂移
+        content.pop("markdown", None)
+        content.pop("md", None)
+
     entry = Entry(
         content_type_id=draft["content_type_id"],
         title=draft["title"],
         slug=draft.get("slug"),
-        content=draft.get("content") or {},
+        content=content,
         custom_fields=draft.get("custom_fields") or {},
         seo=draft.get("seo") or {},
         status="draft",  # 强制草稿，AI 不能直接发布
@@ -651,8 +705,7 @@ async def translate_entry(
 
         try:
             raw, result = await llm.chat_json(messages, temperature=0.2, max_tokens=6000)
-            if not isinstance(raw, dict):
-                raise LLMError("翻译输出不是对象结构")
+            raw = _as_object(raw, "翻译")
 
             field_values = {
                 "title": str(raw.get("title") or entry.title)[:200],
@@ -709,7 +762,7 @@ async def translate_entry(
 # ---------------------------------------------------------------------------
 _SEO_SYSTEM = """你是 SEO 与 GEO（生成式引擎优化）专家。为给定内容生成元数据。
 
-只输出一个 JSON 对象：
+只输出一个 JSON 对象（以 { 开头、以 } 结尾），不要数组、不要任何解释文字：
 {
   "title": "SEO 标题，不超过 60 字符",
   "description": "meta description，60~155 字符，包含核心关键词，像人话不像堆词",
@@ -763,8 +816,7 @@ async def suggest_seo(
         )
         raise
 
-    if not isinstance(raw, dict):
-        raise LLMError("SEO 输出不是对象结构")
+    raw = _as_object(raw, "SEO")
 
     seo = {
         "title": str(raw.get("title") or "")[:120],
@@ -803,7 +855,7 @@ REWRITE_ACTIONS: dict[str, str] = {
     "shorten": "精简：删掉冗余与重复，长度约为原文的一半",
     "formal": "改写为正式书面语，适合官网、白皮书、商务函件",
     "plain": "改写为通俗口语，让不懂行的人也能看懂",
-    "title": "据此拟一个标题：不超过 30 字，不堆关键词，不加引号与句号，不要「浅谈」「解析」这类空话",
+    "title": "另拟一个新标题：不超过 30 字，不堆关键词，不加引号与句号，不要「浅谈」「解析」这类空话；新标题必须与输入的现有标题不同",
     "summary": "概括为一段摘要：80~120 字，只陈述原文意思，不添加新信息，不要「本文」「这篇文章」",
     "custom": "按用户给出的具体要求改写",
 }
@@ -840,6 +892,15 @@ def _rewrite_user_msg(
     parts = [f"动作：{REWRITE_ACTIONS[action]}（{action}）", f"输出语言：{lang}"]
     if context:
         parts.append(f"上下文（仅供理解，不要改写）：{context[:1000]}")
+    if action == "title":
+        # 模型看到输入就是一句像模像样的标题时，很容易原样返回。
+        # 这里把「输入是旧标题、要依据正文重拟」说死，并给出信息不足时的退路。
+        parts.append(
+            "注意：下面的输入是**现有标题**，不是要概括的正文。"
+            "请依据上下文里的正文另拟一个新标题，且必须与现有标题不同。"
+            "若正文信息不足以支撑新标题，就换一个更具体的角度改写（补上主题词），"
+            "但绝不要原样返回现有标题。"
+        )
     if instruction:
         parts.append(f"用户具体要求：{instruction[:1000]}")
     if blocks is not None:
@@ -910,8 +971,37 @@ async def rewrite_text(
         )
         raise
 
-    if not isinstance(raw, dict):
-        raise LLMError("改写输出不是对象结构")
+    raw = _as_object(raw, "改写")
+
+    # 拟标题时模型若把现有标题原样吐回来，等于什么也没做。
+    # 给一次带明确指正的重试；仍不行就如实返回，由前端提示「未改动」。
+    if action == "title" and blocks is None and text:
+        first = str(raw.get("text") or "").strip()
+        if first == text.strip():
+            retry_messages = [
+                *messages,
+                {"role": "assistant", "content": result.text[:2000]},
+                {
+                    "role": "user",
+                    "content": (
+                        "你刚才把现有标题原样返回了，没有完成任务。"
+                        "请依据上下文里的正文另拟一个与现有标题不同的标题，"
+                        '仍然只输出 {"text": "新标题"}。'
+                    ),
+                },
+            ]
+            try:
+                retried, retry_result = await llm.chat_json(
+                    retry_messages, temperature=0.8, max_tokens=200
+                )
+                alt = str((retried or {}).get("text") or "").strip() if isinstance(retried, dict) else ""
+                if alt and alt != text.strip():
+                    raw = retried
+                    result = retry_result
+                    logger.info("cms.ai.title_retried", entry_title=text[:40])
+            except Exception as exc:  # noqa: BLE001
+                # 重试是锦上添花，失败就用第一次的结果，不能把主流程带崩
+                logger.warning("cms.ai.title_retry_failed", error=str(exc))
 
     out: dict[str, Any] = {"action": action}
     if blocks is not None:

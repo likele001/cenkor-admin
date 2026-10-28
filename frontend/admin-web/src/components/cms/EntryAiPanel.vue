@@ -185,6 +185,8 @@ function slugify(s: string): string {
         <button
           class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
           :disabled="!hasBody || !!busy"
+          aria-label="生成摘要"
+          title="生成摘要"
           @click="makeSummary"
         >
           {{ busy === 'summary' ? '生成中…' : '生成' }}
@@ -212,6 +214,8 @@ function slugify(s: string): string {
         <button
           class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
           :disabled="!canEntryOp"
+          aria-label="生成 SEO 建议"
+          title="生成 SEO 建议"
           @click="makeSeo"
         >
           {{ busy === 'seo' ? '生成中…' : '生成' }}
@@ -238,7 +242,7 @@ function slugify(s: string): string {
           </div>
         </div>
         <div class="flex gap-2 pt-0.5">
-          <button class="btn-ghost text-xs px-2 py-0.5" @click="applySlug">用作 slug</button>
+          <button class="btn-ghost text-xs px-2 py-0.5" @click="applySlug">按 SEO 标题生成 slug</button>
           <button class="text-xs text-ink-400 hover:text-ink-700 px-1" @click="seo = null">收起</button>
         </div>
       </div>
@@ -251,6 +255,8 @@ function slugify(s: string): string {
         <button
           class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
           :disabled="!canEntryOp || !targetLangs.length"
+          aria-label="翻译到选中语言"
+          title="翻译到选中语言"
           @click="doTranslate"
         >
           {{ busy === 'translate' ? '翻译中…' : `翻译 ${targetLangs.length || ''}` }}

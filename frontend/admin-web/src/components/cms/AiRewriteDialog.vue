@@ -49,7 +49,10 @@ const emit = defineEmits<{
   (e: 'apply', v: string): void
 }>()
 
-const action = ref('polish')
+// 默认动作取 presets 的第一个：标题弹层的第一个是「拟标题」。
+// 写死 polish 的话，点标题旁的 ✨ 会去「润色标题」——对一句 6 字标题
+// 几乎改不出东西，模型常常原样返回，用户以为坏了。
+const action = ref(props.presets?.[0]?.key || 'polish')
 const instruction = ref('')
 const busy = ref(false)
 const errorMsg = ref('')
@@ -62,6 +65,12 @@ const showOriginal = ref(false)
 
 const canApply = computed(() => !!result.value && !busy.value)
 const needInstruction = computed(() => action.value === 'custom')
+// 结果和原文一致（去掉空白差异后比较）：模型没改，需要给用户一个解释
+const unchanged = computed(() => {
+  if (!result.value || !originalPlain.value) return false
+  const norm = (s: string) => s.replace(/\s+/g, '').trim()
+  return norm(resultPlain.value || result.value) === norm(originalPlain.value)
+})
 
 interface TextBlock {
   node: Text
@@ -199,6 +208,10 @@ watch(
     errorMsg.value = ''
     showOriginal.value = false
     aiUnavailable.value = false
+    // 每次打开都回到默认动作：上次可能切到了「精简」，重开还停在精简
+    // 会让「点 ✨ 就是干默认那件事」的预期落空
+    action.value = props.presets?.[0]?.key || 'polish'
+    instruction.value = ''
     // 点 ✨ 的意图就是「帮我改」，直接跑默认动作，少一次点击
     void run()
   },
@@ -300,6 +313,15 @@ watch(
             {{ originalPlain }}
           </div>
         </div>
+
+        <!-- 模型有时会原样返回（内容太短、或它认为无需改动）。
+             不说明的话，用户只看到两栏一模一样，会以为是坏了。 -->
+        <p
+          v-if="result && !busy && unchanged"
+          class="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"
+        >
+          模型这次没有做出改动——可能是这段内容太短，或它认为无需调整。换个动作、补一句要求，或点「再来一次」。
+        </p>
       </div>
 
       <footer class="px-5 py-3 border-t border-ink-200 flex items-center gap-3 shrink-0">

@@ -26,7 +26,6 @@ from cenkor_admin.apps.cms.ai.admin_router import router as admin_router
 from cenkor_admin.apps.cms.ai.embedding import vectorize_entry, vectorize_pending
 from cenkor_admin.apps.cms.ai.search import semantic_search, similar_entries
 from cenkor_admin.apps.cms.models import Entry
-from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.llm import LLMError, LLMNotConfiguredError
 
@@ -37,11 +36,22 @@ router = APIRouter(prefix="/ai", tags=["cms-ai"])
 router.include_router(admin_router)
 
 
-def _require_ai() -> None:
-    if not get_settings().ai_ready:
+async def _require_ai(db: AsyncSession) -> None:
+    """判定 AI 是否可用，以**实际生效的配置**为准。
+
+    不能用 ``settings.ai_ready`` —— 那只看 ``.env``（AI_ENABLED + AI_API_KEY）。
+    后台「AI 设置」里绑好服务商与模型后，registry 里已有可用端点，
+    但 .env 仍可能是空的，按 .env 判会把配好的 AI 误报成未启用。
+    registry.load 在 TTL 内直接返回缓存，每请求调用零开销。
+    """
+    from cenkor_admin.apps.cms.ai import registry as ai_registry
+
+    reg = await ai_registry.load(db)
+    if reg.endpoint("chat") is None:
+        reason = reg.last_error or "未绑定对话服务商"
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI 未启用：请在 .env 设置 AI_ENABLED=true 与 AI_API_KEY",
+            detail=f"AI 未配置（{reason}）：请在后台「AI 设置」里绑定服务商与模型",
         )
 
 
@@ -62,7 +72,7 @@ async def propose_content_type(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     description = str(body.get("description") or "").strip()
     if not description:
         raise HTTPException(status_code=400, detail="缺少 description")
@@ -88,7 +98,7 @@ async def apply_content_type(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     try:
         ct = await copilot.apply_content_type(db, body, created_by=user.id)
         return {
@@ -111,7 +121,7 @@ async def draft_entry(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     ct_id = body.get("content_type_id")
     brief = str(body.get("brief") or "").strip()
     if not ct_id or not brief:
@@ -138,7 +148,7 @@ async def save_draft(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     try:
         entry = await copilot.create_entry_from_draft(db, body, created_by=user.id)
         return {"entry_id": entry.id, "status": entry.status, "title": entry.title}
@@ -166,7 +176,7 @@ async def translate_entry(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     langs = body.get("langs")
     if not isinstance(langs, list) or not langs:
         raise HTTPException(status_code=400, detail='需要 langs 数组，如 ["en-US"]')
@@ -193,7 +203,7 @@ async def suggest_seo(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     entry = await _load_entry(db, entry_id)
     try:
         result = await copilot.suggest_seo(
@@ -224,7 +234,7 @@ async def rewrite_text(
     正文之所以走多块，是为了让模型不产出 HTML —— 标签结构由前端 DOM 负责，
     模型只回文本，既不会破坏格式也没有 XSS 面。
     """
-    _require_ai()
+    await _require_ai(db)
     action = str(body.get("action") or "polish")
     blocks = body.get("blocks")
     if blocks is not None and not isinstance(blocks, list):
@@ -262,7 +272,7 @@ async def ai_search(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     try:
         hits = await semantic_search(
             db,
@@ -286,7 +296,7 @@ async def ai_similar(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     hits = await similar_entries(db, entry_id, lang=lang, limit=limit)
     return {"entry_id": entry_id, "count": len(hits), "results": [h.as_dict() for h in hits]}
 
@@ -300,7 +310,7 @@ async def rebuild_vectors(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    _require_ai()
+    await _require_ai(db)
     limit = int(body.get("limit") or 50)
     force = bool(body.get("force", False))
     entry_id = body.get("entry_id")
@@ -329,9 +339,13 @@ async def ai_usage(
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
     rows = await copilot.usage_summary(db, days=days)
+    from cenkor_admin.apps.cms.ai import registry as ai_registry
+
+    reg = await ai_registry.load(db)
     return {
         "days": days,
-        "enabled": get_settings().ai_ready,
+        "enabled": reg.endpoint("chat") is not None,
+        "embed_ready": reg.endpoint("embedding") is not None,
         "items": rows,
         "total_calls": sum(r["calls"] for r in rows),
         "total_tokens": sum(r["tokens_in"] + r["tokens_out"] for r in rows),
