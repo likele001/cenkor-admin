@@ -136,7 +136,9 @@ class _Dispatch:
             }
             return d
         except Exception as e:
-            log.debug("storage.fallback_to_minio", error=str(e))
+            # 降级到本地 MinIO 会掩盖云存储配置错误（历史上曾把「七牛驱动加载失败」
+            # 误判成「七牛上传慢」），因此必须以 warning 级别暴露。
+            log.warning("storage.fallback_to_minio", error=f"{type(e).__name__}: {str(e)[:300]}")
             self._driver = _S3Fallback()
             self._meta = {"provider": "minio", "bucket": settings.S3_BUCKET_PUBLIC}
             return self._driver
@@ -204,8 +206,14 @@ class _Dispatch:
             return True
 
     async def download(self, bucket: str, key: str) -> bytes:
-        """从当前激活存储下载对象内容（用于本地备份回写）。"""
+        """从当前激活存储下载对象内容（用于本地备份回写）。
+
+        driver 自带原生 download 时优先使用（如七牛走 CDN，避开缓慢的 S3 网关）。
+        """
         d = await self._resolve()
+        native = getattr(d, "download", None)
+        if callable(native):
+            return await native(bucket, key)
         async with d.client() as c:
             r = await c.get_object(Bucket=bucket, Key=key)
             return await r["Body"].read()
