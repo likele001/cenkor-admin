@@ -71,8 +71,16 @@ _PERM_RULES: tuple[tuple[str, str | None, str | None], ...] = (
     ("/ai/overview", "cms:ai:read", None),
     ("/ai/presets", "cms:ai:read", None),
     ("/ai/usage", "cms:ai:read", None),
+    # 单价决定「花了多少钱」的口径，读要 read，改要 manage
+    ("/ai/prices", "cms:ai:read", "cms:ai:manage"),
     ("/ai/providers", "cms:ai:read", "cms:ai:manage"),
     ("/ai/capabilities", "cms:ai:read", "cms:ai:manage"),
+    ("/ai/prompts", "cms:ai:read", "cms:ai:manage"),
+    # 批量生产会一次消耗大量 token，写操作与「改提示词」同档。
+    # 最长前缀匹配，所以 /ai/batch-stats 不会被 /ai/batch 吃掉。
+    ("/ai/dashboard", "cms:ai:read", None),
+    ("/ai/batch-stats", "cms:ai:read", None),
+    ("/ai/batch", "cms:ai:read", "cms:ai:manage"),
     # 重建向量直接烧 token，只给管理员
     ("/ai/vectors/rebuild", None, "cms:ai:manage"),
     # ---------------- AI 业务：产出的是内容，按内容权限管 ----------------
@@ -82,6 +90,32 @@ _PERM_RULES: tuple[tuple[str, str | None, str | None], ...] = (
     # 故意不挂 cms:ai:*，否则能给 AI 配 key 的人才有权润色一段话，说不通。
     ("/ai/text", "cms:entries:read", "cms:entries:write"),
     ("/ai/search", "cms:entries:read", None),
+    # ---- P2 分批新增的能力：体检 / 问答 / 选题 / 质检 / 配图 ----
+    # 这些都是后续批次加进来的端点，最初漏在 _PERM_RULES 之外。
+    # 漏配的后果不是「不能用」而是「谁都能用」：守卫只告警然后放行，
+    # 于是任何登录角色都能看全站健康报告、跑模型 A/B、生成配图（都在烧钱）。
+    ("/ai/health", "cms:entries:read", None),
+    # 问答是 POST（问题放 body），写侧同样要码，不能留 None 变成「不设限」
+    ("/ai/ask", "cms:ai:read", "cms:ai:read"),
+    ("/ai/topic-gaps", "cms:ai:read", None),
+    # 跑一次 A/B 是两版并发生成，写侧按 manage 管
+    ("/ai/quality/ab", "cms:ai:read", "cms:ai:manage"),
+    # 提交盲评结论是编辑的本职工作，不该要求 AI 配置权限
+    ("/ai/quality/ab/{run_id}/review", "cms:ai:read", "cms:ai:read"),
+    # 人工打分同理：评审不是配置
+    ("/ai/quality", "cms:ai:read", "cms:ai:read"),
+    # 配图结果落在条目上，按条目权限管；生图费用由套餐额度控制，不叠权限码
+    ("/ai/illustration", "cms:entries:read", "cms:entries:write"),
+    # 把媒体挂到条目 = 改条目
+    ("/ai/media", "media:upload", "media:upload"),
+    # 渠道清单是纯只读枚举
+    ("/ai/redistribute", "cms:entries:read", None),
+    # 建模影响面分析（改字段/改类型前看会波及谁）：纯只读
+    ("/ai/schema", "cms:content_types:read", None),
+    # ---------------- MCP（外部 Agent 的写入口）----------------
+    # 这里只有 get_current_user 一层，没有 API Key。漏配规则时守卫直接放行，
+    # 等于任何登录用户都能借 MCP 的 publish 工具发内容 —— 必须按条目权限管。
+    ("/mcp", "cms:entries:read", "cms:entries:write"),
     # ---------------- 内容引擎：建模三件套 ----------------
     # 字段组 / 字段定义 / 选项统一归 field_definitions。
     # 显式排在 /content-types 前面，让「改字段要 field_definitions 权限而不是
@@ -119,6 +153,8 @@ _PERM_RULES: tuple[tuple[str, str | None, str | None], ...] = (
     ("/news", "cms:news:read", "cms:news:write"),
     # ---------------- 站点与模板 ----------------
     # 模板渲染决定对外呈现，等价于改站点配置
+    # 站点增删改是对整个站群的写操作，跟 site-config 同级
+    ("/sites", "cms:site:read", "cms:site:write"),
     ("/site-config", "cms:site:read", "cms:site:write"),
     ("/templates", "cms:site:read", "cms:site:write"),
     # ---------------- 媒体 ----------------
