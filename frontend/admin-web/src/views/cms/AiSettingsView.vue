@@ -415,6 +415,20 @@ onMounted(loadAll)
         <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← Dashboard</router-link>
         <span class="font-semibold">AI 设置</span>
         <span class="text-xs text-ink-400">服务商 · 能力绑定 · 连通性</span>
+        <div class="ml-auto flex items-center gap-4">
+          <router-link
+            to="/cms/ai-batch"
+            class="text-sm text-ink-600 hover:text-ink-900 underline underline-offset-4"
+          >
+            批量生产
+          </router-link>
+          <router-link
+            to="/cms/ai-prompts"
+            class="text-sm text-ink-600 hover:text-ink-900 underline underline-offset-4"
+          >
+            提示词管理
+          </router-link>
+        </div>
       </div>
     </header>
 

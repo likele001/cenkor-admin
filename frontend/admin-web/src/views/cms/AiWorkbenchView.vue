@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
 interface ContentType { id: number; key: string; name: string; translatable?: boolean }
 interface Language { code: string; name: string; flag?: string; is_default: boolean; enabled: boolean }
@@ -49,11 +50,44 @@ const entryFilter = ref('')
 
 const busy = ref(false)
 
+// 流式起草状态：正文逐段透出，done 后落到 draft
+interface StreamState {
+  title: string
+  slug: string
+  body: string
+  phase: 'connecting' | 'writing' | 'enriching'
+}
+const streaming = ref<StreamState | null>(null)
+let abortDraft: AbortController | null = null
+
 // 起草
 const brief = ref('')
 const draftLang = ref('zh-CN')
 const draft = ref<Draft | null>(null)
 const savedEntryId = ref<number | null>(null)
+
+// 素材直入：附件解析成文本后追加到 brief
+interface AttachedFile {
+  name: string
+  kind: string
+  chars: number
+  warnings: string[]
+}
+const attached = ref<AttachedFile[]>([])
+const ingesting = ref(false)
+const ingestError = ref('')
+const dragOver = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const KIND_LABEL: Record<string, string> = {
+  pdf: 'PDF',
+  docx: 'Word',
+  xlsx: 'Excel',
+  image: '图片',
+  video: '视频',
+  html: '网页',
+  text: '文本',
+}
 
 // 翻译
 const targetLangs = ref<string[]>([])
@@ -116,6 +150,99 @@ async function loadEntries() {
   }
 }
 
+function parseSseEvent(raw: string): { event: string; data: any } | null {
+  let event = 'message'
+  let data = ''
+  for (const line of raw.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim()
+    else if (line.startsWith('data:')) data += line.slice(5).trim()
+  }
+  if (!data) return null
+  try {
+    return { event, data: JSON.parse(data) }
+  } catch {
+    return null
+  }
+}
+
+function handleStreamEvent(event: string, data: any) {
+  if (event === 'meta') {
+    if (streaming.value) {
+      streaming.value.title = data.title || ''
+      streaming.value.slug = data.slug || ''
+      streaming.value.phase = 'writing'
+    }
+  } else if (event === 'delta') {
+    if (streaming.value) streaming.value.body += data.t || ''
+  } else if (event === 'extra') {
+    if (streaming.value) {
+      streaming.value.phase = 'enriching'
+    }
+  } else if (event === 'done') {
+    draft.value = data as Draft
+    streaming.value = null
+  } else if (event === 'error') {
+    errorMsg.value = data.detail || '生成失败'
+    streaming.value = null
+  }
+}
+
+function pickFiles() {
+  fileInput.value?.click()
+}
+
+function onFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = '' // 允许重复选同一个文件
+  if (files.length) void ingestFiles(files)
+}
+
+function onDrop(e: DragEvent) {
+  dragOver.value = false
+  const files = Array.from(e.dataTransfer?.files || [])
+  if (files.length) void ingestFiles(files)
+}
+
+async function ingestFiles(files: File[]) {
+  if (ingesting.value) return
+  ingesting.value = true
+  ingestError.value = ''
+  try {
+    const fd = new FormData()
+    files.slice(0, 5).forEach((f) => fd.append('files', f))
+    // 解析可能是「视频抽帧 + 视觉识别」，axios 默认 15s 必然超时
+    const { data } = await api.post('/api/v1/cms/ai/ingest/extract', fd, { timeout: 300000 })
+    for (const r of data.results || []) {
+      attached.value.push({
+        name: r.filename,
+        kind: r.kind,
+        chars: r.chars,
+        warnings: r.warnings || [],
+      })
+    }
+    if (data.brief) {
+      brief.value = brief.value.trim() ? `${brief.value.trim()}\n\n${data.brief}` : data.brief
+    }
+    const fails = (data.failures || []).map((f: any) => `${f.filename}：${f.error}`)
+    if (fails.length) {
+      ingestError.value = fails.join('；')
+    } else if ((data.results || []).length) {
+      notice.value = `已解析 ${data.results.length} 个素材，共 ${data.chars} 字`
+    }
+  } catch (e: any) {
+    ingestError.value = errText(e)
+  } finally {
+    ingesting.value = false
+  }
+}
+
+function resetBrief() {
+  brief.value = ''
+  attached.value = []
+  ingestError.value = ''
+}
+
 async function doDraft() {
   if (!canDraft.value) return
   busy.value = true
@@ -123,18 +250,62 @@ async function doDraft() {
   notice.value = ''
   draft.value = null
   savedEntryId.value = null
+  streaming.value = { title: '', slug: '', body: '', phase: 'connecting' }
+  const auth = useAuthStore()
+  const base = import.meta.env.VITE_API_BASE_URL || ''
+  abortDraft = new AbortController()
   try {
-    const { data } = await api.post('/api/v1/cms/ai/entries/draft', {
-      content_type_id: ctId.value,
-      brief: brief.value.trim(),
-      lang: draftLang.value,
+    // axios 默认 15s 超时接不住 40s 的生成，起草走原生 fetch + SSE
+    const resp = await fetch(`${base}/api/v1/cms/ai/entries/draft/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
+      },
+      body: JSON.stringify({
+        content_type_id: ctId.value,
+        brief: brief.value.trim(),
+        lang: draftLang.value,
+      }),
+      signal: abortDraft.signal,
     })
-    draft.value = data as Draft
+    if (!resp.ok || !resp.body) {
+      let detail = `HTTP ${resp.status}`
+      try {
+        const j = await resp.json()
+        detail = j.detail || detail
+      } catch {
+        /* 非 JSON 错误体 */
+      }
+      if (resp.status === 503) aiUnavailable.value = true
+      throw new Error(detail)
+    }
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      let idx: number
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const raw = buf.slice(0, idx)
+        buf = buf.slice(idx + 2)
+        const ev = parseSseEvent(raw)
+        if (ev) handleStreamEvent(ev.event, ev.data)
+      }
+    }
   } catch (e: any) {
-    errorMsg.value = errText(e)
+    if (e?.name !== 'AbortError') errorMsg.value = e?.message || '生成失败'
   } finally {
+    streaming.value = null
     busy.value = false
+    abortDraft = null
   }
+}
+
+function cancelDraft() {
+  abortDraft?.abort()
 }
 
 async function saveDraft() {
@@ -142,6 +313,27 @@ async function saveDraft() {
   busy.value = true
   errorMsg.value = ''
   try {
+    // 保存前查重：命中高相似则二次确认，避免重复落库
+    let dupTop: any = null
+    try {
+      const { data: dup } = await api.post('/api/v1/cms/ai/entries/dedup', {
+        title: draft.value.title,
+        content: draft.value.content || {},
+        content_type_id: ctId.value,
+      })
+      if (dup.has_duplicate && dup.duplicates?.length) dupTop = dup.duplicates[0]
+    } catch {
+      /* 查重接口异常不阻断保存 */
+    }
+    if (dupTop) {
+      const ok = window.confirm(
+        `检测到与《${dupTop.title}》高度相似（相似度 ${dupTop.score}），可能重复内容。仍要保存为草稿吗？`
+      )
+      if (!ok) {
+        busy.value = false
+        return
+      }
+    }
     const { data } = await api.post('/api/v1/cms/ai/entries/draft/save', draft.value)
     savedEntryId.value = data.entry_id
     notice.value = `已保存为草稿条目：${data.title}`
@@ -252,6 +444,10 @@ onMounted(async () => {
   await loadBase()
   await loadEntries()
 })
+
+onUnmounted(() => {
+  abortDraft?.abort()
+})
 </script>
 
 <template>
@@ -339,7 +535,61 @@ onMounted(async () => {
             素材里没有的具体数字、客户名、日期，AI 不会编，会标「（待补充）」。
           </p>
 
-          <label class="block mt-4 text-xs font-medium text-ink-700">素材 / 大纲</label>
+          <div class="mt-4 flex items-center justify-between gap-2">
+            <label class="text-xs font-medium text-ink-700">素材 / 大纲</label>
+            <button
+              v-if="brief"
+              class="text-[11px] text-ink-400 hover:text-red-500"
+              @click="resetBrief"
+            >
+              清空
+            </button>
+          </div>
+
+          <!-- 素材直入：附件解析成文本后追加到下面素材框 -->
+          <div
+            class="mt-1.5 rounded-lg border border-dashed px-3 py-3 text-center cursor-pointer transition-colors"
+            :class="dragOver ? 'border-emerald-400 bg-emerald-50' : 'border-ink-300 hover:border-ink-400'"
+            @click="pickFiles"
+            @dragover.prevent="dragOver = true"
+            @dragleave.prevent="dragOver = false"
+            @drop.prevent="onDrop"
+          >
+            <input
+              ref="fileInput"
+              type="file"
+              multiple
+              class="hidden"
+              accept=".pdf,.docx,.xlsx,.xlsm,.png,.jpg,.jpeg,.webp,.gif,.bmp,.mp4,.mov,.webm,.txt,.md,.csv,.html,.htm"
+              @change="onFileChange"
+            />
+            <p class="text-xs text-ink-600">
+              <template v-if="ingesting">
+                <span class="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse align-middle"></span>
+                正在解析素材…
+              </template>
+              <template v-else>
+                拖入 PDF / Word / Excel / 图片 / 视频，或
+                <span class="font-medium text-ink-900 underline">点击选择</span>
+              </template>
+            </p>
+            <p class="mt-1 text-[11px] text-ink-400">
+              扫描件自动 OCR，视频抽 3 帧识别 · 单个 ≤ 20MB · 一次最多 5 个
+            </p>
+          </div>
+
+          <div v-if="attached.length" class="mt-2 flex flex-wrap gap-1.5">
+            <span
+              v-for="(f, i) in attached"
+              :key="i"
+              class="inline-flex items-center gap-1 rounded-md bg-ink-100 px-2 py-1 text-[11px] text-ink-700"
+              :title="f.warnings.join('；')"
+            >
+              {{ KIND_LABEL[f.kind] || f.kind }} · {{ f.name }} · {{ f.chars }} 字
+            </span>
+          </div>
+          <p v-if="ingestError" class="mt-1.5 text-[11px] text-red-500">{{ ingestError }}</p>
+
           <textarea
             v-model="brief"
             rows="9"
@@ -353,13 +603,42 @@ onMounted(async () => {
             <option v-for="l in languages" :key="l.code" :value="l.code">{{ l.name }}（{{ l.code }}）</option>
           </select>
 
-          <button class="btn-primary w-full mt-4" :disabled="!canDraft" @click="doDraft">
-            {{ busy ? '正在生成…' : '生成草稿' }}
-          </button>
+          <div class="flex items-center justify-between gap-3 mt-4">
+            <button class="btn-primary flex-1" :disabled="!canDraft" @click="doDraft">
+              {{ busy ? '正在生成…' : '生成草稿' }}
+            </button>
+            <button v-if="busy && streaming" class="btn-outline shrink-0" @click="cancelDraft">取消</button>
+          </div>
         </div>
 
         <div class="lg:col-span-3">
-          <div v-if="!draft" class="card flex flex-col items-center justify-center py-20 text-center">
+          <!-- 流式生成中：标题先到，正文逐段长出来 -->
+          <div v-if="streaming" class="card">
+            <div class="flex items-center gap-2">
+              <span class="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h3 class="text-sm font-semibold text-ink-900">
+                {{
+                  streaming.phase === 'connecting'
+                    ? 'AI 正在构思…'
+                    : streaming.phase === 'writing'
+                      ? '正在写作…'
+                      : '正在补充摘要与字段…'
+                }}
+              </h3>
+            </div>
+            <template v-if="streaming.title">
+              <h4 class="mt-3 text-lg font-semibold text-ink-900">{{ streaming.title }}</h4>
+              <p v-if="streaming.slug" class="mt-1 text-xs font-mono text-ink-400">/{{ streaming.slug }}</p>
+            </template>
+            <pre
+              v-if="streaming.body"
+              class="mt-3 text-xs text-ink-700 bg-ink-50 border border-ink-200 rounded-lg p-3 whitespace-pre-wrap break-words max-h-96 overflow-auto"
+              >{{ streaming.body }}▌</pre
+            >
+            <p v-else class="mt-6 text-xs text-ink-400">正在等模型出第一句…（约 5~15 秒）</p>
+          </div>
+
+          <div v-else-if="!draft" class="card flex flex-col items-center justify-center py-20 text-center">
             <div class="text-4xl">✍️</div>
             <p class="mt-3 text-sm font-medium text-ink-700">还没有草稿</p>
             <p class="mt-1 text-xs text-ink-400 max-w-xs leading-relaxed">

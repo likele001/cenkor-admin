@@ -726,6 +726,9 @@ async def list_entries(
     status_filter: str | None = Query(None, alias="status"),
     search: str | None = Query(None),
     include_deleted: bool = Query(False),
+    # 三态筛选：ai=只看 AI 产出；human=只看人工；具体值（draft/rewrite/translate）
+    # =精确匹配某类 AI 来源。不传 = 全部。
+    ai_origin: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -749,6 +752,12 @@ async def list_entries(
         conds.append(models.Entry.id.in_(
             select(models.ContentTag.content_id).where(models.ContentTag.tag_id == tag_id)
         ))
+    if ai_origin == "ai":
+        conds.append(models.Entry.ai_origin.is_not(None))
+    elif ai_origin == "human":
+        conds.append(models.Entry.ai_origin.is_(None))
+    elif ai_origin:
+        conds.append(models.Entry.ai_origin == ai_origin)
     stmt = select(models.Entry).where(*conds).order_by(models.Entry.sort, models.Entry.id.desc())
     data = await paginate(db, stmt, page=page, page_size=page_size)
     return {
@@ -819,6 +828,12 @@ async def create_entry(
         await dispatch("entry.saved", entry=obj, db=db, user=current)
     except Exception as e:
         log.warning("hook.dispatch_failed", hook="entry.saved", error=str(e))
+    # [P2C] 发布语义单独一个事件：entry.saved 是「存了一次」，下游 Agent 要的是「对外可见了」
+    if obj.status == "published":
+        try:
+            await dispatch("entry.published", entry=obj, db=db, user=current)
+        except Exception as e:
+            log.warning("hook.dispatch_failed", hook="entry.published", error=str(e))
     # 版本控制：创建时生成 v1 快照
     try:
         await _snapshot_version(db, obj, current.id, note="创建")
@@ -847,6 +862,7 @@ async def update_entry(
         raise HTTPException(404, "Entry not found")
 
     tag_ids = body.pop("tag_ids", None)
+    old_status = obj.status  # [P2C] 判断是否发生了「变成已发布」
     for k in ("title", "slug", "content", "custom_fields", "seo", "category_id", "status", "sort"):
         if k in body:
             setattr(obj, k, body[k])
@@ -876,6 +892,12 @@ async def update_entry(
         await dispatch("entry.saved", entry=obj, db=db, user=current)
     except Exception as e:
         log.warning("hook.dispatch_failed", hook="entry.saved", error=str(e))
+    # [P2C] 发布语义单独一个事件：entry.saved 是「存了一次」，下游 Agent 要的是「对外可见了」
+    if old_status != "published" and obj.status == "published":
+        try:
+            await dispatch("entry.published", entry=obj, db=db, user=current)
+        except Exception as e:
+            log.warning("hook.dispatch_failed", hook="entry.published", error=str(e))
     # 版本控制：更新后生成新快照
     try:
         await _snapshot_version(db, obj, current.id, note="更新")
@@ -1221,6 +1243,12 @@ async def review_entry(
     )
     await db.commit()
     await db.refresh(entry)
+    # [P2C] 审批通过 = 一次对外发布
+    if action == "approve":
+        try:
+            await dispatch("entry.published", entry=entry, db=db, user=current)
+        except Exception as e:
+            log.warning("hook.dispatch_failed", hook="entry.published", error=str(e))
     return _entry_to_dict(entry)
 
 
@@ -1538,6 +1566,7 @@ def _version_to_dict(v: models.EntryVersion, include_data: bool = True) -> dict:
 def _entry_to_dict(e: models.Entry) -> dict:
     return {
         "id": e.id,
+        "site_id": getattr(e, "site_id", None),
         "content_type_id": e.content_type_id,
         "slug": e.slug,
         "title": e.title,
@@ -1551,6 +1580,8 @@ def _entry_to_dict(e: models.Entry) -> dict:
         "expire_at": e.expire_at.isoformat() if e.expire_at else None,
         "sort": e.sort,
         "view_count": e.view_count,
+        "ai_origin": getattr(e, "ai_origin", None),
+        "ai_generation_id": getattr(e, "ai_generation_id", None),
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "updated_at": e.updated_at.isoformat() if e.updated_at else None,
     }

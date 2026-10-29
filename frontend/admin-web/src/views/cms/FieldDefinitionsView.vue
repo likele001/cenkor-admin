@@ -128,6 +128,11 @@ async function saveField() {
       sort: fieldForm.value.sort,
       status: fieldForm.value.status,
     }
+    // 改类型前先算影响面：破坏性变更要让人明确确认，不能闷头改坏线上数据
+    if (editingField.value && editingField.value.field_type !== fieldForm.value.field_type) {
+      const ok = await confirmTypeChange()
+      if (!ok) return
+    }
     if (editingField.value) {
       await api.patch(`/api/v1/cms/field-definitions/${editingField.value.id}`, payload)
     } else {
@@ -142,8 +147,65 @@ async function saveField() {
   }
 }
 
+/**
+ * 字段类型变更前的影响确认。
+ *
+ * 为什么要拦：字段类型是「模型 schema」，改了它库里的旧值可能直接作废
+ * （比如 price 从 text 改成 number，存着「面议」的老数据就废了）。
+ * 后端 /ai/schema/field-impact 会逐条用项目自己的校验规则跑一遍旧值，
+ * 告诉我们「到底有几条真的会坏」——不是「可能有风险」的空话。
+ */
+async function confirmTypeChange(): Promise<boolean> {
+  const fd = editingField.value
+  if (!fd) return true
+  try {
+    const { data } = await api.get('/api/v1/cms/ai/schema/field-impact', {
+      params: {
+        content_type_id: ctId.value,
+        field_key: fd.field_key,
+        target_field_type: fieldForm.value.field_type,
+      },
+    })
+    const broken = Number(data.broken_count || 0)
+    const published = Number(data.impact?.published_with_value || 0)
+    if (!broken && !published) return true
+    if (broken > 0) {
+      const samples = (data.broken_samples || [])
+        .map((s: any) => `《${(s.title || '').slice(0, 20)}》`)
+        .slice(0, 3)
+        .join('、')
+      return window.confirm(
+        `把字段「${fd.label}」从 ${fd.field_type} 改成 ${fieldForm.value.field_type} 会破坏 ${broken} 条已有数据` +
+          `${samples ? `（如 ${samples}）` : ''}。\n\n已发布内容中 ${published} 条用到了该字段。\n\n建议先跑数据迁移。确认继续？`,
+      )
+    }
+    return window.confirm(
+      `字段「${fd.label}」从 ${fd.field_type} 改成 ${fieldForm.value.field_type}，\n` +
+        `现有数据不会坏，但有 ${published} 条已发布内容用到了该字段，确认修改？`,
+    )
+  } catch {
+    // 影响分析接口不可用时不阻塞编辑（分析是辅助，不是门禁）
+    return true
+  }
+}
+
 async function deleteField(fd: FieldDef) {
   if (!confirm(`确定删除字段「${fd.label}」？`)) return
+  // 删除同样要看影响面：已发布内容里的旧值会变成没人认领的残留数据
+  try {
+    const { data } = await api.get('/api/v1/cms/ai/schema/field-impact', {
+      params: { content_type_id: ctId.value, field_key: fd.field_key },
+    })
+    const published = Number(data.impact?.published_with_value || 0)
+    if (published > 0) {
+      const ok = window.confirm(
+        `字段「${fd.label}」被 ${published} 条已发布内容使用，删除后这些值会变成残留数据（内容本身不受影响）。\n\n确认删除？`,
+      )
+      if (!ok) return
+    }
+  } catch {
+    /* 影响分析不可用时不阻塞删除 */
+  }
   try {
     await api.delete(`/api/v1/cms/field-definitions/${fd.id}`)
     await load()

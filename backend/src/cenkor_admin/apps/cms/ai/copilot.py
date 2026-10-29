@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import html
 import json
@@ -27,21 +28,27 @@ from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cenkor_admin.apps.cms.ai import prompt_registry as prompts
 from cenkor_admin.apps.cms.ai.models import CmsAiGeneration
+from cenkor_admin.apps.cms.ai.search import semantic_search
 from cenkor_admin.apps.cms.field_types import ARRAY_VALUE_TYPES, FIELD_TYPES
 from cenkor_admin.apps.cms.models import (
+    ContentTag,
     ContentType,
     Entry,
     EntryTranslation,
     FieldDefinition,
+    Tag,
 )
-from cenkor_admin.core.llm import LLMError, LLMResult, get_llm
+from cenkor_admin.core.db import AsyncSessionLocal
+from cenkor_admin.core.llm import LLMError, LLMNotConfiguredError, LLMResult, LLMUsage, get_llm
 
 # ---------------------------------------------------------------------------
 # 溯源
 # ---------------------------------------------------------------------------
 _KIND_CT = "content_type_from_nl"
 _KIND_DRAFT = "entry_draft"
+_KIND_TAG = "auto_tag"
 _KIND_TRANSLATE = "translate"
 _KIND_SEO = "seo"
 _KIND_REWRITE = "text_rewrite"
@@ -100,27 +107,50 @@ async def _record(
     error: str | None = None,
     created_by: int | None = None,
     prompt: str = "",
-) -> None:
-    """写一条生成溯源。失败不应影响主流程，所以内部吞异常。"""
+    latency_ms: int | None = None,
+    model: str | None = None,
+    provider: str | None = None,
+) -> int | None:
+    """写一条生成溯源，返回记录 id（失败返回 None）。
+
+    返回 id 是给 create_entry_from_draft 用的 —— 条目要把「我这条是哪次生成
+    的产物」写进 ai_generation_id，否则事后查不到用了哪个模型、多少 token、
+    哪版提示词。失败不应影响主流程，所以内部吞异常。
+    """
     try:
+        # 当前站点由中间件写入 contextvar；脚本/CLI 下为空，兜到默认站。
+        # 用函数内 import 是为了避免 core -> apps 的循环依赖。
+        from cenkor_admin.core.site_scope import current_site_id
+
         gen = CmsAiGeneration(
+            site_id=(current_site_id() or 1),
             kind=kind,
             target=target,
-            provider=(result.provider if result else ""),
-            model=(result.model if result else ""),
+            # 生图返回的不是 LLMResult，provider/model 只能由调用方传
+            provider=(provider if provider is not None else (result.provider if result else "")),
+            model=(model if model is not None else (result.model if result else "")),
             prompt_digest=_digest(prompt),
             params=params,
             tokens_in=(result.usage.tokens_in if result else 0),
             tokens_out=(result.usage.tokens_out if result else 0),
-            latency_ms=(result.latency_ms if result else 0),
+            # 生图返回的不是 LLMResult，拿不到 result.latency_ms，
+            # 必须由调用方传进来 —— 否则最慢的一类操作在用量页反而显示「—」
+            latency_ms=(
+                latency_ms
+                if latency_ms is not None
+                else (result.latency_ms if result else 0)
+            ),
             status=status,
             error=(error[:2000] if error else None),
             created_by=created_by,
         )
         session.add(gen)
         await session.flush()
+        return gen.id
     except Exception as exc:
-        logger.warning("cms.ai_record_failed", error=str(exc))
+        # loguru 不认 kwargs，必须用 {} 占位 —— 原写法会让这条日志永远打不出内容
+        logger.warning("cms.ai_record_failed err={}", exc)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +362,7 @@ async def propose_content_type(
     user_msg += f"\n\n（界面语言：{locale}；name/label 用该语言）"
 
     messages = [
-        {"role": "system", "content": _CT_SYSTEM},
+        {"role": "system", "content": await prompts.get(session, "ct", _CT_SYSTEM)},
         {"role": "user", "content": user_msg},
     ]
 
@@ -515,7 +545,7 @@ async def draft_entry(
 
     llm = get_llm()
     messages = [
-        {"role": "system", "content": _DRAFT_SYSTEM},
+        {"role": "system", "content": await prompts.get(session, "draft", _DRAFT_SYSTEM)},
         {"role": "user", "content": user_msg},
     ]
 
@@ -538,24 +568,7 @@ async def draft_entry(
     raw = _as_object(raw, "草稿")
 
     # 清洗 custom_fields：只留合法 key，并按字段类型粗校验
-    valid_keys = {f.field_key: f.field_type for f in fields}
-    raw_custom = raw.get("custom_fields") if isinstance(raw.get("custom_fields"), dict) else {}
-    custom: dict[str, Any] = {}
-    dropped: list[str] = []
-    for k, v in raw_custom.items():
-        fk = _norm_key(k)
-        if fk not in valid_keys:
-            dropped.append(str(k))
-            continue
-        ftype = valid_keys[fk]
-        if ftype in ("number",) and not isinstance(v, (int, float)):
-            try:
-                v = float(str(v).strip() or 0)
-            except (TypeError, ValueError):
-                v = None
-        if ftype in ARRAY_VALUE_TYPES and not isinstance(v, list):
-            v = [v] if v not in (None, "") else []
-        custom[fk] = v
+    custom, dropped = _clean_custom_fields(raw.get("custom_fields"), fields)
 
     title = str(raw.get("title") or "").strip()[:200]
     if not title:
@@ -571,7 +584,7 @@ async def draft_entry(
     content = raw.get("content") if isinstance(raw.get("content"), dict) else {}
     seo = raw.get("seo") if isinstance(raw.get("seo"), dict) else {}
 
-    await _record(
+    generation_id = await _record(
         session,
         kind=_KIND_DRAFT,
         target=f"content_type:{content_type_id}",
@@ -595,8 +608,296 @@ async def draft_entry(
         "seo": seo,
         "dropped_fields": dropped,
         "status": "draft",  # AI 产出永远是草稿
+        # 供 create_entry_from_draft 写入条目溯源；不在 API 响应里外露（下划线前缀
+        # 的 key 会被路由层过滤），避免前端把它当业务字段回传
+        "_generation_id": generation_id,
         "_meta": result.meta(),
     }
+
+
+# 3b) 素材 → 条目草稿（流式）
+# ---------------------------------------------------------------------------
+_DRAFT_STREAM_SYSTEM = """你是资深内容编辑。根据用户给的素材和大纲，为指定内容类型写一条草稿正文。
+
+**输出格式（严格遵守，第一行就是 TITLE:，不要任何前言、解释或 markdown 代码围栏）：**
+TITLE: 标题（不超过 60 字）
+SLUG: 英文小写短横线（如 customer-case-baosteel）
+（空一行）
+正文 markdown（600~1200 字）
+
+硬性规则：
+1. 第一行以 TITLE: 开头，第二行以 SLUG: 开头，前缀一字不差，各只占一行
+2. 绝不编造具体数字、客户名、日期、证书编号——素材里没有就在正文用「（待补充）」标出
+3. 正文用 markdown，段落之间空行，不用一级标题（标题已在 TITLE 里）
+4. 语气专业克制，不用「赋能」「闭环」「抓手」这类空话
+5. 宁可短而实，不要为凑长度注水
+6. TITLE 和 SLUG 之后除正文外不要再输出任何别的内容"""
+
+# 第二阶段：正文完成后补充摘要/字段/SEO（输出少，几秒）
+_DRAFT_EXTRA_SYSTEM = """你是内容编辑助理。给你字段定义与一篇已写好的草稿，产出补充元数据。
+
+只输出一个 JSON 对象（不要数组、不要解释、不要代码围栏）：
+{"summary": "摘要（80~150 字）", "custom_fields": {"字段key": 值}, "seo": {"title": "", "description": ""}}
+
+硬性规则：
+1. custom_fields 的 key 必须是字段定义里的 field_key，不得自造；没有合适值的字段不要硬填
+2. 类型对齐：number 用数字、boolean 用 true/false、数组类型用数组、select 只能取 choices 里的值
+3. 绝不编造——正文里没有的信息留空字符串或 null"""
+
+_DRAFT_TITLE_RE = re.compile(r"^[ \t]*TITLE[:：][ \t]*(.+?)[ \t]*\r?\n", re.MULTILINE)
+_DRAFT_STREAM_SLUG_RE = re.compile(r"^[ \t]*SLUG[:：][ \t]*(\S+)[ \t]*\r?\n", re.MULTILINE)
+
+
+async def draft_entry_stream(
+    session: AsyncSession,
+    content_type_id: int,
+    brief: str,
+    *,
+    created_by: int | None = None,
+    lang: str = "zh-CN",
+    max_tokens: int = 4000,
+):
+    """流式起草：async generator，yield (event, payload) 事件序列。
+
+    事件：meta(标题/别名) → delta(正文片段，多次) → extra(摘要/字段/SEO) →
+    done(与 draft_entry 返回值同构的完整草稿对象)；任何一步失败 yield
+    ("error", {"detail", "preview"}) 后结束。
+
+    两阶段设计：阶段一只让模型写 TITLE/SLUG/正文（正文 token 流式透出，
+    用户边等边读）；阶段二拿完整正文小请求补 summary/custom_fields/seo。
+    """
+    ct = (
+        await session.execute(select(ContentType).where(ContentType.id == content_type_id))
+    ).scalar_one_or_none()
+    if ct is None:
+        yield ("error", {"detail": f"内容类型 {content_type_id} 不存在"})
+        return
+
+    fields = (
+        (
+            await session.execute(
+                select(FieldDefinition)
+                .where(
+                    FieldDefinition.content_type_id == content_type_id,
+                    FieldDefinition.status == "active",
+                )
+                .order_by(FieldDefinition.sort)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    field_spec = [
+        {
+            "field_key": f.field_key,
+            "label": f.label,
+            "field_type": f.field_type,
+            "required": f.required,
+            "choices": ((f.options or {}).get("choices") if isinstance(f.options, dict) else None),
+        }
+        for f in fields
+    ]
+
+    # 阶段一不带字段定义：正文用不上，省 prompt 也快出第一句
+    user_msg = (
+        f"内容类型：{ct.name}（key={ct.key}）\n"
+        f"素材/大纲：\n{(brief or '').strip()[:6000]}\n\n"
+        f"（正文语言：{lang}）"
+    )
+    llm = get_llm()
+    messages = [
+        {"role": "system", "content": await prompts.get(session, "draft_stream", _DRAFT_STREAM_SYSTEM)},
+        {"role": "user", "content": user_msg},
+    ]
+
+    meta: dict[str, Any] = {}
+    acc: list[str] = []
+    header_done = False
+    body_start = 0  # 正文起点（SLUG 行换行之后，固定不变）
+    sent = 0  # 已作为 delta 透出的字符数（随 delta 推进）
+    emitted_body = False
+    title = ""
+    slug = ""
+    try:
+        async for delta in llm.chat_stream(messages, temperature=0.5, max_tokens=max_tokens, meta_out=meta):
+            acc.append(delta)
+            text = "".join(acc)
+            if not header_done:
+                mt = _DRAFT_TITLE_RE.search(text)
+                if mt is None:
+                    if len(text) > 300:
+                        raise LLMError("模型未按 TITLE:/SLUG: 格式输出")
+                    continue
+                ms = _DRAFT_STREAM_SLUG_RE.search(text, mt.end())
+                if ms is None:
+                    if len(text) > 400:
+                        raise LLMError("模型未按 TITLE:/SLUG: 格式输出（缺 SLUG）")
+                    continue
+                # 正则要求行尾换行符，行没到齐不会提前匹配（分号边界安全）
+                title = mt.group(1).strip()[:200]
+                slug = ms.group(1).strip()
+                body_start = sent = ms.end()
+                header_done = True
+                yield ("meta", {"title": title, "slug": slug})
+            if header_done and len(text) > sent:
+                seg = text[sent:]
+                if not emitted_body:
+                    # 头部与正文之间的空行不透出，保证 done.body 与 delta 拼接一致
+                    seg = seg.lstrip()
+                    if not seg:
+                        sent = len(text)
+                        continue
+                    emitted_body = True
+                yield ("delta", {"t": seg})
+                sent = len(text)
+
+        if not header_done:
+            raise LLMError("模型未按 TITLE:/SLUG: 格式输出")
+        body_md = "".join(acc)[body_start:].strip()
+        if not body_md:
+            raise LLMError("模型未输出正文")
+
+        # slug 清洗与兜底（与 draft_entry 同规则）
+        slug_clean = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-")
+        if slug_clean and not _SLUG_RE.match(slug_clean):
+            slug_clean = ""
+        if not slug_clean:
+            slug_clean = f"ai-{_digest(title)[:8]}"
+
+        # 阶段二：补充元数据。失败不阻断 —— 草稿仍可保存，缺的字段用户手填
+        extra_error = ""
+        extra_obj: dict[str, Any] = {}
+        extra_result = None
+        try:
+            extra_raw, extra_result = await llm.chat_json(
+                [
+                    {"role": "system", "content": await prompts.get(session, "draft_extra", _DRAFT_EXTRA_SYSTEM)},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"字段定义：\n{json.dumps(field_spec, ensure_ascii=False, indent=2)}\n\n"
+                            f"标题：{title}\n\n正文：\n{body_md[:8000]}"
+                        ),
+                    },
+                ],
+                temperature=0.3,
+                max_tokens=1200,
+            )
+            extra_obj = _as_object(extra_raw, "补充元数据")
+        except Exception as exc:  # noqa: BLE001
+            extra_error = str(exc)[:300]
+
+        custom, dropped = _clean_custom_fields(extra_obj.get("custom_fields"), fields)
+        content = {
+            "summary": str(extra_obj.get("summary") or "").strip(),
+            "body": body_md,
+        }
+        seo = extra_obj.get("seo") if isinstance(extra_obj.get("seo"), dict) else {}
+
+        # 两次调用合并为一条溯源记录（kind 与非流式一致，驾驶舱统计不断档）
+        su = meta.get("usage") or {}
+        eu = extra_result.usage if extra_result else LLMUsage()
+        gen_result = LLMResult(
+            text="",
+            model=str(meta.get("model") or ""),
+            provider=str(meta.get("provider") or ""),
+            usage=LLMUsage(
+                tokens_in=int(su.get("tokens_in") or 0) + eu.tokens_in,
+                tokens_out=int(su.get("tokens_out") or 0) + eu.tokens_out,
+                total_tokens=int(su.get("total_tokens") or 0) + eu.total_tokens,
+            ),
+            latency_ms=int(meta.get("latency_ms") or 0) + (extra_result.latency_ms if extra_result else 0),
+            finish_reason=str(meta.get("finish_reason") or ""),
+        )
+        generation_id = await _record(
+            session,
+            kind=_KIND_DRAFT,
+            target=f"content_type:{content_type_id}",
+            result=gen_result,
+            params={
+                "brief_digest": _digest(brief),
+                "dropped_fields": dropped,
+                "title": title[:60],
+                "stream": True,
+                **({"extra_error": extra_error} if extra_error else {}),
+            },
+            created_by=created_by,
+            prompt=user_msg,
+        )
+        await session.commit()
+
+        draft = {
+            "content_type_id": content_type_id,
+            "content_type_key": ct.key,
+            "title": title,
+            "slug": slug_clean,
+            "content": content,
+            "custom_fields": custom,
+            "seo": seo,
+            "dropped_fields": dropped,
+            "status": "draft",
+            "_generation_id": generation_id,
+            "_meta": gen_result.meta(),
+        }
+        yield (
+            "extra",
+            {
+                "summary": content["summary"],
+                "custom_fields": custom,
+                "seo": seo,
+                "dropped_fields": dropped,
+                "extra_error": extra_error,
+            },
+        )
+        yield ("done", draft)
+    except Exception as exc:  # noqa: BLE001
+        try:
+            await session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        await _record(
+            session,
+            kind=_KIND_DRAFT,
+            target=f"content_type:{content_type_id}",
+            result=None,
+            params={"brief_digest": _digest(brief), "stream": True},
+            status="failed",
+            error=str(exc),
+            created_by=created_by,
+            prompt=user_msg,
+        )
+        await session.commit()
+        yield (
+            "error",
+            {"detail": str(exc)[:300] or "生成失败", "preview": "".join(acc)[:300]},
+        )
+
+
+def _clean_custom_fields(
+    raw_custom: Any, fields: list[Any]
+) -> tuple[dict[str, Any], list[str]]:
+    """清洗模型给的 custom_fields：只留合法 key，按字段类型粗校验。
+
+    draft_entry 与 draft_entry_stream 共用；返回 (custom, dropped)。
+    """
+    valid_keys = {f.field_key: f.field_type for f in fields}
+    custom: dict[str, Any] = {}
+    dropped: list[str] = []
+    for k, v in (raw_custom or {}).items() if isinstance(raw_custom, dict) else []:
+        fk = _norm_key(k)
+        if fk not in valid_keys:
+            dropped.append(str(k))
+            continue
+        ftype = valid_keys[fk]
+        if ftype in ("number",) and not isinstance(v, (int, float)):
+            try:
+                v = float(str(v).strip() or 0)
+            except (TypeError, ValueError):
+                v = None
+        if ftype in ARRAY_VALUE_TYPES and not isinstance(v, list):
+            v = [v] if v not in (None, "") else []
+        custom[fk] = v
+    return custom, dropped
 
 
 async def create_entry_from_draft(
@@ -604,8 +905,13 @@ async def create_entry_from_draft(
     draft: dict[str, Any],
     *,
     created_by: int | None = None,
+    ai_origin: str = "draft",
 ) -> Entry:
-    """把 draft_entry 的产物真正落库为草稿条目。"""
+    """把 draft_entry 的产物真正落库为草稿条目。
+
+    ai_origin 同时承担两个作用：写入条目的来源标记，以及决定是否关联生成记录。
+    显式传 None 表示「这次落库不算 AI 产出」（比如人工确认后重放草稿）。
+    """
     content = dict(draft.get("content") or {})
 
     # 起草给的是 markdown（content.body），编辑页读的是富文本（content.text）。
@@ -627,12 +933,291 @@ async def create_entry_from_draft(
         seo=draft.get("seo") or {},
         status="draft",  # 强制草稿，AI 不能直接发布
         author_id=created_by,
+        ai_origin=ai_origin,
+        ai_generation_id=(draft.get("_generation_id") if ai_origin else None),
     )
     session.add(entry)
     await session.commit()
     await session.refresh(entry)
-    logger.info("cms.ai.entry_created", entry_id=entry.id, title=entry.title[:40])
+    # 顺手把来源和溯源 id 记进日志：用户报「这篇是 AI 写的吗」时能直接查
+    logger.info(
+        "cms.ai.entry_created id={} origin={} gen={} title={}",
+        entry.id, ai_origin, entry.ai_generation_id, entry.title[:40],
+    )
+    # 自动打标签：后台任务补打，不拖慢保存/批量响应
+    _spawn_bg_task(_auto_tag_later(entry.id, created_by))
     return entry
+
+
+# ---------------------------------------------------------------------------
+# 3b) 内容去重检测
+# ---------------------------------------------------------------------------
+def _collect_simple(obj: Any, out: list[str], depth: int = 0) -> None:
+    """递归收集 JSON 里的字符串值（查重辅助：自定义字段文本也纳入比对）。"""
+    if depth > 5:
+        return
+    if isinstance(obj, str):
+        s = obj.strip()
+        if len(s) >= 2 and not s.startswith(("http://", "https://", "#")):
+            out.append(s)
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            _collect_simple(v, out, depth + 1)
+    elif isinstance(obj, list):
+        for v in obj:
+            _collect_simple(v, out, depth + 1)
+
+
+def _draft_to_text(title: str, content: Any) -> str:
+    """把 draft 的标题+正文压成可检索纯文本（查重用，覆盖标题/正文/自定义/SEO）。
+
+    content 可能是 str（纯文本）或 dict（entry.content：text/body/markdown/custom_fields/seo）。
+    顺序即重要度：标题 → 正文 → 自定义字段 → SEO。
+    """
+    parts: list[str] = []
+    if title:
+        parts.append(str(title).strip())
+
+    if isinstance(content, str):
+        parts.append(re.sub(r"<[^>]+>", " ", content))
+    elif isinstance(content, dict):
+        for key in ("text", "body", "markdown", "md", "summary"):
+            v = content.get(key)
+            if isinstance(v, str) and v.strip():
+                parts.append(re.sub(r"<[^>]+>", " ", v))
+        custom = content.get("custom_fields")
+        if isinstance(custom, dict):
+            extra: list[str] = []
+            _collect_simple(custom, extra)
+            parts.extend(extra)
+        seo = content.get("seo")
+        if isinstance(seo, dict):
+            for key in ("title", "description", "keywords"):
+                v = seo.get(key)
+                if isinstance(v, str) and v.strip():
+                    parts.append(v)
+
+    text = "\n".join(p for p in parts if p)
+    return text[:6000]
+
+
+async def detect_duplicates(
+    session: AsyncSession,
+    title: str,
+    content: Any,
+    *,
+    content_type_id: int | None = None,
+    content_type_key: str | None = None,
+    threshold: float = 0.8,
+    limit: int = 5,
+    recall_min: float = 0.4,
+) -> list[dict[str, Any]]:
+    """查重：把给定标题+正文当作查询，返回库内相似条目。
+
+    threshold 是「判定重复」的硬阈值（默认 0.8，即 >80% 相似）；recall_min 是
+    「召回下限」——只展示 >= recall_min 的命中，把弱相关噪声挡在外面。
+    每条命中带 is_duplicate = score >= threshold，前端据此决定「预警」还是「仅参考」。
+
+    复用 semantic_search(include_drafts=True)：查当前站点内所有非删除条目
+    （含已发布 + 草稿），避免和任何已有内容撞车。embedding 未配置时静默返回空。
+    """
+    text = _draft_to_text(title, content)
+    if not text.strip():
+        return []
+    try:
+        hits = await semantic_search(
+            session,
+            text,
+            content_type_id=content_type_id,
+            content_type_key=content_type_key,
+            include_drafts=True,
+            min_score=recall_min,
+            limit=limit,
+            lang="base",
+        )
+    except LLMNotConfiguredError:
+        logger.warning("cms.dedup.skip_embed_not_configured")
+        return []
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cms.dedup.search_failed err={}", str(exc))
+        return []
+
+    out: list[dict[str, Any]] = []
+    for h in hits:
+        d = h.as_dict()
+        d["is_duplicate"] = h.score >= threshold
+        out.append(d)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 3c) 自动打标签
+# ---------------------------------------------------------------------------
+_AUTO_TAG_SYSTEM = """你是内容标签员。给你一篇内容的标题与正文摘录，以及站点的已有标签池。
+
+只输出一个 JSON 对象（不要数组、不要解释、不要代码围栏）：
+{"tags": [{"name": "标签名", "slug": "english-slug"}]}
+
+硬性规则：
+1. 最多 5 个标签，按相关性排序；宁缺毋滥，没有贴切的就少给
+2. 优先复用已有标签池里的标签（名字一致或明显同义）；池里确实没有贴切的新标签才新建
+3. 新标签 name 用简短中文（2~8 字），slug 用小写英文短横线
+4. 不要输出与内容无关的泛化标签（如「新闻」「其他」「文章」）
+5. 绝不编造正文里没有的属性（客户名、型号、地域）"""
+
+# 后台任务引用集：防 create_task 后被 GC
+_bg_tasks: set[asyncio.Task] = set()
+
+
+def _spawn_bg_task(coro) -> None:
+    t = asyncio.create_task(coro)
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+
+
+def _content_excerpt(content: dict[str, Any] | None, limit: int = 1200) -> str:
+    """从条目 content 里抽纯文本摘录（标签/摘要/翻译共用的小工具）。"""
+    for k in ("text", "body", "markdown", "summary"):
+        v = (content or {}).get(k)
+        if isinstance(v, str) and v.strip():
+            return re.sub(r"<[^>]+>", " ", v)[:limit].strip()
+    return ""
+
+
+async def auto_tag_entry(
+    session: AsyncSession,
+    entry: Entry,
+    *,
+    created_by: int | None = None,
+    max_tags: int = 5,
+    max_new: int = 3,
+) -> dict[str, Any]:
+    """给条目自动打标签：LLM 优先从已有标签池挑，必要时新建少量标签。
+
+    加法式：只新增关联，不动已有标签；LLM 失败抛异常由调用方兜底。
+    返回 {"attached": 新增关联的标签名, "created": 新建的标签名, "already": 本来就有的}。
+    """
+    existing = (
+        await session.execute(
+            select(Tag).where(
+                Tag.site_id == entry.site_id,
+                Tag.content_type_id == entry.content_type_id,
+            )
+        )
+    ).scalars()
+    existing = list(existing)
+    pool = [{"name": t.name, "slug": t.slug} for t in existing]
+
+    user_msg = (
+        f"标题：{entry.title}\n\n"
+        f"已有标签池（优先从中选）：{json.dumps(pool, ensure_ascii=False)}\n\n"
+        f"正文摘录：\n{_content_excerpt(entry.content) or '（无正文，仅按标题判断）'}"
+    )
+    llm = get_llm()
+    raw, result = await llm.chat_json(
+        [
+            {"role": "system", "content": await prompts.get(session, "auto_tag", _AUTO_TAG_SYSTEM)},
+            {"role": "user", "content": user_msg},
+        ],
+        temperature=0.2,
+        max_tokens=600,
+    )
+    obj = _as_object(raw, "标签建议")
+    items = obj.get("tags") if isinstance(obj.get("tags"), list) else []
+
+    picks: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for it in items[:max_tags]:
+        if isinstance(it, dict):
+            name = str(it.get("name") or "").strip()[:80]
+            slug = str(it.get("slug") or "").strip()[:80]
+        else:
+            name, slug = str(it).strip()[:80], ""
+        if not name or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        picks.append({"name": name, "slug": slug})
+
+    attached: list[str] = []
+    created: list[str] = []
+    already: list[str] = []
+    if picks:
+        by_name = {t.name.strip().lower(): t for t in existing}
+        have = set(
+            (
+                await session.execute(
+                    select(ContentTag.tag_id).where(
+                        ContentTag.content_type_id == entry.content_type_id,
+                        ContentTag.content_id == entry.id,
+                    )
+                )
+            ).scalars()
+        )
+        taken_slugs = {t.slug for t in existing}
+        for p in picks:
+            tag = by_name.get(p["name"].lower())
+            if tag is None and len(created) < max_new:
+                slug_clean = re.sub(r"[^a-z0-9-]+", "-", p["slug"].lower()).strip("-")
+                if not slug_clean:
+                    slug_clean = f"tag-{_digest(p['name'])[:8]}"
+                base = slug_clean
+                while slug_clean in taken_slugs:  # 唯一约束兜底：撞了就拼摘要后缀
+                    slug_clean = f"{base}-{_digest(p['name'] + slug_clean)[:4]}"
+                taken_slugs.add(slug_clean)
+                tag = Tag(
+                    site_id=entry.site_id,
+                    content_type_id=entry.content_type_id,
+                    slug=slug_clean,
+                    name=p["name"],
+                )
+                session.add(tag)
+                await session.flush()
+                existing.append(tag)
+                by_name[p["name"].lower()] = tag
+                created.append(p["name"])
+            if tag is None:  # 超出 max_new 的新标签：复用失败就跳过
+                continue
+            if tag.id in have:
+                already.append(tag.name)
+                continue
+            session.add(ContentTag(
+                content_type_id=entry.content_type_id,
+                content_id=entry.id,
+                tag_id=tag.id,
+            ))
+            have.add(tag.id)
+            attached.append(tag.name)
+        await session.commit()
+
+    await _record(
+        session,
+        kind=_KIND_TAG,
+        target=f"entry:{entry.id}",
+        result=result,
+        params={"attached": attached, "created": created},
+        created_by=created_by,
+        prompt=user_msg,
+    )
+    await session.commit()
+    if attached or created:
+        logger.info(
+            "cms.ai.auto_tag entry={} attached={} created={}",
+            entry.id, attached, created,
+        )
+    return {"attached": attached, "created": created, "already": already}
+
+
+async def _auto_tag_later(entry_id: int, created_by: int | None = None) -> None:
+    """落库后异步补标签：自开 session，不占调用方的连接。"""
+    try:
+        async with AsyncSessionLocal() as s:
+            entry = await s.get(Entry, entry_id)
+            if entry is None or getattr(entry, "deleted_at", None) is not None:
+                return
+            await auto_tag_entry(s, entry, created_by=created_by)
+    except Exception as exc:  # noqa: BLE001
+        # 标签是增强不是门槛：失败只记日志，绝不影响条目
+        logger.warning("cms.ai.auto_tag_failed entry={} err={}", entry_id, str(exc)[:200])
 
 
 # ---------------------------------------------------------------------------
@@ -699,7 +1284,7 @@ async def translate_entry(
 
         user_msg = f"目标语言：{lang}\n\n原文 JSON：\n{payload}"
         messages = [
-            {"role": "system", "content": _TRANSLATE_SYSTEM},
+            {"role": "system", "content": await prompts.get(session, "translate", _TRANSLATE_SYSTEM)},
             {"role": "user", "content": user_msg},
         ]
 
@@ -797,7 +1382,7 @@ async def suggest_seo(
         f"（输出语言：{lang}）"
     )
     messages = [
-        {"role": "system", "content": _SEO_SYSTEM},
+        {"role": "system", "content": await prompts.get(session, "seo", _SEO_SYSTEM)},
         {"role": "user", "content": user_msg},
     ]
 
@@ -950,7 +1535,7 @@ async def rewrite_text(
     llm = get_llm()
     user_msg = _rewrite_user_msg(action, lang, text, blocks, context, instruction)
     messages = [
-        {"role": "system", "content": _REWRITE_SYSTEM},
+        {"role": "system", "content": await prompts.get(session, "rewrite", _REWRITE_SYSTEM)},
         {"role": "user", "content": user_msg},
     ]
     target = f"action:{action}"
@@ -1051,31 +1636,21 @@ async def rewrite_text(
 # 用量统计（给后台看成本）
 # ---------------------------------------------------------------------------
 async def usage_summary(session: AsyncSession, *, days: int = 30) -> list[dict[str, Any]]:
-    """按 kind 汇总最近 N 天的 AI 用量。"""
-    rows = (
-        await session.execute(
-            select(
-                CmsAiGeneration.kind,
-                func.count(CmsAiGeneration.id),
-                func.coalesce(func.sum(CmsAiGeneration.tokens_in), 0),
-                func.coalesce(func.sum(CmsAiGeneration.tokens_out), 0),
-                func.coalesce(func.avg(CmsAiGeneration.latency_ms), 0),
-            )
-            .where(
-                CmsAiGeneration.created_at >= func.now() - func.make_interval(0, 0, 0, days),
-                CmsAiGeneration.status == "ok",
-            )
-            .group_by(CmsAiGeneration.kind)
-        )
-    ).all()
+    """按 kind 汇总最近 N 天的 AI 用量（旧接口，只给用量，不含金额）。
 
+    新代码请用 `ai.pricing.usage_summary`：它会细到模型维度并折算金额。
+    这里保留只是为了不破坏已有调用方。
+    """
+    from cenkor_admin.apps.cms.ai import pricing
+
+    data = await pricing.usage_summary(session, days=days)
     return [
         {
-            "kind": r[0],
-            "calls": int(r[1]),
-            "tokens_in": int(r[2]),
-            "tokens_out": int(r[3]),
-            "avg_latency_ms": int(r[4] or 0),
+            "kind": i["kind"],
+            "calls": i["calls"],
+            "tokens_in": i["tokens_in"],
+            "tokens_out": i["tokens_out"],
+            "avg_latency_ms": i["avg_latency_ms"],
         }
-        for r in rows
+        for i in data["items"]
     ]

@@ -190,6 +190,49 @@ async def has_pgvector(session: AsyncSession) -> bool:
     return _pgvector_supported
 
 
+async def _vector_scores_sql(
+    session: AsyncSession,
+    query_vec: list[float],
+    *,
+    lang: str,
+    content_type_id: int | None = None,
+    exclude_id: int | None = None,
+    limit: int = 50,
+) -> dict[int, float]:
+    """在库内算余弦距离，只回传 top K。
+
+    pgvector 的 `<=>` 是余弦距离（0 相同 / 2 相反），相似度 = 1 - 距离。
+    走 HNSW 索引时 ORDER BY 由索引扫描完成，不再把全表向量拉进内存——
+    这是相比于「拉候选到 Python 算余弦」的根本区别：后者必须靠
+    MAX_CANDIDATES 截断，数据量一大就会漏召回或撑爆内存。
+    """
+    q = "[" + ",".join(f"{x:.6f}" for x in query_vec) + "]"
+
+    sql = """
+        SELECT e.entry_id, 1 - (e.vector <=> CAST(:q AS vector)) AS score
+        FROM cms_embeddings e
+        WHERE e.lang = :lang AND e.field = :field AND e.vector IS NOT NULL
+    """
+    params: dict[str, object] = {
+        "q": q,
+        "lang": lang,
+        "field": "combined",
+        "limit": int(limit),
+    }
+
+    if content_type_id is not None:
+        sql += " AND e.entry_id IN (SELECT id FROM cms_entries WHERE content_type_id = :ct)"
+        params["ct"] = content_type_id
+    if exclude_id is not None:
+        sql += " AND e.entry_id <> :ex"
+        params["ex"] = exclude_id
+
+    sql += " ORDER BY e.vector <=> CAST(:q AS vector) LIMIT :limit"
+
+    rows = (await session.execute(text(sql), params)).all()
+    return {int(r[0]): float(r[1]) for r in rows}
+
+
 # ---------------------------------------------------------------------------
 # 主检索
 # ---------------------------------------------------------------------------
@@ -234,24 +277,34 @@ async def semantic_search(
         logger.warning("cms.search_embed_failed", error=str(exc))
         raise
 
-    # 2) 拉候选向量
-    stmt = select(CmsEmbedding.entry_id, CmsEmbedding.vector).where(
-        CmsEmbedding.lang == lang,
-        CmsEmbedding.field == "combined",
-        CmsEmbedding.vector.is_not(None),
-    )
-    if content_type_id is not None:
-        stmt = stmt.join(Entry, Entry.id == CmsEmbedding.entry_id).where(
-            Entry.content_type_id == content_type_id
-        )
-    rows = (await session.execute(stmt.limit(MAX_CANDIDATES))).all()
-
+    # 2) 取候选向量
+    #    装了 pgvector 就库内算距离（走 HNSW 索引，只回传 top K）；
+    #    没装才退化成「拉到内存算余弦」，那条路必须靠 MAX_CANDIDATES 截断防内存爆。
     vec_scores: dict[int, float] = {}
-    if rows:
-        vectors = [r[1] for r in rows]
-        scores = _cosine_batch(query_vec, vectors)
-        for (entry_id, _), sc in zip(rows, scores, strict=False):
-            vec_scores[entry_id] = float(sc)
+    if await has_pgvector(session):
+        vec_scores = await _vector_scores_sql(
+            session,
+            query_vec,
+            lang=lang,
+            content_type_id=content_type_id,
+            limit=max(limit * 5, MAX_CANDIDATES),
+        )
+    else:
+        stmt = select(CmsEmbedding.entry_id, CmsEmbedding.vector).where(
+            CmsEmbedding.lang == lang,
+            CmsEmbedding.field == "combined",
+            CmsEmbedding.vector.is_not(None),
+        )
+        if content_type_id is not None:
+            stmt = stmt.join(Entry, Entry.id == CmsEmbedding.entry_id).where(
+                Entry.content_type_id == content_type_id
+            )
+        rows = (await session.execute(stmt.limit(MAX_CANDIDATES))).all()
+        if rows:
+            vectors = [list(r[1]) for r in rows]
+            scores = _cosine_batch(query_vec, vectors)
+            for (entry_id, _), sc in zip(rows, scores, strict=False):
+                vec_scores[entry_id] = float(sc)
 
     # 3) 命中条目详情（只查候选里出现的 + 关键词命中的）
     entry_ids = list(vec_scores.keys())
@@ -312,7 +365,7 @@ async def semantic_search(
         for h in hits:
             h.content_type_key = ct_map.get(h.content_type_id, "")
 
-    logger.info("cms.search", query=q[:40], candidates=len(rows), hits=len(hits), lang=lang)
+    logger.info("cms.search", query=q[:40], candidates=len(vec_scores), hits=len(hits), lang=lang)
     return hits
 
 
@@ -347,23 +400,30 @@ async def _search_by_vector(
     limit: int,
     exclude_id: int | None = None,
 ) -> list[SearchHit]:
-    stmt = select(CmsEmbedding.entry_id, CmsEmbedding.vector).where(
-        CmsEmbedding.lang == lang,
-        CmsEmbedding.field == "combined",
-        CmsEmbedding.vector.is_not(None),
-    )
-    if exclude_id is not None:
-        stmt = stmt.where(CmsEmbedding.entry_id != exclude_id)
-    rows = (await session.execute(stmt.limit(MAX_CANDIDATES))).all()
-    if not rows:
-        return []
+    ranked: list[tuple[int, float]]
+    if await has_pgvector(session):
+        scores_map = await _vector_scores_sql(
+            session, vector, lang=lang, exclude_id=exclude_id, limit=limit
+        )
+        ranked = sorted(scores_map.items(), key=lambda x: x[1], reverse=True)[:limit]
+    else:
+        stmt = select(CmsEmbedding.entry_id, CmsEmbedding.vector).where(
+            CmsEmbedding.lang == lang,
+            CmsEmbedding.field == "combined",
+            CmsEmbedding.vector.is_not(None),
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(CmsEmbedding.entry_id != exclude_id)
+        rows = (await session.execute(stmt.limit(MAX_CANDIDATES))).all()
+        if not rows:
+            return []
 
-    scores = _cosine_batch(vector, [r[1] for r in rows])
-    ranked = sorted(
-        ((r[0], float(s)) for r, s in zip(rows, scores, strict=False)),
-        key=lambda x: x[1],
-        reverse=True,
-    )[:limit]
+        scores = _cosine_batch(vector, [list(r[1]) for r in rows])
+        ranked = sorted(
+            ((r[0], float(s)) for r, s in zip(rows, scores, strict=False)),
+            key=lambda x: x[1],
+            reverse=True,
+        )[:limit]
 
     ids = [eid for eid, _ in ranked]
     entries = {

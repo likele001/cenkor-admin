@@ -37,7 +37,7 @@ const categories = ref<Category[]>([])
 const allTags = ref<Tag[]>([])
 const entry = ref<any>(null)
 const form = ref({
-  title: '', slug: '', content: {} as Record<string, any>,
+  title: (route.query.title as string) || '', slug: '', content: {} as Record<string, any>,
   custom_fields: {} as Record<string, any>,
   category_id: null as number | null, status: 'draft', sort: 0,
   tag_ids: [] as number[],
@@ -193,6 +193,42 @@ function applySummary(v: string) {
 
 function applySlug(v: string) {
   activeForm.value.slug = v
+}
+
+/** HTML 转义：AI 产出的锚文本/标题不能直接进正文（防存储型 XSS） */
+function escHtml(s: string): string {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * 插入内链：追加到正文末尾的「相关阅读」段落。
+ *
+ * 为什么不插到光标处 —— 机器猜的插入点经常落在句子中间，读起来别扭，
+ * 而且撤销麻烦。追加到末尾是内容运营最常见也最可控的做法，
+ * 位置不满意用户自己拖一下就行。
+ */
+function applyLink(v: { anchorText: string; url: string; title: string }) {
+  const cur = activeForm.value.content?.text || ''
+  const anchor = escHtml(v.anchorText)
+  const url = escHtml(v.url)
+  const title = escHtml(v.title)
+  const block = `<p><strong>相关阅读：</strong><a href="${url}" title="${title}" rel="noopener noreferrer" target="_blank">${anchor}</a></p>`
+  // 已有「相关阅读」段落就并进去，避免每次插入都多一段
+  const re = /<p><strong>相关阅读：<\/strong>(.*?)<\/p>/s
+  if (re.test(cur)) {
+    activeForm.value.content.text = cur.replace(
+      re,
+      (_m: string, inner: string) =>
+        `<p><strong>相关阅读：</strong>${inner} · <a href="${url}" title="${title}" rel="noopener noreferrer" target="_blank">${anchor}</a></p>`,
+    )
+    return
+  }
+  activeForm.value.content.text = `${cur}${cur ? '\n' : ''}${block}`
 }
 
 async function onAiTranslated() {
@@ -494,7 +530,7 @@ onMounted(async () => {
                 @click="rewriteTarget = 'content'"
               >✨ AI</button>
             </div>
-            <RichTextEditor v-model="activeForm.content.text" placeholder="t('entryEdit.富文本内_72xjm1')" />
+            <RichTextEditor v-model="activeForm.content.text" :placeholder="t('entryEdit.富文本内_72xjm1')" />
           </div>
         </div>
 
@@ -543,7 +579,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- AI 助手：摘要 / SEO / 翻译 -->
+        <!-- AI 助手：摘要 / SEO / 翻译 / 内链建议 -->
         <EntryAiPanel
           :entry-id="savedEntryId"
           :title="activeForm.title || ''"
@@ -553,6 +589,7 @@ onMounted(async () => {
           :translatable-langs="translatableLangs"
           @apply-slug="applySlug"
           @apply-summary="applySummary"
+          @apply-link="applyLink"
           @translated="onAiTranslated"
         />
 

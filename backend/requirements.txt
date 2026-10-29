@@ -35,3 +35,4 @@ Pillow>=10.0.0
 # Liquid 模板引擎 + Markdown 渲染（M3-B）
 python-liquid>=2.2.0
 markdown>=3.5.0
+pgvector>=0.3.0

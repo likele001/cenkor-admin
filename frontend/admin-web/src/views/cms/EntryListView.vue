@@ -11,6 +11,8 @@ interface Entry {
   category_id: number | null; status: string; author_id: number | null
   published_at: string | null; sort: number; view_count: number
   created_at: string; updated_at: string
+  /** AI 来源标记：null=人工；draft/rewrite/translate=AI 产出 */
+  ai_origin: string | null
 }
 interface ContentType { id: number; key: string; name: string; icon: string | null; supports_category: boolean; supports_tags: boolean }
 interface Category { id: number; name: string; slug: string; parent_id: number | null }
@@ -28,6 +30,7 @@ const loading = ref(true)
 const search = ref('')
 const statusFilter = ref('')
 const categoryFilter = ref<number | null>(null)
+const aiFilter = ref<'ai' | 'human' | ''>('')
 const page = ref(1)
 const pageSize = 20
 const selected = ref<number[]>([])
@@ -70,6 +73,7 @@ async function loadEntries() {
     if (search.value) params.set('search', search.value)
     if (statusFilter.value) params.set('status', statusFilter.value)
     if (categoryFilter.value) params.set('category_id', String(categoryFilter.value))
+    if (aiFilter.value) params.set('ai_origin', aiFilter.value)
     const { data } = await api.get(`/api/v1/cms/entries?${params}`)
     entries.value = data.items || []
     total.value = data.total || 0
@@ -117,6 +121,13 @@ async function reviewEntry(e: Entry, action: 'approve' | 'reject') {
   await api.post(`/api/v1/cms/entries/${e.id}/review`, { action })
   await loadEntries()
 }
+/** AI 来源徽章：一眼看出哪些稿是 AI 写的，点徽章等同筛选 */
+const AI_META: Record<string, { label: string; cls: string }> = {
+  draft: { label: 'AI 起草', cls: 'bg-violet-50 text-violet-700 border border-violet-200' },
+  rewrite: { label: 'AI 改写', cls: 'bg-sky-50 text-sky-700 border border-sky-200' },
+  translate: { label: 'AI 翻译', cls: 'bg-teal-50 text-teal-700 border border-teal-200' },
+}
+
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   draft: { label: '草稿', cls: 'bg-yellow-50 text-yellow-700' },
   published: { label: '已发布', cls: 'bg-green-50 text-green-700' },
@@ -187,6 +198,11 @@ onMounted(async () => {
         <option :value="null">{{ t('entryList.全部分类_av9kmt') }}</option>
         <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
+      <select v-model="aiFilter" class="input w-full sm:w-32" @change="onStatusChange">
+        <option value="">全部来源</option>
+        <option value="ai">AI 产出</option>
+        <option value="human">人工创建</option>
+      </select>
       <select v-model="statusFilter" class="input w-full sm:w-32" @change="onStatusChange">
         <option value="">{{ t('portalUsersList.全部状态_avez63') }}</option>
         <option value="draft">{{ t('productEdit.草稿_n02e') }}</option>
@@ -235,6 +251,13 @@ onMounted(async () => {
           </td>
           <td class="py-2 px-2">
             <a href="#" class="text-blue-600 hover:underline" @click.prevent="editEntry(e)">{{ e.title }}</a>
+            <span
+              v-if="e.ai_origin"
+              class="text-[10px] px-1.5 py-0.5 rounded ml-1.5 align-middle cursor-pointer"
+              :class="AI_META[e.ai_origin]?.cls || 'bg-ink-100 text-ink-500'"
+              :title="`此条由 AI ${AI_META[e.ai_origin]?.label?.slice(3) || e.ai_origin} 生成，点击筛选同类`"
+              @click="aiFilter = aiFilter === 'ai' ? '' : 'ai'; onStatusChange()"
+            >{{ AI_META[e.ai_origin]?.label || 'AI' }}</span>
             <code v-if="e.slug" class="text-xs text-ink-400 ml-2">{{ e.slug }}</code>
           </td>
           <td class="py-2 px-2 text-ink-500">

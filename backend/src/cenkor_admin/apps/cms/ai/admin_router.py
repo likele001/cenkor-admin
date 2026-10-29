@@ -657,26 +657,32 @@ async def test_capability(
     started = time.monotonic()
     try:
         if capability == "chat":
+            # max_tokens 给到 512：当前 chat 是推理模型（MiniMax-M3.1-Flash），
+            # 它会先写思考过程再给答案，32 的预算会被思考占满，报
+            # 「输出被 max_tokens 截断」—— 看着像服务坏了，其实是预算不够。
             r = await client.chat(
                 [{"role": "user", "content": "用两个字回答：收到"}],
-                max_tokens=int(ep.params.get("max_tokens", 32)),
+                max_tokens=int(ep.params.get("max_tokens", 512)),
             )
             result: Any = {"text": r.text[:200], "model": r.model, "tokens": r.usage.total_tokens}
         elif capability == "embedding":
             vec = await client.embed_one("连通性测试")
             result = {"dim": len(vec), "model": ep.model, "preview": vec[:3]}
         elif capability == "vision":
-            # 1x1 透明 PNG，只验证多模态通道能不能走通
+            # 32x32 纯蓝方块，只验证多模态通道能不能走通。
+            # 为什么不是 1x1：火山要求图片最短边 ≥ 14 像素，1x1 会被判
+            # InvalidParameter「Image dimensions are too small」——那是参数错，
+            # 不是模型不支持，测出来的结论会误导人以为模型没配好。
             pixel = (
                 "data:image/png;base64,"
-                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8AAAwAB"
-                "Af4B9xyB4QAAAABJRU5ErkJggg=="
+                "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAJ0lEQVR4nO3NsQkAAAgDsJ7u5/"
+                "YKByGQPcnsLYFAIBAIBAKBQPAlKPAr/Ez/cO8XAAAAAElFTkSuQmCC"
             )
             r = await client.vision_chat(
                 "这张图是什么颜色？只回答颜色。",
                 [pixel],
                 detail=str(ep.params.get("detail", "low")),
-                max_tokens=int(ep.params.get("max_tokens", 32)),
+                max_tokens=int(ep.params.get("max_tokens", 512)),
             )
             result = {"text": r.text[:200], "model": r.model}
         elif capability == "image":

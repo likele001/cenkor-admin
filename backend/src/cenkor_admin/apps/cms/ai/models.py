@@ -1,10 +1,11 @@
 """CMS AI 层 · 数据模型
 
-四张表：
+五张表：
 - cms_embeddings     条目向量（增量维护，content_hash 判断是否需要重算）
 - cms_ai_generations AI 生成溯源（谁在什么时候用什么模型生成了什么，成本多少）
 - cms_ai_providers    服务商通道（base_url + 加密密钥 + 连接参数），后台可视化维护
 - cms_ai_capabilities 能力绑定（chat / embedding / vision / image ... 各用哪个服务商哪个模型）
+- cms_ai_prompts      提示词版本（运营可改、可对比、可回滚，代码常量为出厂默认）
 
 设计取舍：
 1. 向量不依赖 pgvector。线上 PG 未必装了该扩展，装扩展要停机重启，
@@ -20,6 +21,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -27,6 +29,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -55,8 +58,10 @@ class CmsEmbedding(Base):
     field: Mapped[str] = mapped_column(String(40), nullable=False, default="combined")
     lang: Mapped[str] = mapped_column(String(16), nullable=False, default="base")
 
-    # 向量本体。PG 原生数组，检索时读到内存做余弦
-    vector: Mapped[list[float] | None] = mapped_column(PG_ARRAY(Float), nullable=True)
+    # 向量本体。pgvector 原生类型：距离在库内算，并走 HNSW 索引。
+    # 1024 维不是随手定的：HNSW / IVFFlat 索引上限 2000 维，
+    # 豆包默认 2048 维刚好超线，得靠 dimensions=1024 降下来才能建索引。
+    vector: Mapped[list[float] | None] = mapped_column(Vector(1024), nullable=True)
     dim: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # 生成该向量的源文本指纹：内容没变就不重算 embedding（省钱的关键）
@@ -85,6 +90,12 @@ class CmsAiGeneration(Base):
     __tablename__ = "cms_ai_generations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # 站点归属：驾驶舱按站点看账单。脚本/CLI 取不到上下文时落默认站 1，
+    # 不留 NULL —— 否则统计里会多出一个「不归属任何站点」的黑洞分类。
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
     kind: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     target: Mapped[str] = mapped_column(String(80), nullable=False, default="")
     provider: Mapped[str] = mapped_column(String(40), nullable=False, default="")
@@ -188,3 +199,284 @@ class CmsAiCapability(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     updated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class CmsAiPrompt(Base):
+    """AI 提示词版本。
+
+    为什么落库而不是留在代码里：改一句措辞要发版、重启、回归测试，
+    客户说「语气太官方」就得排一次发布窗口。落库后运营自己就能调，
+    改坏了回滚上一版即可。
+
+    三条约束保证可治理：
+    - `(prompt_key, version)` 唯一 —— 版本号单调递增，不覆盖历史
+    - `is_active` 部分唯一索引（见迁移 006）—— 每个 key 同时只有一个生效版本
+    - `content` 不允许为空 —— 空提示词会让模型行为完全失控，挡在入口
+    """
+
+    __tablename__ = "cms_ai_prompts"
+    __table_args__ = (
+        UniqueConstraint("prompt_key", "version", name="uq_ai_prompt_key_ver"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    prompt_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# 批量生产队列
+# ---------------------------------------------------------------------------
+class CmsAiBatchJob(Base):
+    """一批选题的批量起草任务。
+
+    为什么是 DB 队列而不是 Celery：本机跑着的 worker 属于其它项目，为本项目
+    单开一个 worker + supervisord 配置的成本高于收益。批量任务「长但不密集」
+    （每篇 10-30s 纯等 LLM），进程内 asyncio 足够；状态全落 DB，进程重启后
+    pending 项可续跑，不会像纯内存队列那样一重启全丢。
+
+    每个站点同时只允许一个 running 批次（部分唯一索引保障）：两批同时跑会抢
+    LLM 配额，前端进度也互相干扰，出问题极难定位。
+    """
+
+    __tablename__ = "cms_ai_batch_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    content_type_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_content_types.id", ondelete="RESTRICT"), nullable=False
+    )
+    # 冗余 key：列表页免 join，内容类型改名也不影响历史批次的可读性
+    content_type_key: Mapped[str] = mapped_column(String(60), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    lang: Mapped[str] = mapped_column(String(20), nullable=False, default="zh-CN")
+    total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    succeeded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    concurrency: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CmsAiBatchItem(Base):
+    """批次里的一个选题。
+
+    `brief` 是喂给 draft_entry 的素材/大纲原文；成功后 `entry_id` 指向落库的
+    草稿条目。失败只记 `error` 不删行，便于「只重试失败的」。
+    """
+
+    __tablename__ = "cms_ai_batch_items"
+    __table_args__ = (
+        UniqueConstraint("job_id", "seq", name="uq_batch_item_seq"),
+        Index("ix_batch_items_job_status", "job_id", "status", "seq"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_ai_batch_jobs.id", ondelete="CASCADE"), nullable=False
+    )
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    brief: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    entry_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cms_entries.id", ondelete="SET NULL"), nullable=True
+    )
+    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    tokens_in: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CmsAiReview(Base):
+    """一条 AI 产出的质检打分（人评）。
+
+    为什么必须存**模型快照**（`provider` / `model`）而不是每次 join
+    `cms_ai_generations`：条目可能被删、记账可能被清理，而质量曲线要能回溯
+    「三个月前那个模型到底行不行」。快照两列成本极低，丢了的结论补不回来。
+
+    `scores` 用 JSONB 而不是四个独立列：评分维度会随业务调整（今天看
+    「准确性/可读性」，明天可能加「事实密度」），加维度不该改表。
+    `overall` 单独冗余一份，是因为曲线和图表的查询只用到它，避免每行都去
+    解析 JSON。
+    """
+
+    __tablename__ = "cms_ai_reviews"
+    __table_args__ = (
+        Index("ix_ai_reviews_entry", "entry_id", "created_at"),
+        Index("ix_ai_reviews_model", "model", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, index=True)
+    entry_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cms_entries.id", ondelete="SET NULL"), nullable=True
+    )
+    generation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # sample（随机抽样）/ ab（A/B 盲评）—— 两类打分的分布不可混在一起算均分
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="sample")
+    ab_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kind: Mapped[str] = mapped_column(String(40), nullable=False, default="entry_draft")
+    provider: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    overall: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    scores: Mapped[dict[str, Any] | None] = mapped_column(json_column(), nullable=True)
+    verdict: Mapped[str] = mapped_column(String(20), nullable=False, default="pass")
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    reviewer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+class CmsAiAbRun(Base):
+    """一次模型 A/B：同一输入，两个模型各出一份，盲评后揭晓。
+
+    盲评的关键在**左右位置随机**：人能看见「左边/右边」，看不见模型名。
+    如果固定 A 在左，评分者会不知不觉形成位置偏好，对比结果就废了。
+    `left_model` / `right_model` 是随机化之后的落位，不是参数顺序。
+    """
+
+    __tablename__ = "cms_ai_ab_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, index=True)
+    topic: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    left_model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    right_model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    left_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    right_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    left_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    right_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    left_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    right_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # left / right / tie；未评分为 NULL
+    winner: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CmsAiVideoJob(Base):
+    """一次视频生成任务。
+
+    ## 为什么要落库而不是留在内存
+
+    视频生成是**分钟级**的：提交后要轮询 60~300 秒才有产物。这期间
+    进程重启、请求断开、用户关页面都是常态。任务状态只存内存的话，
+    一次发布就全丢，而服务商那边还在照常计费 —— 钱花了、视频找不到。
+
+    所以状态全部落 DB，轮询由进程内后台协程推进，同时前端每次查询也
+    会顺手推一次（`refresh`）。两条路互为兜底：后台协程丢了，前端一刷
+    就能把状态追回来；没人看页面时后台协程自己也会跑完。
+
+    ## 为什么存 cover_media_id
+
+    视频不能当 og_image —— 社交平台抓分享卡片只认图片。所以落视频时
+    同步用 ffmpeg 抽首帧存成一张图片媒体，分享卡片和列表缩略图都用它。
+    抽帧失败不算任务失败（视频本身是好的），封面留空，前端显示占位。
+    """
+
+    __tablename__ = "cms_ai_video_jobs"
+    __table_args__ = (
+        Index("ix_cms_ai_video_entry", "entry_id", "id"),
+        Index("ix_cms_ai_video_status", "status", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, index=True)
+    entry_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cms_entries.id", ondelete="SET NULL"), nullable=True
+    )
+    # t2v=文生视频 / i2v=图生视频（首帧取 source_media_id）
+    mode: Mapped[str] = mapped_column(String(8), nullable=False, default="t2v")
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="queued", index=True
+    )
+    # 服务商侧任务 id。空串表示还没提交成功
+    provider_task_id: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    model: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # ratio / duration / resolution / watermark ...
+    params: Mapped[dict[str, Any] | None] = mapped_column(json_column(), nullable=True)
+    # 图生视频的首帧来源
+    source_media_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cms_media.id", ondelete="SET NULL"), nullable=True
+    )
+    media_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cms_media.id", ondelete="SET NULL"), nullable=True
+    )
+    cover_media_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("cms_media.id", ondelete="SET NULL"), nullable=True
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 服务商产物 URL，仅作排查线索：24 小时就失效，不能当引用用
+    upstream_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CmsAiPrice(Base):
+    """AI 调用单价，把 token 用量换算成金额。
+
+    为什么是可配置表而不是写死价目表：embedding / chat / 图像三类单价差一个
+    数量级，各家还会随时调价。写死在代码里迟早算错钱，而**算错钱比不算钱更糟**。
+    所以默认空表，没配置就明确显示「未配置单价」，绝不猜。
+
+    匹配规则：`provider` / `model` / `kind` 三个维度，空串表示「任意」。
+    精确维度越多的规则优先级越高，同分时 id 小的先配先生效。
+    """
+
+    __tablename__ = "cms_ai_prices"
+    __table_args__ = (
+        UniqueConstraint("provider", "model", "kind", name="uq_cms_ai_prices"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    model: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    # chat / embedding / image，空串 = 任意
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    # token=按百万 token 计价；image=按张计价（生图没有 token，按 token 折算恒为 0）
+    unit: Mapped[str] = mapped_column(String(8), nullable=False, default="token")
+    # 每百万 token / 每张的单价
+    input_per_m: Mapped[float] = mapped_column(Numeric(14, 4), nullable=False, default=0)
+    output_per_m: Mapped[float] = mapped_column(Numeric(14, 4), nullable=False, default=0)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False, default="CNY")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    note: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

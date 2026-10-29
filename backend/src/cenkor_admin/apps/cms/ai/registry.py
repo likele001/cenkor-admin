@@ -53,6 +53,7 @@ CAPABILITIES: tuple[CapabilitySpec, ...] = (
     CapabilitySpec("embedding", "向量化", "语义检索与相似度计算"),
     CapabilitySpec("vision", "视觉理解", "看图说话、图文审校、截图转结构化数据"),
     CapabilitySpec("image", "图片生成", "封面图、配图、示意图"),
+    CapabilitySpec("video", "视频生成", "文生视频、图生视频（异步任务，分钟级）"),
     CapabilitySpec("rerank", "重排序", "检索结果精排，提升召回质量", wired=False),
     CapabilitySpec("asr", "语音识别", "音视频转文字", wired=False),
     CapabilitySpec("tts", "语音合成", "文案转语音", wired=False),
@@ -85,6 +86,10 @@ PARAM_SPECS: dict[str, dict[str, ParamSpec]] = {
     "embedding": {
         "dim": ParamSpec("int", 1, 8192),
         "batch": ParamSpec("int", 1, 128),
+        # 豆包等厂商支持在请求里指定输出维度（dimensions=1024）。
+        # 上限 2000 不是随手写的：pgvector 的 HNSW / IVFFlat 索引最多支持
+        # 2000 维，超过就建不了索引，只能全表扫。
+        "dimensions": ParamSpec("int", 256, 2000),
     },
     "vision": {
         "max_tokens": ParamSpec("int", 1, 32000),
@@ -95,6 +100,19 @@ PARAM_SPECS: dict[str, dict[str, ParamSpec]] = {
         "quality": ParamSpec("str", enum=("standard", "hd", "low", "medium", "high", "auto")),
         "n": ParamSpec("int", 1, 4),
         "style": ParamSpec("str", enum=("vivid", "natural")),
+    },
+    # 视频参数都是「拼进 prompt 的 --key」而不是顶层字段：火山 Seedance 只认文本
+    # 指令，顶层多传会 400。所以这里只需校验取值范围，不透传给服务商。
+    "video": {
+        "ratio": ParamSpec("str", enum=("16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive")),
+        "duration": ParamSpec("int", 3, 12),
+        "resolution": ParamSpec("str", enum=("480p", "720p", "1080p")),
+        "watermark": ParamSpec("bool"),
+        "camera_fixed": ParamSpec("bool"),
+        # 覆盖模型：文生与图生在多数服务商是两个模型 id（-t2v / -i2v），
+        # 而能力表只能绑一个。留两个可选键，不填就都用能力表里的 model。
+        "t2v_model": ParamSpec("str"),
+        "i2v_model": ParamSpec("str"),
     },
     "rerank": {"top_n": ParamSpec("int", 1, 100)},
     "asr": {"language": ParamSpec("str")},
