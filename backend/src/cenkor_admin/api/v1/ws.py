@@ -99,9 +99,21 @@ async def notifications_ws(
         asyncio.create_task(notifier(), name="ws.notifier"),
     ]
     try:
-        _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
             t.cancel()
+        # 必须把已完成任务的异常取走：客户端关标签页时 reader 会抛 WebSocketDisconnect，
+        # 没人 retrieve 的话 asyncio 会在事件循环退出时刷一条
+        # "Task exception was never retrieved" ERROR —— 纯噪音，还会掩盖真错误。
+        for t in done:
+            if t.cancelled():
+                continue
+            exc = t.exception()
+            if exc is not None and not isinstance(exc, WebSocketDisconnect):
+                log.warning("ws.task_failed", task=t.get_name(), error=str(exc))
+        # 等 cancel 真正生效，避免退出时留下悬挂任务
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
     except WebSocketDisconnect:
         pass
     finally:
