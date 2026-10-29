@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from cenkor_admin.core.compat import json_column
@@ -15,9 +15,11 @@ class Page(Base):
     """页面（区块 schema：blocks: [{type, data}]）。"""
 
     __tablename__ = "cms_pages"
+    __table_args__ = (UniqueConstraint("site_id", "key", name="uq_pages_site_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    key: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1", index=True)
+    key: Mapped[str] = mapped_column(String(60), nullable=False)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     schema: Mapped[list[Any]] = mapped_column(json_column(), default=list)
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)

@@ -186,6 +186,8 @@ async def lifespan(app: FastAPI):
     # 注册内置钩子处理器（插件框架 M1·P0）：导入模块即触发 @hook 装饰器注册
     try:
         from cenkor_admin.apps.system import hooks as _builtin_hooks
+        # [P2C] webhook 投递器此前无人 import，@hook 处理器全未注册
+        from cenkor_admin.apps.system import webhooks as _webhook_hooks  # noqa: F401
 
         # 已退役 cenkormes-center 桥接：付款后发卡改由本仓 commerce 层自行签发，不再向外部仓库 auto-issue。
         # 闭源商业模块（无 manifest，由 api/v1/__init__.py 直接挂载 /api/v1/store）
@@ -209,6 +211,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("scheduler.start_failed", error=str(e))
 
+    # [P2C] Webhook 失败重试 worker（进程重启后未投完的记录会续上）
+    webhook_task = None
+    try:
+        import asyncio as _asyncio
+
+        from cenkor_admin.apps.system.webhooks import retry_loop as _wh_retry_loop
+
+        webhook_task = _asyncio.create_task(_wh_retry_loop())
+        log.info("webhook.retry_loop.spawned")
+    except Exception as e:
+        log.warning("webhook.retry_loop.spawn_failed", error=str(e))
+
     # 核心版本检查预热（升级提示）：spoke 向官方云查一次，发现新版记日志，不阻塞启动
     try:
         import asyncio as _asyncio
@@ -219,12 +233,35 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("release.warm_spawn_failed", error=str(e))
 
+    # AI 批量生产：进程上次被杀时可能停在 running，启动时把僵死项回退成 pending。
+    # 故意不自动续跑 —— 重启瞬间就冲 LLM 配额很难排查；用户点「继续」即可，
+    # 已生成的篇目不会重复。
+    async def _recover_batch_jobs() -> None:
+        try:
+            from cenkor_admin.apps.cms.ai import batch_runner
+
+            n = await batch_runner.resume_on_boot()
+            if n:
+                log.warning("cms.ai.batch.recovered_jobs", count=n)
+        except Exception as e:  # noqa: BLE001
+            log.warning("cms.ai.batch.recover_failed", error=str(e))
+
+    try:
+        import asyncio as _asyncio
+
+        _asyncio.create_task(_recover_batch_jobs())
+    except Exception as e:  # noqa: BLE001
+        log.warning("cms.ai.batch.recover_spawn_failed", error=str(e))
+
     try:
         yield
     finally:
         if scheduler_task is not None:
             scheduler_task.cancel()
             log.info("scheduler.stopped")
+        if webhook_task is not None:
+            webhook_task.cancel()
+            log.info("webhook.retry_loop.stopped")
 
     log.info("app.stopping")
     await async_engine.dispose()
@@ -315,6 +352,11 @@ app.middleware("http")(redirect_middleware)
 from cenkor_admin.core.ratelimit import rate_limit_middleware
 
 app.middleware("http")(rate_limit_middleware)
+
+# 多站点隔离：把当前站点写进 contextvar，ORM 层据此自动加 site_id 条件
+from cenkor_admin.core.site_scope import site_scope_middleware
+
+app.middleware("http")(site_scope_middleware)
 
 
 # 路由

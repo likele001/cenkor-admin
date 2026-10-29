@@ -242,6 +242,11 @@ class Category(Base):
 
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+
 
     content_type_id: Mapped[int] = mapped_column(
 
@@ -285,7 +290,9 @@ class Category(Base):
 
     __table_args__ = (
 
-        UniqueConstraint("content_type_id", "slug", name="uq_category_ct_slug"),
+        UniqueConstraint(
+            "site_id", "content_type_id", "slug", name="uq_category_site_ct_slug"
+        ),
 
         Index("ix_cms_categories_ct_parent", "content_type_id", "parent_id"),
 
@@ -304,6 +311,11 @@ class Tag(Base):
 
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+
 
     content_type_id: Mapped[int] = mapped_column(
 
@@ -321,7 +333,9 @@ class Tag(Base):
 
     __table_args__ = (
 
-        UniqueConstraint("content_type_id", "slug", name="uq_tag_ct_slug"),
+        UniqueConstraint(
+            "site_id", "content_type_id", "slug", name="uq_tag_site_ct_slug"
+        ),
 
     )
 
@@ -360,6 +374,11 @@ class Entry(Base):
 
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+
 
     content_type_id: Mapped[int] = mapped_column(
 
@@ -397,6 +416,15 @@ class Entry(Base):
 
     view_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # AI 来源标记：NULL = 人工创建；draft/rewrite/translate = AI 产出。
+    # ai_generation_id 指回 cms_ai_generations，用于追溯模型、token、提示词版本。
+    ai_origin: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    ai_generation_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("cms_ai_generations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     updated_at: Mapped[datetime] = mapped_column(
@@ -421,7 +449,9 @@ class Entry(Base):
 
     __table_args__ = (
 
-        UniqueConstraint("content_type_id", "slug", name="uq_entry_ct_slug"),
+        UniqueConstraint(
+            "site_id", "content_type_id", "slug", name="uq_entry_site_ct_slug"
+        ),
 
         Index("ix_cms_entries_ct_status", "content_type_id", "status"),
 
@@ -520,6 +550,11 @@ class Product(Base):
 
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+
 
     slug: Mapped[str] = mapped_column(String(120), unique=True, index=True)
 
@@ -592,6 +627,11 @@ class Case(Base):
 
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+
 
     industry: Mapped[str] = mapped_column(String(80), index=True)
 
@@ -635,6 +675,11 @@ class News(Base):
 
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+
 
     slug: Mapped[str] = mapped_column(String(200), unique=True, index=True)
 
@@ -673,6 +718,35 @@ class News(Base):
 
 
 
+class Site(Base):
+    """站点（多站点 / 站群）。
+
+    kind:      main 主站 | blog 博客分站 | city 城市分站 | landing 落地页
+    site_mode: article 传统文章模式 | structured AI 结构化模式
+    geo:       本地 GEO，形如 {city, district, area, lat, lng}
+    """
+
+    __tablename__ = "cms_sites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="main", index=True)
+    domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    locale: Mapped[str] = mapped_column(String(20), nullable=False, default="zh-CN")
+    default_lang: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    site_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="article")
+    geo: Mapped[dict | None] = mapped_column(json_column(), nullable=True)
+    seo_defaults: Mapped[dict | None] = mapped_column(json_column(), nullable=True)
+    settings: Mapped[dict | None] = mapped_column(json_column(), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)
+    sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class SiteConfig(Base):
 
     """站点配置 KV（key-value，value 为 JSON）"""
@@ -708,6 +782,11 @@ class Media(Base):
 
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+
 
     bucket: Mapped[str] = mapped_column(String(80), index=True)
 

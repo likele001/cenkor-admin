@@ -19,6 +19,7 @@ from cenkor_admin.apps.cms.content_engine_router import router as content_engine
 from cenkor_admin.apps.cms.public_router import router as cms_public_router
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.apps.cms.router import router as cms_router
+from cenkor_admin.apps.cms.site_router import router as cms_site_router
 from cenkor_admin.apps.cms.ai.router import router as cms_ai_router
 from cenkor_admin.apps.cms.mcp.router import router as cms_mcp_router
 from cenkor_admin.apps.cms.template_router import router as template_router
@@ -80,6 +81,11 @@ api_v1_router.include_router(
 # CMS AI 能力（对话式建模 / AI 起草 / 翻译 / SEO / 语义检索）
 api_v1_router.include_router(
     cms_ai_router, prefix="/cms", tags=["cms-ai"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 站点管理（多站点 / 站群）：本 router 内部 bypass 站点过滤，自身要跨站
+api_v1_router.include_router(
+    cms_site_router, prefix="/cms", tags=["cms-sites"],
     dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
 )
 # CMS MCP（Agent 接入）：鉴权走 MCP_API_KEY，绝不能套登录依赖，否则 Agent 进不来
