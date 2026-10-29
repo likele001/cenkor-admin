@@ -64,6 +64,18 @@ async def scheduler_tick() -> dict[str, int]:
         if published or expired:
             await db.commit()
 
+        # [P2C] 定时发布同样要发 entry.published：下游 Agent 不该区分「人点的」还是「到点发的」
+        if published and due_ids:
+            try:
+                from cenkor_admin.core.hooks import dispatch as _dispatch
+
+                for _eid in due_ids:
+                    _e = await db.get(models.Entry, _eid)
+                    if _e is not None:
+                        await _dispatch("entry.published", entry=_e, db=db, user=None)
+            except Exception as _de:  # noqa: BLE001
+                log.warning("scheduler.publish_dispatch_failed", error=str(_de))
+
     # 通用扩展点：任何应用都可订阅 scheduler.tick 挂自己的周期任务
     # （结算解冻、超时关单等）。扩展点失败不能拖垮核心调度。
     try:

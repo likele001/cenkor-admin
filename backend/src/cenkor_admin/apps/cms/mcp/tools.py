@@ -248,6 +248,13 @@ async def _publish_entry(session: AsyncSession, args: dict[str, Any]) -> Any:
     entry.published_at = entry.published_at or datetime.now(UTC)
     await session.commit()
     logger.info("mcp.entry_published", entry_id=entry.id)
+    # [P2C] Agent 自己调用的发布会走另一条路径，事件必须补上
+    try:
+        from cenkor_admin.core.hooks import dispatch as _dispatch
+
+        await _dispatch("entry.published", entry=entry, db=session, user=None)
+    except Exception as _de:  # noqa: BLE001
+        logger.warning("mcp.publish_dispatch_failed", error=str(_de))
     return {"entry_id": entry.id, "status": "published"}
 
 
