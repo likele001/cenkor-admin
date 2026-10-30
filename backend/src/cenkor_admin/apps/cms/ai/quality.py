@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import random
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -101,7 +101,7 @@ def _strip_think(raw: str) -> tuple[str, bool]:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _plain(title: str, content: Any) -> str:
@@ -501,7 +501,7 @@ async def run_ab(
 
         ep = get_endpoint("chat")
         provider = (ep.provider_slug if ep else "") or ""
-    except Exception:  # noqa: BLE001 —— 取 provider 只为留痕，拿不到不影响生成
+    except Exception:
         provider = ""
 
     # 提示词走版本化：改一句措辞不该发版重启
@@ -537,7 +537,7 @@ async def run_ab(
                     "输出被模型的思考过程占满（max_tokens 偏小），正文未生成",
                 )
             return clean, res.latency_ms, ""
-        except Exception as exc:  # noqa: BLE001 —— 单侧失败不能拖垮另一次，仍要留痕
+        except Exception as exc:
             await _record(
                 db,
                 kind="ab_run",
@@ -756,7 +756,7 @@ async def list_models(db: AsyncSession, *, force: bool = False) -> dict[str, Any
                 data = resp.json().get("data") or []
                 models = [str(x.get("id")) for x in data if x.get("id")]
                 source = "provider"
-    except Exception as exc:  # noqa: BLE001 —— 取不到列表不该让 A/B 不可用
+    except Exception as exc:
         logger.info("cms.ai.list_models_failed err={}", str(exc)[:120])
 
     if not models:

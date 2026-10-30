@@ -30,8 +30,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from loguru import logger
 from sqlalchemy import select
@@ -437,7 +438,7 @@ async def _draft_write(ctx: StepCtx) -> dict[str, Any]:
                 lang=ctx.p("lang", "zh-CN"),
                 max_tokens=max_tokens,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise StepError(f"起草失败：{err or exc}") from exc
 
     body = _plain(draft.get("content"))
@@ -537,7 +538,7 @@ async def _quality_check(ctx: StepCtx) -> dict[str, Any]:
         max_tokens=4000,
     )
     try:
-        score = int(round(float(raw.get("score") or 0)))
+        score = round(float(raw.get("score") or 0))
     except (TypeError, ValueError):
         score = 0
     score = max(0, min(100, score))

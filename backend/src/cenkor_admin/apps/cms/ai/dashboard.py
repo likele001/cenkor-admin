@@ -22,7 +22,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -141,7 +141,7 @@ async def _output_stats(db: AsyncSession, sid: int) -> dict[str, Any]:
 
     # 补齐空缺日期 —— 前端画柱状图需要连续 7 天，缺一天图就断
     got = {r[0]: int(r[1]) for r in trend_rows}
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     trend = [
         {
             "date": (today - timedelta(days=_TREND_DAYS - 1 - i)).isoformat(),
@@ -440,5 +440,5 @@ async def ai_dashboard(
         "recent": await _recent(db, sid),
         "batches": await _batches(db, sid),
         "prompts": await _prompt_stats(db),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }

@@ -95,7 +95,7 @@ def _pdf_sync(path: Path) -> tuple[str, int, bool, float]:
         for i in range(min(pages, MAX_PDF_PAGES)):
             try:
                 raw = doc[i].get_text("text") or ""
-            except Exception:  # noqa: BLE001 —— 单页坏了不该拖垮整个文件
+            except Exception:
                 continue
             body = raw.strip()
             if body:
@@ -254,7 +254,7 @@ def _shrink(path: Path) -> Path:
 
     try:
         im = Image.open(path)
-    except Exception:  # noqa: BLE001 —— 打不开就原样交给下游报错
+    except Exception:
         return path
     if max(im.size) <= VISION_MAX_EDGE:
         return path
@@ -272,7 +272,7 @@ def _probe_duration(path: Path) -> float:
             capture_output=True, text=True, timeout=60,
         )
         return float((p.stdout or "0").strip() or 0)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0.0
 
 
@@ -312,7 +312,7 @@ async def _vision(
     llm = get_llm_for("vision")
     try:
         res = await llm.vision_chat(prompt, images, max_tokens=2000)
-    except Exception as exc:  # noqa: BLE001 —— 识别失败要让上层知道，但不能吞掉素材
+    except Exception as exc:
         await copilot._record(
             session, kind=kind, target=target, result=None,
             status="failed", error=str(exc)[:500], created_by=created_by, prompt=prompt,

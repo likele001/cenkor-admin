@@ -236,7 +236,7 @@ async def retrieve(
     except LLMNotConfiguredError:
         logger.warning("cms.rag.embed_not_configured")
         return {"query": q, "hits": [], "count": 0, "warning": "embedding 模型未配置"}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.rag.search_failed err={}", str(exc))
         return {"query": q, "hits": [], "count": 0, "warning": f"检索失败：{exc}"}
 
@@ -326,4 +326,4 @@ def _source_url(hit: dict[str, Any]) -> str:
     return ""
 
 
-__all__ = ["retrieve", "chunk_entry"]
+__all__ = ["chunk_entry", "retrieve"]

@@ -109,7 +109,7 @@ async def enqueue(event: str, data: dict[str, Any], *, webhook_ids: list[int] | 
         for did in created:
             asyncio.create_task(deliver(did))
         return created
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("webhook.enqueue_failed", evt=event, error=str(e))
         return []
 
@@ -198,7 +198,7 @@ async def deliver(delivery_id: int) -> bool:
         else:
             status = "pending" if attempts < MAX_ATTEMPTS else "failed"
             err = f"HTTP {resp.status_code}"
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         duration = int((time.perf_counter() - started) * 1000)
         status = "pending" if attempts < MAX_ATTEMPTS else "failed"
         err = f"{type(e).__name__}: {e}"[:1000]
@@ -280,7 +280,7 @@ async def retry_loop(interval: int = RETRY_LOOP_INTERVAL) -> None:
         except asyncio.CancelledError:
             log.info("webhook.retry_loop.stopped")
             raise
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("webhook.retry_loop.error", error=str(e))
 
 
@@ -316,7 +316,7 @@ async def _entry_data(entry: Any, db: Any = None) -> dict[str, Any]:
             ct = await db.get(cms_models.ContentType, entry.content_type_id)
             if ct is not None:
                 ct_key, ct_name = ct.key, ct.name
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # 查不到类型不影响投递本身：地址字段留空，其余照发
             log.debug("webhook.ct_lookup_failed", error=str(e))
 

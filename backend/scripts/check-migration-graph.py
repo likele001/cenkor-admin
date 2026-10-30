@@ -190,7 +190,7 @@ def analyze(nodes: dict[str, dict]):
 def _find_cycles(nodes, children) -> list[list[str]]:
     """DFS 三色标记找环。"""
     WHITE, GRAY, BLACK = 0, 1, 2
-    color = {r: WHITE for r in nodes}
+    color = dict.fromkeys(nodes, WHITE)
     stack: list[str] = []
     cycles: list[list[str]] = []
 
@@ -200,7 +200,7 @@ def _find_cycles(nodes, children) -> list[list[str]]:
         for c in children[r]:
             if color[c] == GRAY:
                 idx = stack.index(c)
-                cycles.append(stack[idx:] + [c])
+                cycles.append([*stack[idx:], c])
             elif color[c] == WHITE:
                 visit(c)
         stack.pop()
@@ -257,7 +257,7 @@ def render(nodes, analysis, root) -> None:
         h = a.full_heads[0]
         print(f"  ✓ 应挂在：{h}  [scope={nodes[h]['scope']}]")
         print("     这是全量图唯一 head，也是它所在 scope 内唯一没被接管的局部 head。")
-        others = [s for s in a.shadowed]
+        others = list(a.shadowed)
         if others:
             print(f"  其余 {len(others)} 个局部 head 都已被跨目录节点接管（链中间段），")
             print("     往那些 scope 追加会让新迁移落在链的中段、后续 head 判定失效。")
@@ -313,7 +313,7 @@ def main() -> int:
             "total": len(nodes),
             "full_heads": a.full_heads,
             "full_bases": a.full_bases,
-            "scopes": {k: v for k, v in sorted(a.scopes.items())},
+            "scopes": dict(sorted(a.scopes.items())),
             "cross_mounts": a.cross_mounts,
             "dangling": a.dangling,
             "cycles": a.cycles,

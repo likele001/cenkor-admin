@@ -351,7 +351,7 @@ def render_blocks(blocks: list[dict], ctx: dict | None = None) -> str:
         d = b.get("data") if isinstance(b.get("data"), dict) else {}
         try:
             parts.append(fn(d, ctx))
-        except Exception:  # noqa: BLE001
+        except Exception:
             # 单个区块渲染失败不该让整页白屏：落地页是要投广告的
             continue
     return "\n".join(p for p in parts if p)

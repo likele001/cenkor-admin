@@ -124,7 +124,7 @@ async def suggest_links(
         cands = await _candidate_entries(session, entry, limit=candidates)
     except LLMNotConfiguredError:
         cands = []
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.internal_link.recall_failed entry={} err={}", entry.id, str(exc))
         cands = []
 
@@ -175,7 +175,7 @@ async def suggest_links(
             "links": [],
             "warning": "AI 未配置，无法生成内链建议（候选已召回）",
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.internal_link.llm_failed entry={} err={}", entry.id, str(exc))
         return {
             "entry_id": entry.id,

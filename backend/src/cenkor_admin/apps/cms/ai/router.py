@@ -22,33 +22,33 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms.ai import copilot
+from cenkor_admin.apps.cms.ai import copilot, pricing
 from cenkor_admin.apps.cms.ai import ingest as ingest_mod
-from cenkor_admin.apps.cms.ai import pricing
-from cenkor_admin.apps.cms.ai.models import CmsAiPrice
 from cenkor_admin.apps.cms.ai.admin_router import router as admin_router
-from cenkor_admin.apps.cms.ai.prompt_router import router as prompt_router
 from cenkor_admin.apps.cms.ai.batch_router import router as batch_router
-from cenkor_admin.apps.cms.ai.memory_router import router as memory_router
-from cenkor_admin.apps.cms.publish_router import router as publish_router
-from cenkor_admin.apps.cms.stats_router import router as stats_router
-from cenkor_admin.apps.cms.knowledge_router import router as knowledge_router
-from cenkor_admin.apps.cms.ai.landing_router import router as landing_router
-from cenkor_admin.apps.cms.ai.workflow_router import router as workflow_router
-from cenkor_admin.apps.cms.ai.dashboard import router as dashboard_router
 from cenkor_admin.apps.cms.ai.content_health import entry_health, site_health
-from cenkor_admin.apps.cms.ai.health_report import render_html, render_markdown
+from cenkor_admin.apps.cms.ai.dashboard import router as dashboard_router
 from cenkor_admin.apps.cms.ai.embedding import vectorize_entry, vectorize_pending
+from cenkor_admin.apps.cms.ai.health_report import render_html, render_markdown
 from cenkor_admin.apps.cms.ai.internal_link import suggest_links
+from cenkor_admin.apps.cms.ai.landing_router import router as landing_router
+from cenkor_admin.apps.cms.ai.memory_router import router as memory_router
+from cenkor_admin.apps.cms.ai.models import CmsAiPrice
+from cenkor_admin.apps.cms.ai.prompt_router import router as prompt_router
 from cenkor_admin.apps.cms.ai.redistribute import CHANNELS, channels_meta, redistribute_entry
 from cenkor_admin.apps.cms.ai.schema_impact import content_type_impact, field_impact
 from cenkor_admin.apps.cms.ai.search import semantic_search, similar_entries
+from cenkor_admin.apps.cms.ai.workflow_router import router as workflow_router
+from cenkor_admin.apps.cms.knowledge_router import router as knowledge_router
 from cenkor_admin.apps.cms.models import Entry, SiteConfig
+from cenkor_admin.apps.cms.publish_router import router as publish_router
+from cenkor_admin.apps.cms.stats_router import router as stats_router
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.llm import LLMError, LLMNotConfiguredError, LLMUnsupportedError
 from cenkor_admin.core.site_scope import current_site_id
@@ -125,7 +125,7 @@ def _explain_unsupported(raw: str) -> str:
             "当前服务商套餐不包含该能力。请在后台「AI 设置」里改绑到支持该能力的"
             "服务商，或升级该服务商的套餐。"
         )
-    if "authentication" in lowered or "invalid" in lowered and "key" in lowered:
+    if "authentication" in lowered or ("invalid" in lowered and "key" in lowered):
         return "AI 服务商密钥无效或已失效，请检查后台「AI 设置」里的密钥。"
     if "quota" in lowered or "rate limit" in lowered or "429" in lowered:
         return "AI 服务商配额已用尽或触发限流，请等待配额重置或升级套餐。"
@@ -223,10 +223,10 @@ async def ingest_extract(
             )
             results.append(r)
             await db.commit()  # 逐个提交，保住已成功文件的识别记账
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await db.rollback()
             failures.append({"filename": name, "error": f"解析超时（>{_INGEST_TIMEOUT}s）"})
-        except Exception as exc:  # noqa: BLE001 —— 单文件失败不该毁掉整批
+        except Exception as exc:
             await db.rollback()
             failures.append({"filename": name, "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
         finally:
@@ -303,11 +303,11 @@ async def draft_entry_stream(
                 lang=str(body.get("lang") or "zh-CN"),
             ):
                 yield f"event: {ev}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # copilot 内部已兜底；这里是最后一道防线，绝不让连接静默断掉
             try:
                 await db.rollback()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
             detail = str(exc)[:300] or "AI 服务调用失败"
             yield f"event: error\ndata: {json.dumps({'detail': detail}, ensure_ascii=False)}\n\n"
@@ -892,7 +892,7 @@ async def upsert_price(
     # 和 0（配了价且免费），不必再靠拒绝来防误解。
 
     # 缓存单价：留空 = 没配（按输入价计），填 0 = 缓存免费
-    raw_cache = body.get("cache_per_m", None)
+    raw_cache = body.get("cache_per_m")
     cache_per_m: float | None
     if raw_cache is None or (isinstance(raw_cache, str) and raw_cache.strip() == ""):
         cache_per_m = None
@@ -1045,8 +1045,8 @@ async def ai_topic_gaps(
             from cenkor_admin.apps.cms import stats as cms_stats
 
             result = await cms_stats.enrich_topic_gaps(db, result)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("cms.topic.evidence_failed", error=str(exc))
+        except Exception as exc:
+            logger.warning("cms.topic.evidence_failed err={}", str(exc))
         return result
     except Exception as exc:
         await db.rollback()

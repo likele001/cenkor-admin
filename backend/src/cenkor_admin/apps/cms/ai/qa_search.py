@@ -83,7 +83,7 @@ async def _kb_hits(session: AsyncSession, question: str, *, limit: int = 3) -> l
         rows = await knowledge.search(
             session, question, site_id=current_site_id() or 1, limit=limit
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # 知识库挂了不该让站内问答整体不可用
         logger.warning("cms.qa.kb_failed", error=str(exc))
         return []

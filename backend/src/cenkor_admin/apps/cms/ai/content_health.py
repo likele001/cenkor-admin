@@ -72,7 +72,7 @@ CMS 里最容易腐烂的东西不是「没写完的草稿」，而是**上线�
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import unquote, urlparse
 
@@ -84,6 +84,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # （体检说「正文 280 字」，RAG 切出来的也是同一份文本，对得上）
 from cenkor_admin.apps.cms.ai.rag import _extract_body, _strip_html
 from cenkor_admin.apps.cms.models import ContentType, Entry, SiteConfig
+
 # 业务日口径与看板同源：用 UTC 切日会在北京时间早 8 点断一天
 from cenkor_admin.apps.cms.tracking import biz_today
 
@@ -350,7 +351,7 @@ def check_entry(
     `perf` 为 None 表示效果维度未启用（埋点还没数据，或调用方不要求）；
     `cannibal` 为 None 表示没做关键词交叉分析。
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     body = _extract_body(entry.content or {})
     text = _strip_html(body)
     seo = entry.seo or {}
@@ -377,7 +378,7 @@ def check_entry(
     if entry.status == "published" and entry.expire_at is not None:
         expire_at = entry.expire_at
         if expire_at.tzinfo is None:
-            expire_at = expire_at.replace(tzinfo=timezone.utc)
+            expire_at = expire_at.replace(tzinfo=UTC)
         if expire_at <= now:
             add(
                 "expired",
@@ -416,7 +417,7 @@ def check_entry(
     updated = entry.updated_at
     if updated is not None:
         if updated.tzinfo is None:
-            updated = updated.replace(tzinfo=timezone.utc)
+            updated = updated.replace(tzinfo=UTC)
         days = (now - updated).days
         if days > stale_days:
             add("stale", f"已 {days} 天未更新", days=days)
@@ -479,7 +480,7 @@ def check_entry(
     # 维度分：每个维度单独看 100 分底。
     # 不这样做的话，一篇「结构 100、效果 0」的内容总分会被平均成 88，
     # 看起来还行，实际问题在效果侧 —— 这正是最该被看见的一侧。
-    dim_scores: dict[str, int] = {d: 100 for d in DIMENSIONS}
+    dim_scores: dict[str, int] = dict.fromkeys(DIMENSIONS, 100)
     for issue in issues:
         dim = CHECKS[issue["check"]]["dimension"]
         dim_scores[dim] = max(0, dim_scores[dim] - issue["deduct"])
@@ -512,7 +513,7 @@ def _age_days(entry: Entry, now: datetime) -> int | None:
     if ref is None:
         return None
     if ref.tzinfo is None:
-        ref = ref.replace(tzinfo=timezone.utc)
+        ref = ref.replace(tzinfo=UTC)
     return max(0, (now - ref).days)
 
 
@@ -650,7 +651,7 @@ async def site_health(
     `limit` 只限制**问题条目明细**的返回条数，扫描范围仍是全站
     （否则分数会随分页漂移，同一个站点两次刷新分数不一样 = 报告不可信）。
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     stmt = select(Entry).where(Entry.site_id == site_id, Entry.deleted_at.is_(None))
     if not include_drafts:

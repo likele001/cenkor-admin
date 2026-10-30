@@ -57,16 +57,16 @@ target_metadata = Base.metadata
 
 # 过滤规则放在 core 里，和 scripts/check_schema_drift.py 共用同一套 ——
 # 两边各写一份的话，体检结论和 autogenerate 结论迟早会对不上。
-from cenkor_admin.core.schema_filters import (
-    fetch_view_names,
-    make_include_object,
-    scope_from_env,
-)
 # DDL 幂等层：库结构与 alembic_version 不同步时（历史上手工补过 DDL，
 # 加上挂载点被 rebase_closed_chain 反复顺延），重跑迁移会撞
 # DuplicateColumn/DuplicateTable。装上这层后「已存在就跳过」，
 # 版本号漂移到哪都不炸。详见 core/migration_idempotent.py。
 from cenkor_admin.core.migration_idempotent import install_idempotent_ops
+from cenkor_admin.core.schema_filters import (
+    fetch_view_names,
+    make_include_object,
+    scope_from_env,
+)
 
 
 def run_migrations_offline() -> None:

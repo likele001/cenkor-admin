@@ -18,6 +18,7 @@ doc_id（status=pending），前端轮询列表看状态变化。
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -225,7 +226,7 @@ async def kb_delete(
     分片不做物理删除：保留是为了「删错了能不能救回来」这件事有个余地。
     检索侧按 `deleted_at IS NULL` 过滤，删掉立刻不进召回。
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     doc = (
         await db.execute(
@@ -237,7 +238,7 @@ async def kb_delete(
     if doc is None:
         raise HTTPException(status_code=404, detail="文档不存在")
 
-    doc.deleted_at = datetime.now(timezone.utc)
+    doc.deleted_at = datetime.now(UTC)
     await db.commit()
     logger.info("cms.kb.doc_deleted", doc_id=doc_id, by=getattr(user, "id", None))
     return {"deleted": True, "doc_id": doc_id}
@@ -299,7 +300,7 @@ async def kb_search(
         raise HTTPException(
             status_code=503, detail="未配置 embedding 能力，知识库检索不可用"
         ) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(status_code=500, detail=f"检索失败：{exc}") from exc
 
     # 低于门槛的也返回，但标 passed=false —— 让人看见「召回了但不会用」，

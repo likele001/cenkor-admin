@@ -75,7 +75,7 @@ async def get(session: AsyncSession, key: str, default: str) -> str:
                 .limit(1)
             )
         ).scalar()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # 表不存在 / 连接抖动都不该让 AI 功能整个不可用
         logger.warning("cms.ai.prompt_load_failed", key=key, error=str(exc))
         return default

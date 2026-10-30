@@ -43,8 +43,8 @@ from typing import Any
 
 import structlog
 from sqlalchemy import select, update
-from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm.exc import StaleDataError
 
 from cenkor_admin.apps.cms.ai import workflow_steps as ws
 from cenkor_admin.apps.cms.ai.workflow_models import (
@@ -287,7 +287,7 @@ def spawn(run_id: int, *, resume: bool = False) -> asyncio.Task:
             await execute(run_id, resume=resume)
         except asyncio.CancelledError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.error("cms.workflow.run_crashed", run=run_id, error=str(exc))
             try:
                 async with AsyncSessionLocal() as db:
@@ -297,7 +297,7 @@ def spawn(run_id: int, *, resume: bool = False) -> asyncio.Task:
                         run.error = f"执行异常：{exc}"[:500]
                         run.finished_at = datetime.now(UTC)
                         await db.commit()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
     task = asyncio.create_task(_runner())
@@ -451,7 +451,7 @@ async def execute(run_id: int, *, resume: bool = False) -> dict[str, Any]:
                     await db.rollback()
                     await _finish(db, run_id, wf_id, "cancelled", "执行被取消")
                     raise
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     last_err = f"{type(exc).__name__}: {exc}"[:1000]
                     log.warning(
                         "cms.workflow.step_failed",
@@ -622,7 +622,7 @@ async def fire_due_workflows() -> int:
                 run = await create_run(db, wf, payload={}, trigger="schedule")
                 spawn(run.id)
                 fired += 1
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("cms.workflow.schedule_failed", workflow=wf_id, error=str(exc))
             wf = await db.get(CmsWorkflow, wf_id)
             if wf is not None:
@@ -673,14 +673,14 @@ async def fire_schedules() -> None:
         n = await fire_due_workflows()
         if n:
             log.info("cms.workflow.fired", count=n)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("cms.workflow.fire_failed", error=str(exc))
 
 
 # ---------------------------------------------------------------------------
 # 调度器挂载
 # ---------------------------------------------------------------------------
-from cenkor_admin.core.hooks import hook  # noqa: E402
+from cenkor_admin.core.hooks import hook
 
 _RECOVERED = False
 
@@ -699,6 +699,6 @@ async def _hook_workflow_tick() -> None:
             n = await recover_stale()
             if n:
                 log.info("cms.workflow.recovered", count=n)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("cms.workflow.recover_failed", error=str(exc))
     await fire_schedules()

@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone as _tz
+from datetime import datetime, timedelta
+from datetime import timezone as _tz
 from decimal import Decimal
 from typing import Any
 

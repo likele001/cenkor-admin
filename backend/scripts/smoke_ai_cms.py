@@ -46,7 +46,7 @@ def call(method: str, path: str, body: dict | None = None, timeout: int = 120):
             return e.code, json.loads(raw)
         except json.JSONDecodeError:
             return e.code, raw
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return 0, str(e)
 
 
@@ -173,7 +173,7 @@ def p2_workflow() -> None:
         CREATED.append(("DELETE", f"/cms/ai/workflow/flows/{wf_id}"))
         st2, _ = call("GET", f"/cms/ai/workflow/flows/{wf_id}")
         check("工作流详情", st2 == 200, f"HTTP {st2}")
-        st3, body3 = call("GET", f"/cms/ai/workflow/flows/{wf_id}")
+        _st3, body3 = call("GET", f"/cms/ai/workflow/flows/{wf_id}")
         graph = (body3.get("item") or {}).get("graph") if isinstance(body3, dict) else None
         if graph:
             st4, _ = call("POST", "/cms/ai/workflow/validate", {"graph": graph})

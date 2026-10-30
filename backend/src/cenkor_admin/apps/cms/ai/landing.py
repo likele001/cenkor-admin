@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.apps.cms.ai import prompt_registry as prompts
 from cenkor_admin.apps.cms.ai.copilot import _as_object, _record
 from cenkor_admin.apps.cms.ai.landing_blocks import AI_BLOCK_TYPES, clean_blocks
-from cenkor_admin.core.llm import LLMError, LLMNotConfiguredError, get_llm
+from cenkor_admin.core.llm import LLMNotConfiguredError, get_llm
 
 # 单次生成的规模上限：超了就是模型没节制的信号，截断比报错友好
 MAX_BLOCKS_PER_PAGE = 12
@@ -282,7 +282,7 @@ async def draft(
                     "## 企业资料摘录（事实以此为准，没有的不要编）\n"
                     f"{kb_text}\n\n"
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("cms.landing.kb_failed", error=str(exc))
 
     system = await prompts.get(

@@ -116,7 +116,7 @@ class QiniuKodoDriver(S3CompatDriver):
                     timeout=_UPLOAD_TIMEOUT,
                 )
                 return
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 last = e
                 if attempt < 2:
                     time.sleep(1 + attempt * 2)

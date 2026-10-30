@@ -204,8 +204,8 @@ async def vectorize_entry(
         # 向量化同样按 token 计费。不记账的话「AI 用量」页会漏掉这块成本 ——
         # 批量补建 50 条时页面看着一次没调，实际账单已经在涨。
         try:
-            from cenkor_admin.apps.cms.ai.models import CmsAiGeneration
             from cenkor_admin.apps.cms.ai import pricing as ai_pricing
+            from cenkor_admin.apps.cms.ai.models import CmsAiGeneration
             from cenkor_admin.core.site_scope import current_site_id
 
             # 与 copilot._record 一致：成本写记录时就算好存下来，
@@ -223,7 +223,7 @@ async def vectorize_entry(
                     tokens_cache=0,
                     calls=1,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 cost = None
 
             session.add(
@@ -245,7 +245,7 @@ async def vectorize_entry(
                     created_by=None,
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # 记账失败不能影响向量本身落库
             logger.warning("cms.embedding_record_failed", error=str(exc))
     return api_calls

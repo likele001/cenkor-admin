@@ -42,9 +42,10 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Iterator
+from typing import Any
 
 import sqlalchemy as sa
 import structlog
@@ -67,6 +68,7 @@ def scoped_models() -> tuple[type, ...]:
     global _SCOPED
     if _SCOPED is None:
         from cenkor_admin.apps.builder.models import Page
+        from cenkor_admin.apps.cms.ai.models import CmsAiBatchItem, CmsAiBatchJob
         from cenkor_admin.apps.cms.models import (
             Case,
             Category,
@@ -76,7 +78,6 @@ def scoped_models() -> tuple[type, ...]:
             Product,
             Tag,
         )
-        from cenkor_admin.apps.cms.ai.models import CmsAiBatchItem, CmsAiBatchJob
         from cenkor_admin.apps.forms.models import Form
 
         # 批次与批次条目也带 site_id：一个站点的批量生产不该被别的站点看到，
@@ -127,7 +128,7 @@ def require_site_id() -> int:
 
 def _install_events() -> None:
     @event.listens_for(Session, "do_orm_execute")
-    def _apply_site_filter(execute_state: Any) -> None:  # noqa: ANN401
+    def _apply_site_filter(execute_state: Any) -> None:
         sid = _current_site_id.get()
         if sid is None or _bypass.get():
             return
@@ -146,7 +147,7 @@ def _install_events() -> None:
         )
 
     @event.listens_for(Session, "before_flush")
-    def _stamp_site_id(session: Session, flush_context: Any, instances: Any) -> None:  # noqa: ARG001,ANN401
+    def _stamp_site_id(session: Session, flush_context: Any, instances: Any) -> None:
         sid = _current_site_id.get()
         if sid is None or _bypass.get():
             return
@@ -185,7 +186,7 @@ class _SiteCache:
     def _fresh(self) -> bool:
         return self.loaded and (time.monotonic() - self.at) < self.TTL
 
-    async def load(self) -> "_SiteCache":
+    async def load(self) -> _SiteCache:
         if self._fresh():
             return self
         async with self._lock:
@@ -193,7 +194,7 @@ class _SiteCache:
                 return self
             return await self._reload()
 
-    async def _reload(self) -> "_SiteCache":
+    async def _reload(self) -> _SiteCache:
         from cenkor_admin.apps.cms.models import Site
         from cenkor_admin.core.db import AsyncSessionLocal
 
@@ -206,7 +207,7 @@ class _SiteCache:
                         .order_by(Site.sort, Site.id)
                     )
                 ).all()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # 查不到就沿用上次结果，别让中间件把整个后台拖挂
             log.warning("cms.site.cache_load_failed", error=str(exc))
             return self
@@ -234,7 +235,7 @@ def _parse_explicit(raw: str | None) -> int | None:
         return None
 
 
-async def site_scope_middleware(request: Request, call_next: Any) -> Any:  # noqa: ANN401
+async def site_scope_middleware(request: Request, call_next: Any) -> Any:
     """把当前站点写进 contextvar，供 ORM 事件与端点读取。
 
     优先级：X-Site-Id 头 > ?site_id= > 请求域名 > 默认站点。

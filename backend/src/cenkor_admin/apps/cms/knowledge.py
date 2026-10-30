@@ -28,7 +28,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -241,7 +241,7 @@ async def index_doc(session: AsyncSession, doc: KbDoc, *, force: bool = False) -
             vec, meta = await llm.embed_one_meta(piece["text"])
         except LLMNotConfiguredError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # 单个分片失败不放弃整篇：其余分片仍可检索，报告里说明缺几段
             logger.warning("cms.kb.embed_failed", doc_id=doc.id, seq=seq, error=str(exc))
             continue
@@ -316,7 +316,7 @@ async def _record_embedding_cost(
                 tokens_cache=0,
                 calls=1,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             cost = None
 
         session.add(
@@ -338,7 +338,7 @@ async def _record_embedding_cost(
                 created_by=doc.created_by,
             )
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.kb.cost_record_failed", doc_id=doc.id, error=str(exc))
 
 
@@ -423,7 +423,7 @@ async def context_for_prompt(
         hits = await search(session, query, site_id=site_id, limit=limit)
     except LLMNotConfiguredError:
         return "", []
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # 检索挂了不能连带把起草搞挂：起草本身可能用的是别的能力
         logger.warning("cms.kb.context_failed", error=str(exc))
         return "", []
@@ -534,7 +534,7 @@ async def recover_stale(session: AsyncSession, *, older_than_minutes: int = 5) -
     正常索引中的文档 `updated_at` 会被 flush 刷新，
     超过 5 分钟没动静基本就是进程重启把后台任务丢了。
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
+    cutoff = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
     rows = (
         await session.execute(
             select(KbDoc.id)
@@ -563,7 +563,7 @@ def spawn_index(doc_id: int, *, force: bool = False) -> bool:
         return False
     try:
         task = asyncio.create_task(index_in_background(doc_id, force=force))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.kb.spawn_failed", doc_id=doc_id, error=str(exc))
         return False
     _BG.add(task)
@@ -591,7 +591,7 @@ async def index_in_background(doc_id: int, *, force: bool = False) -> None:
                 return
             await index_doc(db, doc, force=force)
             await db.commit()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.kb.bg_index_failed", doc_id=doc_id, error=str(exc))
         # 留一条可读的失败原因，别让用户只看到「排队中」
         try:
@@ -603,7 +603,7 @@ async def index_in_background(doc_id: int, *, force: bool = False) -> None:
                     doc.status = "failed"
                     doc.error = str(exc)[:500]
                     await db.commit()
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
     finally:
         _INFLIGHT.discard(doc_id)
@@ -629,6 +629,6 @@ async def _hook_recover_kb() -> None:
             task.add_done_callback(_BG.discard)
         if ids:
             logger.info("cms.kb.recovered", docs=ids)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.kb.recover_failed", error=str(exc))
 

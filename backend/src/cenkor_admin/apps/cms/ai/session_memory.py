@@ -49,7 +49,7 @@ def _site_id() -> int:
         from cenkor_admin.core.site_scope import current_site_id
 
         return current_site_id() or 1
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 1
 
 
@@ -123,11 +123,11 @@ async def add_turn(
             sess.title = title[:200]
         if commit:
             await session.commit()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.session_turn_failed entry={} kind={} err={}", entry_id, kind, exc)
         try:
             await session.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
 
@@ -158,7 +158,7 @@ async def render_entry_context(
             .scalars()
             .all()
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.session_render_failed entry={} err={}", entry_id, exc)
         return ""
 

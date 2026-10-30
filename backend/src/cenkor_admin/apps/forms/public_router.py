@@ -89,7 +89,7 @@ _LEAD_WRITABLE = (
 )
 
 
-async def _create_lead(db: AsyncSession, form: "Form", values: dict, ip: str | None) -> int | None:
+async def _create_lead(db: AsyncSession, form: Form, values: dict, ip: str | None) -> int | None:
     """把一次表单提交落成 CRM 线索。
 
     用 SAVEPOINT 包住：线索写失败只回滚这一个 savepoint，
@@ -158,6 +158,6 @@ async def _create_lead(db: AsyncSession, form: "Form", values: dict, ip: str | N
             db.add(lead)
             await db.flush()
             return lead.id
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("forms.lead_create_failed", form=form.key, error=str(exc))
         return None

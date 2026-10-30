@@ -95,7 +95,7 @@ def _image_size(data: bytes | None, fallback: str) -> tuple[int | None, int | No
     try:
         w_s, h_s = fallback.lower().split("x")
         return int(w_s), int(h_s)
-    except Exception:  # noqa: BLE001 —— 尺寸只是元数据，解析不出不算失败
+    except Exception:
         return None, None
 
 
@@ -124,7 +124,7 @@ async def _resolve_bytes(urls: list[str], b64: list[str]) -> tuple[bytes, str]:
                 data = await _download(u)
                 if data:
                     return data, u
-            except Exception as exc:  # noqa: BLE001 —— 换下一个候选，都失败再抛
+            except Exception as exc:
                 logger.warning("cms.illustration.download_failed url={} err={}", u[:120], exc)
     if b64:
         try:
@@ -220,7 +220,7 @@ async def generate_for_entry(
     await s3.upload_fileobj(bucket, key, io.BytesIO(data), mime)
     try:
         url = await s3.public_url(bucket, key)
-    except Exception:  # noqa: BLE001 —— 取不到公网形态时退回相对路径
+    except Exception:
         url = f"/{bucket}/{key}"
 
     width, height = _image_size(data, size)

@@ -76,7 +76,7 @@ async def scheduler_tick() -> dict[str, int]:
                     _e = await db.get(models.Entry, _eid)
                     if _e is not None:
                         await _dispatch("entry.published", entry=_e, db=db, user=None)
-            except Exception as _de:  # noqa: BLE001
+            except Exception as _de:
                 log.warning("scheduler.publish_dispatch_failed", error=str(_de))
 
     # 通用扩展点：任何应用都可订阅 scheduler.tick 挂自己的周期任务

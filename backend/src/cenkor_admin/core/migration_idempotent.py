@@ -117,7 +117,7 @@ class _IdempotentGuard:
                 {"t": table},
             ).fetchone()
             return row is not None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
     def _has_column(self, table: str, column: str) -> bool:
@@ -133,7 +133,7 @@ class _IdempotentGuard:
                 {"t": table, "c": column},
             ).fetchone()
             return row is not None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
     def _has_index(self, index: str) -> bool:
@@ -169,7 +169,7 @@ class _IdempotentGuard:
             ).fetchall()
             if rows:
                 return bool(rows[0][0]), tuple(r[1] for r in rows)
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         return None
 
@@ -181,9 +181,7 @@ class _IdempotentGuard:
         unique, cols = got
         if unique != want_unique:
             return False
-        if want_cols and cols and set(cols) != set(want_cols):
-            return False
-        return True
+        return not (want_cols and cols and set(cols) != set(want_cols))
 
     def _has_unique(self, constraint: str) -> bool:
         """直查 pg_constraint，不用 inspector（同样的缓存问题）。"""
@@ -195,7 +193,7 @@ class _IdempotentGuard:
                 {"c": constraint},
             ).fetchone()
             return row is not None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
     def _skip(self, what: str) -> None:
@@ -247,7 +245,7 @@ class _IdempotentGuard:
             # 直接调原始实现，不能走包装层（会无限递归）
             orig_drop(ops, name, table_name=table_name)
             log.warning("migration.idempotent_reindex", index=name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("migration.idempotent_reindex_failed", index=name, error=str(exc)[:200])
 
     def drop_index(self, original, ops, args: tuple, kw: dict):

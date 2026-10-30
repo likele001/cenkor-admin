@@ -77,7 +77,7 @@ async def collect(request: Request, db: AsyncSession = Depends(get_db)) -> Respo
         )
         if result.get("dropped"):
             log.debug("cms.track.partial", **result)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # 埋点是旁路，任何情况都不能把错误抛给访客的浏览器
         log.warning("cms.track.failed", error=str(exc))
     return Response(status_code=204)

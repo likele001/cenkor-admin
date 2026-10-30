@@ -125,7 +125,7 @@ async def _run_job(job_id: int) -> None:
         # 进程退出或被显式取消：把手上 running 的条目回退，下次能接着跑
         await _release_running_items(job_id)
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("cms.ai.batch.crashed job={} err={}", job_id, exc)
         await _mark_job_failed(job_id, str(exc))
     finally:
@@ -189,7 +189,7 @@ async def _process_item(job_id: int, item: dict[str, Any]) -> None:
                     threshold=0.8,
                     limit=3,
                 )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("cms.ai.batch.dedup_failed item={} err={}", item_id, str(exc))
                 dups = []
             hit = next((d for d in dups if d.get("is_duplicate")), None)
@@ -234,7 +234,7 @@ async def _process_item(job_id: int, item: dict[str, Any]) -> None:
             await db.commit()
         logger.info("cms.ai.batch.item_done job={} item={}", job_id, item_id)
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         msg = f"{type(exc).__name__}: {exc}"[:2000]
         logger.warning("cms.ai.batch.item_failed job={} item={} err={}", job_id, item_id, msg)
         await _fail_item(item_id, msg)

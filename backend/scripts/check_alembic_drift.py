@@ -95,12 +95,12 @@ def main() -> int:
             cols = {c["name"] for c in insp.get_columns(tbl)}
             if col not in cols:
                 missing_cols.append((tbl, col))
-        real_idx = {i["name"] for i in insp.get_indexes("app_pricing")}
+        {i["name"] for i in insp.get_indexes("app_pricing")}
         all_idx = set()
         for tbl in real_tables:
             try:
                 all_idx |= {i["name"] for i in insp.get_indexes(tbl)}
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         missing_idx = sorted({(n, t) for n, t in exp["indexes"] if n not in all_idx})
         real_uniques = set()
@@ -108,7 +108,7 @@ def main() -> int:
             try:
                 for u in insp.get_unique_constraints(tbl):
                     real_uniques.add((u["name"], tbl))
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         missing_uniques = sorted({(n, t) for n, t in exp["uniques"] if (n, t) not in real_uniques})
 

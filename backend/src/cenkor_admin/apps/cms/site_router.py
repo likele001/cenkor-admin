@@ -18,7 +18,8 @@ DB 上 `cms_entries.site_id` 是 `ON DELETE RESTRICT`，硬删会被外键拦住
 from __future__ import annotations
 
 import re
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -360,7 +361,7 @@ async def site_content(
 async def site_legacy(site_id: int, db: DBSession) -> dict[str, int]:
     await _one(db, site_id)
 
-    async def _count(model: Any) -> int:  # noqa: ANN401
+    async def _count(model: Any) -> int:
         n = (
             await db.execute(
                 select(func.count()).select_from(model).where(model.site_id == site_id)

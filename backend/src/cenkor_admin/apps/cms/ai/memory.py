@@ -35,10 +35,10 @@ from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms.ai.models import (
-    CmsAiEntryDigest,
-    CmsAiMemory,
     MEMORY_SCOPE_LABEL,
     MEMORY_SCOPES,
+    CmsAiEntryDigest,
+    CmsAiMemory,
 )
 
 # 渲染顺序 = 重要程度。品牌调性和硬事实必须先进预算，
@@ -491,7 +491,7 @@ async def digest_entries(
             )
             await session.commit()
             built += 1
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             await session.rollback()
             # 降级而不是留洞：一条索引生成失败就整篇没有记忆，这个洞是沉默的 ——
             # 起草时 AI 会以为「这篇没写过」，于是重复选题。用「标题 + 开头」
@@ -515,7 +515,7 @@ async def digest_entries(
                 await session.commit()
                 built += 1
                 degraded += 1
-            except Exception:  # noqa: BLE001
+            except Exception:
                 await session.rollback()
                 failed += 1
             errors.append(f"entry {r['id']}: {type(exc).__name__}: {str(exc)[:100]}")

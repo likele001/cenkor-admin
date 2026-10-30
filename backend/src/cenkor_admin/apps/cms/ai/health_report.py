@@ -38,7 +38,6 @@ from cenkor_admin.apps.cms.ai.content_health import (
     NO_CONV_MIN_PV,
     NO_TRAFFIC_MIN_AGE_DAYS,
     PERF_WINDOW_DAYS,
-    REMEDIES,
     SEO_DESC_MAX,
     SEO_DESC_MIN,
     SEO_TITLE_MAX,
@@ -129,7 +128,7 @@ def render_markdown(report: dict[str, Any], *, site_name: str = "") -> str:
     out.append(scope_line)
     out.append("- 判定口径：结构 + SEO + 效果三个维度，各 100 分底")
     out.append("")
-    out.append(f"## 一、结论")
+    out.append("## 一、结论")
     out.append("")
     out.append(f"**综合得分 {score:.1f} / 100 —— {level}**")
     out.append("")
@@ -155,8 +154,8 @@ def render_markdown(report: dict[str, Any], *, site_name: str = "") -> str:
 
     if not report.get("perf_ready"):
         out.append(
-            f"> 效果维度未启用：埋点还没有采集到任何数据。接入埋点后，"
-            f"这里会给出零访问、读完率、转化三类问题。"
+            "> 效果维度未启用：埋点还没有采集到任何数据。接入埋点后，"
+            "这里会给出零访问、读完率、转化三类问题。"
         )
         out.append("")
 

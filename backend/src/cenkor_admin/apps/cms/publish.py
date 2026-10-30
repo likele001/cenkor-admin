@@ -183,7 +183,7 @@ class SiteChannel(BaseChannel):
             from cenkor_admin.core.hooks import dispatch
 
             await dispatch("entry.published", entry=entry, db=db, user=None)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("cms.publish.dispatch_failed", entry_id=entry.id, error=str(exc))
 
         return PublishResult(
@@ -329,7 +329,7 @@ class WechatChannel(BaseChannel):
                 ok=False,
                 error=f"建草稿失败（{code}）：{WECHAT_ERRORS.get(code, data.get('errmsg') or '未知错误')}",
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return PublishResult(ok=False, error=f"公众号调用异常：{exc}")
 
     async def test(self, db: AsyncSession, channel: Any) -> dict[str, Any]:
@@ -338,7 +338,7 @@ class WechatChannel(BaseChannel):
             return {"ok": False, "detail": "未配置 AppID / AppSecret"}
         try:
             await self._token(cfg["appid"], cfg["secret"])
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {"ok": False, "detail": str(exc)}
         extra = "" if cfg["thumb_media_id"] else "（但还缺封面 thumb_media_id，实际发布会失败）"
         return {"ok": True, "detail": f"access_token 获取成功{extra}"}
@@ -508,7 +508,7 @@ async def run_job(db: AsyncSession, job: Any) -> PublishResult:
 
     try:
         result = await handler.publish(db, entry, channel)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("cms.publish.exception", job_id=job.id, error=str(exc))
         result = PublishResult(ok=False, error=f"{type(exc).__name__}: {exc}")
 
@@ -644,7 +644,7 @@ async def _drain_pending() -> None:
         await run_pending(db, limit=5)
 
 
-from cenkor_admin.core.hooks import hook  # noqa: E402
+from cenkor_admin.core.hooks import hook
 
 
 @hook("scheduler.tick")
@@ -662,5 +662,5 @@ async def _hook_run_publish_jobs() -> None:
         task = asyncio.create_task(_drain_pending())
         _bg_tasks.add(task)
         task.add_done_callback(_bg_tasks.discard)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("cms.publish.spawn_failed", error=str(exc))

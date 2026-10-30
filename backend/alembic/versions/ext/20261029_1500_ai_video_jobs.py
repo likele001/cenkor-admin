@@ -23,8 +23,9 @@ app_schema 属闭源模块，被 .gitignore 排除，公开仓库看不到它 �
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "20261029_1500_ai_video_jobs"
 down_revision: str | Sequence[str] | None = "20261014_124200_schema_versions"

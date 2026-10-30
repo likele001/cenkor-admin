@@ -15,13 +15,13 @@ from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.auth.api_key_router import router as api_key_router
 from cenkor_admin.apps.auth.router import router as auth_router
 from cenkor_admin.apps.auth.schemas import UserBrief
+from cenkor_admin.apps.cms.ai.router import router as cms_ai_router
 from cenkor_admin.apps.cms.content_engine_router import router as content_engine_router
+from cenkor_admin.apps.cms.mcp.router import router as cms_mcp_router
 from cenkor_admin.apps.cms.public_router import router as cms_public_router
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.apps.cms.router import router as cms_router
 from cenkor_admin.apps.cms.site_router import router as cms_site_router
-from cenkor_admin.apps.cms.ai.router import router as cms_ai_router
-from cenkor_admin.apps.cms.mcp.router import router as cms_mcp_router
 from cenkor_admin.apps.cms.template_router import router as template_router
 from cenkor_admin.apps.notification.router import router as notification_router
 from cenkor_admin.apps.portal.admin_router import router as portal_admin_router

@@ -9,7 +9,7 @@ import sys
 
 from sqlalchemy import func, select
 
-from cenkor_admin.apps.cms.ai import copilot, prompt_registry
+from cenkor_admin.apps.cms.ai import copilot
 from cenkor_admin.apps.cms.ai.models import CmsAiPrompt
 from cenkor_admin.core.db import AsyncSessionLocal
 

@@ -37,7 +37,7 @@ def call(method, path, body=None, timeout=420):
             return e.code, json.loads(raw), time.time() - t0
         except json.JSONDecodeError:
             return e.code, raw, time.time() - t0
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return 0, f"{type(e).__name__}: {e}", time.time() - t0
 
 

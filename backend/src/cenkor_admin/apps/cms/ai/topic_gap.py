@@ -287,7 +287,7 @@ async def analyze(
 
 
 def _intent_dist(gaps: list[dict[str, Any]]) -> dict[str, int]:
-    dist = {k: 0 for k in INTENTS}
+    dist = dict.fromkeys(INTENTS, 0)
     for g in gaps:
         dist[g["intent"]] += 1
     return dist

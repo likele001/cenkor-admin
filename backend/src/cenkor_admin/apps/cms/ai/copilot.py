@@ -25,7 +25,7 @@ from typing import Any
 
 import markdown as md
 from loguru import logger
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms.ai import prompt_registry as prompts
@@ -120,8 +120,8 @@ async def _record(
     try:
         # 当前站点由中间件写入 contextvar；脚本/CLI 下为空，兜到默认站。
         # 用函数内 import 是为了避免 core -> apps 的循环依赖。
-        from cenkor_admin.core.site_scope import current_site_id
         from cenkor_admin.apps.cms.ai import pricing as ai_pricing
+        from cenkor_admin.core.site_scope import current_site_id
 
         p_provider = provider if provider is not None else (result.provider if result else "")
         p_model = model if model is not None else (result.model if result else "")
@@ -206,7 +206,7 @@ async def _with_memory(
         from cenkor_admin.apps.cms.ai import memory as mem
 
         block, _meta = await mem.render_prompt_block(session, budget=budget)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.memory_inject_failed err={}", exc)
         block = ""
 
@@ -217,7 +217,7 @@ async def _with_memory(
             from cenkor_admin.apps.cms.ai import session_memory as sess_mem
 
             session_block = await sess_mem.render_entry_context(session, entry_id)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("cms.session_inject_failed entry={} err={}", entry_id, exc)
 
     parts = [p for p in (block, session_block) if p]
@@ -248,7 +248,7 @@ async def _remember(
             kind=kind, content=content, role=role,
             created_by=created_by, title=title, commit=commit,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.session_remember_failed entry={} kind={} err={}", entry_id, kind, exc)
 
 
@@ -900,7 +900,7 @@ async def draft_entry_stream(
                 max_tokens=1200,
             )
             extra_obj = _as_object(extra_raw, "补充元数据")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             extra_error = str(exc)[:300]
 
         custom, dropped = _clean_custom_fields(extra_obj.get("custom_fields"), fields)
@@ -968,10 +968,10 @@ async def draft_entry_stream(
             },
         )
         yield ("done", draft)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         try:
             await session.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         await _record(
             session,
@@ -1171,7 +1171,7 @@ async def detect_duplicates(
     except LLMNotConfiguredError:
         logger.warning("cms.dedup.skip_embed_not_configured")
         return []
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.dedup.search_failed err={}", str(exc))
         return []
 
@@ -1238,7 +1238,7 @@ async def _kb_reference(
             limit=limit,
             max_chars=max_chars,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("cms.draft.kb_failed", error=str(exc))
         return "", []
 
@@ -1400,7 +1400,7 @@ async def _auto_tag_later(entry_id: int, created_by: int | None = None) -> None:
             if entry is None or getattr(entry, "deleted_at", None) is not None:
                 return
             await auto_tag_entry(s, entry, created_by=created_by)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # 标签是增强不是门槛：失败只记日志，绝不影响条目
         logger.warning("cms.ai.auto_tag_failed entry={} err={}", entry_id, str(exc)[:200])
 
@@ -1798,7 +1798,7 @@ async def rewrite_text(
                     raw = retried
                     result = retry_result
                     logger.info("cms.ai.title_retried", entry_title=text[:40])
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 # 重试是锦上添花，失败就用第一次的结果，不能把主流程带崩
                 logger.warning("cms.ai.title_retry_failed", error=str(exc))
 

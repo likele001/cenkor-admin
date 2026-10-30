@@ -918,5 +918,5 @@ class EntryPreview(Base):
 # ------------------------------------------------------------
 # 埋点与分发模型（实体定义在独立文件，此处 import 只为注册进 Base.metadata）
 # ------------------------------------------------------------
-from cenkor_admin.apps.cms import analytics_models as _analytics_models  # noqa: E402,F401
-from cenkor_admin.apps.cms import knowledge_models as _knowledge_models  # noqa: E402,F401
+from cenkor_admin.apps.cms import analytics_models as _analytics_models  # noqa: F401
+from cenkor_admin.apps.cms import knowledge_models as _knowledge_models  # noqa: F401

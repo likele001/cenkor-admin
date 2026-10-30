@@ -70,9 +70,7 @@ def _is_empty(v: Any) -> bool:
         return True
     if isinstance(v, str) and not v.strip():
         return True
-    if isinstance(v, (list, dict, tuple, set)) and len(v) == 0:
-        return True
-    return False
+    return bool(isinstance(v, (list, dict, tuple, set)) and len(v) == 0)
 
 
 def _type_family(field_type: str) -> str:
@@ -309,8 +307,8 @@ async def content_type_impact(
 
 
 __all__ = [
-    "field_impact",
-    "content_type_impact",
-    "FIELD_TYPES",
     "FIELD_DEFAULTS",
+    "FIELD_TYPES",
+    "content_type_impact",
+    "field_impact",
 ]

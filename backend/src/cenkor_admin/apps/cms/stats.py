@@ -24,8 +24,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.cms import analytics_models as am
-from cenkor_admin.apps.cms.tracking import BIZ_TZ, biz_today
+from cenkor_admin.apps.cms.tracking import biz_today
 
 log = structlog.get_logger()
 
@@ -464,8 +463,7 @@ async def topic_weights(db: AsyncSession, *, days: int = 90, limit: int = 30) ->
 _STOP_BIGRAMS = frozenset(
     {
         "的了", "以及", "如何", "怎么", "什么", "为什", "这类", "那些", "一个",
-        "我们", "你们", "他们", "可以", "需要", "应该", "到底", "谁管", "为什",
-        "是不", "不是", "有没", "没有", "多少", "哪些", "为何", "怎样",
+        "我们", "你们", "他们", "可以", "需要", "应该", "到底", "谁管", "是不", "不是", "有没", "没有", "多少", "哪些", "为何", "怎样",
     }
 )
 
@@ -674,13 +672,13 @@ async def on_scheduler_tick(db: AsyncSession | None = None) -> dict[str, Any]:
 # 挂到调度器扩展点上：scheduler 每 30 秒 tick，这里内部 5 分钟节流。
 # 用 hook 而不是改 scheduler 源码 —— 汇总属于「内容运营」这个应用的关注点，
 # 不该塞进核心调度器。核心只负责提供扩展点。
-from cenkor_admin.core.hooks import hook  # noqa: E402
+from cenkor_admin.core.hooks import hook
 
 
 @hook("scheduler.tick")
 async def _hook_refresh_stats() -> None:
     try:
         await on_scheduler_tick()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # 汇总失败不能影响定时发布 —— 那条链路比统计数据重要得多
         log.warning("cms.stats.tick_failed", error=str(exc))

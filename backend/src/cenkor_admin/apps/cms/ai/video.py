@@ -147,7 +147,7 @@ def _model_for_mode(mode: str) -> str | None:
 
         ep = get_endpoint("video")
         params = dict(getattr(ep, "params", None) or {}) if ep else {}
-    except Exception:  # noqa: BLE001 —— 取不到配置不该阻断提交，用默认模型
+    except Exception:
         return None
     key = "i2v_model" if mode == "i2v" else "t2v_model"
     value = str(params.get(key) or "").strip()
@@ -274,7 +274,7 @@ async def _poll_loop(job_id: int) -> None:
             await asyncio.sleep(_POLL_FAST if elapsed < _FAST_WINDOW else _POLL_SLOW)
     except asyncio.CancelledError:
         raise
-    except Exception as exc:  # noqa: BLE001 —— 后台任务不能让异常游荡到事件循环
+    except Exception as exc:
         logger.exception("cms.video.poll_crashed job={}", job_id)
         await _fail(job_id, f"轮询异常：{type(exc).__name__} {str(exc)[:200]}")
 
@@ -399,7 +399,7 @@ async def _upload(
     await s3.upload_fileobj(bucket, key, io.BytesIO(data), mime)
     try:
         url = await s3.public_url(bucket, key)
-    except Exception:  # noqa: BLE001 —— 取不到公网形态时退回相对路径
+    except Exception:
         url = f"/{bucket}/{key}"
 
     async with AsyncSessionLocal() as db:
@@ -445,7 +445,7 @@ async def _materialize(job_id: int, task: VideoTask) -> None:
         try:
             client = get_llm_for("video")
             await client.download_to_file(task.video_url, raw)
-        except Exception as exc:  # noqa: BLE001 —— 下载失败要给出可读原因
+        except Exception as exc:
             await _fail(job_id, f"产物下载失败：{type(exc).__name__} {str(exc)[:300]}")
             return
 
@@ -465,7 +465,7 @@ async def _materialize(job_id: int, task: VideoTask) -> None:
                 width=width,
                 height=height,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             await _fail(job_id, f"视频上传失败：{type(exc).__name__} {str(exc)[:300]}")
             return
 
@@ -482,7 +482,7 @@ async def _materialize(job_id: int, task: VideoTask) -> None:
                     created_by=created_by,
                 )
                 cover_id = cover.id
-            except Exception as exc:  # noqa: BLE001 —— 封面失败不算任务失败，视频本身是好的
+            except Exception as exc:
                 logger.warning("cms.video.cover_upload_failed job={} err={}", job_id, str(exc)[:200])
 
     async with AsyncSessionLocal() as db:

@@ -222,12 +222,12 @@ def check_drift(cfg: Config, connection) -> DriftReport:
     for tbl in tables:
         try:
             all_indexes |= {i["name"] for i in insp.get_indexes(tbl)}
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         try:
             for u in insp.get_unique_constraints(tbl):
                 all_uniques.add((u["name"], tbl))
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
     missing_tables = sorted(t for t in expected.tables if t not in tables)
@@ -237,7 +237,7 @@ def check_drift(cfg: Config, connection) -> DriftReport:
             continue
         try:
             cols = {c["name"] for c in insp.get_columns(tbl)}
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
         if col not in cols:
             missing_columns.append((tbl, col))

@@ -189,6 +189,7 @@ async def lifespan(app: FastAPI):
     # 注册内置钩子处理器（插件框架 M1·P0）：导入模块即触发 @hook 装饰器注册
     try:
         from cenkor_admin.apps.system import hooks as _builtin_hooks
+
         # [P2C] webhook 投递器此前无人 import，@hook 处理器全未注册
         from cenkor_admin.apps.system import webhooks as _webhook_hooks  # noqa: F401
 
@@ -246,14 +247,14 @@ async def lifespan(app: FastAPI):
             n = await batch_runner.resume_on_boot()
             if n:
                 log.warning("cms.ai.batch.recovered_jobs", count=n)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("cms.ai.batch.recover_failed", error=str(e))
 
     try:
         import asyncio as _asyncio
 
         _asyncio.create_task(_recover_batch_jobs())
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("cms.ai.batch.recover_spawn_failed", error=str(e))
 
     try:

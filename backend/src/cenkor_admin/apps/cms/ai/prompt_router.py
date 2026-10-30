@@ -19,15 +19,14 @@ from __future__ import annotations
 import difflib
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms.ai import prompt_registry
-from cenkor_admin.apps.cms.ai import copilot
+from cenkor_admin.apps.cms.ai import copilot, prompt_registry
 from cenkor_admin.apps.cms.ai.models import CmsAiPrompt
 from cenkor_admin.core.db import get_db
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from loguru import logger
 from sqlalchemy import func, select
@@ -111,7 +111,7 @@ async def landing_draft(
     except ValueError as exc:
         await db.rollback()
         raise HTTPException(400, str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         await db.rollback()
         logger.warning("cms.landing.draft_failed", error=str(exc))
         raise HTTPException(502, f"生成失败：{str(exc)[:200]}") from exc
@@ -144,7 +144,7 @@ async def landing_save(
     except ValueError as exc:
         await db.rollback()
         raise HTTPException(400, str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         await db.rollback()
         logger.warning("cms.landing.save_failed", error=str(exc))
         raise HTTPException(500, f"保存失败：{str(exc)[:200]}") from exc
@@ -186,7 +186,7 @@ async def landing_pages(
 
 
 def _form_ids_for(page: Page, forms: list) -> list[int]:
-    keys = set(k for k in _form_keys(page.schema or []) if k)
+    keys = {k for k in _form_keys(page.schema or []) if k}
     return [r[0] for r in forms if r[1] in keys]
 
 
@@ -267,7 +267,7 @@ async def landing_delete(
     if not page:
         raise HTTPException(404, "页面不存在")
     # 只删本页挂的表单，且仅当没有别的页在用它（普通页 1:1，子站内可能共用）
-    form_keys = set(k for k in _form_keys(page.schema or []) if k)
+    form_keys = {k for k in _form_keys(page.schema or []) if k}
     await db.delete(page)
     await db.flush()
     if form_keys:

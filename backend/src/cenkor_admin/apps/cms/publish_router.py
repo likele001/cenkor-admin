@@ -159,7 +159,7 @@ async def test_channel(
         raise HTTPException(400, f"渠道类型 {channel.channel_type} 没有实现")
     try:
         result = await handler.test(db, channel)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"ok": False, "detail": f"测试异常：{exc}"}
     return result
 
