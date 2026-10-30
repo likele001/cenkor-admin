@@ -32,6 +32,7 @@ from cenkor_admin.apps.cms.ai.models import CmsAiPrice
 from cenkor_admin.apps.cms.ai.admin_router import router as admin_router
 from cenkor_admin.apps.cms.ai.prompt_router import router as prompt_router
 from cenkor_admin.apps.cms.ai.batch_router import router as batch_router
+from cenkor_admin.apps.cms.ai.memory_router import router as memory_router
 from cenkor_admin.apps.cms.ai.dashboard import router as dashboard_router
 from cenkor_admin.apps.cms.ai.content_health import entry_health, site_health
 from cenkor_admin.apps.cms.ai.embedding import vectorize_entry, vectorize_pending
@@ -53,6 +54,8 @@ router.include_router(admin_router)
 router.include_router(prompt_router)
 # 批量生产队列：一次起草 N 篇，逐篇落草稿
 router.include_router(batch_router)
+# 记忆层：站点记忆（硬事实/软风格）+ 内容记忆（已发布内容索引）
+router.include_router(memory_router)
 # 驾驶舱放最后：它要在所有能力端点注册完之后才能枚举 registry
 router.include_router(dashboard_router)
 
@@ -717,11 +720,17 @@ async def ai_usage(
     from cenkor_admin.apps.cms.ai import registry as ai_registry
 
     summary = await pricing.usage_summary(db, days=days)
+    trend = await pricing.usage_trend(db, days=days)
+    prev = await pricing.usage_prev_total(db, days=days)
     reg = await ai_registry.load(db)
     return {
         "days": days,
         "enabled": reg.endpoint("chat") is not None,
         "embed_ready": reg.endpoint("embedding") is not None,
+        # 逐日时间序列（缺数据的日子已补零，前端不用再处理空洞）
+        "trend": trend,
+        # 上一个等长窗口的总量，用于环比。没有它就只是一个孤零零的数字
+        "prev": prev,
         **summary,
     }
 
@@ -735,6 +744,8 @@ def _price_out(row: CmsAiPrice) -> dict[str, Any]:
         "unit": row.unit or "token",
         "input_per_m": float(row.input_per_m or 0),
         "output_per_m": float(row.output_per_m or 0),
+        # None 与 0 必须分开：None=没配（按输入价计），0=缓存真免费
+        "cache_per_m": float(row.cache_per_m) if row.cache_per_m is not None else None,
         "currency": row.currency or "CNY",
         "enabled": bool(row.enabled),
         "note": row.note or "",
@@ -763,7 +774,10 @@ async def list_prices(
         # 下拉候选用库里真实出现过的业务功能，避免手打错字导致规则永远匹配不上
         "kinds": await pricing.distinct_kinds(db),
         "units": list(pricing.UNITS),
-        "note": "单价按每百万 token 计。留空 provider/model/kind 表示任意匹配，精确维度越多越优先。",
+        "note": (
+            "单价按每百万 token 计。留空 provider/model/kind 表示任意匹配，精确维度越多越优先。"
+            "缓存单价留空 = 按输入价计；填 0 = 缓存免费。"
+        ),
     }
 
 
@@ -792,9 +806,25 @@ async def upsert_price(
         raise HTTPException(400, "单价必须是数字") from exc
     if input_per_m < 0 or output_per_m < 0:
         raise HTTPException(400, "单价不能为负")
-    if input_per_m == 0 and output_per_m == 0:
-        # 全 0 的规则会让金额恒为 0，看起来像「已经算了」其实没算，不如直接拒绝
-        raise HTTPException(400, "至少填一个非零单价，否则金额恒为 0")
+    # 全 0 是合法配置：Kolors / bge-reranker / Agnes 视频这些模型本来免费。
+    # 以前拒绝 0 是怕「以为算了其实没算」，现在 cost 快照能区分 NULL（没配价）
+    # 和 0（配了价且免费），不必再靠拒绝来防误解。
+
+    # 缓存单价：留空 = 没配（按输入价计），填 0 = 缓存免费
+    raw_cache = body.get("cache_per_m", None)
+    cache_per_m: float | None
+    if raw_cache is None or (isinstance(raw_cache, str) and raw_cache.strip() == ""):
+        cache_per_m = None
+    else:
+        try:
+            cache_per_m = float(raw_cache)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(400, "缓存单价必须是数字") from exc
+        if cache_per_m < 0:
+            raise HTTPException(400, "缓存单价不能为负")
+        if cache_per_m > input_per_m:
+            # 缓存比全价还贵，只可能是填错了；放过去会让「缓存节省」变成负数
+            raise HTTPException(400, "缓存单价不应高于输入单价，请核对")
 
     row = (
         await db.execute(
@@ -813,12 +843,31 @@ async def upsert_price(
     row.input_per_m = input_per_m
     # 按张计价没有「输出」的概念，强制归零，避免页面显示一个永远不参与计算的数
     row.output_per_m = 0 if unit == "image" else output_per_m
+    # 按张/按条计价同样没有缓存概念
+    row.cache_per_m = cache_per_m if unit == "token" else None
     row.currency = str(body.get("currency") or "CNY").strip()[:8] or "CNY"
     row.enabled = bool(body.get("enabled", True))
     row.note = str(body.get("note") or "").strip()[:200]
     await db.commit()
     await db.refresh(row)
+    # 价格表有进程内缓存（60s），改完立刻失效 —— 否则运营改完价要等一分钟才生效，
+    # 中途的调用还会按旧价记快照
+    pricing.invalidate_cache()
     return {"ok": True, "price": _price_out(row)}
+
+
+@router.post("/prices/recalc", summary="按当前单价重算历史成本快照")
+async def recalc_price_snapshots(
+    days: int | None = Query(default=None, ge=1, le=3650),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """把历史记录的 `cost` 用当前单价重算一遍。
+
+    专门为「单价一开始填错了」准备。日常不需要动 —— 正常调价不该追溯历史，
+    否则上个月的账单这个月会变，对账没法做。所以这是个显式动作，不自动跑。
+    """
+    return {"ok": True, **await pricing.recalc_costs(db, days=days)}
 
 
 @router.delete("/prices/{pid}", summary="删除一条 AI 单价")
@@ -832,6 +881,7 @@ async def delete_price(
         raise HTTPException(404, "单价规则不存在")
     await db.delete(row)
     await db.commit()
+    pricing.invalidate_cache()
     return {"ok": True, "deleted": pid}
 
 

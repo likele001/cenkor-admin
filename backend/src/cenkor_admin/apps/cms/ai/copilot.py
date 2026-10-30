@@ -121,18 +121,48 @@ async def _record(
         # 当前站点由中间件写入 contextvar；脚本/CLI 下为空，兜到默认站。
         # 用函数内 import 是为了避免 core -> apps 的循环依赖。
         from cenkor_admin.core.site_scope import current_site_id
+        from cenkor_admin.apps.cms.ai import pricing as ai_pricing
+
+        p_provider = provider if provider is not None else (result.provider if result else "")
+        p_model = model if model is not None else (result.model if result else "")
+        tokens_in = result.usage.tokens_in if result else 0
+        tokens_out = result.usage.tokens_out if result else 0
+        tokens_cache = result.usage.tokens_cache if result else 0
+
+        # 成本在写记录时就算好存下来（快照）。运营以后调单价，历史账单不该跟着变 ——
+        # 否则上月成本今天看一个数、明天改价又变一个数，对账直接废掉。
+        # 没配单价时留 NULL，与「配了价且确实 0 元」严格区分。
+        cost = None
+        currency = "CNY"
+        if status == "ok":
+            try:
+                cost, currency = await ai_pricing.snapshot_cost(
+                    session,
+                    kind=kind,
+                    provider=p_provider,
+                    model=p_model,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    tokens_cache=tokens_cache,
+                    calls=1,
+                )
+            except Exception as exc:  # 算钱失败绝不能影响主流程
+                logger.warning("cms.ai_cost_snapshot_failed err={}", exc)
 
         gen = CmsAiGeneration(
             site_id=(current_site_id() or 1),
             kind=kind,
             target=target,
             # 生图返回的不是 LLMResult，provider/model 只能由调用方传
-            provider=(provider if provider is not None else (result.provider if result else "")),
-            model=(model if model is not None else (result.model if result else "")),
+            provider=p_provider,
+            model=p_model,
             prompt_digest=_digest(prompt),
             params=params,
-            tokens_in=(result.usage.tokens_in if result else 0),
-            tokens_out=(result.usage.tokens_out if result else 0),
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            tokens_cache=tokens_cache,
+            cost=cost,
+            currency=currency,
             # 生图返回的不是 LLMResult，拿不到 result.latency_ms，
             # 必须由调用方传进来 —— 否则最慢的一类操作在用量页反而显示「—」
             latency_ms=(
@@ -151,6 +181,75 @@ async def _record(
         # loguru 不认 kwargs，必须用 {} 占位 —— 原写法会让这条日志永远打不出内容
         logger.warning("cms.ai_record_failed err={}", exc)
         return None
+
+
+# ---------------------------------------------------------------------------
+# 站点记忆注入
+# ---------------------------------------------------------------------------
+async def _with_memory(
+    session: AsyncSession,
+    system: str,
+    *,
+    budget: int = 2000,
+    entry_id: int | None = None,
+) -> str:
+    """把站点记忆（+ 该条目的会话记忆）拼到 system prompt **末尾**。
+
+    为什么在末尾：固定部分（角色设定）在前、记忆在后，前缀缓存才能命中。
+    把记忆塞最前面会让每次请求的前缀都不一样，缓存全部失效 —— 明明省钱的地方
+    反而更贵。
+
+    记忆读失败绝不能连带起草失败：站点的核心业务是产出内容，记忆只是提升质量。
+    所以这里吞异常，降级成「没有记忆的起草」。
+    """
+    try:
+        from cenkor_admin.apps.cms.ai import memory as mem
+
+        block, _meta = await mem.render_prompt_block(session, budget=budget)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cms.memory_inject_failed err={}", exc)
+        block = ""
+
+    # 会话记忆：围绕这篇内容的历次 AI 动作。没有就跳过，不占预算。
+    session_block = ""
+    if entry_id:
+        try:
+            from cenkor_admin.apps.cms.ai import session_memory as sess_mem
+
+            session_block = await sess_mem.render_entry_context(session, entry_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("cms.session_inject_failed entry={} err={}", entry_id, exc)
+
+    parts = [p for p in (block, session_block) if p]
+    if not parts:
+        return system
+    return f"{system}\n\n" + "\n\n".join(parts)
+
+
+async def _remember(
+    session: AsyncSession,
+    entry_id: int | None,
+    *,
+    kind: str,
+    content: str,
+    role: str = "assistant",
+    created_by: int | None = None,
+    title: str = "",
+    commit: bool = True,
+) -> None:
+    """记一轮会话记忆。失败只打日志，绝不影响主流程。"""
+    if not entry_id:
+        return
+    try:
+        from cenkor_admin.apps.cms.ai import session_memory as sess_mem
+
+        await sess_mem.add_turn(
+            session, entry_id,
+            kind=kind, content=content, role=role,
+            created_by=created_by, title=title, commit=commit,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cms.session_remember_failed entry={} kind={} err={}", entry_id, kind, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -545,7 +644,9 @@ async def draft_entry(
 
     llm = get_llm()
     messages = [
-        {"role": "system", "content": await prompts.get(session, "draft", _DRAFT_SYSTEM)},
+        {"role": "system", "content": await _with_memory(
+            session, await prompts.get(session, "draft", _DRAFT_SYSTEM)
+        )},
         {"role": "user", "content": user_msg},
     ]
 
@@ -706,7 +807,9 @@ async def draft_entry_stream(
     )
     llm = get_llm()
     messages = [
-        {"role": "system", "content": await prompts.get(session, "draft_stream", _DRAFT_STREAM_SYSTEM)},
+        {"role": "system", "content": await _with_memory(
+            session, await prompts.get(session, "draft_stream", _DRAFT_STREAM_SYSTEM)
+        )},
         {"role": "user", "content": user_msg},
     ]
 
@@ -946,6 +1049,21 @@ async def create_entry_from_draft(
     )
     # 自动打标签：后台任务补打，不拖慢保存/批量响应
     _spawn_bg_task(_auto_tag_later(entry.id, created_by))
+
+    # 开一条会话：把这次起草的由头记下来，后面改写 / SEO / 翻译都跟它对齐
+    if ai_origin:
+        brief = str(draft.get("_brief") or draft.get("brief") or "").strip()
+        body_text = _draft_to_text(entry.title, entry.content)
+        await _remember(
+            session, entry.id,
+            kind="draft",
+            content=(
+                (f"起草由头：{brief[:300]}；" if brief else "起草由头：未记录；")
+                + f"成稿标题「{entry.title}」，正文约 {len(body_text)} 字"
+            ),
+            created_by=created_by,
+            title=entry.title,
+        )
     return entry
 
 
@@ -1284,7 +1402,11 @@ async def translate_entry(
 
         user_msg = f"目标语言：{lang}\n\n原文 JSON：\n{payload}"
         messages = [
-            {"role": "system", "content": await prompts.get(session, "translate", _TRANSLATE_SYSTEM)},
+            {"role": "system", "content": await _with_memory(
+                session,
+                await prompts.get(session, "translate", _TRANSLATE_SYSTEM),
+                entry_id=entry.id,
+            )},
             {"role": "user", "content": user_msg},
         ]
 
@@ -1339,6 +1461,17 @@ async def translate_entry(
             results[lang] = {"ok": False, "error": str(exc)[:300]}
 
     await session.commit()
+
+    if any(v.get("ok") for v in results.values()):
+        ok_langs = [k for k, v in results.items() if v.get("ok")]
+        await _remember(
+            session, entry.id,
+            kind="translate",
+            content=f"译文已生成：{'、'.join(ok_langs)}（标题与字段按中文原稿对齐）",
+            created_by=created_by,
+            title=entry.title,
+        )
+
     return results
 
 
@@ -1382,7 +1515,9 @@ async def suggest_seo(
         f"（输出语言：{lang}）"
     )
     messages = [
-        {"role": "system", "content": await prompts.get(session, "seo", _SEO_SYSTEM)},
+        {"role": "system", "content": await _with_memory(
+            session, await prompts.get(session, "seo", _SEO_SYSTEM), entry_id=entry.id
+        )},
         {"role": "user", "content": user_msg},
     ]
 
@@ -1420,6 +1555,16 @@ async def suggest_seo(
         params={"title": seo["title"][:60]},
         created_by=created_by,
         prompt=user_msg,
+    )
+
+    # 会话记忆：记下这次 SEO 的口径，后续翻译/再分发要跟它对齐
+    await _remember(
+        session, entry.id,
+        kind="seo",
+        content=f"SEO 标题「{seo['title']}」；描述「{seo['description'][:80]}」；"
+                f"关键词 {', '.join(seo['keywords'][:6])}",
+        created_by=created_by,
+        title=entry.title,
     )
 
     return {"seo": seo, "_meta": result.meta()}
@@ -1535,7 +1680,9 @@ async def rewrite_text(
     llm = get_llm()
     user_msg = _rewrite_user_msg(action, lang, text, blocks, context, instruction)
     messages = [
-        {"role": "system", "content": await prompts.get(session, "rewrite", _REWRITE_SYSTEM)},
+        {"role": "system", "content": await _with_memory(
+            session, await prompts.get(session, "rewrite", _REWRITE_SYSTEM)
+        )},
         {"role": "user", "content": user_msg},
     ]
     target = f"action:{action}"

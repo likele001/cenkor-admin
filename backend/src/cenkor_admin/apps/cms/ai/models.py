@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
@@ -107,7 +108,16 @@ class CmsAiGeneration(Base):
 
     tokens_in: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 输入里命中 prompt cache 的部分，是 tokens_in 的子集（不是额外增量）。
+    # 各家 prompt_tokens 都含缓存命中数，所以真实未命中输入 = tokens_in - tokens_cache。
+    tokens_cache: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # 成本快照：写记录时按当时单价算出来存下，之后改单价**不追溯**历史。
+    # 不存快照的话，运营调一次价，上月账单跟着变，对账就废了。
+    # NULL 表示当时没配单价 —— 与「花了 0 元」严格区分。
+    cost: Mapped[Decimal | None] = mapped_column(Numeric(16, 6), nullable=True)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False, default="CNY")
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ok", index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -471,6 +481,10 @@ class CmsAiPrice(Base):
     # 每百万 token / 每张的单价
     input_per_m: Mapped[float] = mapped_column(Numeric(14, 4), nullable=False, default=0)
     output_per_m: Mapped[float] = mapped_column(Numeric(14, 4), nullable=False, default=0)
+    # 缓存命中的每百万 token 单价。NULL = 没配，按 input_per_m 计 ——
+    # 「不知道缓存便宜多少」时按全价算，宁可高估也不低估。
+    # 显式填 0 才代表缓存真的免费（部分服务商确实如此）。
+    cache_per_m: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="CNY")
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     note: Mapped[str] = mapped_column(String(200), nullable=False, default="")
@@ -479,4 +493,153 @@ class CmsAiPrice(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# 记忆层
+# ---------------------------------------------------------------------------
+MEMORY_SCOPES = ("brand", "term", "ban", "fact", "style", "audience")
+
+MEMORY_SCOPE_LABEL = {
+    "brand": "品牌调性",
+    "term": "术语规范",
+    "ban": "禁用词",
+    "fact": "固定事实",
+    "style": "写作偏好",
+    "audience": "目标读者",
+}
+
+
+class CmsAiMemory(Base):
+    """站点记忆：让 AI 不再是每次从零开始的陌生人。
+
+    分两类来源，刻意不混在一起：
+    - `manual` —— 人工维护的**硬事实**（产品参数、公司口径、禁用词）。
+      错一条就是事故，所以只能人工写、人工改。
+    - `ai` —— AI 从已发布内容里提炼的**软风格**（语言习惯、结构偏好）。
+      省人工但会提炼错，所以默认 `pending`，人审过才 `approved`。
+
+    `weight` 决定注入提示词时的先后：预算有限时必须能决定谁先进。
+    品牌调性给 80，冷门事实给 30 —— 否则一堆术语会把调性挤出预算。
+    """
+
+    __tablename__ = "cms_ai_memory"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="CASCADE"),
+        nullable=False, default=1, index=True,
+    )
+    scope: Mapped[str] = mapped_column(String(24), nullable=False)
+    # 术语的规范写法 / 禁用词本身；其他 scope 留空
+    key: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    weight: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="approved")
+    # 被注入次数：用来发现「写了但从来轮不到注入」的僵尸记忆
+    injection_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_cms_ai_memory_site", "site_id", "status", "enabled", "scope", "weight"),
+    )
+
+
+class CmsAiEntryDigest(Base):
+    """内容记忆：每条已发布内容的摘要 + 话题 + 关键实体。
+
+    为什么不在起草时现查正文：正文动辄几千字，塞进提示词既贵又稀释重点。
+    摘要 120 字就够回答「我们以前写过这个话题吗、当时的结论是什么」。
+
+    `content_hash` 用来判断是否过期 —— 正文改了要重新提炼，
+    否则记忆里存的是上一版的说法，AI 会拿旧结论写新文章。
+    """
+
+    __tablename__ = "cms_ai_entry_digests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, index=True)
+    entry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_entries.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
+    )
+    title: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    digest: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    topics: Mapped[list[str]] = mapped_column(
+        PG_ARRAY(String(60)), nullable=False, default=list
+    )
+    # {product:[], org:[], metric:[]}：用来发现「同一产品这次写 1.6MPa、上次写 2.5MPa」
+    entities: Mapped[dict[str, Any] | None] = mapped_column(
+        json_column(), nullable=True
+    )
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    built_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CmsAiSession(Base):
+    """会话记忆：把「围绕同一份工作的一连串 AI 操作」串成一条线。
+
+    为什么按 entry 而不是按聊天窗口：这套系统的工作台不是对话框，而是
+    「起草 → 改写 → SEO → 翻译 → 再分发」一串独立动作。真正丢上下文的地方
+    不是聊天断了，而是 SEO 生成时不知道正文最终改成了什么、翻译时不知道
+    编辑先前要求「参数口径统一用 MPa」。
+
+    `session_key` 用 `entry:{id}`，同一篇内容的所有 AI 动作共享一个会话。
+    """
+
+    __tablename__ = "cms_ai_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1, index=True)
+    session_key: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    turn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), index=True
+    )
+
+
+class CmsAiSessionTurn(Base):
+    """会话里的一轮记录：一次 AI 动作的「输入要点 + 产出要点」。
+
+    只存要点不存全文：全文在条目和 cms_ai_generations 里已经有了，
+    会话表的职责是给下一次调用提供上下文，不是做备份。
+    """
+
+    __tablename__ = "cms_ai_session_turns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_ai_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # user = 人的要求（含人工备注）；assistant = AI 产出要点；system = 系统记录
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="system")
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, default="note")
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    meta: Mapped[dict[str, Any] | None] = mapped_column(json_column(), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_cms_ai_turns_session", "session_id", "created_at"),
     )

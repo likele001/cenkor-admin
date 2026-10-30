@@ -32,6 +32,18 @@ export const useAuthStore = defineStore('auth', {
       this.refreshToken = refreshToken
       localStorage.setItem('cenkor_refresh', refreshToken)
     },
+    /** 仅有 token 但本地 user 丢失时（清缓存/换设备），补拉一次身份，避免误判无权限 */
+    async fetchMe(): Promise<boolean> {
+      try {
+        const { api } = await import('@/lib/api')
+        const { data } = await api.get('/api/v1/auth/me')
+        this.user = data as UserBrief
+        localStorage.setItem('cenkor_user', JSON.stringify(data))
+        return true
+      } catch {
+        return false
+      }
+    },
     hasPermission(code: string): boolean {
       if (this.isSuper) return true
       if (!this.user) return false

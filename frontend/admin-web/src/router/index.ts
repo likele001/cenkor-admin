@@ -100,6 +100,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/ai-gaps', name: 'cms-ai-gaps', component: () => import('@/views/cms/TopicGapView.vue'), meta: { permission: 'cms:ai:read' } },
       { path: 'cms/ai-quality', name: 'cms-ai-quality', component: () => import('@/views/cms/QualityView.vue'), meta: { permission: 'cms:ai:read' } },
       { path: 'cms/ai-usage', name: 'cms-ai-usage', component: () => import('@/views/cms/AiUsageView.vue'), meta: { permission: 'cms:ai:read' } },
+      { path: 'cms/ai-memory', name: 'cms-ai-memory', component: () => import('@/views/cms/AiMemoryView.vue'), meta: { permission: 'cms:ai:read' } },
       { path: 'cms/media', name: 'cms-media', component: MediaView, meta: { permission: 'media:upload' } },
       // System
       { path: 'system/users', name: 'system-users', component: UsersListView, meta: { permission: 'rbac:user:read' } },
@@ -139,11 +140,19 @@ export const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (to.meta.public) return true
   if (!auth.isAuthed) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  // token 还在但 user 对象丢失（换浏览器配置/清过缓存/刷新 token 后）时，
+  // 先补拉身份再判权限，否则会误跳 403。
+  if (!auth.user) {
+    const ok = await auth.fetchMe()
+    if (!ok) {
+      return { name: 'login', query: { redirect: to.fullPath } }
+    }
   }
   const perm = to.meta.permission as string | undefined
   if (perm && !auth.hasPermission(perm)) {

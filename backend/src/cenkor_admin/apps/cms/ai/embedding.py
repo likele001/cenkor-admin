@@ -205,7 +205,26 @@ async def vectorize_entry(
         # 批量补建 50 条时页面看着一次没调，实际账单已经在涨。
         try:
             from cenkor_admin.apps.cms.ai.models import CmsAiGeneration
+            from cenkor_admin.apps.cms.ai import pricing as ai_pricing
             from cenkor_admin.core.site_scope import current_site_id
+
+            # 与 copilot._record 一致：成本写记录时就算好存下来，
+            # 以后调单价不追溯历史。算不出来留 NULL（不是 0）。
+            cost = None
+            currency = "CNY"
+            try:
+                cost, currency = await ai_pricing.snapshot_cost(
+                    session,
+                    kind="embedding",
+                    provider=llm.provider or "",
+                    model=llm.embed_model or "",
+                    tokens_in=total_tokens,
+                    tokens_out=0,
+                    tokens_cache=0,
+                    calls=1,
+                )
+            except Exception:  # noqa: BLE001
+                cost = None
 
             session.add(
                 CmsAiGeneration(
@@ -218,6 +237,8 @@ async def vectorize_entry(
                     params={"api_calls": api_calls, "force": bool(force)},
                     tokens_in=total_tokens,
                     tokens_out=0,
+                    cost=cost,
+                    currency=currency,
                     latency_ms=(total_latency // api_calls) if api_calls else 0,
                     status="ok",
                     error=None,

@@ -55,13 +55,51 @@ class LLMUsage:
     tokens_in: int = 0
     tokens_out: int = 0
     total_tokens: int = 0
+    # 输入中命中 prompt cache 的部分，**已包含在 tokens_in 里**（各家的
+    # prompt_tokens 都是含缓存的总数）。单独记一份是为了按缓存价打折 ——
+    # 缓存价通常只有正常输入价的 1/10，混在一起算会系统性高估成本。
+    tokens_cache: int = 0
 
     def as_dict(self) -> dict[str, int]:
         return {
             "tokens_in": self.tokens_in,
             "tokens_out": self.tokens_out,
             "total_tokens": self.total_tokens,
+            "tokens_cache": self.tokens_cache,
         }
+
+
+def extract_cache_tokens(usage: dict[str, Any] | None) -> int:
+    """从各家 usage 里挖出「命中缓存的输入 token 数」。
+
+    各服务商字段名完全不统一，且都是可选的 —— 拿不到就返回 0（表示
+    「不知道」，此时按全价计费，绝不假设得了便宜）：
+
+    - OpenAI / 火山方舟 / 硅基流动：`prompt_tokens_details.cached_tokens`
+    - DeepSeek：`prompt_cache_hit_tokens`
+    - Anthropic 原生：`cache_read_input_tokens`
+    - 少数网关把 `cached_tokens` 平铺在 usage 顶层
+    """
+    if not isinstance(usage, dict):
+        return 0
+
+    def _int(v: Any) -> int:
+        try:
+            return max(0, int(v))
+        except (TypeError, ValueError):
+            return 0
+
+    details = usage.get("prompt_tokens_details")
+    if isinstance(details, dict):
+        hit = _int(details.get("cached_tokens"))
+        if hit:
+            return hit
+
+    for key in ("prompt_cache_hit_tokens", "cache_read_input_tokens", "cached_tokens"):
+        hit = _int(usage.get(key))
+        if hit:
+            return hit
+    return 0
 
 
 @dataclass(slots=True)
@@ -446,6 +484,7 @@ class LLMClient:
             tokens_in=int(u.get("prompt_tokens") or 0),
             tokens_out=int(u.get("completion_tokens") or 0),
             total_tokens=int(u.get("total_tokens") or 0),
+            tokens_cache=extract_cache_tokens(u),
         )
         result = LLMResult(
             text=text,
@@ -573,6 +612,7 @@ class LLMClient:
                             tokens_in=int(u.get("prompt_tokens") or 0),
                             tokens_out=int(u.get("completion_tokens") or 0),
                             total_tokens=int(u.get("total_tokens") or 0),
+                            tokens_cache=extract_cache_tokens(u),
                         )
                     if chunk.get("model"):
                         resp_model = str(chunk["model"])
@@ -767,12 +807,23 @@ class LLMClient:
         data = await self._post("/images/generations", payload)
         latency_ms = int((time.monotonic() - started) * 1000)
 
-        items = data.get("data") or []
+        # 返回形状有两族：OpenAI/火山/Agnes 用 data[]，硅基流动的 Kolors 用
+        # images[]。只认 data 会把 Kolors 判成「响应缺少 data」，看着像模型坏了。
+        items = data.get("data") or data.get("images") or []
         if not isinstance(items, list) or not items:
-            raise LLMError(f"图片生成响应缺少 data：{str(data)[:300]}")
+            raise LLMError(f"图片生成响应缺少 data/images：{str(data)[:300]}")
 
-        urls = [str(it["url"]) for it in items if isinstance(it, dict) and it.get("url")]
-        b64 = [str(it["b64_json"]) for it in items if isinstance(it, dict) and it.get("b64_json")]
+        urls: list[str] = []
+        b64: list[str] = []
+        for it in items:
+            if isinstance(it, dict):
+                if it.get("url"):
+                    urls.append(str(it["url"]))
+                elif it.get("b64_json"):
+                    b64.append(str(it["b64_json"]))
+            elif isinstance(it, str):
+                # 少数服务直接回 URL 字符串数组
+                urls.append(it)
         revised = ""
         if isinstance(items[0], dict):
             revised = str(items[0].get("revised_prompt") or "")
@@ -785,6 +836,81 @@ class LLMClient:
             model=str(data.get("model") or payload["model"]),
             latency_ms=latency_ms,
             raw={k: v for k, v in data.items() if k != "data"},
+        )
+
+    async def rerank(
+        self,
+        query: str,
+        documents: list[str],
+        *,
+        model: str | None = None,
+        top_n: int | None = None,
+        timeout: float | None = 20.0,
+    ) -> RerankResult:
+        """重排序：给 query 与一堆候选文档逐对打分。
+
+        与向量检索的本质区别：向量是把 query 和文档**分别**编码再算距离，
+        rerank 是把两者**拼在一起**送进模型，能判断「这段话是否真的回答了
+        这个问题」，而不只是「用词像不像」。
+
+        响应形状各家有差异（results/relevance_score、data/score），这里抹平。
+        默认 20 秒超时是刻意的：精排只是检索链路上的一环，宁可退回向量分，
+        也不能把一次搜索拖成半分钟。
+        """
+        docs = [d for d in (documents or []) if (d or "").strip()]
+        if not query or not docs:
+            raise LLMError("rerank 需要非空的 query 与 documents")
+
+        payload: dict[str, Any] = {
+            "model": model or self.chat_model,
+            "query": query,
+            "documents": docs,
+        }
+        if top_n:
+            payload["top_n"] = max(1, min(int(top_n), len(docs)))
+
+        started = time.monotonic()
+        data = await self._post("/rerank", payload, timeout=timeout)
+        latency_ms = int((time.monotonic() - started) * 1000)
+
+        raw_items = data.get("results") or data.get("data") or []
+        if not isinstance(raw_items, list) or not raw_items:
+            raise LLMError(f"rerank 响应缺少 results：{str(data)[:300]}")
+
+        items: list[RerankItem] = []
+        for it in raw_items:
+            if not isinstance(it, dict):
+                continue
+            idx = it.get("index")
+            score = it.get("relevance_score", it.get("score"))
+            if idx is None or score is None:
+                continue
+            try:
+                items.append(RerankItem(index=int(idx), score=float(score)))
+            except (TypeError, ValueError):
+                continue
+        if not items:
+            raise LLMError(f"rerank 响应无法解析分数：{str(data)[:300]}")
+        items.sort(key=lambda x: x.score, reverse=True)
+
+        tokens_in = 0
+        meta = data.get("meta")
+        if isinstance(meta, dict):
+            billed = meta.get("tokens")
+            if isinstance(billed, dict):
+                tokens_in = int(billed.get("input_tokens") or 0)
+            elif isinstance(meta.get("billed_units"), dict):
+                # Cohere 按「搜索单元」计费，不是 token
+                tokens_in = int(meta["billed_units"].get("search_units") or 0)
+
+        logger.info(
+            "llm.rerank", model=payload["model"], docs=len(docs), latency_ms=latency_ms
+        )
+        return RerankResult(
+            items=items,
+            model=str(data.get("model") or payload["model"]),
+            latency_ms=latency_ms,
+            usage=LLMUsage(tokens_in=tokens_in, tokens_out=0, total_tokens=tokens_in),
         )
 
     async def create_video_task(
@@ -996,6 +1122,29 @@ def _fmt_video_prompt(
     if camera_fixed is not None:
         parts.append(f"--camerafixed {'true' if camera_fixed else 'false'}")
     return " ".join(p for p in parts if p)
+
+
+@dataclass(slots=True)
+class RerankItem:
+    """单条候选的精排结果。index 是它在传入 documents 里的下标。"""
+
+    index: int
+    score: float
+
+
+@dataclass(slots=True)
+class RerankResult:
+    items: list[RerankItem] = field(default_factory=list)
+    model: str = ""
+    latency_ms: int = 0
+    usage: LLMUsage = field(default_factory=LLMUsage)
+
+    def order(self) -> list[int]:
+        """按相关度降序的下标序列。"""
+        return [it.index for it in self.items]
+
+    def score_map(self) -> dict[int, float]:
+        return {it.index: it.score for it in self.items}
 
 
 @dataclass
