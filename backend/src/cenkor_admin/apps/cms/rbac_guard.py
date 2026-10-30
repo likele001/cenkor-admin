@@ -110,6 +110,27 @@ _PERM_RULES: tuple[tuple[str, str | None, str | None], ...] = (
     ("/ai/media", "media:upload", "media:upload"),
     # 渠道清单是纯只读枚举
     ("/ai/redistribute", "cms:entries:read", None),
+    # ---- 发布闭环：排期 / 效果回填 / 渠道分发 ----
+    # 看效果数据是内容岗的日常，与「看条目」同档；导入第三方数据、强制重算属写。
+    ("/ai/stats", "cms:entries:read", "cms:entries:write"),
+    # 渠道凭据（AppID / AppSecret / 封面素材）是系统对接配置，改它比改一篇文章严重，
+    # 抬到 ai:manage 一档：能配 AI 的人才能配渠道。
+    ("/ai/publish/channels", "cms:entries:read", "cms:ai:manage"),
+    # 真正把内容推到外部渠道 = 改变条目的对外可见状态，按条目写权限管。
+    ("/ai/publish", "cms:entries:read", "cms:entries:write"),
+    # ---- 知识库：上传、删除、重建索引都会改变 AI 的参考语料 ----
+    # 读（列表/详情/检索测试）跟看内容同档；写（上传/删除/重建）跟改内容同档。
+    # 没有单独设「知识库管理」权限码：能写内容的人本来就在决定团队看什么，
+    # 再切一刀只会让配置变复杂而不会真的收紧边界。
+    ("/ai/kb", "cms:entries:read", "cms:entries:write"),
+    # ---- 落地页 / 官网子站 ----
+    # 生成与发布都是对外可见的产出：读=能看内容，写=能上官网。
+    # 发布这条尤其要收紧，一个写错的落地页是可以直接投广告烧钱的。
+    ("/ai/landing", "cms:entries:read", "cms:entries:write"),
+    # ---- Agent 工作流编排 ----
+    # 工作流会成批起草内容、并可能挂发布步骤，等于「一次批准，多次产出」。
+    # 所以写权限跟条目写权限同档，不额外放宽。
+    ("/ai/workflow", "cms:entries:read", "cms:entries:write"),
     # 建模影响面分析（改字段/改类型前看会波及谁）：纯只读
     ("/ai/schema", "cms:content_types:read", None),
     # ---------------- MCP（外部 Agent 的写入口）----------------

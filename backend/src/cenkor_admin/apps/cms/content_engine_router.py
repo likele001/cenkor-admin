@@ -873,8 +873,8 @@ async def update_entry(
     if tag_ids is not None:
         await db.execute(
             models.ContentTag.__table__.delete().where(
-                models.ContentTag.c.content_id == entry_id,
-                models.ContentTag.c.content_type_id == obj.content_type_id,
+                models.ContentTag.__table__.c.content_id == entry_id,
+                models.ContentTag.__table__.c.content_type_id == obj.content_type_id,
             )
         )
         for tid in tag_ids:
@@ -1232,9 +1232,15 @@ async def review_entry(
         raise HTTPException(400, "action 必须是 approve / reject")
     old = entry.status
     if action == "approve":
-        entry.status = "published"
-        if not entry.published_at:
-            entry.published_at = datetime.now(UTC)
+        # 排期在未来 → 审核通过但先不上线，交给调度器到点发布。
+        # 这里必须落 approved 而不是 published：调度器只认 approved，
+        # 直接发布等于把运营设的排期吞掉，「审核 + 定时发布」就断成两截。
+        if entry.scheduled_at and entry.scheduled_at > datetime.now(UTC):
+            entry.status = "approved"
+        else:
+            entry.status = "published"
+            if not entry.published_at:
+                entry.published_at = datetime.now(UTC)
     else:
         entry.status = "draft"
     await _write_review_log(
@@ -1243,8 +1249,8 @@ async def review_entry(
     )
     await db.commit()
     await db.refresh(entry)
-    # [P2C] 审批通过 = 一次对外发布
-    if action == "approve":
+    # [P2C] 只有真正上线才算一次对外发布；排期等待中的不算
+    if action == "approve" and entry.status == "published":
         try:
             await dispatch("entry.published", entry=entry, db=db, user=current)
         except Exception as e:

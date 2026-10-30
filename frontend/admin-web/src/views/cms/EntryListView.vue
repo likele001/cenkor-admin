@@ -10,6 +10,8 @@ interface Entry {
   title: string; content: Record<string, any>; custom_fields: Record<string, any>
   category_id: number | null; status: string; author_id: number | null
   published_at: string | null; sort: number; view_count: number
+  /** 定时发布：UTC ISO；有值且未来 = 已通过审核、等排期 */
+  scheduled_at?: string | null
   created_at: string; updated_at: string
   /** AI 来源标记：null=人工；draft/rewrite/translate=AI 产出 */
   ai_origin: string | null
@@ -126,6 +128,15 @@ const AI_META: Record<string, { label: string; cls: string }> = {
   draft: { label: 'AI 起草', cls: 'bg-violet-50 text-violet-700 border border-violet-200' },
   rewrite: { label: 'AI 改写', cls: 'bg-sky-50 text-sky-700 border border-sky-200' },
   translate: { label: 'AI 翻译', cls: 'bg-teal-50 text-teal-700 border border-teal-200' },
+}
+
+/** 排期展示：库里存的是 UTC，列表必须按本地时区显示，否则差 8 小时。 */
+function fmtSchedule(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
@@ -268,6 +279,10 @@ onMounted(async () => {
               class="text-xs px-1.5 py-0.5 rounded"
               :class="STATUS_META[e.status]?.cls || 'bg-ink-100 text-ink-500'"
             >{{ STATUS_META[e.status]?.label || e.status }}</span>
+            <!-- 审核通过但排期在未来：让审核的人一眼看到「不是没生效，是等到点才发」 -->
+            <div v-if="e.status === 'approved' && e.scheduled_at" class="mt-0.5 text-[11px] text-ink-400">
+              ⏰ {{ fmtSchedule(e.scheduled_at) }} 自动发布
+            </div>
           </td>
           <td class="py-2 px-2 text-ink-500">{{ e.view_count }}</td>
           <td class="py-2 px-2 text-ink-500 text-xs">{{ e.updated_at?.slice(0, 16) }}</td>

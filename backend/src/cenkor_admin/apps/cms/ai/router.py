@@ -16,10 +16,12 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,14 +35,20 @@ from cenkor_admin.apps.cms.ai.admin_router import router as admin_router
 from cenkor_admin.apps.cms.ai.prompt_router import router as prompt_router
 from cenkor_admin.apps.cms.ai.batch_router import router as batch_router
 from cenkor_admin.apps.cms.ai.memory_router import router as memory_router
+from cenkor_admin.apps.cms.publish_router import router as publish_router
+from cenkor_admin.apps.cms.stats_router import router as stats_router
+from cenkor_admin.apps.cms.knowledge_router import router as knowledge_router
+from cenkor_admin.apps.cms.ai.landing_router import router as landing_router
+from cenkor_admin.apps.cms.ai.workflow_router import router as workflow_router
 from cenkor_admin.apps.cms.ai.dashboard import router as dashboard_router
 from cenkor_admin.apps.cms.ai.content_health import entry_health, site_health
+from cenkor_admin.apps.cms.ai.health_report import render_html, render_markdown
 from cenkor_admin.apps.cms.ai.embedding import vectorize_entry, vectorize_pending
 from cenkor_admin.apps.cms.ai.internal_link import suggest_links
 from cenkor_admin.apps.cms.ai.redistribute import CHANNELS, channels_meta, redistribute_entry
 from cenkor_admin.apps.cms.ai.schema_impact import content_type_impact, field_impact
 from cenkor_admin.apps.cms.ai.search import semantic_search, similar_entries
-from cenkor_admin.apps.cms.models import Entry
+from cenkor_admin.apps.cms.models import Entry, SiteConfig
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.llm import LLMError, LLMNotConfiguredError, LLMUnsupportedError
 from cenkor_admin.core.site_scope import current_site_id
@@ -56,6 +64,12 @@ router.include_router(prompt_router)
 router.include_router(batch_router)
 # 记忆层：站点记忆（硬事实/软风格）+ 内容记忆（已发布内容索引）
 router.include_router(memory_router)
+router.include_router(publish_router)
+router.include_router(stats_router)
+router.include_router(knowledge_router)
+router.include_router(landing_router)
+# Agent 工作流编排：拖拽画布定义的流水线，执行引擎在 workflow_engine
+router.include_router(workflow_router)
 # 驾驶舱放最后：它要在所有能力端点注册完之后才能枚举 registry
 router.include_router(dashboard_router)
 
@@ -403,12 +417,15 @@ async def health_report(
     db: AsyncSession = Depends(get_db),
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """七项体检一次算完：过期 / 死链 / 过薄 / SEO 短板 / 孤岛 / 缺图 / 陈旧。
+    """十二项体检一次算完，分结构 / SEO / 效果三个维度。
 
     **零 LLM 调用** —— 纯 SQL + 正则 + 内存分析，AI 未配置也能用。
 
-    分数口径：每条 100 分起扣，站点分 = 各条均值。扫描全站，
-    `limit` 只影响明细返回条数（否则分数会随分页漂移，同一站点两次刷新不一致）。
+    分数口径：每条 100 分起扣，站点分 = 各条均值；三个维度各自再有 100 分底的
+    维度分（只看一个总分时，效果差会被结构分糊住）。
+
+    扫描全站，`limit` 只影响明细返回条数（否则分数会随分页漂移，
+    同一站点两次刷新不一致）。效果维度需要埋点已有数据，否则 `perf_ready=false`。
     """
     sid = current_site_id() or 1
     return await site_health(
@@ -419,6 +436,70 @@ async def health_report(
         stale_days=stale_days,
         thin_chars=thin_chars,
     )
+
+
+@router.get("/health/export", summary="内容体检：导出可交付报告（HTML / Markdown）")
+async def health_export(
+    fmt: str = Query(default="html", alias="format", pattern="^(html|md|markdown)$",
+                     description="html 自带样式可直接发客户；md 便于贴进文档"),
+    include_drafts: bool = Query(default=False, description="是否把草稿也纳入体检"),
+    stale_days: int = Query(default=365, ge=30, le=3650, description="多少天未更新算陈旧"),
+    thin_chars: int = Query(default=300, ge=50, le=5000, description="正文低于多少字算过薄"),
+    inline: bool = Query(default=False, description="true 时直接在浏览器打开，不下载"),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> Response:
+    """把体检结果渲染成一份可以直接发出去的报告。
+
+    与 `/health/report` 是**同一套计算**，只换输出形态：
+    面板是给自己天天看的（密度高、可点进去），报告是发给客户/老板/外包的
+    （口径、阈值、改法都要自己说清楚）。
+
+    明细固定取 500 条 —— 报告不该比面板少东西。
+    """
+    sid = current_site_id() or 1
+    report = await site_health(
+        db,
+        sid,
+        include_drafts=include_drafts,
+        limit=500,
+        stale_days=stale_days,
+        thin_chars=thin_chars,
+    )
+
+    rows = (
+        await db.execute(
+            select(SiteConfig.key, SiteConfig.value).where(SiteConfig.key.like("brand.%"))
+        )
+    ).all()
+    meta = {k: str(v) for k, v in rows if isinstance(v, str)}
+    site_name = meta.get("brand.name") or meta.get("brand.name_en") or ""
+    site_url = meta.get("brand.domain") or ""
+
+    stamp = datetime.now().strftime("%Y%m%d")
+    is_md = fmt in ("md", "markdown")
+
+    if is_md:
+        body = render_markdown(report, site_name=site_name)
+        media = "text/markdown; charset=utf-8"
+        ext = "md"
+    else:
+        body = render_html(report, site_name=site_name, site_url=site_url)
+        media = "text/html; charset=utf-8"
+        ext = "html"
+
+    ascii_name = f"content-health-report-{stamp}.{ext}"
+    cn_name = quote(f"内容体检报告-{site_name or 'site'}-{stamp}.{ext}")
+    disposition = "inline" if inline else "attachment"
+    # 中文文件名走 RFC 5987（filename*），老的 filename= 只留 ASCII 兜底
+    headers = {
+        "Content-Disposition": (
+            disposition
+            + '; filename="' + ascii_name + '"'
+            + "; filename*=UTF-8''" + cn_name
+        )
+    }
+    return Response(content=body, media_type=media, headers=headers)
 
 
 @router.get("/health/entries/{entry_id}", summary="内容健康度体检：单条明细")
@@ -954,9 +1035,19 @@ async def ai_topic_gaps(
         if exists is None:
             raise HTTPException(404, f"内容类型不存在: {content_type_key}")
     try:
-        return await topic_gap.analyze(
+        result = await topic_gap.analyze(
             db, content_type_key=content_type_key, limit=limit, created_by=user.id
         )
+        # 效果回填：给每个缺口附上同类主题的历史表现。
+        # 放在 AI 调用之后而不是塞进提示词 —— 数据作为证据给人看，
+        # 不要让它变成模型编造因果的素材。注入失败只丢证据，不影响选题结果。
+        try:
+            from cenkor_admin.apps.cms import stats as cms_stats
+
+            result = await cms_stats.enrich_topic_gaps(db, result)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("cms.topic.evidence_failed", error=str(exc))
+        return result
     except Exception as exc:
         await db.rollback()
         raise _map_llm_error(exc) from exc

@@ -27,11 +27,14 @@ async def scheduler_tick() -> dict[str, int]:
     published: int = 0
     expired: int = 0
     async with AsyncSessionLocal() as db:
-        # 1) 到期发布：非 published + scheduled_at <= now
+        # 1) 到期发布：approved + scheduled_at <= now（待审内容不会自动发布）
         due_ids = (await db.execute(
             select(models.Entry.id).where(
                 models.Entry.deleted_at.is_(None),
-                models.Entry.status != "published",
+                # 只有审核通过（approved）的才允许到点自动发布。
+                # 原来写的是「status != published」，意味着 pending_review 的内容
+                # 只要设了排期就会绕过审核直接上线 —— 那审核就等于不存在。
+                models.Entry.status == "approved",
                 models.Entry.scheduled_at.is_not(None),
                 models.Entry.scheduled_at <= now,
             )

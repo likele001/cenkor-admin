@@ -914,3 +914,9 @@ class EntryPreview(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+# ------------------------------------------------------------
+# 埋点与分发模型（实体定义在独立文件，此处 import 只为注册进 Base.metadata）
+# ------------------------------------------------------------
+from cenkor_admin.apps.cms import analytics_models as _analytics_models  # noqa: E402,F401
+from cenkor_admin.apps.cms import knowledge_models as _knowledge_models  # noqa: E402,F401

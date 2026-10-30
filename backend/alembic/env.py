@@ -62,6 +62,11 @@ from cenkor_admin.core.schema_filters import (
     make_include_object,
     scope_from_env,
 )
+# DDL 幂等层：库结构与 alembic_version 不同步时（历史上手工补过 DDL，
+# 加上挂载点被 rebase_closed_chain 反复顺延），重跑迁移会撞
+# DuplicateColumn/DuplicateTable。装上这层后「已存在就跳过」，
+# 版本号漂移到哪都不炸。详见 core/migration_idempotent.py。
+from cenkor_admin.core.migration_idempotent import install_idempotent_ops
 
 
 def run_migrations_offline() -> None:
@@ -98,6 +103,8 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             include_object=make_include_object(view_names, scope_from_env()),
         )
+        # 幂等层：必须在 configure 之后、run_migrations 之前装
+        install_idempotent_ops(connection)
         with context.begin_transaction():
             context.run_migrations()
 

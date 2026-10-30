@@ -33,6 +33,9 @@ class Form(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     fields: Mapped[list[Any]] = mapped_column(json_column(), default=list)
     success_message: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 留资闭环：提交后是否落一条 CRM 线索，以及字段映射 {lead_field: form_field_key}
+    create_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    lead_mapping: Mapped[dict[str, Any]] = mapped_column(json_column(), default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

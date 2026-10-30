@@ -40,14 +40,17 @@ async def lifespan(app: FastAPI):
     # 安装 App 时拷贝的迁移文件会在下次重启时自动生效
     # 用 "heads" 而非 "head"：公开链与商业应用闭源链靠挂载点串成单 head，
     # 万一挂载点漏顺延出现双 head，heads 仍能各升各的；"head" 会抛 MultipleHeads 整条失败。
+    #
+    # 但直接 upgrade 有个坑：库里结构可能已经比版本号新（历史上手工补过 DDL，
+    # 见 core/migration_drift.py 的背景）。此时 upgrade 会重跑那一整串迁移，
+    # 撞 DuplicateColumn/DuplicateTable，启动日志被刷满 error。
+    # 所以先做一次全量图漂移检测：期望对象全在库里 → stamp（版本号落后），
+    # 有缺失 → 正常 upgrade（结构真落后）。
     try:
-        from alembic.config import Config
+        from cenkor_admin.core.migration_runner import run_migrations_with_drift_guard
 
-        from alembic import command
-
-        _alembic_cfg = Config(Path(__file__).resolve().parent.parent.parent / "alembic.ini")
-        command.upgrade(_alembic_cfg, "heads")
-        log.info("migration.ok")
+        _mig_result = run_migrations_with_drift_guard()
+        log.info("migration.ok", result=_mig_result)
     except Exception as e:
         # 迁移失败意味着数据表可能缺失：服务虽能起来，但接口会大面积报错，
         # 必须显式告警（error 级，而非静默的 warning），以便日志告警规则能捕获。

@@ -51,6 +51,10 @@ api_v1_router.include_router(forms_public_router, prefix="/public", tags=["forms
 from cenkor_admin.apps.builder.public_router import router as builder_public_router
 
 api_v1_router.include_router(builder_public_router, prefix="/public", tags=["builder"])
+# 埋点采集：公开接口，勿加鉴权依赖（访客浏览器直接上报）
+from cenkor_admin.apps.cms.tracking_router import router as cms_tracking_router
+
+api_v1_router.include_router(cms_tracking_router, prefix="/public", tags=["tracking"])
 
 # ============================================================
 # 鉴权

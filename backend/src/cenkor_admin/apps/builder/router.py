@@ -44,7 +44,7 @@ async def update_page(page_id: int, body: dict, db: AsyncSession = Depends(get_d
     obj = await db.get(Page, page_id)
     if not obj:
         raise HTTPException(404, "Page not found")
-    for k in ("title", "schema", "status"):
+    for k in ("title", "schema", "status", "seo", "nav"):
         if k in body:
             setattr(obj, k, body[k])
     await db.commit()
@@ -76,6 +76,8 @@ async def delete_page(page_id: int, db: AsyncSession = Depends(get_db)):
 def _page_dict(p: Page) -> dict:
     return {
         "id": p.id, "key": p.key, "title": p.title, "schema": p.schema or [],
+        "seo": p.seo or {}, "kind": p.kind or "page", "site_key": p.site_key,
+        "nav": p.nav or [],
         "status": p.status,
         "published_at": p.published_at.isoformat() if p.published_at else None,
         "created_at": p.created_at.isoformat() if p.created_at else None,

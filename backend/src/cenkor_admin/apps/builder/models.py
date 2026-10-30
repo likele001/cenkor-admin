@@ -23,6 +23,13 @@ class Page(Base):
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     schema: Mapped[list[Any]] = mapped_column(json_column(), default=list)
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    # 落地页 / 子站扩展：seo 存 head 元信息，kind 区分独立页与子站内页，
+    # site_key 把同一子站的多页归到一起，nav 存该子站的导航（子站内共用）
+    seo: Mapped[dict[str, Any]] = mapped_column(json_column(), default=dict)
+    kind: Mapped[str] = mapped_column(String(20), default="page", index=True)
+    site_key: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)
+    nav: Mapped[list[Any]] = mapped_column(json_column(), default=list)
+    ai_generation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

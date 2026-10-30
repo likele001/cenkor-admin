@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, "feat/**"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: "3.11"
@@ -126,7 +127,16 @@ jobs:
           export S3_ACCESS_KEY="minio"
           export S3_SECRET_KEY="minio12345"
           export PYTHONPATH=src
-          python -m pytest tests/ -v --tb=short --cov=cenkor_admin --cov-report=xml --cov-report=term
+          # 只跑单元测试；集成测试（test_auth/cms/content_engine/notification/portal/rbac）
+          # 依赖真 uvicorn:8002 + seed 数据（见 tests/conftest.py），留 E2E 环境跑，不进轻量 CI 门禁
+          python -m pytest tests/ \
+            --ignore=tests/test_auth.py \
+            --ignore=tests/test_cms.py \
+            --ignore=tests/test_content_engine.py \
+            --ignore=tests/test_notification.py \
+            --ignore=tests/test_portal.py \
+            --ignore=tests/test_rbac.py \
+            -v --tb=short --cov=cenkor_admin --cov-report=xml --cov-report=term
 
   frontend:
     name: Frontend (Vue)

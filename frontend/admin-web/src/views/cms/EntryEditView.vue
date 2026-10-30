@@ -41,7 +41,17 @@ const form = ref({
   custom_fields: {} as Record<string, any>,
   category_id: null as number | null, status: 'draft', sort: 0,
   tag_ids: [] as number[],
+  // 定时发布时间：datetime-local 的字符串，保存时转成带时区的 ISO
+  scheduled_at: '',
 })
+
+// 分发渠道选择弹窗
+const showPublish = ref(false)
+const publishChannels = ref<{ key: string; name: string; enabled: boolean }[]>([])
+const publishPicked = ref<string[]>([])
+const publishing = ref(false)
+const publishResults = ref<{ channel: string; ok: boolean; error: string | null; external_url: string | null; payload?: Record<string, any> }[]>([])
+
 const activeGroup = ref<number | null>(null)
 const saving = ref(false)
 const error = ref('')
@@ -312,6 +322,7 @@ function applyEntry(data: any) {
     status: data.status || 'draft',
     sort: data.sort || 0,
     tag_ids: (data.tag_ids as number[]) || [],
+    scheduled_at: toLocalInput(data.scheduled_at),
   }
   entry.value = data
 }
@@ -355,6 +366,53 @@ async function loadCtAndOptions() {
   if (groups.value.length) activeGroup.value = groups.value[0].id
 }
 
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+// datetime-local 给的是本地时间字符串，直接发后端会被当成 UTC，差 8 小时。
+function toIso(local: string): string {
+  const d = new Date(local)
+  return Number.isNaN(d.getTime()) ? local : d.toISOString()
+}
+
+async function openPublish() {
+  showPublish.value = true
+  publishResults.value = []
+  if (!publishChannels.value.length) {
+    const { data } = await api.get('/api/v1/cms/ai/publish/channels')
+    publishChannels.value = (data.items || []).map((c: any) => ({
+      key: c.key, name: c.name, enabled: c.enabled,
+    }))
+    publishPicked.value = publishChannels.value.filter((c) => c.enabled).map((c) => c.key)
+  }
+}
+
+function togglePublishChannel(key: string) {
+  const i = publishPicked.value.indexOf(key)
+  if (i >= 0) publishPicked.value.splice(i, 1)
+  else publishPicked.value.push(key)
+}
+
+async function doPublish() {
+  if (!entry.value?.id || !publishPicked.value.length) return
+  publishing.value = true
+  try {
+    const { data } = await api.post(`/api/v1/cms/ai/entries/${entry.value.id}/publish`, {
+      channels: publishPicked.value,
+    })
+    publishResults.value = data.results || []
+  } catch (e: any) {
+    publishResults.value = [{ channel: '—', ok: false, error: e?.message || '发布失败', external_url: null }]
+  } finally {
+    publishing.value = false
+  }
+}
+
 async function save() {
   saving.value = true
   error.value = ''
@@ -368,6 +426,7 @@ async function save() {
       status: form.value.status,
       sort: form.value.sort,
       tag_ids: form.value.tag_ids,
+      scheduled_at: form.value.scheduled_at ? toIso(form.value.scheduled_at) : null,
     }
     let savedId: number | null = null
     if (isNew.value) {
@@ -418,7 +477,7 @@ watch(selectedCtKey, async () => {
   if (isNew.value) {
     form.value = {
       title: '', slug: '', content: {}, custom_fields: {},
-      category_id: null, status: 'draft', sort: 0, tag_ids: [],
+      category_id: null, status: 'draft', sort: 0, tag_ids: [], scheduled_at: '',
     }
     // 重新初始化 custom_fields（loadCtAndOptions 已加载 ct）
     if (ct.value) {
@@ -637,8 +696,18 @@ onMounted(async () => {
         </div>
 
         <!-- 发布工作流（M2·P1）+ 暂存预览（M4·P3） -->
-        <div v-if="!isNew && (form.status === 'draft' || form.status === 'approved' || form.status === 'pending_review')" class="card space-y-2">
+        <div v-if="!isNew" class="card space-y-2">
           <h3 class="font-medium text-sm">🚦 发布工作流</h3>
+          <div v-if="form.status !== 'published'" class="space-y-1">
+            <label class="text-xs text-ink-500">定时发布时间（可选）</label>
+            <input v-model="form.scheduled_at" type="datetime-local" class="input w-full text-sm" />
+            <div class="text-[11px] text-ink-400">
+              到点自动上线。仅「已通过」状态生效 —— 待审核的内容不会被自动发布，审核这道关还得人过。
+            </div>
+          </div>
+          <button v-if="form.status === 'published'" class="btn-ghost text-sm text-emerald-600 w-full" @click="openPublish">
+            🚀 分发到渠道
+          </button>
           <button class="btn-ghost text-sm text-blue-600 w-full" @click="previewEntry">🖥 暂存预览（未发布）</button>
           <div v-if="form.status === 'draft' || form.status === 'approved'" class="flex gap-2">
             <button class="btn-ghost text-sm text-purple-600 w-full" @click="submitReview">提交审核</button>
@@ -649,6 +718,43 @@ onMounted(async () => {
           </div>
           <div class="text-xs text-ink-400">
             当前状态：{{ { draft: '草稿', published: '已发布', archived: '已归档', pending_review: '待审核', approved: '已通过' }[form.status] || form.status }}
+          </div>
+        </div>
+
+        <div v-if="showPublish" class="card space-y-3 border-emerald-200 bg-emerald-50/40">
+          <div class="flex items-center justify-between">
+            <h3 class="font-medium text-sm">🚀 分发到渠道</h3>
+            <button class="text-ink-400 hover:text-ink-600" @click="showPublish = false">✕</button>
+          </div>
+          <div class="space-y-1.5">
+            <label
+              v-for="c in publishChannels"
+              :key="c.key"
+              class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-white/60"
+            >
+              <input
+                type="checkbox"
+                :checked="publishPicked.includes(c.key)"
+                @change="togglePublishChannel(c.key)"
+              />
+              <span class="text-ink-800">{{ c.name }}</span>
+              <span v-if="!c.enabled" class="text-[11px] text-ink-400">（未在渠道配置里启用，本次仍会尝试）</span>
+            </label>
+          </div>
+          <button class="btn-primary text-sm w-full" :disabled="publishing || !publishPicked.length" @click="doPublish">
+            {{ publishing ? '发布中…' : `发布到 ${publishPicked.length} 个渠道` }}
+          </button>
+          <div v-if="publishResults.length" class="space-y-1.5 border-t border-emerald-200 pt-2">
+            <div v-for="r in publishResults" :key="r.channel" class="text-[12px]">
+              <span :class="r.ok ? 'text-emerald-700' : 'text-red-600'">
+                {{ r.ok ? '✓' : '✕' }} {{ r.channel }}
+              </span>
+              <span v-if="r.error" class="ml-1 text-ink-500">{{ r.error }}</span>
+              <a v-else-if="r.external_url" :href="r.external_url" target="_blank" class="ml-1 text-blue-600 hover:underline">查看</a>
+            </div>
+            <div v-if="publishResults.some((r) => r.payload?.html)" class="text-[11px] text-ink-500">
+              导出渠道已生成 HTML，到「分发渠道」页的任务列表里可以取用。
+            </div>
           </div>
         </div>
 

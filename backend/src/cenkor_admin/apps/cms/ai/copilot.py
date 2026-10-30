@@ -635,9 +635,14 @@ async def draft_entry(
         for f in fields
     ]
 
+    # 知识库参考：先按 brief 召回相关段落。没有命中时 kb_text 为空，
+    # 提示词与接入知识库之前完全一致
+    kb_text, kb_sources = await _kb_reference(session, brief)
+
     user_msg = (
         f"内容类型：{ct.name}（key={ct.key}）\n"
         f"字段定义：\n{json.dumps(field_spec, ensure_ascii=False, indent=2)}\n\n"
+        f"{_kb_block(kb_text)}"
         f"素材/大纲：\n{(brief or '').strip()[:6000]}\n\n"
         f"（正文语言：{lang}）"
     )
@@ -658,7 +663,10 @@ async def draft_entry(
             kind=_KIND_DRAFT,
             target=f"content_type:{content_type_id}",
             result=None,
-            params={"brief_digest": _digest(brief)},
+            params={
+                "brief_digest": _digest(brief),
+                "kb_docs": [x["doc_id"] for x in kb_sources],
+            },
             status="failed",
             error=str(exc),
             created_by=created_by,
@@ -708,6 +716,9 @@ async def draft_entry(
         "custom_fields": custom,
         "seo": seo,
         "dropped_fields": dropped,
+        # 用了哪些知识库资料。前端据此显示「参考了 N 份资料」并允许点开原文 ——
+        # 不告诉用户引用了什么，就没法验证稿子里的数字是从哪来的
+        "kb_sources": kb_sources,
         "status": "draft",  # AI 产出永远是草稿
         # 供 create_entry_from_draft 写入条目溯源；不在 API 响应里外露（下划线前缀
         # 的 key 会被路由层过滤），避免前端把它当业务字段回传
@@ -800,8 +811,10 @@ async def draft_entry_stream(
     ]
 
     # 阶段一不带字段定义：正文用不上，省 prompt 也快出第一句
+    kb_text, kb_sources = await _kb_reference(session, brief)
     user_msg = (
         f"内容类型：{ct.name}（key={ct.key}）\n"
+        f"{_kb_block(kb_text)}"
         f"素材/大纲：\n{(brief or '').strip()[:6000]}\n\n"
         f"（正文语言：{lang}）"
     )
@@ -841,7 +854,7 @@ async def draft_entry_stream(
                 slug = ms.group(1).strip()
                 body_start = sent = ms.end()
                 header_done = True
-                yield ("meta", {"title": title, "slug": slug})
+                yield ("meta", {"title": title, "slug": slug, "kb_sources": kb_sources})
             if header_done and len(text) > sent:
                 seg = text[sent:]
                 if not emitted_body:
@@ -922,6 +935,7 @@ async def draft_entry_stream(
                 "dropped_fields": dropped,
                 "title": title[:60],
                 "stream": True,
+                "kb_docs": [x["doc_id"] for x in kb_sources],
                 **({"extra_error": extra_error} if extra_error else {}),
             },
             created_by=created_by,
@@ -938,6 +952,7 @@ async def draft_entry_stream(
             "custom_fields": custom,
             "seo": seo,
             "dropped_fields": dropped,
+            "kb_sources": kb_sources,
             "status": "draft",
             "_generation_id": generation_id,
             "_meta": gen_result.meta(),
@@ -1191,6 +1206,58 @@ def _spawn_bg_task(coro) -> None:
     t = asyncio.create_task(coro)
     _bg_tasks.add(t)
     t.add_done_callback(_bg_tasks.discard)
+
+
+async def _kb_reference(
+    session: AsyncSession,
+    query: str,
+    *,
+    limit: int = 4,
+    max_chars: int = 4000,
+) -> tuple[str, list[dict[str, Any]]]:
+    """从知识库捞参考资料，返回 (拼好的文本块, 出处列表)。
+
+    函数内 import 是必需的，不是洁癖：knowledge → ingest → copilot 是一条回边，
+    顶层 import 会在模块初始化阶段撞上循环导入。
+
+    没有命中时返回 ("", [])，调用方据此保持原提示词 —— 知识库为空
+    不该让起草变差，也不该让 prompt 里多出一段空标题。
+    """
+    text = (query or "").strip()
+    if not text:
+        return "", []
+
+    from cenkor_admin.apps.cms import knowledge
+    from cenkor_admin.core.site_scope import current_site_id
+
+    try:
+        return await knowledge.context_for_prompt(
+            session,
+            text[:500],
+            site_id=current_site_id() or 1,
+            limit=limit,
+            max_chars=max_chars,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cms.draft.kb_failed", error=str(exc))
+        return "", []
+
+
+def _kb_block(block: str) -> str:
+    """包成提示词片段。
+
+    措辞刻意保守：「资料里没有的不许编造」而不是「请充分利用资料」。
+    后一种说法会让模型把不相干的段落硬接上去凑出因果关系 ——
+    有了 RAG 之后最常见的质量问题就是这个。
+    """
+    if not block.strip():
+        return ""
+    return (
+        "【企业内部资料】\n"
+        "以下是该企业自己的资料摘录。涉及事实、参数、流程、数字、名称时"
+        "优先采用这里的内容；资料里没有的不许编造，写不出就留空或标「（待补充）」。\n\n"
+        f"{block}\n\n"
+    )
 
 
 def _content_excerpt(content: dict[str, Any] | None, limit: int = 1200) -> str:

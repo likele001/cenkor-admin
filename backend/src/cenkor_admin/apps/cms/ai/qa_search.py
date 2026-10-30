@@ -66,12 +66,50 @@ _ASK_SYSTEM = """你是 Cenkor 官网的内容助理，回答访客提问。
 """
 
 
+async def _kb_hits(session: AsyncSession, question: str, *, limit: int = 3) -> list[dict[str, Any]]:
+    """取知识库命中，转成和站内片段同构的形态。
+
+    为什么单独一路而不是并进 rag.retrieve：
+    两路的分数量纲不同（站内是混合分，知识库是纯余弦），混在一起排序会让
+    「谁排前面」变成一个没法解释的结果。分批追加、编号连续，至少引用是可追溯的。
+
+    函数内 import：knowledge → ingest → copilot，而本模块也 import copilot，
+    顶层导入会撞循环。
+    """
+    from cenkor_admin.apps.cms import knowledge
+    from cenkor_admin.core.site_scope import current_site_id
+
+    try:
+        rows = await knowledge.search(
+            session, question, site_id=current_site_id() or 1, limit=limit
+        )
+    except Exception as exc:  # noqa: BLE001
+        # 知识库挂了不该让站内问答整体不可用
+        logger.warning("cms.qa.kb_failed", error=str(exc))
+        return []
+
+    return [
+        {
+            "title": r["doc_title"],
+            "heading_path": r["heading_path"],
+            "text": r["text"],
+            "score": r["score"],
+            "source_url": "",
+            "source": "kb",
+        }
+        for r in rows
+    ]
+
+
 def _build_context(hits: list[dict[str, Any]]) -> str:
     """把 chunk 列表拼成带编号的资料块。"""
     lines: list[str] = []
     for i, h in enumerate(hits, start=1):
         heading = h.get("heading_path") or h.get("title") or ""
-        lines.append(f"[{i}] 《{h.get('title') or '未命名'}》 · {heading}")
+        # 标出来源，模型才不会把「内部资料」当成「站内文章」来引用；
+        # 访客侧也据此区分可点原页 vs 无公开链接
+        tag = "企业知识库" if h.get("source") == "kb" else "站内内容"
+        lines.append(f"[{i}]（{tag}）《{h.get('title') or '未命名'}》 · {heading}")
         lines.append(str(h.get("text") or "").strip())
         lines.append("")
     return "\n".join(lines).strip()
@@ -125,7 +163,13 @@ async def ask(
         candidates=12,
         include_drafts=include_drafts,
     )
-    hits = retrieved.get("hits") or []
+    hits = list(retrieved.get("hits") or [])
+
+    # 站内没有命中不等于答不上来：参数、流程、规格这类事实往往只在知识库里。
+    # 所以在短路之前先补一路检索，两路都空才判「没有相关内容」。
+    if len(hits) < top_k:
+        hits.extend(await _kb_hits(session, q, limit=max(1, top_k - len(hits))))
+
     if not hits:
         warning = retrieved.get("warning")
         reason = warning or "站内没有检索到相关内容"
@@ -186,6 +230,9 @@ async def ask(
             "source_url": h.get("source_url"),
             "snippet": (h.get("text") or "")[:300],
             "score": round(float(h.get("score") or 0.0), 4),
+            # 前端据此区分「能点进去的站内文章」与「只能看摘录的内部资料」；
+            # 降级路径早就带了这个字段，成功路径漏了会让同一份数据结构有两种形状
+            "source": h.get("source") or "entry",
         }
         for i, h in enumerate(hits)
         if (i + 1) in used
@@ -251,6 +298,7 @@ def _degraded(question: str, hits: list[dict[str, Any]], warning: str) -> dict[s
                 "source_url": h.get("source_url"),
                 "snippet": (h.get("text") or "")[:300],
                 "score": round(float(h.get("score") or 0.0), 4),
+                "source": h.get("source") or "entry",
             }
             for i, h in enumerate(hits)
         ],
