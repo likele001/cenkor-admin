@@ -26,6 +26,8 @@ export interface MetaTag {
   name?: string
   property?: string
   content: string
+  /** 兼容 unhead Meta 的扩展属性（data-* 等），vue-tsc 才收得下 */
+  [key: string]: string | undefined
 }
 
 /**
