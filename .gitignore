@@ -167,3 +167,15 @@ backend/alembic/versions/ext/20260924_0025_cloud.py
 backend/alembic/versions/ext/20260925_0027_workflow.py
 backend/alembic/versions/ext/20261020_0035_app_publish.py
 backend/alembic/versions/ext/20261027_0100_app_schema.py
+
+# ===== 一次性运维与迁移补丁脚本（2026-10-30 新增）=====
+# 这些是「跑一次就完」的临时脚本：直接改线上数据库、手工改服务商配置、
+# 甚至 kill 进程重启。它们不是代码，是操作记录 —— 入库只会让后来的人
+# 以为必须执行。结构变更以 backend/migrations/*.sql 为准。
+# 特别注意 restart_8002.py：手工启停 Python 进程违反宝塔托管约定，绝不入库。
+backend/restart_8002.py
+backend/bind_video_capability.py
+backend/fix_vision_capability.py
+backend/migrate_media_urls.py
+backend/migrations/patch_*.py
+backend/migrations/rebuild_vectors.py
