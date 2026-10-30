@@ -31,6 +31,12 @@ declare -A img=(
   [developer-web]=cenkor-admin-web-developer
 )
 for fe in admin-web portal-web developer-web; do
+  # developer-web 是闭源商业资产（.gitignore 显式排除），开源仓库/CI 的干净 checkout 里不存在；
+  # 存在才构建，否则 COPY 该目录会直接让构建失败。
+  if [ ! -d "frontend/$fe" ]; then
+    echo "[cenkor] 跳过 ${fe}（目录不存在：闭源商业资产，未随仓库分发）"
+    continue
+  fi
   docker buildx build --platform "$PLAT" \
     -f docker/fullstack/frontend.Dockerfile --build-arg FRONTEND="$fe" \
     $(tag "${img[$fe]}") $PUSH_FLAG .

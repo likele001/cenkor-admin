@@ -26,9 +26,15 @@ npm install --silent 2>/dev/null || npm install
 VITE_API_BASE_URL="$API_BASE" npm run build
 
 info "构建 developer-web..."
-cd ../developer-web
-npm install --silent 2>/dev/null || npm install
-VITE_API_BASE_URL="$API_BASE" npm run build
+# developer-web 是闭源商业资产（.gitignore 显式排除），开源仓库/CI 的干净 checkout 里不存在，
+# 存在才构建：本地私有部署照样出包，CI 环境自动跳过，避免 cd 失败导致整个打包中断。
+if [ -d ../developer-web ]; then
+  cd ../developer-web
+  npm install --silent 2>/dev/null || npm install
+  VITE_API_BASE_URL="$API_BASE" npm run build
+else
+  info "跳过 developer-web（闭源商业资产，未随仓库分发）"
+fi
 
 info "构建 landing-web（品牌落地页）..."
 cd ../landing-web
