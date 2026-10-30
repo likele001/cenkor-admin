@@ -1,5 +1,8 @@
 # 数据库迁移：两条链、一个挂载点
 
+> ⚠️ **本文为 2026-10-27 的历史记录与事故复盘，部分结论已过时**（当时的 head 是 `0029_product_commerce`，现在完整 head 是 `20261027_0100_app_schema`）。当前权威规范见 [database-migrations.md](./database-migrations.md)。
+
+
 > 适用：cenkor-admin（hub）后端。开源基础框架与商业应用共用同一套 Alembic 迁移目录，
 > 但两张迁移图必须**各自保持单 head，再通过挂载点串成一条**。
 > 违反这条规则曾导致 2026-10-26 门户应用中心整页 500，见 §6。
