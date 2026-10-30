@@ -38,6 +38,13 @@ from cenkor_admin.core.secrets import (
     secret_hint,
 )
 
+# rerank 连通性测试样本：一对「该命中 / 不该命中」。
+# 只验证能不能调通看不出效果，看顺序才知道模型是不是真在判断语义。
+_RERANK_PROBE: tuple[str, ...] = (
+    "QV-100 球阀采用三重密封结构，泄漏率低于国家标准 GB/T 13927",
+    "今天天气晴朗，适合户外活动",
+)
+
 router = APIRouter(tags=["cms-ai-admin"])
 
 _READ = Depends(require_permission("cms:ai:read"))
@@ -699,6 +706,18 @@ async def test_capability(
                 "has_b64": bool(r.b64),
                 "model": r.model,
                 "revised_prompt": r.revised_prompt[:120],
+            }
+        elif capability == "rerank":
+            # 用一对「该命中 / 不该命中」的样本测：只验证能不能调通看不出效果，
+            # 看顺序才知道模型是不是真在判断语义。
+            docs = list(_RERANK_PROBE)
+            r = await client.rerank("阀门密封性如何", docs, top_n=len(docs))
+            if not r.items:
+                raise LLMError("返回里没有任何分数")
+            result = {
+                "order": r.order(),
+                "scores": [round(it.score, 4) for it in r.items],
+                "model": r.model,
             }
         else:  # pragma: no cover - 未来能力
             raise LLMError(f"能力 {capability} 暂无测试实现")

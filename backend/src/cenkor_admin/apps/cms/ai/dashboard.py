@@ -42,7 +42,7 @@ router = APIRouter(tags=["cms-ai"])
 _TREND_DAYS = 7
 _RECENT_LIMIT = 12
 
-# 能力矩阵的「是否真能用」判据。wired=False 的（rerank/asr/tts）即使配了也
+# 能力矩阵的「是否真能用」判据。wired=False 的（asr/tts）即使配了也
 # 没有调用链，界面上标「仅配置」，不许它冒充能力。
 _LABELS = {
     "chat": ("对话补全", "起草 / 翻译 / SEO / 建模"),

@@ -54,7 +54,7 @@ CAPABILITIES: tuple[CapabilitySpec, ...] = (
     CapabilitySpec("vision", "视觉理解", "看图说话、图文审校、截图转结构化数据"),
     CapabilitySpec("image", "图片生成", "封面图、配图、示意图"),
     CapabilitySpec("video", "视频生成", "文生视频、图生视频（异步任务，分钟级）"),
-    CapabilitySpec("rerank", "重排序", "检索结果精排，提升召回质量", wired=False),
+    CapabilitySpec("rerank", "重排序", "检索结果精排，提升召回质量"),
     CapabilitySpec("asr", "语音识别", "音视频转文字", wired=False),
     CapabilitySpec("tts", "语音合成", "文案转语音", wired=False),
 )
@@ -114,7 +114,10 @@ PARAM_SPECS: dict[str, dict[str, ParamSpec]] = {
         "t2v_model": ParamSpec("str"),
         "i2v_model": ParamSpec("str"),
     },
-    "rerank": {"top_n": ParamSpec("int", 1, 100)},
+    # rerank 刻意没有可配参数：检索链路必须拿到**全部候选**的分数才能完整
+    # 重排，一旦只回 top_n 条，后面的条目就会保持原分留在原位，排出来是错的。
+    # 留个 top_n 只会让人以为「限定返回 3 条」，而它在这个场景下不成立。
+    "rerank": {},
     "asr": {"language": ParamSpec("str")},
     "tts": {"speed": ParamSpec("float", 0.25, 4.0)},
 }

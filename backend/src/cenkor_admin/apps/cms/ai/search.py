@@ -98,6 +98,7 @@ class SearchHit:
     score: float = 0.0
     vector_score: float = 0.0
     keyword_score: float = 0.0
+    rerank_score: float | None = None
     snippet: str = ""
     published_at: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
@@ -113,6 +114,7 @@ class SearchHit:
             "score": round(self.score, 4),
             "vector_score": round(self.vector_score, 4),
             "keyword_score": round(self.keyword_score, 4),
+            "rerank_score": (None if self.rerank_score is None else round(self.rerank_score, 4)),
             "snippet": self.snippet,
             "published_at": self.published_at,
         }
@@ -236,6 +238,60 @@ async def _vector_scores_sql(
 # ---------------------------------------------------------------------------
 # 主检索
 # ---------------------------------------------------------------------------
+RERANK_CANDIDATES = 20
+"""送进 rerank 的候选上限。
+
+为什么不把候选全送：rerank 是同步调用且按 token 计费，一条候选几百字，
+200 条就是几十万 token，又贵又慢。而 limit 通常 ≤10，前 20 条已经覆盖
+了最终要返回的范围，再往后排的结果根本不会出现在页面上。
+"""
+
+
+async def _rerank_hits(query: str, hits: list[SearchHit], *, limit: int) -> list[SearchHit]:
+    """用 rerank 模型对候选做精排。
+
+    三个原则：
+    1. 未绑定时静默跳过 —— 没这个能力不等于搜索坏了
+    2. 调用失败时原样返回 —— 精排是加分项，不该成为单点故障
+    3. 分数替换而非叠加 —— 精排分与混合分不同量纲，混着加会互相干扰
+    """
+    if len(hits) < 2:
+        return hits
+
+    try:
+        llm = get_llm_for("rerank")
+    except LLMNotConfiguredError:
+        return hits
+    except Exception as exc:
+        logger.debug("cms.rerank_skip", error=str(exc)[:150])
+        return hits
+
+    pool = hits[: min(len(hits), max(RERANK_CANDIDATES, limit))]
+    # 标题放前面：用户搜的往往是产品名/栏目名，正文里的词只是佐证
+    docs = [f"{h.title}\n{h.snippet}" for h in pool]
+
+    try:
+        res = await llm.rerank(query, docs, timeout=15.0)
+    except Exception as exc:
+        logger.warning("cms.rerank_failed", error=str(exc)[:200])
+        return hits
+
+    smap = res.score_map()
+    if not smap:
+        return hits
+
+    for i, hit in enumerate(pool):
+        if i in smap:
+            hit.rerank_score = smap[i]
+            hit.score = smap[i]
+    pool.sort(key=lambda h: h.score, reverse=True)
+
+    logger.info(
+        "cms.rerank", candidates=len(pool), latency_ms=res.latency_ms, model=res.model
+    )
+    return pool + hits[len(pool) :]
+
+
 async def semantic_search(
     session: AsyncSession,
     query: str,
@@ -350,6 +406,8 @@ async def semantic_search(
         )
 
     hits.sort(key=lambda h: h.score, reverse=True)
+    # 4.5) 可选精排：绑了 rerank 就重排前若干条，没绑或失败保持原序
+    hits = await _rerank_hits(q, hits, limit=limit)
     hits = hits[:limit]
 
     # 5) 补内容类型 key（Agent 更爱看 key 而不是数字 id）
