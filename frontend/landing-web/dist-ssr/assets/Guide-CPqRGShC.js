@@ -30,13 +30,24 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         tip: "应用通过 manifest 声明业务数据，安装时自动注册，卸载时自动清理，即插即用。"
       },
       {
-        icon: "📝",
-        title: "CMS 内容管理",
+        icon: "🤖",
+        title: "AI CMS 内容管理",
         paragraphs: [
-          "使用通用内容引擎，后台即可创建内容类型、动态增删字段（支持 21+ 字段类型）。",
-          "配置多级分类与标签，维护内容条目，前台通过公开只读 API 消费。"
+          "进入后台「内容管理」，用 AI 建模向导描述业务，生成内容类型与字段定义草案，确认后才真正落库（支持 21+ 字段类型）。",
+          "配置多级分类与标签，维护内容条目；AI 起草的稿件强制为 draft，必须人工审核通过才能发布。",
+          "内容完成审核后，可在发布渠道推到官网、Webhook、微信公众号草稿箱，或导出到第三方平台。"
         ],
-        tip: "CMS 提供 /api/v1/public/* 公开接口，任意前端（包括独立官网）都可直接调用。"
+        tip: "内容同时以 REST / GraphQL / MCP 三种协议对外输出，前端与 Agent 各取所需，数据只有一份。"
+      },
+      {
+        icon: "🧠",
+        title: "AI 模型接入",
+        paragraphs: [
+          "进入「AI 设置」，新增服务商（OpenAI 兼容协议，填 base_url 与密钥），保存后可用连通性测试发一次最小请求验证。",
+          "把 chat / embedding / vision / image / rerank / asr / tts 七类能力分别绑定到服务商与模型，chat 与 embedding 可来自不同服务商。",
+          "密钥出接口只返回掩码，编辑时原样回传即等于不修改；用量按输入 / 输出 / 缓存分段统计，配合价格表算真实成本。"
+        ],
+        tip: "不接模型也能用：AI 端点会返回明确的 503 提示，而建模、审核、REST / GraphQL / MCP 只读工具完全不受影响。"
       },
       {
         icon: "🔐",
@@ -76,25 +87,25 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     });
     return (_ctx, _push, _parent, _attrs) => {
       const _component_router_link = resolveComponent("router-link");
-      _push(`<div${ssrRenderAttrs(mergeProps({ class: "guide-page" }, _attrs))} data-v-c3089238><section class="page-hero" data-v-c3089238><div class="container" data-v-c3089238><div class="page-hero-content" data-v-c3089238><span class="hero-tag" data-v-c3089238>使用指南</span><h1 data-v-c3089238>Cenkor Admin 使用入门</h1><p data-v-c3089238>从部署上线到应用安装，快速了解平台全貌</p></div></div></section><section class="section" data-v-c3089238><div class="container" data-v-c3089238><div class="guide-content" data-v-c3089238><div class="guide-nav" data-v-c3089238><!--[-->`);
+      _push(`<div${ssrRenderAttrs(mergeProps({ class: "guide-page" }, _attrs))} data-v-d10864c5><section class="page-hero" data-v-d10864c5><div class="container" data-v-d10864c5><div class="page-hero-content" data-v-d10864c5><span class="hero-tag" data-v-d10864c5>使用指南</span><h1 data-v-d10864c5>Cenkor Admin 使用入门</h1><p data-v-d10864c5>从部署上线到应用安装，快速了解平台全貌</p></div></div></section><section class="section" data-v-d10864c5><div class="container" data-v-d10864c5><div class="guide-content" data-v-d10864c5><div class="guide-nav" data-v-d10864c5><!--[-->`);
       ssrRenderList(sections, (sec, i) => {
-        _push(`<button type="button" class="${ssrRenderClass([{ active: activeSection.value === i }, "guide-nav-item"])}" data-v-c3089238><span class="nav-icon" data-v-c3089238>${ssrInterpolate(sec.icon)}</span><span data-v-c3089238>${ssrInterpolate(sec.title)}</span></button>`);
+        _push(`<button type="button" class="${ssrRenderClass([{ active: activeSection.value === i }, "guide-nav-item"])}" data-v-d10864c5><span class="nav-icon" data-v-d10864c5>${ssrInterpolate(sec.icon)}</span><span data-v-d10864c5>${ssrInterpolate(sec.title)}</span></button>`);
       });
-      _push(`<!--]--></div><div class="guide-body" data-v-c3089238><!--[-->`);
+      _push(`<!--]--></div><div class="guide-body" data-v-d10864c5><!--[-->`);
       ssrRenderList(sections, (sec, i) => {
-        _push(`<div class="guide-section" style="${ssrRenderStyle(activeSection.value === i ? null : { display: "none" })}" data-v-c3089238><h2 data-v-c3089238>${ssrInterpolate(sec.title)}</h2><div class="guide-text" data-v-c3089238><!--[-->`);
+        _push(`<div class="guide-section" style="${ssrRenderStyle(activeSection.value === i ? null : { display: "none" })}" data-v-d10864c5><h2 data-v-d10864c5>${ssrInterpolate(sec.title)}</h2><div class="guide-text" data-v-d10864c5><!--[-->`);
         ssrRenderList(sec.paragraphs, (p, j) => {
-          _push(`<p data-v-c3089238>${ssrInterpolate(p)}</p>`);
+          _push(`<p data-v-d10864c5>${ssrInterpolate(p)}</p>`);
         });
         _push(`<!--]--></div>`);
         if (sec.tip) {
-          _push(`<div class="guide-tip" data-v-c3089238><span class="tip-icon" data-v-c3089238>💡</span><p data-v-c3089238>${ssrInterpolate(sec.tip)}</p></div>`);
+          _push(`<div class="guide-tip" data-v-d10864c5><span class="tip-icon" data-v-d10864c5>💡</span><p data-v-d10864c5>${ssrInterpolate(sec.tip)}</p></div>`);
         } else {
           _push(`<!---->`);
         }
         _push(`</div>`);
       });
-      _push(`<!--]--></div></div></div></section><section class="cta-section" data-v-c3089238><div class="container" data-v-c3089238><div class="cta-content" data-v-c3089238><h2 data-v-c3089238>需要更详细的文档？</h2><p data-v-c3089238>完整使用文档与技术支持随时为您提供</p><div class="cta-actions" data-v-c3089238><a${ssrRenderAttr("href", unref(urls).github)} target="_blank" rel="noopener" class="btn btn-primary btn-large" data-v-c3089238>GitHub 仓库</a>`);
+      _push(`<!--]--></div></div></div></section><section class="cta-section" data-v-d10864c5><div class="container" data-v-d10864c5><div class="cta-content" data-v-d10864c5><h2 data-v-d10864c5>需要更详细的文档？</h2><p data-v-d10864c5>完整使用文档与技术支持随时为您提供</p><div class="cta-actions" data-v-d10864c5><a${ssrRenderAttr("href", unref(urls).github)} target="_blank" rel="noopener" class="btn btn-primary btn-large" data-v-d10864c5>GitHub 仓库</a>`);
       _push(ssrRenderComponent(_component_router_link, {
         to: "/deploy",
         class: "btn btn-secondary btn-large"
@@ -120,7 +131,7 @@ _sfc_main.setup = (props, ctx) => {
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/views/docs/Guide.vue");
   return _sfc_setup ? _sfc_setup(props, ctx) : void 0;
 };
-const Guide = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-c3089238"]]);
+const Guide = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-d10864c5"]]);
 export {
   Guide as default
 };

@@ -5,7 +5,7 @@
         <div class="page-hero-content">
           <span class="hero-tag">技术优势</span>
           <h1>为什么选择辰科Cenkor Admin</h1>
-          <p>现代技术栈 + 应用中心生态 + 灵活部署，企业级后台管理平台首选</p>
+          <p>现代技术栈 + 应用中心生态 + AI 原生内容层，企业级平台与内容引擎双主线</p>
         </div>
       </div>
     </section>
@@ -49,7 +49,7 @@
         <SectionTitle
           tag="对比优势"
           title="Cenkor Admin 的核心竞争力"
-          description="应用中心生态 + 通用内容引擎 + 灵活部署，平台化交付"
+          description="应用中心生态 + AI 原生内容层 + 三协议开放，平台化交付"
           :center="true"
         />
         <div class="compare-grid">
@@ -59,8 +59,9 @@
               <li class="no">业务功能需逐套开发</li>
               <li class="no">内容字段改代码才能扩展</li>
               <li class="no">应用难以按需安装</li>
-              <li class="no">前后台用户体系混杂</li>
-              <li class="no">部署方式单一</li>
+              <li class="no">内容只能人写人读，AI 接不进来</li>
+              <li class="no">只给前端用，Agent 无接口</li>
+              <li class="no">升级靠手工拉代码、跑迁移</li>
             </ul>
           </div>
           <div class="compare-card win">
@@ -68,10 +69,11 @@
             <h3>辰科Cenkor Admin</h3>
             <ul>
               <li class="yes">应用中心按需安装，即插即用</li>
-              <li class="yes">通用内容引擎，后台动态扩字段</li>
-              <li class="yes">应用安装自动注册权限/菜单</li>
-              <li class="yes">前后台双用户体系完全隔离</li>
-              <li class="yes">Docker/宝塔/裸机三种部署</li>
+              <li class="yes">动态建模，后台即可扩字段（21+ 类型）</li>
+              <li class="yes">AI CMS：说一句话建模型、起草、翻译</li>
+              <li class="yes">REST / GraphQL / MCP 三协议出口</li>
+              <li class="yes">在线升级：版本提示 + 应用 OTA 免重启</li>
+              <li class="yes">Docker / 宝塔 / 裸机三种部署</li>
             </ul>
           </div>
         </div>
@@ -99,40 +101,58 @@ import ScrollReveal from '@/components/ScrollReveal.vue'
 
 const advantages = [
   {
+    icon: '🤖',
+    title: 'AI 原生内容层',
+    description: '对话式建模、AI 起草翻译、语义检索、内容生产线。AI 是可选增强 —— 不配模型时传统能力照常工作。',
+    bg: 'rgba(139, 92, 246, 0.1)'
+  },
+  {
     icon: '🏪',
     title: '应用中心生态',
     description: '应用 manifest 声明内容/字段/权限/菜单，安装时自动注册，卸载自动清理，业务模块即插即用。',
     bg: 'rgba(16, 185, 129, 0.1)'
   },
   {
-    icon: '📝',
-    title: '通用内容引擎',
-    description: '动态字段定义 + 21+ 字段类型 + 多级分类标签，后台 UI 即可扩字段，无需改代码。',
+    icon: '🧩',
+    title: '动态建模与多站点',
+    description: '动态字段定义 + 21+ 字段类型 + 多级分类标签，后台 UI 即可扩字段；多站点站群会话级隔离。',
     bg: 'rgba(245, 158, 11, 0.1)'
   },
   {
     icon: '⚡',
     title: '现代技术栈',
-    description: 'FastAPI 异步高性能 + Vue3 + SQLAlchemy 2，PostgreSQL/Redis/MinIO 标准中间件。',
-    bg: 'rgba(139, 92, 246, 0.1)'
+    description: 'FastAPI 异步高性能 + Vue3 + SQLAlchemy 2，PostgreSQL 16 / Redis 7 / MinIO 标准中间件。',
+    bg: 'rgba(6, 182, 212, 0.1)'
   },
   {
     icon: '🔐',
     title: '安全可控',
-    description: 'JWT 前后台双体系鉴权 + RBAC 权限 + 审计日志，平台安全可追溯。',
+    description: 'JWT 前后台双体系鉴权 + RBAC 三级权限 + 审计日志；AI 密钥只出掩码，读配置与改密钥分权。',
     bg: 'rgba(236, 72, 153, 0.1)'
+  },
+  {
+    icon: '🔌',
+    title: '三协议开放',
+    description: 'REST / GraphQL / MCP 三种出口共享同一套权限与检索底座，Agent 可直接消费内容。',
+    bg: 'rgba(99, 102, 241, 0.1)'
+  },
+  {
+    icon: '🚀',
+    title: '在线升级',
+    description: '核心平台发现新版本即在工作台提示，升级脚本自动备份与迁移；可插拔应用授权码 OTA，免重启。',
+    bg: 'rgba(20, 184, 166, 0.1)'
+  },
+  {
+    icon: '📊',
+    title: '可观测',
+    description: '内容埋点、效果统计、AI 用量三段计费与操作审计，效果与成本都能落到数字上。',
+    bg: 'rgba(234, 88, 12, 0.1)'
   },
   {
     icon: '🏠',
     title: '灵活部署',
     description: 'Docker Compose / 宝塔静态 dist / 裸机 systemd 三种模式，可独立运营不依赖官网。',
     bg: 'rgba(37, 99, 235, 0.1)'
-  },
-  {
-    icon: '🔗',
-    title: '开放 API',
-    description: '公开只读 API（/api/v1/public/*）供任意前端消费，生态开放可扩展。',
-    bg: 'rgba(6, 182, 212, 0.1)'
   }
 ]
 
@@ -142,6 +162,8 @@ const techStack = [
   { name: 'Tailwind', icon: '🎨', desc: '原子化样式' },
   { name: 'PostgreSQL 16', icon: '🗄️', desc: '关系型数据库' },
   { name: 'Redis 7', icon: '🔴', desc: '缓存与消息' },
+  { name: 'OpenAI 兼容', icon: '🧠', desc: '任意模型服务可接' },
+  { name: 'MCP', icon: '🔌', desc: 'Agent 内容协议' },
   { name: 'Docker', icon: '🐳', desc: '容器化部署' }
 ]
 </script>

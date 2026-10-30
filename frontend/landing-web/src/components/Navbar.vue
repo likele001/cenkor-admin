@@ -22,6 +22,10 @@
 
         <div class="nav-links" :class="{ active: mobileMenuOpen }">
           <a @click.prevent="navigate('/')">首页</a>
+          <a @click.prevent="navigate('/ai-cms')" class="nav-hot">
+            AI CMS
+            <span class="hot-dot"></span>
+          </a>
           <a @click.prevent="navigate('/features')">功能</a>
           <a @click.prevent="navigate('/advantages')">优势</a>
           <a @click.prevent="navigate('/deploy')">私有部署</a>
@@ -156,7 +160,7 @@ onUnmounted(() => {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: $spacing-xl;
+  gap: $spacing-lg;
 
   a {
     color: $text-secondary;
@@ -168,6 +172,40 @@ onUnmounted(() => {
     &.router-link-active {
       color: $primary;
     }
+  }
+
+  // AI CMS 入口：品牌紫 + 呼吸点
+  a.nav-hot {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #7c3aed;
+    font-weight: 600;
+
+    &:hover {
+      color: #6d28d9;
+    }
+
+    .hot-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #8b5cf6;
+      animation: hotPulse 2s infinite;
+    }
+  }
+}
+
+@keyframes hotPulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.45);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 5px rgba(139, 92, 246, 0);
   }
 }
 

@@ -13,6 +13,11 @@ export const routes = [
     component: () => import('@/views/Home.vue')
   },
   {
+    path: '/ai-cms',
+    name: 'AiCms',
+    component: () => import('@/views/AiCms.vue')
+  },
+  {
     path: '/features',
     name: 'Features',
     component: () => import('@/views/Features.vue')

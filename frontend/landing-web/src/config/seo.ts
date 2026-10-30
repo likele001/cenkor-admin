@@ -58,29 +58,34 @@ export const PRERENDERED_HEAD_SELECTOR =
 /** 路由 path → SEO 元数据 */
 export const SEO: Record<string, SeoEntry> = {
   '/': {
-    title: '辰科Cenkor Admin - 企业级后台管理平台 | 私有化部署',
+    title: '辰科Cenkor Admin - 企业级平台 × AI CMS | 私有化部署',
     description:
-      '辰科Cenkor Admin 企业级后台管理平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、通用内容引擎、用户中心、审计日志，应用按需安装，支持私有化部署。',
+      '辰科Cenkor Admin 企业级平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、工作流审批、AI CMS 内容引擎、用户中心与审计日志。AI CMS 支持对话式建模、AI 起草翻译、语义检索，内容以 REST / GraphQL / MCP 三协议输出，支持私有化部署。',
+  },
+  '/ai-cms': {
+    title: '辰科Cenkor Admin - AI CMS 内容引擎 | 对话式建模 · AI 起草 · MCP 出口',
+    description:
+      '辰科 AI CMS：用中文描述业务直接生成内容模型，AI 起草与批量翻译，语义检索带引用溯源，内容健康度体检、选题 Gap 分析、问答式站内搜索、AI 配图与视频、多渠道再分发。内容以 REST / GraphQL / MCP 三种协议供给任意前端与 Agent。',
   },
   '/features': {
-    title: '辰科Cenkor Admin - 核心功能 | 企业级后台管理平台',
+    title: '辰科Cenkor Admin - 核心功能 | AI CMS 与应用中心',
     description:
-      '辰科Cenkor Admin 核心功能：应用中心、RBAC 权限、通用内容引擎（21+ 字段类型）、用户中心、审计日志、私有化部署。',
+      '辰科Cenkor Admin 核心功能：AI CMS 内容引擎、应用中心（12 个可插拔应用）、RBAC 三级权限、动态建模与多站点、工作流审批、多渠道发布与效果统计、REST / GraphQL / MCP 开放接口、在线升级、私有化部署。',
   },
   '/advantages': {
-    title: '辰科Cenkor Admin - 技术优势 | 企业级后台管理平台',
+    title: '辰科Cenkor Admin - 技术优势 | AI 原生内容层',
     description:
-      '辰科Cenkor Admin 技术优势：FastAPI + Vue3 现代架构、应用中心生态、通用内容引擎、前后台双用户体系、三种部署模式。',
+      '辰科Cenkor Admin 技术优势：FastAPI + Vue3 现代架构、应用中心生态、动态建模、AI 原生内容层（可选增强）、三协议开放接口、在线升级、前后台双用户体系与三种部署模式。',
   },
   '/deploy': {
-    title: '辰科Cenkor Admin - 私有部署 | 企业级后台管理平台',
+    title: '辰科Cenkor Admin - 私有部署 | 企业级平台',
     description:
-      '辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal。',
+      '辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal；含 AI 模型接入与在线升级说明。',
   },
   '/docs/guide': {
-    title: '辰科Cenkor Admin - 使用指南 | 企业级后台管理平台',
+    title: '辰科Cenkor Admin - 使用指南 | 企业级平台',
     description:
-      '辰科Cenkor Admin 使用入门指南：系统登录、应用中心安装、RBAC 权限、CMS 内容管理、用户中心快速上手。',
+      '辰科Cenkor Admin 使用入门指南：系统登录、应用中心安装、RBAC 权限、AI CMS 建模与内容管理、工作流审批、用户中心快速上手。',
   },
 }
 

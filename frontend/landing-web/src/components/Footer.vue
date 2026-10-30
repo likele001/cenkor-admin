@@ -20,13 +20,14 @@
             </div>
             <span class="logo-text">辰科 Cenkor Admin</span>
           </div>
-          <p class="footer-desc">企业级后台管理平台 · 应用中心 + RBAC + CMS · FastAPI + Vue3</p>
+          <p class="footer-desc">企业级平台 · 应用中心 + RBAC + 工作流 + AI CMS · FastAPI + Vue3</p>
         </div>
 
         <div class="footer-links">
           <div class="link-group">
             <h4>产品</h4>
             <ul>
+              <li><router-link to="/ai-cms">AI CMS</router-link></li>
               <li><router-link to="/features">功能介绍</router-link></li>
               <li><router-link to="/advantages">技术优势</router-link></li>
               <li><router-link to="/deploy">私有部署</router-link></li>

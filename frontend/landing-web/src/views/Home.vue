@@ -10,32 +10,32 @@
         <div class="hero-content">
           <div class="hero-badge">
             <span class="badge-dot"></span>
-            辰科 · 企业级后台管理平台
+            辰科 · 企业级平台 × AI 原生内容引擎
           </div>
           <h1>
             一套后台，<br>
             <span class="gradient-text">装下所有业务应用</span>
           </h1>
           <p class="hero-desc">
-            FastAPI + Vue3 架构，应用中心 + RBAC 权限 + 通用内容引擎 + 用户中心开箱即用。<br>
-            应用按需安装，支持私有化部署，可独立运营不依赖任何官网。
+            FastAPI + Vue3 架构，应用中心 + RBAC 权限 + 工作流 + 用户中心开箱即用。<br>
+            内置 <strong>AI CMS</strong>：说一句话建内容模型，AI 起草翻译，以 REST / GraphQL / MCP 供给任意前端与 Agent。
           </p>
           <div class="hero-actions">
-            <router-link to="/features" class="btn btn-primary btn-large">
-              查看功能
+            <router-link to="/ai-cms" class="btn btn-primary btn-large">
+              AI CMS 能力
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
                 <polyline points="12 5 19 12 12 19"></polyline>
               </svg>
             </router-link>
-            <router-link to="/deploy" class="btn btn-secondary btn-large">
-              私有部署
+            <router-link to="/features" class="btn btn-secondary btn-large">
+              查看全部功能
             </router-link>
           </div>
           <div class="hero-trust">
             <span><i class="tick">✓</i> 开源 AGPL-3.0</span>
-            <span><i class="tick">✓</i> Docker 一键部署</span>
-            <span><i class="tick">✓</i> 8 个内置应用</span>
+            <span><i class="tick">✓</i> 12 个可插拔应用</span>
+            <span><i class="tick">✓</i> AI CMS v0.3.0</span>
             <span><i class="tick">✓</i> 100% 私有化</span>
           </div>
         </div>
@@ -57,15 +57,15 @@
               </div>
               <div class="sys-row">
                 <div class="sys-item"><span class="dot"></span> RBAC 权限</div>
-                <div class="sys-item"><span class="dot"></span> CMS 内容引擎</div>
-                <div class="sys-item"><span class="dot"></span> 审计日志</div>
-                <div class="sys-item"><span class="dot"></span> 用户中心</div>
+                <div class="sys-item"><span class="dot"></span> AI 对话建模</div>
+                <div class="sys-item"><span class="dot"></span> 语义检索</div>
+                <div class="sys-item"><span class="dot"></span> 审批工作流</div>
               </div>
             </div>
             <div class="card-footer">
               <span class="pulse-dot"></span>
-              <span>系统运行中 · 应用中心已就绪</span>
-              <span class="footer-ver">v2.1</span>
+              <span>系统运行中 · AI CMS 已就绪</span>
+              <span class="footer-ver">v0.3.0</span>
             </div>
           </div>
         </div>
@@ -86,13 +86,75 @@
       </div>
     </section>
 
+    <!-- AI CMS Flagship Section -->
+    <section class="section ai-section">
+      <div class="container">
+        <div class="ai-wrap">
+          <div class="ai-copy">
+            <span class="ai-tag">旗舰能力 · v0.3.0 新增</span>
+            <h2>
+              AI CMS：<br>
+              <span class="ai-gradient">说一句话，建一个内容模型</span>
+            </h2>
+            <p>
+              用中文描述业务，直接生成内容类型与字段定义，草案确认后才落库；
+              AI 起草、批量翻译、语义检索、内容体检、多渠道再分发一条链做完。
+              建好的内容以 REST / GraphQL / MCP 三种协议交给任何前端与 Agent 消费。
+            </p>
+            <div class="ai-highlights">
+              <div class="hl" v-for="h in aiHighlights" :key="h.title">
+                <span class="hl-icon">{{ h.icon }}</span>
+                <div>
+                  <strong>{{ h.title }}</strong>
+                  <span>{{ h.desc }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="ai-actions">
+              <router-link to="/ai-cms" class="btn btn-primary btn-large">
+                AI CMS 完整能力
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                  <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+              </router-link>
+              <router-link to="/deploy" class="btn btn-ghost btn-large">如何接入模型</router-link>
+            </div>
+            <p class="ai-note">AI 是可选增强 —— 不配模型时，建模、审核、REST / GraphQL / MCP 全部照常工作。</p>
+          </div>
+
+          <div class="ai-visual">
+            <div class="ai-console">
+              <div class="console-head">
+                <div class="console-dots"><span></span><span></span><span></span></div>
+                <span>AI 内容生产线</span>
+              </div>
+              <div class="console-body">
+                <div class="step" v-for="(s, i) in aiSteps" :key="s.name" :style="{ animationDelay: `${i * 0.12}s` }">
+                  <span class="step-no">{{ String(i + 1).padStart(2, '0') }}</span>
+                  <span class="step-icon">{{ s.icon }}</span>
+                  <span class="step-name">{{ s.name }}</span>
+                  <span class="step-state" :class="s.state">{{ s.state === 'done' ? '已完成' : '运行中' }}</span>
+                </div>
+              </div>
+              <div class="console-foot">
+                <span class="pill">10 道工序</span>
+                <span class="pill">逐条留痕</span>
+                <span class="pill">人工闸口</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Features Section -->
     <section class="section">
       <div class="container">
         <SectionTitle
           tag="核心能力"
           title="企业级后台一站配齐"
-          description="应用中心 + 权限 + 内容 + 用户，从搭建到运营全流程覆盖"
+          description="AI 内容引擎 + 应用中心 + 权限 + 工作流 + 开放接口，从搭建到运营全流程覆盖"
           :center="true"
         />
         <div class="features-grid">
@@ -153,8 +215,8 @@
       <div class="container">
         <SectionTitle
           tag="内置应用"
-          title="开箱即用的业务应用"
-          description="公告、工单、云存储、链接、记事等，通过应用中心统一安装管理"
+          title="12 个可插拔业务应用"
+          description="CRM、ERP、MES、工作流、CMS、工单、云存储等，通过应用中心统一安装，支持授权码 OTA 升级"
           :center="true"
         />
         <div class="app-grid-lg">
@@ -223,18 +285,41 @@ import { SITE_URLS } from '@/config/site'
 const urls = SITE_URLS
 
 const stats = [
-  { value: 8, label: '内置业务应用', suffix: '' },
+  { value: 12, label: '可插拔业务应用', suffix: '' },
   { value: 21, label: 'CMS 字段类型', suffix: '+' },
-  { value: 3, label: '部署模式', suffix: ' 种' },
-  { value: 100, label: '私有化部署', suffix: '%' }
+  { value: 10, label: '道 AI 内容工序', suffix: '' },
+  { value: 3, label: '内容出口协议', suffix: ' 种' }
+]
+
+const aiHighlights = [
+  { icon: '💬', title: '对话式建模', desc: '中文描述 → 内容类型草案，确认才落库' },
+  { icon: '✍️', title: '起草与翻译', desc: '草稿强制人审，多语言一条命令批量出' },
+  { icon: '🏭', title: '内容生产线', desc: '批量生产、体检、质检、选题、问答、配图' },
+  { icon: '🔌', title: '三协议出口', desc: 'REST / GraphQL / MCP，Agent 直接消费' }
+]
+
+const aiSteps = [
+  { icon: '🎯', name: '选题 Gap 分析', state: 'done' },
+  { icon: '📝', name: '条目起草', state: 'done' },
+  { icon: '🔍', name: '语义检索命中知识库', state: 'done' },
+  { icon: '🖼️', name: '配图生成并落媒体库', state: 'running' },
+  { icon: '🌐', name: '多语言翻译', state: 'queued' },
+  { icon: '🩺', name: '发布前健康度体检', state: 'queued' }
 ]
 
 const features = [
   {
+    icon: '🤖',
+    title: 'AI CMS 内容引擎',
+    description: '对话式建模、AI 起草翻译、语义检索、内容生产线，内容以 REST / GraphQL / MCP 三协议出口',
+    features: ['对话式建模', 'AI 起草与翻译', 'MCP / GraphQL 出口'],
+    color: '#8b5cf6'
+  },
+  {
     icon: '🏪',
     title: '应用中心',
     description: '应用按需安装/卸载，自动注册权限、菜单、内容类型，业务模块即插即用',
-    features: ['应用安装卸载', '权限自动注册', '菜单自动生成'],
+    features: ['应用安装卸载', '权限自动注册', '授权码 OTA 升级'],
     color: '#10b981'
   },
   {
@@ -242,14 +327,35 @@ const features = [
     title: 'RBAC 权限',
     description: '角色、权限规则、数据权限三级控制，后台/前台双用户体系隔离',
     features: ['角色管理', '数据权限', '双用户体系'],
-    color: '#8b5cf6'
+    color: '#0ea5e9'
   },
   {
     icon: '📝',
-    title: '通用内容引擎',
-    description: 'CMS 动态字段定义，21+ 字段类型，分类标签系统，后台即可改字段',
-    features: ['动态字段', '分类标签', '内容类型'],
+    title: '动态建模与多站点',
+    description: '21+ 字段类型后台即可增删，多级分类标签，多站点站群会话级隔离',
+    features: ['动态字段', '多级分类标签', '多站点站群'],
     color: '#f59e0b'
+  },
+  {
+    icon: '🔀',
+    title: '工作流审批',
+    description: '可视化流程编排，待办/已办/抄送/单据齐全，AI 工作流按拓扑序执行并检测环',
+    features: ['可视化编排', '待办已办抄送', 'AI 工作流引擎'],
+    color: '#ec4899'
+  },
+  {
+    icon: '📡',
+    title: '发布与统计',
+    description: '官网、Webhook、微信公众号草稿箱、导出多渠道分发；内容埋点与效果分析内置',
+    features: ['多渠道发布', '内容埋点', '停留与跳出分析'],
+    color: '#14b8a6'
+  },
+  {
+    icon: '🔌',
+    title: '开放接口',
+    description: 'REST 内容引擎、GraphQL 查询、MCP Server 三种协议并存，权限同一套底座',
+    features: ['REST 内容引擎', 'GraphQL', 'MCP Server'],
+    color: '#6366f1'
   },
   {
     icon: '👤',
@@ -259,17 +365,10 @@ const features = [
     color: '#06b6d4'
   },
   {
-    icon: '🛡️',
-    title: '审计日志',
-    description: '操作记录完整留痕，平台安全可追溯',
-    features: ['操作记录', '安全追溯', '合规留痕'],
-    color: '#ec4899'
-  },
-  {
-    icon: '🏠',
-    title: '私有化部署',
-    description: 'Docker Compose / 宝塔静态 / 裸机 systemd 三种模式，可独立运营',
-    features: ['容器化部署', '宝塔静态', '裸机部署'],
+    icon: '🚀',
+    title: '私有化与在线升级',
+    description: '三种部署模式；核心平台发现新版本即提示，应用支持免重启 OTA 升级',
+    features: ['Docker / 宝塔 / 裸机', '版本检查提示', '应用 OTA 升级'],
     color: '#2563eb'
   }
 ]
@@ -293,23 +392,27 @@ const techStack = [
 ]
 
 const heroApps = [
+  { icon: '🤖', name: 'AI CMS', installed: true },
   { icon: '📢', name: '公告', installed: true },
   { icon: '🎫', name: '工单', installed: true },
-  { icon: '☁️', name: '云存储', installed: true },
-  { icon: '🔗', name: '链接', installed: true },
-  { icon: '📝', name: '记事', installed: true },
-  { icon: '✅', name: 'Todo', installed: true }
+  { icon: '🔀', name: '工作流', installed: true },
+  { icon: '📇', name: 'CRM', installed: true },
+  { icon: '☁️', name: '云存储', installed: true }
 ]
 
 const apps = [
-  { icon: '📢', name: '公告管理', desc: '公告发布与通知' },
+  { icon: '🤖', name: 'AI CMS', desc: 'AI 原生内容引擎' },
+  { icon: '📇', name: 'CRM 销售', desc: '线索到回款全流程' },
+  { icon: '🏭', name: 'ERP 管理', desc: '客户/供应商/进销存' },
+  { icon: '⚙️', name: 'MES 制造', desc: '订单/排产/报工' },
+  { icon: '🔀', name: '工作流审批', desc: '可视化流程编排' },
   { icon: '🎫', name: '工单系统', desc: '问题工单流转处理' },
-  { icon: '☁️', name: '云存储', desc: '对象存储管理' },
+  { icon: '☁️', name: '云存储', desc: '多驱动对象存储' },
+  { icon: '📢', name: '公告管理', desc: '公告发布与通知' },
+  { icon: '🔔', name: '通知中心', desc: '多渠道通知推送' },
   { icon: '🔗', name: '链接收藏', desc: '常用链接管理' },
   { icon: '📝', name: 'Quick Notes', desc: '快速记事' },
-  { icon: '✅', name: 'My Todo', desc: '任务清单' },
-  { icon: '🔔', name: '通知', desc: '系统通知推送' },
-  { icon: '📰', name: 'CMS', desc: '官网内容管理' }
+  { icon: '✅', name: 'My Todo', desc: '任务清单' }
 ]
 
 const openIndex = ref(-1)
@@ -319,14 +422,16 @@ const toggleFaq = (index: number) => {
 }
 
 const faqs = [
-  { q: 'Cenkor Admin 是什么？适合哪些场景？', a: 'Cenkor Admin 是一款企业级后台管理平台（FastAPI + Vue3），内置应用中心、RBAC 权限、通用内容引擎（CMS）、用户中心与审计日志。适合需要快速搭建内部管理系统、内容站点，或对既有系统做后台底座的企业与团队。' },
-  { q: '支持哪些部署方式？', a: '支持三种：Docker Compose（一条命令拉起全栈）、宝塔静态、裸机 systemd。数据部署在自己服务器，完全私有化、自主可控。' },
+  { q: 'Cenkor Admin 是什么？适合哪些场景？', a: 'Cenkor Admin 是一款企业级平台（FastAPI + Vue3），内置应用中心、RBAC 权限、工作流审批、AI CMS 内容引擎、用户中心与审计日志。适合需要快速搭建内部管理系统、内容站点与官网，或对既有系统做后台底座的企业与团队。' },
+  { q: 'AI CMS 和普通 CMS 有什么不同？', a: '普通 CMS 是先有模型再填内容；AI CMS 是「说人话建模型」——用中文描述业务需求，直接生成内容类型与字段定义（草案先给你看，确认才落库）。再加 AI 起草、批量翻译、语义检索、内容体检与多渠道再分发，最后以 REST / GraphQL / MCP 三种协议交给任意前端与 Agent 消费。' },
+  { q: '不接 AI 能用吗？', a: '能，而且是刻意设计的。AI 是可选增强不是运行必需：未配置模型时 AI 端点返回明确的 503 提示，而建模 UI、版本管理、多语言、审核、REST / GraphQL / MCP 只读工具完全不受影响。内网离线环境也能先把内容骨架跑起来。' },
+  { q: 'AI 怎么写、用哪个模型？数据会外传吗？', a: '任何 OpenAI 兼容协议的服务都能接：OpenAI、DeepSeek、通义千问、Moonshot、智谱、本地 vLLM / Ollama 或自建网关，改 base_url 与模型名即可，chat 与 embedding 还能绑不同服务商。数据只发往你自己配置的模型服务，平台不中转、不代建账号。' },
+  { q: 'AI 会不会乱写内容？', a: '三道闸口：起草强制 draft 状态必须人审才可发布；知识库把产品手册、FAQ、历史方案变成可检索依据，让模型引用事实而不是编事实；问答检索查不到时明确返回「查不到」，宁可空着也不编。另外还有抽样质检与模型 A/B，好坏有数据可比。' },
+  { q: '支持哪些部署方式？怎么升级？', a: '三种：Docker Compose（一条命令拉起全栈）、宝塔静态、裸机 systemd。核心平台有新版本时后台顶部会出现升级横幅，用 upgrade.sh 或拉新镜像完成；可插拔应用在应用中心用授权码 OTA 升级，免重启。' },
   { q: '是开源的还是商业的？', a: '开源。代码托管在 GitHub（AGPL-3.0 协议），可自由下载部署使用；应用中心按需扩展，业务模块即插即用。' },
-  { q: '应用中心是怎么工作的？', a: '每个应用通过 manifest 声明内容类型、字段、分类、权限与菜单，安装时自动注册到系统，卸载时自动清理，无需改代码。' },
-  { q: '通用内容引擎（CMS）能做什么？', a: '后台即可动态增删字段，支持 21+ 字段类型、多级分类与标签，文章/页面/内容类型统一管理，官网内容也能在系统里维护。' },
-  { q: 'RBAC 权限如何隔离？', a: '角色、权限规则、数据权限三级控制；后台（运营）与前台（C 端用户）双用户体系完全隔离，各自独立登录与权限。' },
-  { q: '需要哪些基础服务？', a: 'PostgreSQL（主库）、Redis（缓存/队列）、MinIO（对象存储）以及 backend / admin-web / portal-web 三端服务，容器化一键编排。' },
-  { q: '可以独立运营、不依赖官网吗？', a: '可以。Cenkor Admin 可独立部署运营，不依赖任何官网；支持多应用并行，适合作为自己的后台底座持续扩展。' }
+  { q: '应用中心是怎么工作的？', a: '每个应用通过 manifest 声明内容类型、字段、分类、权限与菜单，安装时自动注册到系统，卸载时自动清理，无需改代码。当前内置 12 个可插拔应用。' },
+  { q: 'RBAC 权限如何隔离？', a: '角色、权限规则、数据权限三级控制；后台（运营）与前台（C 端用户）双用户体系完全隔离。CMS 与 AI 能力还做了细分权限：读配置与改密钥是两码事，审核动作也独立于编辑。' },
+  { q: '需要哪些基础服务？', a: 'PostgreSQL（主库）、Redis（缓存/队列）、MinIO（对象存储）以及 backend / admin-web / portal-web 三端服务，容器化一键编排。' }
 ]
 </script>
 
@@ -423,6 +528,11 @@ const faqs = [
     color: $text-secondary;
     line-height: 1.8;
     margin-bottom: $spacing-xl;
+
+    strong {
+      color: $primary-dark;
+      font-weight: 700;
+    }
   }
 
   .hero-actions {
@@ -643,6 +753,266 @@ const faqs = [
     font-size: 0.95rem;
     color: $text-secondary;
     margin-top: 4px;
+  }
+}
+
+// AI CMS 旗舰板块
+.ai-section {
+  background: linear-gradient(160deg, #0f172a 0%, #1e293b 55%, #0f172a 100%);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -240px;
+    right: -160px;
+    width: 620px;
+    height: 620px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.22) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -260px;
+    left: -180px;
+    width: 560px;
+    height: 560px;
+    background: radial-gradient(circle, rgba($primary, 0.16) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+}
+
+.ai-wrap {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: $spacing-3xl;
+  align-items: center;
+
+  @include tablet {
+    grid-template-columns: 1fr;
+    gap: $spacing-2xl;
+  }
+
+  @include mobile {
+    grid-template-columns: 1fr;
+    gap: $spacing-2xl;
+  }
+}
+
+.ai-copy {
+  .ai-tag {
+    display: inline-block;
+    padding: 6px 14px;
+    background: rgba(139, 92, 246, 0.16);
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    color: #c4b5fd;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: $radius-full;
+    margin-bottom: $spacing-md;
+  }
+
+  h2 {
+    font-size: 2.4rem;
+    font-weight: 800;
+    line-height: 1.25;
+    color: $text-white;
+    margin-bottom: $spacing-md;
+
+    @include mobile {
+      font-size: 1.85rem;
+    }
+  }
+
+  .ai-gradient {
+    background: linear-gradient(135deg, #a78bfa 0%, $primary-light 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  > p {
+    font-size: 1rem;
+    color: $gray-400;
+    line-height: 1.9;
+    margin-bottom: $spacing-lg;
+  }
+}
+
+.ai-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-md;
+  margin-bottom: $spacing-xl;
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hl {
+  display: flex;
+  gap: $spacing-sm;
+  padding: $spacing-md;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: $radius-md;
+
+  .hl-icon {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  strong {
+    display: block;
+    font-size: 0.88rem;
+    color: $text-white;
+    margin-bottom: 2px;
+  }
+
+  span {
+    font-size: 0.78rem;
+    color: $gray-400;
+    line-height: 1.6;
+  }
+}
+
+.ai-actions {
+  display: flex;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ai-note {
+  margin: $spacing-lg 0 0;
+  font-size: 0.8rem;
+  color: $gray-500;
+}
+
+.ai-visual {
+  @include tablet {
+    order: -1;
+  }
+}
+
+.ai-console {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: $radius-xl;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+.console-head {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  font-size: 12px;
+  color: $gray-400;
+
+  .console-dots {
+    display: flex;
+    gap: 6px;
+
+    span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+
+      &:nth-child(1) { background: #ef4444; }
+      &:nth-child(2) { background: #f59e0b; }
+      &:nth-child(3) { background: #10b981; }
+    }
+  }
+}
+
+.console-body {
+  padding: $spacing-md $spacing-lg;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 28px 24px 1fr auto;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: 11px 0;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.12);
+  animation: stepIn 0.5s ease both;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .step-no {
+    font-family: $font-mono;
+    font-size: 11px;
+    color: $gray-500;
+  }
+
+  .step-icon {
+    font-size: 15px;
+  }
+
+  .step-name {
+    font-size: 0.85rem;
+    color: $gray-300;
+  }
+
+  .step-state {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: $radius-full;
+
+    &.done {
+      background: rgba($success, 0.15);
+      color: $primary-light;
+    }
+
+    &.running {
+      background: rgba(139, 92, 246, 0.18);
+      color: #c4b5fd;
+    }
+
+    &.queued {
+      background: rgba(148, 163, 184, 0.12);
+      color: $gray-400;
+    }
+  }
+}
+
+@keyframes stepIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.console-foot {
+  display: flex;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+  padding: $spacing-md $spacing-lg;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+
+  .pill {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: $radius-full;
+    background: rgba($primary, 0.12);
+    color: $primary-light;
   }
 }
 
