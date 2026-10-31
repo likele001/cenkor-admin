@@ -125,11 +125,21 @@ class TemplateContext:
         self.session = session
         self.site_id = int(site_id or 1)
         self.base = (base or "").rstrip("/")
+        # content_type_id → key 的懒加载缓存，一次渲染里最多查一次
+        self._ct_keys: dict[int, str] | None = None
 
     # ------------------------------------------------------------ 内部
 
     def _type_key(self, type_key: str) -> str:
         return (type_key or "article").strip().lower()
+
+    def _type_keys(self) -> dict[int, str]:
+        if self._ct_keys is None:
+            rows = self.session.execute(
+                select(models.ContentType.id, models.ContentType.key)
+            ).all()
+            self._ct_keys = dict(rows)
+        return self._ct_keys
 
     def _content_type(self, type_key: str):
         return (
@@ -144,14 +154,17 @@ class TemplateContext:
         content = dict(row.content or {})
         seo = dict(row.seo or {})
         category = row.category
+        # 卡片 URL 按条目自己的内容类型拼：case/news 的条目也走 Entry 表，
+        # 一律当 article 会把 /case/xxx.html 写成 /article/xxx.html
+        ct_key = self._type_keys().get(row.content_type_id) or "article"
         card = {
             "id": row.id,
-            "type": "article",
+            "type": ct_key,
             "slug": row.slug,
             "title": row.title,
             "excerpt": seo.get("description") or _plain(content.get("text") or content.get("html"), 160),
             "cover": content.get("cover_image") or seo.get("og_image"),
-            "url": self.url("article", row.slug),
+            "url": self.url(ct_key, row.slug),
             "published_at": _iso(row.published_at),
             "updated_at": _iso(row.updated_at),
             "view_count": row.view_count or 0,
@@ -248,25 +261,51 @@ class TemplateContext:
         offset = max(0, int(offset or 0))
         kind = self._type_key(type)
 
-        if kind in ("product", "news", "case"):
-            model = {"product": models.Product, "news": models.News, "case": models.Case}[kind]
-            stmt = select(model)
-            if hasattr(model, "site_id"):
-                stmt = stmt.where(model.site_id == self.site_id)
-            if hasattr(model, "deleted_at"):
-                stmt = stmt.where(model.deleted_at.is_(None))
-            if hasattr(model, "status"):
-                stmt = stmt.where(model.status == "published")
-            if kind == "product":
-                stmt = stmt.order_by(model.sort.asc(), model.id.desc())
-            elif kind == "news":
-                stmt = stmt.order_by(model.published_at.desc().nullslast(), model.id.desc())
-            else:
-                stmt = stmt.order_by(model.sort.asc(), model.id.desc())
+        if kind == "product":
+            # 产品有独立目录表，和 /product/{slug}.html 同源，不走内容引擎
+            stmt = (
+                select(models.Product)
+                .where(
+                    models.Product.site_id == self.site_id,
+                    models.Product.deleted_at.is_(None),
+                    models.Product.status == "published",
+                )
+                .order_by(models.Product.sort.asc(), models.Product.id.desc())
+            )
             rows = self.session.execute(stmt.limit(limit).offset(offset)).scalars().all()
-            builder = {"product": self._product_card, "news": self._news_card, "case": self._case_card}[kind]
-            return [builder(r) for r in rows]
+            return [self._product_card(r) for r in rows]
 
+        cards = self._entries_of(kind, limit, offset, category, tag, sort, exclude)
+        if cards or kind not in ("news", "case"):
+            return cards
+
+        # case / news 在内容引擎里一条都没有时，兜底查传统表。
+        # News 表目前是空的、Case 表没有 slug 列，正常情况下走不到这里。
+        model = models.News if kind == "news" else models.Case
+        stmt = select(model).where(
+            model.site_id == self.site_id,
+            model.deleted_at.is_(None),
+            model.status == "published",
+        )
+        if kind == "news":
+            stmt = stmt.order_by(model.published_at.desc().nullslast(), model.id.desc())
+        else:
+            stmt = stmt.order_by(model.sort.asc(), model.id.desc())
+        rows = self.session.execute(stmt.limit(limit).offset(offset)).scalars().all()
+        builder = self._news_card if kind == "news" else self._case_card
+        return [builder(r) for r in rows]
+
+    def _entries_of(
+        self,
+        kind: str,
+        limit: int,
+        offset: int,
+        category: str | None,
+        tag: str | None,
+        sort: str,
+        exclude: int | None,
+    ) -> list[dict[str, Any]]:
+        """内容引擎条目查询（article / case / news 共用一套）。"""
         ct = self._content_type(kind)
         if ct is None:
             return []
@@ -313,34 +352,46 @@ class TemplateContext:
         if not slug:
             return None
         kind = self._type_key(type)
-        if kind in ("product", "news", "case"):
-            model = {"product": models.Product, "news": models.News, "case": models.Case}[kind]
-            key_col = model.name if kind == "case" else model.slug
+        if kind == "product":
             row = self.session.execute(
-                select(model).where(key_col == slug, model.deleted_at.is_(None))
+                select(models.Product).where(
+                    models.Product.slug == slug, models.Product.deleted_at.is_(None)
+                )
             ).scalars().first()
             if row is None:
                 return None
-            card = {"product": self._product_card, "news": self._news_card, "case": self._case_card}[kind](row)
+            card = self._product_card(row)
             card["body_html"] = _body_html(card["content"])
             return card
 
-        ct = self._content_type(kind)
-        if ct is None:
-            return None
+        ct = self._content_type(kind) if kind else None
+        if ct is not None:
+            row = self.session.execute(
+                select(models.Entry).where(
+                    models.Entry.site_id == self.site_id,
+                    models.Entry.content_type_id == ct.id,
+                    models.Entry.slug == slug,
+                    models.Entry.status == "published",
+                    models.Entry.deleted_at.is_(None),
+                )
+            ).scalars().first()
+            if row is not None:
+                card = self._entry_card(row, with_body=True)
+                return self._attach_tags([card])[0]
+            if kind not in ("news", "case"):
+                return None
+
+        # case / news 兜底：传统表（News 表为空、Case 表用中文名当 key）
+        model = models.News if kind == "news" else models.Case
+        key_col = model.name if kind == "case" else model.slug
         row = self.session.execute(
-            select(models.Entry).where(
-                models.Entry.site_id == self.site_id,
-                models.Entry.content_type_id == ct.id,
-                models.Entry.slug == slug,
-                models.Entry.status == "published",
-                models.Entry.deleted_at.is_(None),
-            )
+            select(model).where(key_col == slug, model.deleted_at.is_(None))
         ).scalars().first()
         if row is None:
             return None
-        card = self._entry_card(row, with_body=True)
-        return self._attach_tags([card])[0]
+        card = (self._news_card if kind == "news" else self._case_card)(row)
+        card["body_html"] = _body_html(card["content"])
+        return card
 
     # ------------------------------------------------------------ 3. related
 

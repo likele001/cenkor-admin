@@ -634,6 +634,12 @@ async def get_public_news_detail(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
+    # `/news/{slug}` 这个模式被 JSON 接口先占，HTML 页再注册也命中不到
+    # （Starlette 按注册顺序，先注册者胜出）。所以 HTML 走带 `.html` 后缀的
+    # 同一个模式，在这里分流 —— 不用改前缀，老链接也不会断。
+    if slug.endswith(".html"):
+        return await _serve_public_page(request, db, slug, kind="news")
+
     result = await db.execute(
         select(models.News)
         .where(models.News.deleted_at.is_(None), models.News.slug == slug, models.News.status == "published")
@@ -961,55 +967,29 @@ async def _site_meta(db: AsyncSession) -> tuple[str, str]:
     return name, desc
 
 
-async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None:
-    """按类型查出可用于渲染的 item（统一成 `_build_json_ld` 认识的形状）。"""
-    if kind == "product":
-        row = (await db.execute(
-            select(models.Product).where(
-                models.Product.slug == slug,
-                models.Product.deleted_at.is_(None),
-            )
-        )).scalar_one_or_none()
-        if row is None:
-            return None
-        item = _product_to_item(row)
-        item["site_id"] = getattr(row, "site_id", None)
-        return item
+async def _type_key_map(db: AsyncSession) -> dict[int, str]:
+    """content_type_id → key。卡片 URL、sitemap 都要按条目真实类型算路径。"""
+    rows = (await db.execute(
+        select(models.ContentType.id, models.ContentType.key)
+    )).all()
+    return dict(rows)
 
-    if kind == "news":
-        row = (await db.execute(
-            select(models.News).where(
-                models.News.slug == slug,
-                models.News.deleted_at.is_(None),
-            )
-        )).scalar_one_or_none()
-        if row is None:
-            return None
-        item = _news_to_item(row)
-        item["site_id"] = getattr(row, "site_id", None)
-        return item
 
-    if kind == "case":
-        row = (await db.execute(
-            select(models.Case).where(
-                models.Case.name == slug,
-                models.Case.deleted_at.is_(None),
-            )
-        )).scalar_one_or_none()
-        if row is None:
-            return None
-        item = _case_to_item(row)
-        item["site_id"] = getattr(row, "site_id", None)
-        return item
-
-    # article：内容引擎条目，必须已发布
-    row = (await db.execute(
-        select(models.Entry).where(
-            models.Entry.slug == slug,
-            models.Entry.status == "published",
-            models.Entry.deleted_at.is_(None),
-        )
-    )).scalars().first()
+async def _load_entry_page_item(
+    db: AsyncSession, slug: str, kind: str, *, strict: bool = True
+) -> dict | None:
+    """从内容引擎取详情 item，分类与标签一并带上（模板里要用）。"""
+    conds: list[Any] = [
+        models.Entry.slug == slug,
+        models.Entry.status == "published",
+        models.Entry.deleted_at.is_(None),
+    ]
+    if strict:
+        # 类型必须匹配：/news/{slug}.html 不该把一篇文章当成新闻返回
+        conds.append(models.Entry.content_type_id.in_(
+            select(models.ContentType.id).where(models.ContentType.key == kind)
+        ))
+    row = (await db.execute(select(models.Entry).where(*conds))).scalars().first()
     if not row:
         return None
 
@@ -1049,7 +1029,66 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
         "ai_generated": row.ai_origin is not None,
         "category": category,
         "tags": tag_names,
+        # 真实类型：article 走非严格匹配时可能捞到 case/news 的条目，
+        # canonical 得按条目自己的类型算，否则同一个内容会有两个地址
+        "content_type": (await _type_key_map(db)).get(row.content_type_id) or kind,
     }
+
+
+async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None:
+    """按类型查出可用于渲染的 item（统一成 `_build_json_ld` 认识的形状）。
+
+    case / news 的真实数据在**内容引擎**里，和 article 共用 `Entry`；传统的
+    `Case` / `News` 独立表只作兜底 —— `Case` 表连 slug 列都没有，一直拿中文
+    名当 URL，`News` 表干脆是空的（0 行），只查它等于公开页永远 404。
+    """
+    if kind == "product":
+        row = (await db.execute(
+            select(models.Product).where(
+                models.Product.slug == slug,
+                models.Product.deleted_at.is_(None),
+            )
+        )).scalar_one_or_none()
+        if row is None:
+            return None
+        item = _product_to_item(row)
+        item["site_id"] = getattr(row, "site_id", None)
+        item["content_type"] = "product"
+        return item
+
+    if kind in ("case", "news"):
+        item = await _load_entry_page_item(db, slug, kind)
+        if item is not None:
+            return item
+        # 兜底：还没迁到内容引擎的老数据
+        if kind == "news":
+            row = (await db.execute(
+                select(models.News).where(
+                    models.News.slug == slug,
+                    models.News.deleted_at.is_(None),
+                )
+            )).scalar_one_or_none()
+            if row is None:
+                return None
+            item = _news_to_item(row)
+        else:
+            row = (await db.execute(
+                select(models.Case).where(
+                    models.Case.name == slug,
+                    models.Case.deleted_at.is_(None),
+                )
+            )).scalar_one_or_none()
+            if row is None:
+                return None
+            item = _case_to_item(row)
+        item["site_id"] = getattr(row, "site_id", None)
+        item["content_type"] = kind
+        return item
+
+    # article：非严格匹配。历史链接（含 sitemap 里已发出的 /article/{slug}.html）
+    # 覆盖所有内容类型，按类型硬过滤会让这些地址集体变 404；canonical 会按
+    # item["content_type"] 自愈到正确路径。
+    return await _load_entry_page_item(db, slug, "article", strict=False)
 
 
 def _page_path(kind: str, slug: str) -> str:
@@ -1098,13 +1137,18 @@ def _entry_excerpt(content: dict, seo: dict, limit: int = 160) -> str:
     )).strip()
 
 
-async def _entry_cards(db: AsyncSession, entries: list, base: str) -> list[dict[str, Any]]:
+async def _entry_cards(
+    db: AsyncSession, entries: list, base: str, type_keys: dict[int, str] | None = None
+) -> list[dict[str, Any]]:
     """条目 → 模板卡片。字段与 TemplateContext._entry_card 对齐。
 
     分类和标签是**批量**查的：列表 12 条不能退化成 24 次 SQL。
+    卡片链接按条目自己的内容类型拼：/case/ 列表里的卡片不能再指向 /article/，
+    否则点进去虽然能开，但地址是错的（canonical 全靠 301 自愈不现实）。
     """
     if not entries:
         return []
+    keys = type_keys if type_keys is not None else await _type_key_map(db)
     ids = [e.id for e in entries]
 
     cat_ids = {e.category_id for e in entries if e.category_id}
@@ -1130,14 +1174,15 @@ async def _entry_cards(db: AsyncSession, entries: list, base: str) -> list[dict[
         content = dict(e.content or {})
         seo = dict(e.seo or {})
         cat = cats.get(e.category_id)
+        ct_key = keys.get(e.content_type_id) or "article"
         out.append({
             "id": e.id,
-            "type": "article",
+            "type": ct_key,
             "slug": e.slug,
             "title": e.title,
             "excerpt": _entry_excerpt(content, seo),
             "cover": content.get("cover_image") or seo.get("og_image"),
-            "url": f"{base}{_page_path('article', e.slug)}",
+            "url": f"{base}{_page_path(ct_key, e.slug)}",
             "published_at": e.published_at.isoformat() if e.published_at else None,
             "updated_at": e.updated_at.isoformat() if e.updated_at else None,
             "view_count": e.view_count or 0,
@@ -1361,7 +1406,7 @@ async def _serve_list_page(
         .limit(LIST_PER_PAGE)
     )).scalars().all()
 
-    items = await _entry_cards(db, rows, base)
+    items = await _entry_cards(db, rows, base, await _type_key_map(db))
     model = _list_model(
         base=base, site_name=site_name, site_desc=site_desc,
         title=title, description=description, canonical=canonical,
@@ -1388,6 +1433,22 @@ async def product_index(
 ):
     """产品列表页。"""
     return await _serve_list_page(request, db, kind="product", page=page)
+
+
+@router.get("/case/", include_in_schema=False)
+async def case_index(
+    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+):
+    """案例列表页（走主题 list.html）。"""
+    return await _serve_list_page(request, db, kind="case", page=page)
+
+
+@router.get("/news/", include_in_schema=False)
+async def news_index(
+    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+):
+    """新闻列表页。注意 `/news` 那几条是 JSON 接口，和带斜杠的两套。"""
+    return await _serve_list_page(request, db, kind="news", page=page)
 
 
 @router.get("/category/{slug}/", include_in_schema=False)
@@ -1433,7 +1494,8 @@ async def _serve_public_page(
             status_code=404,
             media_type="text/html; charset=utf-8",
         )
-    canonical = f"{base}{_page_path(kind, slug)}"
+    canonical = f"{base}{_page_path(item.get('content_type') or kind, slug)}"
+    kind = item.get("content_type") or kind
     return Response(
         content=await _render_page_html(
             item, base=base, canonical=canonical, kind=kind,
@@ -1570,8 +1632,12 @@ async def sitemap_xml(request: Request, db: AsyncSession = Depends(get_db)):
             or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
         )
     )).scalars().all()
+    # 按条目真实类型拼路径。之前一律当 article，case/news 的条目被列成
+    # /article/{slug}.html —— 能打开但地址是错的，等于把错误 URL 教给爬虫。
+    type_keys = await _type_key_map(db)
     for e in entries:
-        urls.append((f"{base}{_page_path('article', e.slug)}", e.updated_at or e.created_at))
+        ct_key = type_keys.get(e.content_type_id) or "article"
+        urls.append((f"{base}{_page_path(ct_key, e.slug)}", e.updated_at or e.created_at))
 
     # 传统产品 / 新闻
     prods = (await db.execute(
@@ -1583,13 +1649,14 @@ async def sitemap_xml(request: Request, db: AsyncSession = Depends(get_db)):
         if p.slug:
             urls.append((f"{base}{_page_path('product', p.slug)}", p.updated_at or p.created_at))
 
-    # News 表不进 sitemap：没有对应公开页（见 llms.txt 处的说明）
+    # News 表不进 sitemap：它现在是空的（0 行），新闻数据都在内容引擎里，
+    # 上面那个按类型的循环已经覆盖到了。
 
-    # 列表页：文章汇总 / 产品汇总 / 有内容的分类与标签。
+    # 列表页：各内容类型的汇总页 + 有内容的分类与标签。
     # 这些是可索引的落地页，不列出来爬虫只能靠内链发现，收录会很慢。
     now = datetime.now(tz=UTC)
-    urls.append((f"{base}/article/", now))
-    urls.append((f"{base}/product/", now))
+    for ct_key in ("article", "product", "case", "news"):
+        urls.append((f"{base}/{ct_key}/", now))
 
     cats = (await db.execute(
         select(models.Category).where(models.Category.status == "active")
@@ -1659,7 +1726,7 @@ async def llms_txt(request: Request, db: AsyncSession = Depends(get_db)):
             [
                 (
                     e.title,
-                    f"{base}{_page_path('article', e.slug)}",
+                    f"{base}{_page_path(ct.key, e.slug)}",
                     _strip_html(str((e.content or {}).get("text") or ""), 120),
                 )
                 for e in rows_q
@@ -1679,8 +1746,8 @@ async def llms_txt(request: Request, db: AsyncSession = Depends(get_db)):
         for p in prods if p.slug
     ])
 
-    # 新闻（News 表）故意不列：该表没有对应的公开 HTML 页
-    # （`/news/{slug}` 被既有 JSON 接口占用），列出来就是死链。
+    # 「客户案例」这一节读的是传统 Case 表，只有 `href` 外链（官网那几张卡片），
+    # 和内容引擎里的 case 条目不是一回事——后者已在上面按 ContentType 列全。
 
     cases = (await db.execute(
         select(models.Case).where(

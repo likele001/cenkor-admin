@@ -15,14 +15,22 @@
 |---|---|---|
 | `/article/{slug}.html` | `detail.html` | 文章详情 |
 | `/product/{slug}.html` | `detail.html` | 产品详情 |
+| `/case/{slug}.html` | `detail.html` | 案例详情 |
+| `/news/{slug}.html` | `detail.html` | 新闻详情 |
 | `/article/`、`/article/?page=2` | `list.html` | 文章列表（分页 12 条/页） |
 | `/product/` | `list.html` | 产品列表 |
+| `/case/` | `list.html` | 案例列表 |
+| `/news/` | `list.html` | 新闻列表 |
 | `/category/{slug}/` | `list.html` | 分类列表 |
 | `/tag/{slug}/` | `list.html` | 标签列表 |
 | `/search/?kw=xxx` | `list.html` | 搜索结果 |
 | 任何不存在的页面 | `404.html` | 返回 404 状态码 |
 
 `page.html`（单页类型）目前没有对外路由，写了也不生效。
+
+> `/news`（无斜杠）和 `/news/{slug}`（无 `.html`）是既有的 **JSON 接口**，给前端和
+> AI 助手读数据；`/news/` 和 `/news/{slug}.html` 才是给人看的页面。同一段 URL 模式
+> 由后端按后缀分流，两种都保留。
 
 `layout.html`、`partials/*`、`macros/*`、`assets/style.css` 是所有页面的组成部分，改它们立刻生效。
 
@@ -41,8 +49,8 @@
 
 | 路径 | 目标 |
 |---|---|
-| `/article/{slug}.html`、`/product/{slug}.html` 等详情页 | `/api/v1/public/$1/$2` |
-| `/article/`、`/product/` | `/api/v1/public/article/`、`/api/v1/public/product/` |
+| 详情页 `/article/{slug}.html`、`/product/{slug}.html`、`/case/`、`/news/` | `/api/v1/public/$1/$2.html`（**后缀要保留**，后端靠它区分 HTML 与 JSON） |
+| `/article/`、`/product/`、`/case/`、`/news/` | `/api/v1/public/<类型>/` |
 | `/category/{slug}/`、`/tag/{slug}/` | `/api/v1/public/category/$1/`、`/api/v1/public/tag/$1/` |
 | `/search/` | `/api/v1/public/search/`（注意尾斜杠，`/search` 是 JSON 接口） |
 | `/sitemap.xml`、`/llms.txt` | 同名后端路径 |
@@ -210,8 +218,10 @@ assets/style.css         全站样式，会被内联进 <style>
 返回卡片数组，字段：`id` `type` `slug` `title` `excerpt` `cover` `url` `published_at`
 `updated_at` `view_count` `sort` `ai_generated` `content` `custom_fields` `seo` `category` `tags`。
 
-> `product` / `news` / `case` 卡片结构略有不同（多出 `is_flagship` `github` `demo` 等产品字段），
-> 公共字段名是一致的，可以共用一套卡片模板。
+> `product` 读的是产品目录表，卡片字段不同（`is_flagship` `github_url` `demo_url` 等）；
+> `article` / `news` / `case` 读的是同一套内容引擎，卡片**完全同构**，可以共用一套卡片模板。
+> 卡片里的 `type` 是条目自己的类型，`url` 也是按它拼的 —— `/news/` 列表里的卡片
+> 不会错误地指向 `/article/`。
 
 ### 2. `content(type, slug)` — 单条详情
 
