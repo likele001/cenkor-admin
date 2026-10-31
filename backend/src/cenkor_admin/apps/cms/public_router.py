@@ -5,15 +5,21 @@ import re
 import time
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import models, static_cache
 from cenkor_admin.apps.cms.render import render_page
-from cenkor_admin.apps.cms.template_context import build_pagination
+from cenkor_admin.apps.cms.template_context import (
+    PAGE_PREFIX,
+    absolutize_pagination,
+    build_pagination,
+    page_url,
+)
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.db import AsyncSessionLocal, get_db
 from cenkor_admin.core.storage import s3
@@ -1093,6 +1099,11 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
         item["content_type"] = kind
         return item
 
+    if kind == "page":
+        # 单页严格匹配：`/p/about.html` 把一篇文章当单页渲染，面包屑和
+        # canonical 会一起指错栏目，而且这种错很难从页面上看出来
+        return await _load_entry_page_item(db, slug, "page", strict=True)
+
     # article：非严格匹配。历史链接（含 sitemap 里已发出的 /article/{slug}.html）
     # 覆盖所有内容类型，按类型硬过滤会让这些地址集体变 404；canonical 会按
     # item["content_type"] 自愈到正确路径。
@@ -1100,9 +1111,40 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
 
 
 def _page_path(kind: str, slug: str) -> str:
-    """公开页面路径（llms.txt / sitemap / JSON-LD 共用同一套规则）。"""
-    prefix = {"product": "product", "news": "news", "case": "case"}.get(kind, "article")
+    """公开页面路径（llms.txt / sitemap / JSON-LD 共用同一套规则）。
+
+    单页（page 类型，如「关于我们」）走 `/p/{slug}.html`：这类页面和文章共用
+    `/article/` 会让面包屑和 canonical 都指向错的栏目，必须有自己的命名空间。
+    """
+    prefix = PAGE_PREFIX.get(kind, "article")
     return f"/{prefix}/{slug}.html"
+
+
+def _list_base_path(
+    kind: str, *, category_slug: str | None = None, tag_slug: str | None = None
+) -> str:
+    """列表页基路径（不含页码）。分页页在它后面接 `page/{n}/`。"""
+    if category_slug:
+        return f"/category/{category_slug}/"
+    if tag_slug:
+        return f"/tag/{tag_slug}/"
+    return f"/{kind}/"
+
+
+def _search_pagination(pg: dict, *, base: str, kw: str) -> dict:
+    """搜索结果翻页必须带着关键词，塞不进路径，只能留在 query 上。"""
+    q = f"kw={quote(kw)}"
+
+    def u(n: int) -> str:
+        return f"{base}/search/?{q}" + (f"&page={n}" if n > 1 else "")
+
+    pg["url"] = u(pg["page"])
+    pg["first_url"] = u(1)
+    pg["last_url"] = u(pg["total_pages"])
+    pg["prev_url"] = u(pg["page"] - 1) if pg["has_prev"] else None
+    pg["next_url"] = u(pg["page"] + 1) if pg["has_next"] else None
+    pg["pages"] = [{"n": n, "url": u(n), "current": n == pg["page"]} for n in pg["window"]]
+    return pg
 
 
 # ============================================================
@@ -1280,9 +1322,20 @@ def _product_cards(rows: list, base: str) -> list[dict[str, Any]]:
     return out
 
 
+async def _html_404(request: Request, db: AsyncSession) -> Response:
+    """统一 404：走主题的 404.html，别让未知路径掉进静态兜底变成 200 首页。"""
+    base = str(request.base_url).rstrip("/")
+    site_id, site_name, _ = await _resolve_site(db, request)
+    return Response(
+        content=await _render_404_html(base, site_name, site_id=site_id),
+        status_code=404,
+        media_type="text/html; charset=utf-8",
+    )
+
+
 async def _serve_product_list(
     db: AsyncSession, *, site_id: int, base: str, page: int,
-    site_name: str, site_desc: str,
+    site_name: str, site_desc: str, from_query: bool = False,
 ) -> Response:
     """产品列表：直接查 Product 表，与 /product/{slug}.html 详情同源。"""
     conds: list[Any] = [models.Product.deleted_at.is_(None), models.Product.status == "published"]
@@ -1293,7 +1346,14 @@ async def _serve_product_list(
     total = (await db.execute(
         select(func.count()).select_from(models.Product).where(*conds)
     )).scalar() or 0
-    pg = build_pagination(page, total, LIST_PER_PAGE, 5)
+    base_path = _list_base_path("product")
+    pg = build_pagination(page, total, LIST_PER_PAGE, 5, base_path=base_path)
+
+    # 老的 ?page=N 与越界页码统一 301 到规范地址，别让爬虫把同一页收成两个 URL
+    if (from_query and pg["page"] > 1) or page != pg["page"]:
+        return RedirectResponse(f"{base}{page_url(base_path, pg['page'])}", status_code=301)
+    absolutize_pagination(pg, base)
+
     rows = (await db.execute(
         select(models.Product)
         .where(*conds)
@@ -1305,7 +1365,8 @@ async def _serve_product_list(
     title, description = _LIST_META["product"]
     model = _list_model(
         base=base, site_name=site_name, site_desc=site_desc,
-        title=title, description=description, canonical=f"{base}/product/",
+        title=title, description=description,
+        canonical=f"{base}{page_url(base_path, pg['page'])}",
         items=_product_cards(rows, base), pagination=pg,
     )
     return Response(
@@ -1324,8 +1385,13 @@ async def _serve_list_page(
     category_slug: str | None = None,
     tag_slug: str | None = None,
     kw: str | None = None,
+    from_query: bool = False,
 ) -> Response:
-    """列表页统一入口：文章列表 / 分类 / 标签 / 搜索共用一套查询与分页。"""
+    """列表页统一入口：文章列表 / 分类 / 标签 / 搜索共用一套查询与分页。
+
+    from_query 标记页码是 `?page=N` 这种老式传参。老地址一律 301 到
+    `/…/page/N/`，否则同一页会有两个可访问 URL，且 query 版本永远进不了静态缓存。
+    """
     base = str(request.base_url).rstrip("/")
     site_id, site_name, site_desc = await _resolve_site(db, request)
 
@@ -1333,15 +1399,11 @@ async def _serve_list_page(
     if kind == "product":
         return await _serve_product_list(
             db, site_id=site_id, base=base, page=page,
-            site_name=site_name, site_desc=site_desc,
+            site_name=site_name, site_desc=site_desc, from_query=from_query,
         )
 
     async def not_found() -> Response:
-        return Response(
-            content=await _render_404_html(base, site_name, site_id=site_id),
-            status_code=404,
-            media_type="text/html; charset=utf-8",
-        )
+        return await _html_404(request, db)
 
     ct = (await db.execute(
         select(models.ContentType).where(models.ContentType.key == kind)
@@ -1416,7 +1478,22 @@ async def _serve_list_page(
         select(func.count()).select_from(models.Entry).where(*conds)
     )).scalar() or 0
 
-    pg = build_pagination(page, total, LIST_PER_PAGE, 5)
+    base_path = _list_base_path(kind, category_slug=category_slug, tag_slug=tag_slug)
+    # 搜索页的筛选条件在 query 上，页码没法塞进路径，保持 `?kw=x&page=n`
+    pg = build_pagination(page, total, LIST_PER_PAGE, 5, base_path=None if kw else base_path)
+
+    # 老的 ?page=N、以及越界页码，统一 301 到规范地址。
+    # 不跳的话同一页会有两个可访问 URL，canonical 也说不清哪个是真的。
+    if not kw and ((from_query and pg["page"] > 1) or page != pg["page"]):
+        return RedirectResponse(f"{base}{page_url(base_path, pg['page'])}", status_code=301)
+
+    if kw:
+        pg = _search_pagination(pg, base=base, kw=kw)
+        canonical = pg["url"]
+    else:
+        absolutize_pagination(pg, base)
+        canonical = pg["url"]
+
     rows = (await db.execute(
         select(models.Entry)
         .where(*conds)
@@ -1431,10 +1508,14 @@ async def _serve_list_page(
         title=title, description=description, canonical=canonical,
         items=items, pagination=pg,
     )
+    headers = {"Cache-Control": "public, max-age=120"}
+    if kw:
+        # 搜索结果页是无限薄内容，被收录只会稀释站点权重
+        headers["X-Robots-Tag"] = "noindex, follow"
     return Response(
         content=await render_page(model, site_id=site_id, base=base),
         media_type="text/html; charset=utf-8",
-        headers={"Cache-Control": "public, max-age=120"},
+        headers=headers,
     )
 
 
@@ -1442,8 +1523,10 @@ async def _serve_list_page(
 async def article_index(
     request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
 ):
-    """文章列表页（走主题 list.html）。"""
-    return await _serve_list_page(request, db, kind="article", page=page)
+    """文章列表页（走主题 list.html）。`?page=N` 会被 301 到 `/article/page/N/`。"""
+    return await _serve_list_page(
+        request, db, kind="article", page=page, from_query="page" in request.query_params
+    )
 
 
 @router.get("/product/", include_in_schema=False)
@@ -1451,7 +1534,9 @@ async def product_index(
     request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
 ):
     """产品列表页。"""
-    return await _serve_list_page(request, db, kind="product", page=page)
+    return await _serve_list_page(
+        request, db, kind="product", page=page, from_query="page" in request.query_params
+    )
 
 
 @router.get("/case/", include_in_schema=False)
@@ -1459,7 +1544,9 @@ async def case_index(
     request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
 ):
     """案例列表页（走主题 list.html）。"""
-    return await _serve_list_page(request, db, kind="case", page=page)
+    return await _serve_list_page(
+        request, db, kind="case", page=page, from_query="page" in request.query_params
+    )
 
 
 @router.get("/news/", include_in_schema=False)
@@ -1467,7 +1554,9 @@ async def news_index(
     request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
 ):
     """新闻列表页。注意 `/news` 那几条是 JSON 接口，和带斜杠的两套。"""
-    return await _serve_list_page(request, db, kind="news", page=page)
+    return await _serve_list_page(
+        request, db, kind="news", page=page, from_query="page" in request.query_params
+    )
 
 
 @router.get("/category/{slug}/", include_in_schema=False)
@@ -1475,7 +1564,10 @@ async def category_page(
     slug: str, request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
 ):
     """分类列表页。"""
-    return await _serve_list_page(request, db, kind="article", page=page, category_slug=slug)
+    return await _serve_list_page(
+        request, db, kind="article", page=page, category_slug=slug,
+        from_query="page" in request.query_params,
+    )
 
 
 @router.get("/tag/{slug}/", include_in_schema=False)
@@ -1483,7 +1575,72 @@ async def tag_page(
     slug: str, request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
 ):
     """标签列表页。"""
-    return await _serve_list_page(request, db, kind="article", page=page, tag_slug=slug)
+    return await _serve_list_page(
+        request, db, kind="article", page=page, tag_slug=slug,
+        from_query="page" in request.query_params,
+    )
+
+
+@router.get("/{kind}/page/{n}/", include_in_schema=False)
+async def kind_paged(
+    kind: str, n: str, request: Request, db: AsyncSession = Depends(get_db),
+):
+    """列表分页页：`/article/page/2/`。
+
+    泛型路由必须严格限定在已知列表类型上，否则 `/foo/page/1/` 会拿一个空列表
+    冒充有效页面，被爬虫收进去就是无穷薄内容。
+
+    页码收成 str 再手工解析：写成 `n: int` 时非数字页码会被 FastAPI 判 422，
+    而 nginx 侧又只转发数字，非法页码会掉进静态兜底返回 200 首页 —— 假 200
+    是这个项目已经踩过一次的坑，宁可显式 404。
+    """
+    if kind not in _LIST_META:
+        return await _html_404(request, db)
+    try:
+        page_no = int(str(n).strip())
+    except (TypeError, ValueError):
+        return await _html_404(request, db)
+    if page_no <= 1:
+        # `/article/page/1/` 和 `/article/` 是同一份内容，留两个地址就是给自己
+        # 制造重复页面。第 1 页统一回基路径。
+        return RedirectResponse(
+            f"{str(request.base_url).rstrip('/')}{_list_base_path(kind)}", status_code=301
+        )
+    return await _serve_list_page(request, db, kind=kind, page=page_no)
+
+
+@router.get("/category/{slug}/page/{n}/", include_in_schema=False)
+async def category_paged(
+    slug: str, n: str, request: Request, db: AsyncSession = Depends(get_db),
+):
+    """分类分页页：`/category/{slug}/page/2/`。"""
+    try:
+        page_no = int(str(n).strip())
+    except (TypeError, ValueError):
+        return await _html_404(request, db)
+    if page_no <= 1:
+        return RedirectResponse(
+            f"{str(request.base_url).rstrip('/')}"
+            f"{_list_base_path('article', category_slug=slug)}", status_code=301
+        )
+    return await _serve_list_page(request, db, kind="article", page=page_no, category_slug=slug)
+
+
+@router.get("/tag/{slug}/page/{n}/", include_in_schema=False)
+async def tag_paged(
+    slug: str, n: str, request: Request, db: AsyncSession = Depends(get_db),
+):
+    """标签分页页：`/tag/{slug}/page/2/`。"""
+    try:
+        page_no = int(str(n).strip())
+    except (TypeError, ValueError):
+        return await _html_404(request, db)
+    if page_no <= 1:
+        return RedirectResponse(
+            f"{str(request.base_url).rstrip('/')}"
+            f"{_list_base_path('article', tag_slug=slug)}", status_code=301
+        )
+    return await _serve_list_page(request, db, kind="article", page=page_no, tag_slug=slug)
 
 
 @router.get("/search/", include_in_schema=False)
@@ -1494,8 +1651,10 @@ async def search_page(
     db: AsyncSession = Depends(get_db),
 ):
     """搜索页（HTML）。JSON 版仍是 /api/v1/public/search，两者互不影响。"""
-    if not kw.strip():
-        return await _serve_list_page(request, db, kind="article", page=page)
+    kw = kw.strip()
+    if not kw:
+        # 空搜索页就是 /article/ 的副本，留着只会让爬虫收到两份一样的内容
+        return RedirectResponse(f"{str(request.base_url).rstrip('/')}/article/", status_code=302)
     return await _serve_list_page(request, db, kind="article", page=page, kw=kw)
 
 
@@ -1507,12 +1666,7 @@ async def _serve_public_page(
     site_name, site_desc = await _site_meta(db)
     item = await _load_page_item(db, slug, kind)
     if not item:
-        site_id, _, _ = await _resolve_site(db, request)
-        return Response(
-            content=await _render_404_html(base, site_name, site_id=site_id),
-            status_code=404,
-            media_type="text/html; charset=utf-8",
-        )
+        return await _html_404(request, db)
     canonical = f"{base}{_page_path(item.get('content_type') or kind, slug)}"
     kind = item.get("content_type") or kind
     html = await _render_page_html(
@@ -1557,6 +1711,16 @@ async def product_page(slug: str, request: Request, db: AsyncSession = Depends(g
 @router.get("/case/{slug}", include_in_schema=False)
 async def case_page(slug: str, request: Request, db: AsyncSession = Depends(get_db)):
     return await _serve_public_page(request, db, slug, kind="case")
+
+
+@router.get("/p/{slug}", include_in_schema=False)
+async def single_page(slug: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """单页（page 类型）：关于我们 / 联系我们 / 隐私政策这类。
+
+    `page.html` 模板和 `KIND_TEMPLATE["page"]` 一直都在，但从没有对外路由 ——
+    后台建出来的单页根本没有地址可访问。单独给 `/p/` 前缀，不和文章混住。
+    """
+    return await _serve_public_page(request, db, slug, kind="page")
 
 
 @router.get("/preview/{token}", include_in_schema=False)

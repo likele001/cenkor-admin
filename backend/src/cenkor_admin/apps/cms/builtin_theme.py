@@ -22,7 +22,9 @@ LAYOUT = """<!DOCTYPE html>
 <meta name="description" content="{{ page.description }}">
 <link rel="canonical" href="{{ page.canonical }}">
 {% include "partials/meta.html" %}
-{% block head %}{% endblock %}
+{% if page.pagination and page.pagination.prev_url %}<link rel="prev" href="{{ page.pagination.prev_url }}">
+{% endif %}{% if page.pagination and page.pagination.next_url %}<link rel="next" href="{{ page.pagination.next_url }}">
+{% endif %}{% block head %}{% endblock %}
 <style>{{ theme_css|safe }}</style>
 </head>
 <body>
@@ -94,12 +96,12 @@ CARD_PARTIAL = """<a class="card" href="{{ r.url }}">
 PAGINATION_PARTIAL = """{% set pg = page.pagination %}
 {% if pg and pg.total_pages > 1 %}
 <nav class="pagination" aria-label="分页">
-  {% if pg.has_prev %}<a class="page-btn" href="?page={{ pg.prev_page }}">上一页</a>{% endif %}
-  {% for n in pg.window %}
-    {% if n == pg.page %}<span class="page-btn current">{{ n }}</span>
-    {% else %}<a class="page-btn" href="?page={{ n }}">{{ n }}</a>{% endif %}
+  {% if pg.has_prev %}<a class="page-btn" href="{{ pg.prev_url or ('?page=' ~ pg.prev_page) }}">上一页</a>{% endif %}
+  {% for p in (pg.pages or []) %}
+    {% if p.current %}<span class="page-btn current">{{ p.n }}</span>
+    {% else %}<a class="page-btn" href="{{ p.url or ('?page=' ~ p.n) }}">{{ p.n }}</a>{% endif %}
   {% endfor %}
-  {% if pg.has_next %}<a class="page-btn" href="?page={{ pg.next_page }}">下一页</a>{% endif %}
+  {% if pg.has_next %}<a class="page-btn" href="{{ pg.next_url or ('?page=' ~ pg.next_page) }}">下一页</a>{% endif %}
   <span class="page-info">{{ pg.range_start }}–{{ pg.range_end }} / 共 {{ pg.total }} 条</span>
 </nav>
 {% endif %}

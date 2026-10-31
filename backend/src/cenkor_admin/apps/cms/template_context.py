@@ -87,8 +87,38 @@ def _body_html(content: dict) -> str:
 PAGE_PREFIX = {"product": "product", "news": "news", "case": "case", "article": "article", "page": "p"}
 
 
-def build_pagination(page: int = 1, total: int = 0, per_page: int = 20, window: int = 5) -> dict[str, Any]:
-    """分页对象。纯函数，模板 API 与列表页路由共用同一份算法，避免两处算出不同的页码。"""
+def page_url(base_path: str, n: int) -> str:
+    """第 N 页的地址。第 1 页就是列表基路径本身，不给 `/page/1/` 留一份重复内容。"""
+    base = "/" + (base_path or "/").strip("/")
+    base = base + "/" if base != "/" else "/"
+    return base if int(n or 1) <= 1 else f"{base}page/{int(n)}/"
+
+
+def absolutize_pagination(pg: dict, base: str) -> dict:
+    """build_pagination 只产出相对路径（它不该知道站点域名），这里补成可用 href。"""
+    prefix = (base or "").rstrip("/")
+    for k in ("url", "first_url", "last_url", "prev_url", "next_url"):
+        if pg.get(k):
+            pg[k] = f"{prefix}{pg[k]}"
+    for p in pg.get("pages") or []:
+        if p.get("url"):
+            p["url"] = f"{prefix}{p['url']}"
+    return pg
+
+
+def build_pagination(
+    page: int = 1,
+    total: int = 0,
+    per_page: int = 20,
+    window: int = 5,
+    base_path: str | None = None,
+) -> dict[str, Any]:
+    """分页对象。纯函数，模板 API 与列表页路由共用同一份算法，避免两处算出不同的页码。
+
+    base_path 传列表基路径（如 `/article/`）时会额外生成 url / prev_url / next_url /
+    pages，模板直接拿去当 href。不传则这些字段为 None / 空，老模板用 `?page=N`
+    自己拼也不会炸 —— 纯函数不该强制要求调用方知道 URL 长什么样。
+    """
     page = max(1, int(page or 1))
     per_page = max(1, int(per_page or 20))
     total = max(0, int(total or 0))
@@ -98,7 +128,11 @@ def build_pagination(page: int = 1, total: int = 0, per_page: int = 20, window: 
     start = max(1, page - half)
     end = min(total_pages, start + window - 1)
     start = max(1, end - window + 1)
-    return {
+
+    def _url(n: int) -> str | None:
+        return page_url(base_path, n) if base_path else None
+
+    out = {
         "page": page, "per_page": per_page, "total": total,
         "total_pages": total_pages, "window": list(range(start, end + 1)),
         "has_prev": page > 1, "has_next": page < total_pages,
@@ -106,7 +140,17 @@ def build_pagination(page: int = 1, total: int = 0, per_page: int = 20, window: 
         "next_page": page + 1 if page < total_pages else None,
         "range_start": 0 if total == 0 else (page - 1) * per_page + 1,
         "range_end": min(page * per_page, total),
+        "url": _url(page),
+        "first_url": _url(1),
+        "last_url": _url(total_pages),
+        "prev_url": _url(page - 1) if page > 1 else None,
+        "next_url": _url(page + 1) if page < total_pages else None,
+        "pages": [
+            {"n": n, "url": _url(n), "current": n == page}
+            for n in range(start, end + 1)
+        ],
     }
+    return out
 
 _SORT_FIELDS = {
     "published_at": "published_at",
@@ -580,8 +624,11 @@ class TemplateContext:
     # ------------------------------------------------------------ 10. pagination
 
     @cms_api
-    def pagination(self, page: int = 1, total: int = 0, per_page: int = 20, window: int = 5) -> dict[str, Any]:
-        return build_pagination(page, total, per_page, window)
+    def pagination(self, page: int = 1, total: int = 0, per_page: int = 20, window: int = 5,
+                   base_path: str | None = None) -> dict[str, Any]:
+        """分页对象。传 base_path（如 `/article/`）才会生成可点的翻页链接。"""
+        pg = build_pagination(page, total, per_page, window, base_path=base_path)
+        return absolutize_pagination(pg, self.base) if base_path else pg
 
     # ------------------------------------------------------------ 11. asset
 
@@ -607,14 +654,15 @@ class TemplateContext:
             # 带尾斜杠：/search 是 JSON 接口，HTML 搜索页在 /search/
             return f"{self.base}/search/{q}{tail}"
         if kind == "category":
-            return f"{self.base}/category/{slug}/"
+            return f"{self.base}{page_url(f'/category/{slug}/', page or 1)}"
         if kind == "tag":
-            return f"{self.base}/tag/{slug}/"
+            return f"{self.base}{page_url(f'/tag/{slug}/', page or 1)}"
         prefix = PAGE_PREFIX.get(kind, "article")
         if not slug:
-            return f"{self.base}/{prefix}/"
-        tail = f"?page={page}" if page else ""
-        return f"{self.base}/{prefix}/{slug}.html{tail}"
+            # 列表页翻页走路径式：/article/page/2/，不是 ?page=2
+            return f"{self.base}{page_url(f'/{prefix}/', page or 1)}"
+        # 详情页再挂 ?page= 没有意义，忽略掉比生成一个脏链接好
+        return f"{self.base}/{prefix}/{slug}.html"
 
     # ------------------------------------------------------------ 13. comments
 
