@@ -1388,15 +1388,74 @@ async def _page_path(
     )
 
 
-def _list_base_path(
-    kind: str, *, category_slug: str | None = None, tag_slug: str | None = None
+async def _list_base_path(
+    db: AsyncSession,
+    site_id: int,
+    kind: str,
+    *,
+    category_slug: str | None = None,
+    tag_slug: str | None = None,
 ) -> str:
-    """列表页基路径（不含页码）。分页页在它后面接 `page/{n}/`。"""
+    """列表页基路径（不含页码）。分页页在它后面接 `page/{n}/`。
+
+    走规则体系，不再写死 `/category/{slug}/`、`/tag/{slug}/`、`/{kind}/`：
+    用户在后台把栏目规则改成 `{catdir}/` 之后，栏目页地址必须跟着变，
+    否则页内链接和 canonical 全指向旧地址 —— 页面上看着正常，爬虫看到的是错的。
+    """
+    rules = await url_resolver.load_rules(db, site_id)
     if category_slug:
+        cat = await _category_by_slug(db, site_id, category_slug)
+        if cat is not None:
+            catdir = await url_resolver.category_chain(db, cat.id, site_id)
+            return url_resolver.category_base(
+                rules,
+                slug=category_slug,
+                catdir=catdir,
+                category_id=cat.id,
+                type_key=kind,
+            )
         return f"/category/{category_slug}/"
     if tag_slug:
+        tag = await _tag_by_slug(db, site_id, tag_slug)
+        if tag is not None:
+            return url_resolver.tag_base(
+                rules, slug=tag_slug, tag_id=tag.id, type_key=kind
+            )
         return f"/tag/{tag_slug}/"
-    return f"/{kind}/"
+    return url_resolver.list_base(rules, kind)
+
+
+async def _category_by_slug(
+    db: AsyncSession, site_id: int, slug: str
+) -> models.Category | None:
+    return (
+        (
+            await db.execute(
+                select(models.Category).where(
+                    models.Category.site_id == site_id,
+                    models.Category.slug == slug,
+                    models.Category.deleted_at.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+async def _tag_by_slug(db: AsyncSession, site_id: int, slug: str) -> models.Tag | None:
+    return (
+        (
+            await db.execute(
+                select(models.Tag).where(
+                    models.Tag.site_id == site_id,
+                    models.Tag.slug == slug,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
 
 
 def _search_pagination(pg: dict, *, base: str, kw: str) -> dict:
@@ -1657,6 +1716,7 @@ async def _html_404(request: Request, db: AsyncSession) -> Response:
 async def _serve_product_list(
     db: AsyncSession,
     *,
+    request: Request,
     site_id: int,
     base: str,
     page: int,
@@ -1673,8 +1733,14 @@ async def _serve_product_list(
     total = (
         await db.execute(select(func.count()).select_from(models.Product).where(*conds))
     ).scalar() or 0
-    base_path = _list_base_path("product")
+    base_path = await _list_base_path(db, site_id, "product")
     pg = build_pagination(page, total, LIST_PER_PAGE, 5, base_path=base_path)
+
+    # 规范地址自愈：产品列表页也走规则体系，老地址 301 到新地址
+    expected = url_resolver.permalink_page(base_path, page)
+    origin = _origin_path(request)
+    if origin and origin != expected:
+        return RedirectResponse(f"{base}{expected}", status_code=301)
 
     # 老的 ?page=N 与越界页码统一 301 到规范地址，别让爬虫把同一页收成两个 URL
     if (from_query and pg["page"] > 1) or page != pg["page"]:
@@ -1736,6 +1802,7 @@ async def _serve_list_page(
     if kind == "product":
         return await _serve_product_list(
             db,
+            request=request,
             site_id=site_id,
             base=base,
             page=page,
@@ -1827,20 +1894,14 @@ async def _serve_list_page(
         *extra,
     ]
 
-    if category_slug:
-        canonical = f"{base}/category/{category_slug}/"
-    elif tag_slug:
-        canonical = f"{base}/tag/{tag_slug}/"
-    elif kw:
-        canonical = f"{base}/search/?kw={kw}"
-    else:
-        canonical = f"{base}/{kind}/"
-
     total = (
         await db.execute(select(func.count()).select_from(models.Entry).where(*conds))
     ).scalar() or 0
 
-    base_path = _list_base_path(kind, category_slug=category_slug, tag_slug=tag_slug)
+    base_path = await _list_base_path(
+        db, site_id, kind, category_slug=category_slug, tag_slug=tag_slug
+    )
+
     # 搜索页的筛选条件在 query 上，页码没法塞进路径，保持 `?kw=x&page=n`
     pg = build_pagination(page, total, LIST_PER_PAGE, 5, base_path=None if kw else base_path)
 
@@ -1848,6 +1909,23 @@ async def _serve_list_page(
     # 不跳的话同一页会有两个可访问 URL，canonical 也说不清哪个是真的。
     if not kw and ((from_query and pg["page"] > 1) or page != pg["page"]):
         return RedirectResponse(f"{base}{page_url(base_path, pg['page'])}", status_code=301)
+
+    # 规范地址自愈：当前请求路径跟规则算出来的规范地址不一致 → 301。
+    # 用户改了列表页/栏目页规则之后，老地址（/article/、/category/xx/）
+    # 必须跳到新地址，否则同一份内容有两个可访问 URL，权重被稀释。
+    #
+    # canonical 也必须等于规范地址：写死 `/category/{slug}/`、`/{kind}/` 的话，
+    # 用户改完规则页面照常打开，但 canonical 还指着旧地址 ——
+    # 页面上看着正常，爬虫拿到的是「这个页面在别处还有一份」。
+    if kw:
+        canonical = f"{base}/search/?kw={kw}"
+        expected = ""
+    else:
+        expected = url_resolver.permalink_page(base_path, pg["page"])
+        canonical = f"{base}{expected}"
+        origin = _origin_path(request)
+        if origin and origin != expected:
+            return RedirectResponse(f"{base}{expected}", status_code=301)
 
     if kw:
         pg = _search_pagination(pg, base=base, kw=kw)
@@ -2005,8 +2083,10 @@ async def kind_paged(
     if page_no <= 1:
         # `/article/page/1/` 和 `/article/` 是同一份内容，留两个地址就是给自己
         # 制造重复页面。第 1 页统一回基路径。
+        site_id, _, _ = await _resolve_site(db, request)
+        base_path = await _list_base_path(db, site_id, kind)
         return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}{_list_base_path(kind)}", status_code=301
+            f"{str(request.base_url).rstrip('/')}{base_path}", status_code=301
         )
     return await _serve_list_page(request, db, kind=kind, page=page_no)
 
@@ -2024,8 +2104,10 @@ async def category_paged(
     except (TypeError, ValueError):
         return await _html_404(request, db)
     if page_no <= 1:
+        site_id, _, _ = await _resolve_site(db, request)
+        base_path = await _list_base_path(db, site_id, "article", category_slug=slug)
         return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}{_list_base_path('article', category_slug=slug)}",
+            f"{str(request.base_url).rstrip('/')}{base_path}",
             status_code=301,
         )
     return await _serve_list_page(request, db, kind="article", page=page_no, category_slug=slug)
@@ -2044,8 +2126,10 @@ async def tag_paged(
     except (TypeError, ValueError):
         return await _html_404(request, db)
     if page_no <= 1:
+        site_id, _, _ = await _resolve_site(db, request)
+        base_path = await _list_base_path(db, site_id, "article", tag_slug=slug)
         return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}{_list_base_path('article', tag_slug=slug)}",
+            f"{str(request.base_url).rstrip('/')}{base_path}",
             status_code=301,
         )
     return await _serve_list_page(request, db, kind="article", page=page_no, tag_slug=slug)
@@ -2308,24 +2392,36 @@ async def sitemap_xml(request: Request, db: AsyncSession = Depends(get_db)):
 
     # 列表页：各内容类型的汇总页 + 有内容的分类与标签。
     # 这些是可索引的落地页，不列出来爬虫只能靠内链发现，收录会很慢。
+    #
+    # 地址必须走规则体系：用户改完 URL 规则之后，sitemap 里还写着旧地址，
+    # 等于亲手把爬虫送去 404 —— 收录掉了，排名也跟着掉。
     now = datetime.now(tz=UTC)
+    rules = await url_resolver.load_rules(db)
     for ct_key in ("article", "product", "case", "news"):
-        urls.append((f"{base}/{ct_key}/", now))
+        urls.append((f"{base}{url_resolver.list_base(rules, ct_key)}", now))
 
     cats = (
         (await db.execute(select(models.Category).where(models.Category.status == "active")))
         .scalars()
         .all()
     )
+    cat_chains = await url_resolver.category_chains(db)
     for c in cats:
         if c.slug:
             stamp = getattr(c, "updated_at", None) or getattr(c, "created_at", None) or now
-            urls.append((f"{base}/category/{c.slug}/", stamp))
+            urls.append(
+                (
+                    f"{base}{url_resolver.category_base(rules, slug=c.slug, catdir=cat_chains.get(c.id), category_id=c.id)}",
+                    stamp,
+                )
+            )
 
     for t in (await db.execute(select(models.Tag))).scalars().all():
         if t.slug:
             stamp = getattr(t, "created_at", None) or now
-            urls.append((f"{base}/tag/{t.slug}/", stamp))
+            urls.append(
+                (f"{base}{url_resolver.tag_base(rules, slug=t.slug, tag_id=t.id)}", stamp)
+            )
 
     items = "\n".join(
         f"  <url><loc>{loc}</loc><lastmod>{last.date().isoformat()}</lastmod></url>"
@@ -2697,6 +2793,11 @@ async def public_ask(
 # _serve_public_page 会让模板找不到对应模板文件。
 _KNOWN_DETAIL_KINDS = frozenset({"article", "product", "news", "case", "page"})
 
+# URL 前缀 → 内容类型 key（TYPE_PREFIX 的反向表）。
+# 列表页规则里的 {type} 是通配的，反解出来是「article」这样的前缀，
+# 要反查成内容类型 key 才能决定渲染哪个列表模板。
+_KIND_BY_PREFIX: dict[str, str] = {v: k for k, v in permalink.TYPE_PREFIX.items()}
+
 
 def _expand_rules(rules: url_resolver.RuleSet) -> list[permalink.Rule]:
     """把规则集展开成可反解的 Rule 列表。
@@ -2704,10 +2805,20 @@ def _expand_rules(rules: url_resolver.RuleSet) -> list[permalink.Rule]:
     栏目 / 标签级规则给 priority=1，站点默认给 0：后台配了栏目规则的栏目，
     反向解析时要先于全站规则被尝试，否则 `/mes/abc.html` 可能被站点默认的
     `{type}/{slug}.html` 先认走（type=mes）。
+
+    列表页规则（``_list``）也参与反解，但它跟其它规则语义不同：
+    它的 ``{type}`` 用来区分内容类型（``article/`` / ``product/``……），
+    命中后不是详情页，而是列表页。
     """
     out: list[permalink.Rule] = []
     for kind, pattern in rules.defaults.items():
         if kind == "_list":
+            # 列表页规则单独处理：{type} 是通配的（要能认出 article/product/…），
+            # 跟内容类型规则那种「{type} 绑死成字面量」的编译方式不一样。
+            try:
+                out.append(permalink.Rule("_list", pattern, source="site"))
+            except permalink.RuleError:
+                continue
             continue
         try:
             out.append(permalink.Rule(kind, pattern, source="site"))
@@ -2729,15 +2840,17 @@ def _expand_rules(rules: url_resolver.RuleSet) -> list[permalink.Rule]:
 def _origin_path(request: Request) -> str:
     """用户在浏览器里请求的那条路径（已剥掉后端挂载前缀）。
 
-    nginx 把站点路径原样拼在 ``/api/v1/public`` 后面转给后端，所以这里
-    把前缀剥掉，拿到的就是浏览器和爬虫看到的那条路径。
+    nginx 把站点路径原样拼在 ``/api/v1/page`` 后面转给后端（旧的 ``/api/v1/public``
+    也还兼容），所以这里把前缀剥掉，拿到的就是浏览器和爬虫看到的那条路径。
 
     比对规范地址必须用它：拿后端的路由路径去比会把每个页面都判成「不一致」，
     于是所有请求都被 301 到自己身上，直接死循环。
     """
     p = request.url.path
-    if p.startswith("/api/v1/public"):
-        p = p[len("/api/v1/public") :]
+    for prefix in ("/api/v1/page", "/api/v1/public"):
+        if p.startswith(prefix):
+            p = p[len(prefix) :]
+            break
     return p or "/"
 
 
@@ -2861,54 +2974,65 @@ async def _redirect_from_history(
 
     base = str(request.base_url).rstrip("/")
     return RedirectResponse(f"{base}{new_path}", status_code=301)
+def _rule_owner(rule: permalink.Rule) -> tuple[str, int] | None:
+    """规则的归属层级与 id。
 
+    ``category:12`` → ``("category", 12)``；站点默认规则没有归属（返回 None）。
 
-async def resolve_custom_path(request: Request, full_path: str, db: AsyncSession) -> Response:
-    """兜底解析：按后台配置的 URL 规则反解地址。
-
-    ⚠️ 本函数**不在**本文件的 router 上注册 —— 它注册在
-    ``cms_fallback_router``，且必须排在所有 public 子路由之后。
-    原因见那个文件的说明：`{full_path:path}` 会遮蔽后面注册的路径，
-    留在 `cms_public_router` 里会把 /public/comments、/public/track 这些
-    接口全吃掉。
-
-    三级优先级：
-    ① ``cms_entries.url_path`` 精确匹配 —— 用户在手填路径，钉死不动
-    ② 栏目 / 标签 / 站点规则匹配
-    ③ 都不中 → 404
-
-    规则解析出来之后还要用参数回库校验（比如 catdir 必须真对应一个栏目），
-    否则 `/随便/什么.html` 也会被 ``{catdir}/{slug}.html`` 认领成一篇不存在的文章。
+    归属是**归属核对**的依据：栏目级规则编译出来的正则并不知道自己只对
+    某个栏目有效 —— 栏目 7 的 ``{catdir}/{slug}.html`` 同样能匹配栏目 9 的路径。
+    匹配上之后必须回库核对「这条规则配的那个栏目，是不是就是命中的那个栏目」，
+    对不上就换下一条规则继续试。
     """
-    raw = "/" + full_path
-    base_path, page = permalink.split_page(raw)
-    site_id, _, _ = await _resolve_site(db, request)
+    src = rule.source or ""
+    for layer in ("category", "tag"):
+        prefix = f"{layer}:"
+        if src.startswith(prefix):
+            try:
+                return layer, int(src[len(prefix) :])
+            except ValueError:
+                return None
+    return None
 
-    # ① 手填路径
-    hit = await _entry_by_url_path(db, base_path)
-    if hit is not None and hit.slug:
-        type_keys = await _type_key_map(db)
-        return await _serve_public_page(
-            request, db, hit.slug, kind=type_keys.get(hit.content_type_id) or "article"
-        )
 
-    # ② 规则匹配
-    rules = await url_resolver.load_rules(db, site_id)
-    match = permalink.parse_path(base_path, _expand_rules(rules))
-    if match is None:
-        # ③ 旧格式兜底：改过规则的老地址 301 到新地址，不能直接 404
-        return await _redirect_from_history(request, db, rules, base_path, site_id)
+async def _resolve_by_match(
+    request: Request,
+    db: AsyncSession,
+    match: permalink.Match,
+    *,
+    base_path: str,
+    page: int,
+    site_id: int,
+    type_keys: dict[int, str],
+) -> Response | None:
+    """拿一条匹配去反解内容。解不出来返回 None，让调用方试下一条规则。
 
+    归属核对发生在这里：
+
+    - 栏目级规则：命中的栏目必须就是这条规则配的那个栏目
+    - 标签级规则：命中的标签必须就是这条规则配的那个标签
+    - 站点默认规则：不限制归属
+
+    对不上就返回 None —— 继续试下一条规则，而不是直接 404。
+    """
     kind = (match.get("type") or match.kind or "article").strip().lower()
     if kind not in _KNOWN_DETAIL_KINDS:
         kind = "article"
 
+    if match.kind == "_list":
+        # 列表页规则命中。它的 {type} 是通配的（要能认出 article/product/…），
+        # 所以必须反查成已知内容类型，否则 /随便什么/ 会被当成列表页。
+        prefix = (match.get("type") or "").strip().lower()
+        list_kind = _KIND_BY_PREFIX.get(prefix)
+        if list_kind is None or list_kind not in _LIST_META:
+            return None
+        return await _serve_list_page(request, db, kind=list_kind, page=page)
+
     if match.kind == "category":
         slug = match.get("slug") or (match.get("catdir") or "").rsplit("/", 1)[-1]
         if not slug:
-            return await _html_404(request, db)
-        # 栏目必须真实存在，{catdir} 只是路径片段，不代表库里有这个目录
-        exists = (
+            return None
+        row = (
             await db.execute(
                 select(models.Category.id).where(
                     models.Category.site_id == site_id,
@@ -2917,15 +3041,20 @@ async def resolve_custom_path(request: Request, full_path: str, db: AsyncSession
                 )
             )
         ).scalar()
-        if exists is None:
-            return await _html_404(request, db)
+        # 栏目必须真实存在，{catdir} 只是路径片段，不代表库里有这个目录
+        if row is None:
+            return None
+        owner = _rule_owner(match.rule)
+        if owner is not None and owner != ("category", row):
+            # 这条规则配给的是别的栏目 —— 让给下一条规则
+            return None
         return await _serve_list_page(request, db, kind=kind, page=page, category_slug=slug)
 
     if match.kind == "tag":
         slug = match.get("slug")
         if not slug:
-            return await _html_404(request, db)
-        exists = (
+            return None
+        row = (
             await db.execute(
                 select(models.Tag.id).where(
                     models.Tag.site_id == site_id,
@@ -2933,11 +3062,14 @@ async def resolve_custom_path(request: Request, full_path: str, db: AsyncSession
                 )
             )
         ).scalar()
-        if exists is None:
-            return await _html_404(request, db)
+        if row is None:
+            return None
+        owner = _rule_owner(match.rule)
+        if owner is not None and owner != ("tag", row):
+            return None
         return await _serve_list_page(request, db, kind=kind, page=page, tag_slug=slug)
 
-    # ③ 详情页
+    # 详情页
     #
     # 这里有个坑：规则的 ``{type}`` 变量不可靠。``{catdir}/{slug}.html`` 这种
     # 规则里压根没有 {type}，反解出来的 kind 只能是规则的默认类型，猜不准。
@@ -2949,10 +3081,9 @@ async def resolve_custom_path(request: Request, full_path: str, db: AsyncSession
     elif match.get("id"):
         entry = await _entry_by_id(db, match.get("id") or "")
     if entry is None or not entry.slug:
-        # 规则认领了但库里没有这条内容 —— 不是有效的页面
-        return await _html_404(request, db)
+        # 规则认领了但库里没有这条内容 —— 换下一条规则试
+        return None
 
-    type_keys = await _type_key_map(db)
     real_kind = type_keys.get(entry.content_type_id) or kind
 
     # 规范地址自愈：回算这条内容在**当前规则**下的规范地址，跟请求路径比对。
@@ -2975,3 +3106,56 @@ async def resolve_custom_path(request: Request, full_path: str, db: AsyncSession
         return RedirectResponse(f"{base}{canonical_path}", status_code=301)
 
     return await _serve_public_page(request, db, entry.slug, kind=real_kind)
+
+
+async def resolve_custom_path(request: Request, full_path: str, db: AsyncSession) -> Response:
+    """兜底解析：按后台配置的 URL 规则反解地址。
+
+    ⚠️ 本函数**不在**本文件的 router 上注册 —— 它注册在
+    ``cms_fallback_router``，且必须排在所有 public 子路由之后。
+    原因见那个文件的说明：``{full_path:path}`` 会遮蔽后面注册的路径，
+    留在 `cms_public_router` 里会把 /public/comments、/public/track 这些
+    接口全吃掉。
+
+    三级优先级：
+    ① ``cms_entries.url_path`` 精确匹配 —— 用户在手填路径，钉死不动
+    ② 栏目 / 标签 / 站点规则匹配
+    ③ 都不中 → 404
+
+    规则解析出来之后还要用参数回库校验（比如 catdir 必须真对应一个栏目），
+    否则 ``/随便/什么.html`` 也会被 ``{catdir}/{slug}.html`` 认领成一篇不存在的文章。
+
+    ② 不是「取第一条匹配的规则」就完事，而是**逐条试**：栏目级规则编译出来的
+    正则不带栏目归属，A 栏目的规则会抢走 B 栏目的路径。每条匹配都要回库核对
+    归属，对不上就换下一条，全都试完仍无解才走 ③。
+    """
+    raw = "/" + full_path
+    base_path, page = permalink.split_page(raw)
+    site_id, _, _ = await _resolve_site(db, request)
+
+    # ① 手填路径
+    hit = await _entry_by_url_path(db, base_path)
+    if hit is not None and hit.slug:
+        type_keys = await _type_key_map(db)
+        return await _serve_public_page(
+            request, db, hit.slug, kind=type_keys.get(hit.content_type_id) or "article"
+        )
+
+    # ② 规则匹配（逐条试，逐条核对归属）
+    rules = await url_resolver.load_rules(db, site_id)
+    type_keys = await _type_key_map(db)
+    for match in permalink.iter_matches(base_path, _expand_rules(rules)):
+        resp = await _resolve_by_match(
+            request,
+            db,
+            match,
+            base_path=base_path,
+            page=page,
+            site_id=site_id,
+            type_keys=type_keys,
+        )
+        if resp is not None:
+            return resp
+
+    # ③ 旧格式兜底：改过规则的老地址 301 到新地址，不能直接 404
+    return await _redirect_from_history(request, db, rules, base_path, site_id)

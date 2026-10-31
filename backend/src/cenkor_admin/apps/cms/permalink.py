@@ -30,7 +30,7 @@ canonical 全错 —— 这类错只能靠对比页面源码发现，排查成�
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
@@ -39,13 +39,16 @@ __all__ = [
     "ALLOWED_VARS",
     "DEFAULT_PATTERNS",
     "TYPE_PREFIX",
+    "Conflict",
     "Match",
     "Rule",
     "RuleError",
     "RuleNotApplicable",
     "build_url",
+    "classify_conflicts",
     "compile_pattern",
     "find_conflicts",
+    "iter_matches",
     "normalize_pattern",
     "parse_path",
     "sample_paths",
@@ -368,6 +371,22 @@ def parse_path(path: str, rules: Sequence[Rule]) -> Match | None:
     调用方负责规则集的构成（比如先试栏目级再试站点级），这里只按
     传入顺序逐个匹配 —— 顺序由 :func:`sort_rules` 保证。
     """
+    for m in iter_matches(path, rules):
+        return m
+    return None
+
+
+def iter_matches(path: str, rules: Sequence[Rule]) -> Iterator[Match]:
+    """按顺序产出**所有**能认领该路径的匹配。
+
+    为什么不能只取第一条：栏目级规则是用「栏目页地址」模板写的，
+    但编译出来的正则并不知道自己只对某个栏目有效 —— 栏目 7 的规则
+    ``{catdir}/{slug}.html`` 同样能匹配栏目 9 的路径。
+
+    只认第一条的话，栏目 9 的页面会被栏目 7 的规则抢走，
+    然后拿内容 slug 去查栏目表 → 查不到 → 404。
+    调用方拿到匹配后要**回库核对**归属，对不上就继续试下一条。
+    """
     target = path if path.startswith("/") else "/" + path
     for rule in sort_rules(rules):
         try:
@@ -377,8 +396,7 @@ def parse_path(path: str, rules: Sequence[Rule]) -> Match | None:
             continue
         m = rx.match(target)
         if m:
-            return Match(kind=rule.kind, params=dict(m.groupdict()), rule=rule)
-    return None
+            yield Match(kind=rule.kind, params=dict(m.groupdict()), rule=rule)
 
 
 # ---------------------------------------------------------------- 冲突检测
@@ -397,19 +415,35 @@ _SAMPLE_VALUES: dict[str, tuple[str, ...]] = {
 }
 
 
-def sample_paths(pattern: str, limit: int = 24) -> list[str]:
+def sample_paths(pattern: str, limit: int = 24, kind: str = "") -> list[str]:
     """为一个规则生成若干条代表性路径，用于和其他规则对撞。
 
     完整判定两个正则的交集不可行（需要正则求交），工程上够用的替代是
     「拿 A 的样本去撞 B 的正则」。样本覆盖了每个变量的首值和次值，
     现实里的冲突几乎都落在这些形态上。
+
+    ``kind`` 传了的话，``{type}`` 的样本会取该类型**真实的 URL 前缀**
+    （article 类型取 ``article``，单页取 ``p``）。不传就会取通用值
+    ``article``/``product`` 各一份 —— 于是「单页规则」也会生成
+    ``/article/xxx.html`` 这种样本，白白撞上文章规则。
     """
     body = normalize_pattern(pattern)
     names = variables_of(body)
+
+    type_values = _SAMPLE_VALUES["type"]
+    if kind:
+        prefix = TYPE_PREFIX.get(kind)
+        if prefix:
+            type_values = (prefix,)
+
+    def _values_for(name: str) -> tuple[str, ...]:
+        if name == "type":
+            return type_values
+        return _SAMPLE_VALUES.get(name, ("x",))
+
     base: dict[str, str] = {}
     for n in names:
-        vals = _SAMPLE_VALUES.get(n, ("x",))
-        base[n] = vals[0]
+        base[n] = _values_for(n)[0]
 
     paths: list[str] = []
     try:
@@ -418,8 +452,7 @@ def sample_paths(pattern: str, limit: int = 24) -> list[str]:
         return paths
 
     for n in names:
-        vals = _SAMPLE_VALUES.get(n, ("x",))
-        for v in vals[1:]:
+        for v in _values_for(n)[1:]:
             try:
                 paths.append(build_url(body, {**base, n: v}))
             except RuleNotApplicable:
@@ -440,14 +473,14 @@ def _overlap(a: Rule, b: Rule) -> str | None:
     目录名恰好叫 ``article`` 时都能吃 ``/article/x.html``，用户根本猜不到
     哪条生效 —— 这是必须拦下的配置，不是「更具体的赢」就完事。
     """
-    for sample in sample_paths(a.pattern):
+    for sample in sample_paths(a.pattern, kind=a.kind):
         try:
             rx_b = compile_pattern(b.pattern, b.kind)
         except RuleError:
             continue
         if rx_b.match(sample):
             return sample
-    for sample in sample_paths(b.pattern):
+    for sample in sample_paths(b.pattern, kind=b.kind):
         try:
             rx_a = compile_pattern(a.pattern, a.kind)
         except RuleError:
@@ -465,4 +498,140 @@ def find_conflicts(rules: Sequence[Rule]) -> list[tuple[Rule, Rule, str]]:
             sample = _overlap(a, b)
             if sample:
                 out.append((a, b, sample))
+    return out
+
+
+# ---------------------------------------------------------------- 冲突分级
+
+
+@dataclass(frozen=True)
+class Conflict:
+    """一条冲突及其严重级别。
+
+    分级的原因：把「同一层级的两条规则真的分不清谁生效」和「层级之间的正常覆盖」
+    混为一谈，会让「栏目带目录名」这种最常见的配置直接被拦死。
+
+    - ``block``：两条规则在**同一层级**都可能认领同一条内容，
+      用户无法判断点开会看到什么 —— 必须拦下。
+    - ``warn``：跨层级的交集。栏目规则本来就该盖过站点默认，
+      这是设计好的覆盖关系，只提醒不拦。
+    """
+
+    a: Rule
+    b: Rule
+    sample: str
+    severity: str
+    reason: str
+
+
+def _is_type_bound(rule: Rule) -> bool:
+    """这条规则的 ``{type}`` 是否被绑成字面量前缀。
+
+    只有详情类规则（article/product/news/case/page）会绑。
+    ``{type}`` 绑成字面量后，不同类型的规则天然互不重叠。
+    """
+    if "type" not in variables_of(rule.pattern):
+        return False
+    return TYPE_PREFIX.get(rule.kind) is not None
+
+
+def _tier_of(rule: Rule) -> str:
+    """规则所属层级。
+
+    ``site`` = 站点默认，``override`` = 栏目/标签覆盖，``other`` = 历史存档等。
+    同一层级内的冲突才是「真的分不清」，跨层级是设计好的覆盖。
+    """
+    src = rule.source or ""
+    if src == "site" or src == "pending":
+        return "site"
+    if src.startswith("category:") or src.startswith("tag:"):
+        return "override"
+    return "other"
+
+
+def _leading_literal(pattern: str) -> str:
+    """取规则的第一段字面量（非变量部分）。
+
+    用来判断「这条规则写死了一个前缀，恰好等于另一个类型的前缀」——
+    比如 article 规则写成 ``product/{slug}.html``，那它跟 product 的
+    默认规则必然抢同一条地址，属于配错了，必须拦下。
+    """
+    body = normalize_pattern(pattern)
+    first = body.split("/", 1)[0]
+    if "{" in first:
+        return ""
+    return first
+
+
+def classify_conflicts(rules: Sequence[Rule]) -> list[Conflict]:
+    """把冲突分成「必须拦下」和「只提醒」两级。
+
+    跟 :func:`find_conflicts` 的区别：那个函数只回答「有没有交集」，
+    这个函数回答「这个交集要不要拦」。
+
+    判定原则：
+    - 同一层级 + 同一内容类型 → 两条规则都能认领同一条内容，
+      用户没法判断点开会看到什么，**必须拦下**。
+    - 写死的前缀撞上另一个类型的前缀 → 必然抢地址，**必须拦下**。
+    - 其余（跨层级覆盖、跨类型的理论交集）→ 只提醒。
+      栏目规则盖过站点默认是设计好的覆盖关系，拦下来功能就没法用了。
+    """
+    out: list[Conflict] = []
+    for i, a in enumerate(rules):
+        for b in rules[i + 1 :]:
+            sample = _overlap(a, b)
+            if not sample:
+                continue
+            tier_a = _tier_of(a)
+            tier_b = _tier_of(b)
+
+            # 前缀撞前缀：必然抢地址，不管是不是同层级
+            lit_a = _leading_literal(a.pattern)
+            lit_b = _leading_literal(b.pattern)
+            bound_a = TYPE_PREFIX.get(a.kind)
+            bound_b = TYPE_PREFIX.get(b.kind)
+            if (lit_a and bound_b and lit_a == bound_b and a.kind != b.kind) or (
+                lit_b and bound_a and lit_b == bound_a and a.kind != b.kind
+            ):
+                out.append(
+                    Conflict(
+                        a,
+                        b,
+                        sample,
+                        "block",
+                        f"`{a.pattern}` 写死的前缀与 `{b.pattern}` 的类型前缀重复，"
+                        f"两者会认领同一批地址",
+                    )
+                )
+                continue
+
+            if tier_a == tier_b and a.kind == b.kind:
+                # 待保存的规则是在**替换**同类型的站点默认，两者本就是二选一，
+                # 不算冲突 —— 否则「改规则」这个动作永远无法保存。
+                replacing = (a.source == "pending" and b.source == "site") or (
+                    b.source == "pending" and a.source == "site"
+                )
+                if replacing:
+                    continue
+                out.append(
+                    Conflict(
+                        a,
+                        b,
+                        sample,
+                        "block",
+                        "同层级、同类型的两条规则都会认领同一条内容",
+                    )
+                )
+                continue
+
+            out.append(
+                Conflict(
+                    a,
+                    b,
+                    sample,
+                    "warn",
+                    f"`{a.pattern}` 与 `{b.pattern}` 理论上都能认领 `{sample}`，"
+                    f"实际以匹配顺序为准（覆盖关系）",
+                )
+            )
     return out

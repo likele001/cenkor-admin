@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms import models, schemas, static_cache
+from cenkor_admin.apps.cms import models, permalink, schemas, static_cache, url_resolver
 from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.core.db import get_db
@@ -113,6 +113,86 @@ async def _purge_site_static(db: AsyncSession, site_id: int | None) -> None:
         await static_cache.purge_site_by_id(db, site_id)
     except Exception as exc:
         log.warning("static_cache.purge_site_failed", site_id=site_id, error=str(exc))
+
+
+# ============================================================
+# URL 规则写入辅助
+# ============================================================
+
+def _validate_url_pattern(raw: Any, kind: str) -> str | None:
+    """校验一条 URL 规则模板，返回规范化结果。
+
+    空值 = 「不覆盖」，返回 None；非法规则抛 400，把原因直接给用户看。
+    非法规则绝不能静默存进去 —— 那样页面上看着配好了，前台却用旧规则渲染，
+    排查起来非常费时间。
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise HTTPException(400, "URL 规则必须是字符串")
+    text = raw.strip()
+    if not text:
+        return None
+    try:
+        return permalink.validate_pattern(text, kind)
+    except permalink.RuleError as exc:
+        raise HTTPException(400, f"URL 规则不合法：{exc}") from exc
+
+
+def _validate_user_path(raw: Any, site_id: int | None) -> str | None:
+    """校验用户手填的固定路径（``cms_entries.url_path``）。
+
+    手填路径会**完全绕开**规则引擎，优先级最高，所以必须比规则更严：
+    只允许站内相对路径，禁止 ``..``、禁止协议头、禁止空段。
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise HTTPException(400, "自定义路径必须是字符串")
+    text = raw.strip()
+    if not text:
+        return None
+    # 协议头检查必须针对**原始输入**，不能针对规范化后的路径。
+    #
+    # normalize_user_path 会把连续斜杠压成一个，于是 `https://evil.com/x`
+    # 变成 `/https:/evil.com/x` —— 里面的 `://` 已经没了，
+    # 后面再查 `://` 永远查不到，外部地址就被当成站内路径存进了库。
+    if "://" in text:
+        raise HTTPException(400, "自定义路径只能是站内相对路径")
+    # 协议相对 URL（//host/path）：浏览器会当成外站地址跳走，必须拒。
+    # 但 `//mes//abc.html` 是历史支持的冗余斜杠写法，不能一刀切 ——
+    # 只在首段长得像主机名（含点或端口）时才判定为协议相对 URL。
+    if text.startswith("//"):
+        host = text[2:].split("/", 1)[0]
+        if "." in host or ":" in host:
+            raise HTTPException(400, "自定义路径只能是站内相对路径")
+    if "\\" in text:
+        raise HTTPException(400, "自定义路径不能包含反斜杠")
+    path = url_resolver.normalize_user_path(text)
+    if path == "/":
+        raise HTTPException(400, "自定义路径不能是根路径")
+    if ".." in path.split("/"):
+        raise HTTPException(400, "自定义路径不能包含 ..")
+    if len(path) > 300:
+        raise HTTPException(400, "自定义路径太长了（上限 300 字符）")
+    return path
+
+
+async def _assert_url_path_free(
+    db: AsyncSession, site_id: int | None, path: str, exclude_id: int | None = None
+) -> None:
+    """手填路径在同一站点内必须唯一（唯一索引兜底，这里先给出人话报错）。"""
+    stmt = select(models.Entry.id).where(
+        models.Entry.url_path == path,
+        models.Entry.deleted_at.is_(None),
+    )
+    if site_id is not None:
+        stmt = stmt.where(models.Entry.site_id == site_id)
+    if exclude_id is not None:
+        stmt = stmt.where(models.Entry.id != exclude_id)
+    hit = (await db.execute(stmt)).first()
+    if hit is not None:
+        raise HTTPException(409, f"自定义路径 `{path}` 已被其他内容占用")
 
 
 # ============================================================
@@ -578,6 +658,8 @@ async def create_category(
     name = body.get("name")
     if not slug or not name:
         raise HTTPException(400, "slug and name required")
+    # 栏目级 URL 规则：覆盖站点默认的栏目规则，只对这个栏目生效
+    url_pattern = _validate_url_pattern(body.get("url_pattern"), "category")
     obj = models.Category(
         content_type_id=ct_id,
         parent_id=body.get("parent_id"),
@@ -586,6 +668,7 @@ async def create_category(
         icon=body.get("icon"),
         color=body.get("color"),
         sort=body.get("sort", 0),
+        url_pattern=url_pattern,
     )
     db.add(obj)
     await db.commit()
@@ -606,10 +689,15 @@ async def update_category(
     for k in ("name", "slug", "icon", "color", "sort", "status", "parent_id"):
         if k in body:
             setattr(obj, k, body[k])
+    # 栏目 URL 规则：显式传 None / 空串 = 取消覆盖，回到站点默认
+    if "url_pattern" in body:
+        obj.url_pattern = _validate_url_pattern(body.get("url_pattern"), "category")
     await db.commit()
     await db.refresh(obj)
     # [P2] 分类名会出现在该分类下每条详情页的面包屑里，整站静态页撤掉重建
     await _purge_site_static(db, obj.site_id)
+    # 规则改了，URL 生成和反解都要按新规则走 —— 清缓存
+    url_resolver.invalidate(obj.site_id)
     return _category_to_dict(obj)
 
 
@@ -716,6 +804,7 @@ async def create_tag(
         slug=slug,
         name=name,
         color=body.get("color"),
+        url_pattern=_validate_url_pattern(body.get("url_pattern"), "tag"),
     )
     db.add(obj)
     await db.commit()
@@ -736,10 +825,14 @@ async def update_tag(
     for k in ("name", "slug", "color"):
         if k in body:
             setattr(obj, k, body[k])
+    # 标签 URL 规则：显式传 None / 空串 = 取消覆盖，回到站点默认
+    if "url_pattern" in body:
+        obj.url_pattern = _validate_url_pattern(body.get("url_pattern"), "tag")
     await db.commit()
     await db.refresh(obj)
     # [P2] 标签名也会渲染进详情页，整站静态页撤掉重建
     await _purge_site_static(db, obj.site_id)
+    url_resolver.invalidate(obj.site_id)
     return _tag_to_dict(obj)
 
 
@@ -840,6 +933,11 @@ async def create_entry(
 
     body.pop("content_type_key", None)
 
+    # 单条自定义路径：优先级最高，钉死之后规则再改也不动它
+    url_path = _validate_user_path(body.get("url_path"), None)
+    if url_path:
+        await _assert_url_path_free(db, None, url_path)
+
     obj = models.Entry(
         content_type_id=ct_id,
         slug=body.get("slug"),
@@ -854,6 +952,7 @@ async def create_entry(
         scheduled_at=_parse_dt(body.get("scheduled_at")),
         expire_at=_parse_dt(body.get("expire_at")),
         sort=body.get("sort", 0),
+        url_path=url_path,
     )
     db.add(obj)
     await db.flush()
@@ -917,6 +1016,12 @@ async def update_entry(
     for k in ("published_at", "scheduled_at", "expire_at"):
         if k in body:
             setattr(obj, k, _parse_dt(body[k]))
+    # 单条自定义路径：显式传 None / 空串 = 取消钉死，回到规则生成
+    if "url_path" in body:
+        new_path = _validate_user_path(body.get("url_path"), obj.site_id)
+        if new_path and new_path != obj.url_path:
+            await _assert_url_path_free(db, obj.site_id, new_path, exclude_id=obj.id)
+        obj.url_path = new_path
 
     if tag_ids is not None:
         await db.execute(
@@ -1583,6 +1688,7 @@ def _category_to_dict(c: models.Category) -> dict:
         "color": c.color,
         "sort": c.sort,
         "status": c.status,
+        "url_pattern": c.url_pattern,
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
@@ -1595,6 +1701,7 @@ def _tag_to_dict(t: models.Tag) -> dict:
         "slug": t.slug,
         "name": t.name,
         "color": t.color,
+        "url_pattern": t.url_pattern,
     }
 
 
@@ -1656,6 +1763,7 @@ def _entry_to_dict(e: models.Entry) -> dict:
         "expire_at": e.expire_at.isoformat() if e.expire_at else None,
         "sort": e.sort,
         "view_count": e.view_count,
+        "url_path": e.url_path,
         "ai_origin": getattr(e, "ai_origin", None),
         "ai_generation_id": getattr(e, "ai_generation_id", None),
         "created_at": e.created_at.isoformat() if e.created_at else None,

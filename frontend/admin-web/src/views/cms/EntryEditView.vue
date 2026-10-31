@@ -43,7 +43,14 @@ const form = ref({
   tag_ids: [] as number[],
   // 定时发布时间：datetime-local 的字符串，保存时转成带时区的 ISO
   scheduled_at: '',
+  // 自定义固定地址：填了就用它，不再跟规则走（优先级最高）
+  url_path: '',
 })
+
+// 规范地址实时预览：按当前规则算出这条内容最终会以什么地址对外
+const resolvedUrl = ref('')
+const resolvedRuleUrl = ref('')
+const resolvingUrl = ref(false)
 
 // 分发渠道选择弹窗
 const showPublish = ref(false)
@@ -323,6 +330,7 @@ function applyEntry(data: any) {
     sort: data.sort || 0,
     tag_ids: (data.tag_ids as number[]) || [],
     scheduled_at: toLocalInput(data.scheduled_at),
+    url_path: data.url_path || '',
   }
   entry.value = data
 }
@@ -427,6 +435,7 @@ async function save() {
       sort: form.value.sort,
       tag_ids: form.value.tag_ids,
       scheduled_at: form.value.scheduled_at ? toIso(form.value.scheduled_at) : null,
+      url_path: form.value.url_path.trim() || null,
     }
     let savedId: number | null = null
     if (isNew.value) {
@@ -478,6 +487,7 @@ watch(selectedCtKey, async () => {
     form.value = {
       title: '', slug: '', content: {}, custom_fields: {},
       category_id: null, status: 'draft', sort: 0, tag_ids: [], scheduled_at: '',
+      url_path: '',
     }
     // 重新初始化 custom_fields（loadCtAndOptions 已加载 ct）
     if (ct.value) {
@@ -495,6 +505,40 @@ watch(selectedCtKey, async () => {
     }
   }
 })
+
+/** 按当前规则算出这条内容的规范地址（实时预览）。 */
+async function resolveUrl() {
+  if (!selectedCtKey.value) return
+  resolvingUrl.value = true
+  try {
+    const { data } = await api.post('/api/v1/cms/url-rules/resolve', {
+      kind: selectedCtKey.value,
+      slug: form.value.slug || null,
+      category_id: form.value.category_id,
+      entry_id: route.params.id ? Number(route.params.id) : null,
+      published: entry.value?.published_at || null,
+      url_path: form.value.url_path || null,
+    })
+    resolvedUrl.value = data.url || ''
+    resolvedRuleUrl.value = data.rule_url || ''
+  } catch {
+    resolvedUrl.value = ''
+    resolvedRuleUrl.value = ''
+  } finally {
+    resolvingUrl.value = false
+  }
+}
+
+// slug / 栏目 / 自定义路径任一变化都重算地址。
+// 防抖是为了避免连续打字时每个字符都打一次接口。
+let urlResolveTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => [form.value.slug, form.value.category_id, form.value.url_path],
+  () => {
+    if (urlResolveTimer) clearTimeout(urlResolveTimer)
+    urlResolveTimer = setTimeout(resolveUrl, 400)
+  },
+)
 
 onMounted(async () => {
   try {
@@ -577,6 +621,28 @@ onMounted(async () => {
           <div>
             <label class="block text-sm font-medium mb-1">{{ t('entryEdit.text_k755t5') }}</label>
             <input v-model="activeForm.slug" type="text" class="input" placeholder="url-friendly-key" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">自定义地址（可选）</label>
+            <input
+              v-model="form.url_path"
+              type="text"
+              class="input font-mono text-sm"
+              placeholder="留空 = 按 URL 规则生成"
+            />
+            <p class="text-xs text-ink-500 mt-1">
+              填了就以这个地址对外，规则再改也不动它。只支持站内相对路径。
+            </p>
+            <div v-if="resolvedUrl" class="mt-2 text-xs">
+              <div class="text-ink-500">
+                最终地址：
+                <code class="text-ink-800">{{ resolvedUrl }}</code>
+              </div>
+              <div v-if="form.url_path && resolvedRuleUrl && resolvedRuleUrl !== resolvedUrl" class="text-ink-500 mt-0.5">
+                若不填自定义地址：<code class="text-ink-700">{{ resolvedRuleUrl }}</code>
+              </div>
+            </div>
+            <div v-else-if="resolvingUrl" class="mt-2 text-xs text-ink-400">计算中…</div>
           </div>
           <div>
             <div class="flex items-center justify-between mb-1">

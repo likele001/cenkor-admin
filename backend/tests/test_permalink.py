@@ -297,3 +297,222 @@ def test_type_prefix_table_covers_all_detail_kinds() -> None:
     """每个能配 {type} 的类型都得有前缀，否则会退化成 kind 本身。"""
     for kind in ("article", "product", "news", "case", "page"):
         assert kind in P.TYPE_PREFIX
+
+
+# ---------------------------------------------------------------- 冲突分级
+
+
+def _site_defaults() -> list[P.Rule]:
+    """站点默认规则全集（与 DEFAULT_PATTERNS 一致）。"""
+    return [
+        P.Rule("article", "{type}/{slug}.html", source="site"),
+        P.Rule("product", "{type}/{slug}.html", source="site"),
+        P.Rule("news", "{type}/{slug}.html", source="site"),
+        P.Rule("case", "{type}/{slug}.html", source="site"),
+        P.Rule("page", "p/{slug}.html", source="site"),
+        P.Rule("category", "category/{slug}/", source="site"),
+        P.Rule("tag", "tag/{slug}/", source="site"),
+    ]
+
+
+def test_same_kind_different_types_do_not_conflict() -> None:
+    """article 与 product 都用 {type}/{slug}.html，绑成字面量后不该相交。
+
+    之前这里会误报：样本值对所有类型都取 ``article``，
+    于是 product 规则的样本也长成 ``/article/xxx.html``，
+    硬生生撞上 article 规则。
+    """
+    cs = P.classify_conflicts(_site_defaults())
+    assert cs == [], [f"{c.a.pattern} VS {c.b.pattern}" for c in cs]
+
+
+def test_pending_replaces_same_kind_site_rule() -> None:
+    """待保存规则是「替换」同类型的站点默认，不算冲突。
+
+    否则「改规则」这个动作永远保存不下去。
+    """
+    rules = [*_site_defaults(), P.Rule("article", "{catdir}/{slug}.html", source="pending")]
+    cs = P.classify_conflicts(rules)
+    assert not [c for c in cs if c.severity == "block"]
+
+
+def test_literal_prefix_clash_is_blocked() -> None:
+    """article 规则写死 product 前缀 = 必然抢地址，必须拦下。"""
+    rules = [*_site_defaults(), P.Rule("article", "product/{slug}.html", source="pending")]
+    cs = P.classify_conflicts(rules)
+    blocking = [c for c in cs if c.severity == "block"]
+    assert blocking, "写死别人前缀的规则必须被拦下"
+
+
+def test_category_override_is_only_warning() -> None:
+    """栏目规则盖过站点默认是设计好的覆盖关系，不该拦。"""
+    rules = [*_site_defaults(), P.Rule("article", "{catdir}/{slug}.html", source="category:5")]
+    cs = P.classify_conflicts(rules)
+    assert not [c for c in cs if c.severity == "block"]
+
+
+def test_two_category_overrides_same_kind_conflict() -> None:
+    """两个栏目各配一条同类规则且会撞车 —— 这才是真歧义，必须拦。"""
+    rules = [
+        *_site_defaults(),
+        P.Rule("article", "{cat}/{slug}.html", source="category:5"),
+        P.Rule("article", "{catdir}/{slug}.html", source="category:6"),
+    ]
+    cs = P.classify_conflicts(rules)
+    assert [c for c in cs if c.severity == "block"]
+
+
+def test_sample_paths_respect_kind_type_prefix() -> None:
+    """样本路径的 {type} 必须取该类型的真实前缀。"""
+    assert P.sample_paths("{type}/{slug}.html", kind="product")[0] == "/product/demo.html"
+    assert P.sample_paths("{type}/{slug}.html", kind="page")[0] == "/p/demo.html"
+    # 不传 kind 时保留通用样本，供老调用方使用
+    assert P.sample_paths("{type}/{slug}.html")[0].startswith("/")
+
+
+# ---------------------------------------------------------------- 栏目级规则的语义分层
+
+
+def test_category_rule_only_governs_category_page() -> None:
+    """栏目级规则只管**栏目页**，不管该栏目下内容的详情页。
+
+    这是本轮修掉的核心缺陷：``cms_categories.url_pattern`` 曾经被
+    ``detail_url()`` 当成「该栏目下内容的详情页模板」，
+    又被 ``_expand_rules()`` 当成「栏目页规则」，同一份模板两种含义。
+
+    后果：给任意栏目配一条规则 → 该栏目下所有条目反解时拿**内容 slug**
+    去查**栏目表** → 查不到 → 整批 404。
+    """
+    from cenkor_admin.apps.cms import url_resolver as R
+
+    rules = R.RuleSet(
+        defaults={
+            "article": "{type}/{slug}.html",
+            "category": "category/{slug}/",
+            "tag": "tag/{slug}/",
+        },
+        category_patterns={7: "{catdir}/{slug}.html"},
+    )
+
+    # 栏目页走栏目级规则
+    assert R.category_base(
+        rules, slug="mes", catdir="mes", category_id=7
+    ) == "/mes/mes.html"
+
+    # 该栏目下的**内容详情页**仍走站点默认详情规则，跟栏目级规则无关
+    assert R.detail_url(rules, "article", slug="abc", catdir="mes", category_id=7) == (
+        "/article/abc.html"
+    )
+
+    # 不带栏目目录时也一样 —— 栏目级规则不插手
+    assert R.detail_url(rules, "article", slug="abc") == "/article/abc.html"
+
+
+def test_tag_rule_only_governs_tag_page() -> None:
+    """标签级规则只管标签页，跟栏目级对称。"""
+    from cenkor_admin.apps.cms import url_resolver as R
+
+    rules = R.RuleSet(
+        defaults={
+            "article": "{type}/{slug}.html",
+            "category": "category/{slug}/",
+            "tag": "tag/{slug}/",
+        },
+        tag_patterns={3: "t/{slug}/"},
+    )
+    assert R.tag_base(rules, slug="ai", tag_id=3) == "/t/ai/"
+    assert R.detail_url(rules, "article", slug="abc") == "/article/abc.html"
+
+
+def test_category_override_does_not_affect_detail_url() -> None:
+    """栏目覆盖不该顺手改掉该栏目下内容的详情地址。"""
+    from cenkor_admin.apps.cms import url_resolver as R
+
+    rules = R.RuleSet(
+        defaults={"article": "{type}/{slug}.html"},
+        category_patterns={7: "{catdir}/{slug}.html"},
+    )
+    # category_id 传了也不该影响详情页
+    assert R.detail_url(rules, "article", slug="abc", category_id=7) == "/article/abc.html"
+
+
+def test_manual_url_path_wins_over_every_rule() -> None:
+    """手填路径钉死不动，规则改多少都不影响。"""
+    from cenkor_admin.apps.cms import url_resolver as R
+
+    rules = R.RuleSet(defaults={"article": "{type}/{slug}.html"})
+    assert (
+        R.detail_url(rules, "article", slug="abc", url_path="/custom/pinned.html")
+        == "/custom/pinned.html"
+    )
+
+
+def test_list_base_uses_list_rule() -> None:
+    """列表页地址由列表页规则（``url.list``）决定。"""
+    from cenkor_admin.apps.cms import url_resolver as R
+
+    rules = R.RuleSet(defaults={"_list": "{type}/"})
+    assert R.list_base(rules, "article") == "/article/"
+    assert R.list_base(rules, "product") == "/product/"
+
+    custom = R.RuleSet(defaults={"_list": "list/{type}/"})
+    assert R.list_base(custom, "article") == "/list/article/"
+
+
+def test_list_url_appends_page_segment() -> None:
+    """第 1 页是基路径本身，第 N 页接 ``page/N/``。"""
+    from cenkor_admin.apps.cms import url_resolver as R
+
+    rules = R.RuleSet(defaults={"_list": "{type}/"})
+    assert R.list_url(rules, "article", 1) == "/article/"
+    assert R.list_url(rules, "article", 3) == "/article/page/3/"
+
+
+def test_parent_var_only_for_nested_category() -> None:
+    """``{parent}`` 是父栏目链；顶层栏目没有父级 → 规则套不上就回落默认。"""
+    from cenkor_admin.apps.cms import url_resolver as R
+
+    rules = R.RuleSet(defaults={"category": "{parent}/{slug}/"})
+    # 顶层栏目：parent 缺失 → 回落默认
+    assert R.category_base(rules, slug="mes", catdir="mes", category_id=1) == "/category/mes/"
+    # 二级栏目：parent = 父链
+    assert R.category_base(rules, slug="xinwen", catdir="mes/xinwen", category_id=2) == (
+        "/mes/xinwen/"
+    )
+
+
+# ---------------------------------------------------------------- iter_matches：归属核对
+
+
+def test_iter_matches_yields_all_candidates() -> None:
+    """一条路径可能被多条规则认领 —— 必须全部产出，不能只取第一条。"""
+    # 两条规则都能认领 /mes/abc.html：
+    # 站点默认按 {catdir}/{slug}.html 走，栏目 7 的覆盖规则形状相同。
+    rules = [
+        P.Rule("article", "{catdir}/{slug}.html", source="site"),
+        P.Rule("category", "{catdir}/{slug}.html", source="category:7", priority=1),
+    ]
+    matches = list(P.iter_matches("/mes/abc.html", rules))
+    assert len(matches) == 2
+    assert {m.rule.source for m in matches} == {"site", "category:7"}
+
+
+def test_parse_path_still_returns_first_match() -> None:
+    """``parse_path`` 保持旧语义（第一条），调用方按需改用 iter_matches。"""
+    rules = [
+        P.Rule("article", "{catdir}/{slug}.html", source="site"),
+        P.Rule("category", "{catdir}/{slug}.html", source="category:7", priority=1),
+    ]
+    m = P.parse_path("/mes/abc.html", rules)
+    assert m is not None
+    assert m.rule.source == "category:7"
+
+
+def test_iter_matches_skips_invalid_rule() -> None:
+    """脏规则（编译不过）不能把整条链路带崩。"""
+    rules = [
+        P.Rule("article", "{nope}/{slug}.html", source="site"),
+        P.Rule("article", "{type}/{slug}.html", source="site"),
+    ]
+    matches = list(P.iter_matches("/article/abc.html", rules))
+    assert [m.rule.source for m in matches] == ["site"]

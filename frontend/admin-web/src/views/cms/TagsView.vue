@@ -4,7 +4,7 @@ const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
 
-interface Tag { id: number; content_type_id: number; slug: string; name: string; color: string | null }
+interface Tag { id: number; content_type_id: number; slug: string; name: string; color: string | null; url_pattern?: string | null }
 interface ContentType { id: number; key: string; name: string; icon: string | null }
 
 const contentTypes = ref<ContentType[]>([])
@@ -15,7 +15,7 @@ const saving = ref(false)
 const showModal = ref(false)
 const editing = ref<Tag | null>(null)
 const search = ref('')
-const form = ref({ name: '', slug: '', color: '#6366f1' })
+const form = ref({ name: '', slug: '', color: '#6366f1', url_pattern: '' })
 
 const COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
@@ -45,13 +45,13 @@ async function loadTags() {
 
 function openCreate() {
   editing.value = null
-  form.value = { name: '', slug: '', color: COLORS[Math.floor(Math.random() * COLORS.length)] }
+  form.value = { name: '', slug: '', color: COLORS[Math.floor(Math.random() * COLORS.length)], url_pattern: '' }
   showModal.value = true
 }
 
 function openEdit(tag: Tag) {
   editing.value = tag
-  form.value = { name: tag.name, slug: tag.slug, color: tag.color || '#6366f1' }
+  form.value = { name: tag.name, slug: tag.slug, color: tag.color || '#6366f1', url_pattern: tag.url_pattern || '' }
   showModal.value = true
 }
 
@@ -61,11 +61,13 @@ async function save() {
     if (editing.value) {
       await api.patch(`/api/v1/cms/tags/${editing.value.id}`, {
         name: form.value.name, slug: form.value.slug, color: form.value.color,
+        url_pattern: form.value.url_pattern.trim() || null,
       })
     } else {
       await api.post('/api/v1/cms/tags', {
         content_type_key: selectedCtKey.value,
         name: form.value.name, slug: form.value.slug, color: form.value.color,
+        url_pattern: form.value.url_pattern.trim() || null,
       })
     }
     showModal.value = false
@@ -121,6 +123,7 @@ onMounted(async () => {
         <span class="w-3 h-3 rounded-full shrink-0" :style="{ backgroundColor: tag.color || '#6b7280' }"></span>
         <span class="font-medium">{{ tag.name }}</span>
         <code class="text-xs text-ink-400">{{ tag.slug }}</code>
+        <code v-if="tag.url_pattern" class="text-xs text-green-700">{{ tag.url_pattern }}</code>
         <div class="flex gap-1 ml-2">
           <button class="text-ink-400 hover:text-ink-600 text-xs" @click="openEdit(tag)">&#9998;</button>
           <button class="text-ink-400 hover:text-red-600 text-xs" @click="remove(tag)">&times;</button>
@@ -140,6 +143,18 @@ onMounted(async () => {
           <div>
             <label class="block text-sm font-medium mb-1">Slug</label>
             <input v-model="form.slug" class="input" placeholder="tag-slug" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">标签页地址规则（可选）</label>
+            <input
+              v-model="form.url_pattern"
+              class="input font-mono text-sm"
+              placeholder="留空 = 用站点默认，例如 tag/{slug}/"
+            />
+            <p class="text-xs text-ink-500 mt-1">
+              决定这个「标签页」自己的地址。标签页对 SEO 最友好，建议用短 slug，
+              比如 <code>tag/{slug}/</code>。可用变量：<code>{slug}</code> 标签别名、<code>{id}</code> 标签 ID。
+            </p>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">{{ t('tags.颜色_qo9i') }}</label>

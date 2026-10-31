@@ -66,6 +66,7 @@ const navKeyMap: Record<string, string> = {
   '/cms/cases': 'nav.cases',
   '/cms/news': 'nav.news',
   '/cms/site': 'nav.site',
+  '/cms/url-rules': 'nav.urlRules',
   '/cms/media': 'nav.media',
   '/cms/templates': 'nav.templates',
   '/system/users': 'nav.users',

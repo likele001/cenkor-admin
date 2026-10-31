@@ -1,7 +1,6 @@
 """CMS App · 后台管理路由（需要鉴权 - MVP 阶段先放开）"""
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime
 from typing import Any
@@ -14,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms import models, permalink, schemas, url_resolver
+from cenkor_admin.apps.cms import models, schemas, url_resolver
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
@@ -381,60 +380,10 @@ async def upsert_site_config(
 async def _archive_url_rule(db: AsyncSession, key: str, old_value: Any) -> None:
     """把改掉的 URL 规则追加进历史存档。
 
-    只记规则本身，不记内容 —— 历史规则只用来「把老地址反解出来，
-    再按当前规则算出新地址，301 过去」，内容还是从库里现查。
+    实现收敛在 :func:`url_resolver.archive_rule` —— 站点设置页和 URL 规则页
+    两处都要用，留两份实现迟早会分叉。
     """
-    kind = key[len("url.") :]
-    if kind in ("", "_list", "history"):
-        return
-
-    # 旧值可能不在库里：默认规则是代码里的 DEFAULT_PATTERNS，
-    # 用户第一次在后台改规则时，库里根本没有这个 key。
-    # 这时候必须拿默认规则来存档 —— 那才是线上正在用的形态，
-    # 漏掉它意味着「所有已收录的老地址在改规则那一刻集体 404」。
-    if isinstance(old_value, str) and old_value.strip():
-        effective_old = old_value
-    else:
-        effective_old = permalink.DEFAULT_PATTERNS.get(kind)
-    if not effective_old:
-        return
-
-    try:
-        permalink.validate_pattern(effective_old, kind)
-    except permalink.RuleError:
-        # 旧规则本身就不合法（可能是手改库改坏的），存了也没法反解，跳过
-        return
-
-    row = (
-        await db.execute(
-            select(models.SiteConfig).where(models.SiteConfig.key == url_resolver.HISTORY_KEY)
-        )
-    ).scalars().first()
-    raw = row.value if row is not None else None
-    history: list[dict[str, str]] = []
-    if isinstance(raw, list):
-        history = [h for h in raw if isinstance(h, dict)]
-    elif isinstance(raw, str) and raw.strip():
-        # 兼容早期存成 JSON 字符串的脏数据
-        try:
-            parsed = json.loads(raw)
-        except (TypeError, ValueError):
-            parsed = []
-        if isinstance(parsed, list):
-            history = [h for h in parsed if isinstance(h, dict)]
-
-    entry = {"kind": kind, "pattern": effective_old}
-    # 同一条规则已经在存档里就不重复记，避免存档越滚越长
-    if any(h.get("kind") == kind and h.get("pattern") == effective_old for h in history):
-        return
-    history.append(entry)
-    # 只留最近 50 条：存档是给「刚改过的规则」用的，不是无限追溯
-    history = history[-50:]
-
-    if row is None:
-        db.add(models.SiteConfig(key=url_resolver.HISTORY_KEY, value=history))
-    else:
-        row.value = history
+    await url_resolver.archive_rule(db, key[len("url.") :], old_value)
 
 
 # ---- helpers ----

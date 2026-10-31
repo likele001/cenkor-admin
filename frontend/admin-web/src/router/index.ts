@@ -13,6 +13,7 @@ import NewsListView from '@/views/cms/NewsListView.vue'
 import NewsEditView from '@/views/cms/NewsEditView.vue'
 import MediaView from '@/views/cms/MediaView.vue'
 import SiteConfigView from '@/views/cms/SiteConfigView.vue'
+import UrlRulesView from '@/views/cms/UrlRulesView.vue'
 import AiHomeView from '@/views/cms/AiHomeView.vue'
 import AiBuilderView from '@/views/cms/AiBuilderView.vue'
 import AiSettingsView from '@/views/cms/AiSettingsView.vue'
@@ -87,6 +88,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/news/new', name: 'cms-news-new', component: NewsEditView, meta: { permission: 'cms:news:write' } },
       { path: 'cms/news/:id', name: 'cms-news-edit', component: NewsEditView, meta: { permission: 'cms:news:write' } },
       { path: 'cms/site', name: 'cms-site', component: SiteConfigView, meta: { permission: 'cms:site:read' } },
+      { path: 'cms/url-rules', name: 'cms-url-rules', component: UrlRulesView, meta: { permission: 'cms:site:read' } },
       // AI 交互面板：建模向导（内容类型权限）+ 内容工作台（条目权限）
       { path: 'cms/ai', name: 'cms-ai-home', component: AiHomeView, meta: { permission: 'cms:ai:read' } },
       { path: 'cms/ai-builder', name: 'cms-ai-builder', component: AiBuilderView, meta: { permission: 'cms:content_types:write' } },

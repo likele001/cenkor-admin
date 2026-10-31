@@ -25,6 +25,7 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -42,15 +43,21 @@ __all__ = [
     "HISTORY_KEY",
     "URL_KEYS",
     "RuleSet",
+    "archive_rule",
+    "category_base",
     "category_chain",
     "category_chains",
     "category_url",
     "detail_url",
     "invalidate",
+    "list_base",
     "list_url",
     "load_rules",
     "load_rules_sync",
     "normalize_user_path",
+    "permalink_page",
+    "sample_values",
+    "tag_base",
     "tag_url",
     "validate_rule",
 ]
@@ -106,12 +113,30 @@ class RuleSet:
         category_id: int | None = None,
         tag_id: int | None = None,
     ) -> str:
-        """取某条内容该用的规则：栏目覆盖 > 标签覆盖 > 站点默认 > 内置兜底。"""
-        if category_id is not None:
+        """取某类页面该用的规则。
+
+        覆盖只作用于**同一语义层**：
+
+        - ``category_id`` 只影响 ``kind == "category"``（栏目页自己的地址）
+        - ``tag_id`` 只影响 ``kind == "tag"``（标签页自己的地址）
+
+        早期版本里栏目覆盖对任何 kind 都生效，于是「给栏目配一条规则」
+        会顺手把该栏目下所有内容的详情地址一起改掉 —— 同一份模板两种含义。
+        反向解析更糟：那条规则被当成栏目页规则，反解时拿**内容 slug**
+        去查**栏目表**，查不到就整批 404。
+
+        覆盖关系的正确分层是：
+
+            站点默认（``cms_site_config.url.*``）  管全部
+            栏目覆盖（``cms_categories.url_pattern``） 只管栏目页
+            标签覆盖（``cms_tags.url_pattern``）     只管标签页
+            单条钉死（``cms_entries.url_path``）     只管那一条内容
+        """
+        if kind == "category" and category_id is not None:
             hit = self.category_patterns.get(category_id)
             if hit:
                 return hit
-        if tag_id is not None:
+        if kind == "tag" and tag_id is not None:
             hit = self.tag_patterns.get(tag_id)
             if hit:
                 return hit
@@ -129,8 +154,10 @@ def _build(
         if not isinstance(raw, str) or not raw.strip():
             continue
         try:
-            # _list 和详情页共用一套变量集，按 article 校验即可
-            defaults[kind] = permalink.validate_pattern(raw, kind if kind != "_list" else "article")
+            # 按各自的 kind 校验：栏目规则只认栏目变量（{parent} 等），
+            # 列表页规则只认 {type}。统一按 article 校验会让脏规则混进来，
+            # 运行时才发现套不上 —— 那时候规则已经存进库了。
+            defaults[kind] = permalink.validate_pattern(raw, kind)
         except permalink.RuleError as exc:
             # 库里存着脏规则不能让整站 500，记日志继续用默认值
             logger.warning("忽略非法 URL 规则 %s=%r：%s", key, raw, exc)
@@ -163,6 +190,67 @@ def _parse_history(raw: Any) -> tuple[permalink.Rule, ...]:
         except permalink.RuleError:
             continue
     return tuple(out)
+
+
+async def archive_rule(db, kind: str, old_value: Any) -> None:
+    """把被改掉的 URL 规则追加进历史存档。
+
+    只记规则本身，不记内容 —— 历史规则只用来「把老地址反解出来，
+    再按当前规则算出新地址，301 过去」，内容还是从库里现查。
+
+    必须在**覆盖之前**调用：旧值一旦被覆盖就找不回来了。
+
+    旧值可能不在库里 —— 默认规则是代码里的 ``DEFAULT_PATTERNS``，
+    用户第一次改规则时库里根本没这个 key。这时候要拿默认规则来存档，
+    那才是线上正在用的形态。漏掉它意味着「所有已收录的老地址在改规则那一刻集体 404」。
+    """
+    kind = (kind or "").strip().lower()
+    if kind in ("", "_list", "history"):
+        return
+
+    if isinstance(old_value, str) and old_value.strip():
+        effective_old = old_value.strip()
+    else:
+        effective_old = permalink.DEFAULT_PATTERNS.get(kind)
+    if not effective_old:
+        return
+
+    try:
+        permalink.validate_pattern(effective_old, kind)
+    except permalink.RuleError:
+        # 旧规则本身就不合法（可能是手改库改坏的），存了也没法反解，跳过
+        return
+
+    row = (
+        await db.execute(
+            select(models.SiteConfig).where(models.SiteConfig.key == HISTORY_KEY)
+        )
+    ).scalars().first()
+    raw = row.value if row is not None else None
+    history: list[dict[str, str]] = []
+    if isinstance(raw, list):
+        history = [h for h in raw if isinstance(h, dict)]
+    elif isinstance(raw, str) and raw.strip():
+        # 兼容早期存成 JSON 字符串的脏数据
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            parsed = []
+        if isinstance(parsed, list):
+            history = [h for h in parsed if isinstance(h, dict)]
+
+    entry = {"kind": kind, "pattern": effective_old}
+    # 同一条规则已经在存档里就不重复记，避免存档越滚越长
+    if any(h.get("kind") == kind and h.get("pattern") == effective_old for h in history):
+        return
+    history.append(entry)
+    # 只留最近 50 条：存档是给「刚改过的规则」用的，不是无限追溯
+    history = history[-50:]
+
+    if row is None:
+        db.add(models.SiteConfig(key=HISTORY_KEY, value=history))
+    else:
+        row.value = history
 
 
 # ---------------------------------------------------------------- 加载与缓存
@@ -328,6 +416,24 @@ async def category_chain(db, category_id: int | None, site_id: int = 1) -> str |
     return "/".join(reversed(parts)) or None
 
 
+def sample_values(
+    kind: str,
+    *,
+    slug: str | None = None,
+    entry_id: int | None = None,
+    catdir: str | None = None,
+    cat: str | None = None,
+    published: datetime | None = None,
+) -> dict[str, Any]:
+    """给外部（后台预览接口）用的变量取值。
+
+    为什么不直接暴露 :func:`_values`：那个函数的参数是位置参数，
+    调用方一不小心就会把 catdir 传成 cat。规则模板拼错变量的后果是
+    「地址看起来对，点进去 404」，很难查。
+    """
+    return _values(kind, slug, entry_id, catdir, cat, published)
+
+
 def _values(
     kind: str,
     slug: str | None,
@@ -339,7 +445,7 @@ def _values(
     # {type} 填的是**URL 前缀**，不是内容类型 key —— 单页类型 key 是 "page"，
     # 但它的地址前缀是 "/p/"。反向编译时 {type} 也按同一张表绑成字面量，
     # 两边必须一致，否则同一个地址正向生成和反向解析对不上。
-    return {
+    values = {
         "type": permalink.TYPE_PREFIX.get(kind, kind),
         "slug": slug,
         "id": entry_id,
@@ -349,6 +455,13 @@ def _values(
         "month": f"{published.month:02d}" if published else None,
         "day": f"{published.day:02d}" if published else None,
     }
+    # {parent} 只对栏目页有意义（父栏目链，不含自身）。
+    # 顶层栏目没有父级 → None → 规则套不上就回落默认，不拼出脏地址。
+    if catdir and "/" in catdir:
+        values["parent"] = catdir.rsplit("/", 1)[0]
+    else:
+        values["parent"] = None
+    return values
 
 
 def _try_patterns(patterns: list[str], values: dict[str, Any], kind: str) -> str:
@@ -396,25 +509,53 @@ def detail_url(
     """内容详情页地址。
 
     手填路径优先于一切规则 —— 用户在编辑页明确钉死的地址，后台改规则不该动它。
+
+    栏目级 / 标签级规则**不参与**详情页地址：它们只管栏目页 / 标签页自己的地址。
+    「这条内容要不要带栏目目录」由站点默认规则决定（用不用 ``{catdir}``）。
+
+    ``category_id`` 保留是为了让调用方一处传参，但这里不再拿它查栏目覆盖 ——
+    早期版本拿栏目覆盖当详情页模板，正反两个方向解释成两种东西，
+    配了规则的栏目下所有条目反解时拿内容 slug 查栏目表 → 全批 404。
     """
     if url_path and str(url_path).strip():
         return normalize_user_path(str(url_path))
 
     values = _values(kind, slug, entry_id, catdir, cat, published)
-    candidates: list[str] = []
-    if category_id is not None:
-        hit = rules.category_patterns.get(category_id)
-        if hit:
-            candidates.append(hit)
-    candidates.append(rules.pattern_for(kind))
-    return _try_patterns(candidates, values, kind)
+    return _try_patterns([rules.pattern_for(kind)], values, kind)
 
 
 def list_url(rules: RuleSet, kind: str, page: int = 1) -> str:
     """列表页地址，翻页走路径式 `/{base}page/{n}/`。"""
+    return permalink_page(list_base(rules, kind), page)
+
+
+def list_base(rules: RuleSet, kind: str) -> str:
+    """列表页基路径（不含页码）。
+
+    列表页规则只有一条（``url.list``），靠 ``{type}`` 区分内容类型：
+    ``{type}/`` → ``/article/``、``/product/``……
+    """
     values = _values(kind, None, None, None, None, None)
-    base = _try_patterns([rules.pattern_for("_list")], values, "article")
-    return permalink_page(base, page)
+    base = _try_patterns([rules.pattern_for("_list")], values, "_list")
+    return base
+
+
+def category_base(
+    rules: RuleSet,
+    *,
+    slug: str,
+    catdir: str | None = None,
+    category_id: int | None = None,
+    type_key: str = "article",
+) -> str:
+    """栏目页基路径（不含页码）。分页页在它后面接 ``page/{n}/``。
+
+    栏目级规则（``cms_categories.url_pattern``）**只管栏目页**，
+    跟标签级规则一个层级。它不管该栏目下内容的详情页地址 ——
+    那是站点默认规则的活儿（用不用 ``{catdir}`` 决定带不带栏目目录）。
+    """
+    values = _values(type_key, slug, category_id, catdir, slug, None)
+    return _try_patterns([rules.pattern_for("category", category_id=category_id)], values, "category")
 
 
 def category_url(
@@ -426,15 +567,21 @@ def category_url(
     type_key: str = "article",
     page: int = 1,
 ) -> str:
-    values = _values(type_key, slug, category_id, catdir, slug, None)
-    candidates: list[str] = []
-    if category_id is not None:
-        hit = rules.category_patterns.get(category_id)
-        if hit:
-            candidates.append(hit)
-    candidates.append(rules.pattern_for("category", category_id=category_id))
-    base = _try_patterns(candidates, values, "category")
-    return permalink_page(base, page)
+    """栏目页地址（含页码）。"""
+    return permalink_page(category_base(rules, slug=slug, catdir=catdir,
+                                        category_id=category_id, type_key=type_key), page)
+
+
+def tag_base(
+    rules: RuleSet,
+    *,
+    slug: str,
+    tag_id: int | None = None,
+    type_key: str = "article",
+) -> str:
+    """标签页基路径（不含页码）。标签级规则只管标签页，跟栏目级对称。"""
+    values = _values(type_key, slug, tag_id, None, None, None)
+    return _try_patterns([rules.pattern_for("tag", tag_id=tag_id)], values, "tag")
 
 
 def tag_url(
@@ -445,15 +592,8 @@ def tag_url(
     type_key: str = "article",
     page: int = 1,
 ) -> str:
-    values = _values(type_key, slug, tag_id, None, None, None)
-    candidates: list[str] = []
-    if tag_id is not None:
-        hit = rules.tag_patterns.get(tag_id)
-        if hit:
-            candidates.append(hit)
-    candidates.append(rules.pattern_for("tag", tag_id=tag_id))
-    base = _try_patterns(candidates, values, "tag")
-    return permalink_page(base, page)
+    """标签页地址（含页码）。"""
+    return permalink_page(tag_base(rules, slug=slug, tag_id=tag_id, type_key=type_key), page)
 
 
 def permalink_page(base: str, page: int) -> str:
@@ -477,18 +617,22 @@ def validate_rule(pattern: str, kind: str, *, others: list[permalink.Rule] | Non
 
     返回规范化后的规则；不合法抛 :class:`permalink.RuleError`，
     消息直接可以展示给用户。
+
+    只拦**同层级**的冲突：栏目规则盖过站点默认是设计好的覆盖关系，
+    不是错误。跨层级只作为提醒返回，不抛异常。
     """
     body = permalink.validate_pattern(pattern, kind)
     if others:
         mine = permalink.Rule(kind, body, source="pending")
-        conflicts = permalink.find_conflicts([*others, mine])
-        for a, b, sample in conflicts:
-            if mine not in (a, b):
+        for conflict in permalink.classify_conflicts([*others, mine]):
+            if conflict.severity != "block":
                 continue
-            other = b if a is mine else a
+            if mine not in (conflict.a, conflict.b):
+                continue
+            other = conflict.b if conflict.a is mine else conflict.a
             other_label = "站点默认规则" if other.source == "site" else other.source
             raise permalink.RuleError(
                 f"该规则与{other_label}的 `{other.pattern}` 冲突，"
-                f"两者都会认领 `{sample}`，请先调整其中一条"
+                f"两者都会认领 `{conflict.sample}`，请先调整其中一条"
             )
     return body

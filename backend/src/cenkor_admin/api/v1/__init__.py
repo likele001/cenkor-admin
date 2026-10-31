@@ -23,6 +23,7 @@ from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.apps.cms.router import router as cms_router
 from cenkor_admin.apps.cms.site_router import router as cms_site_router
 from cenkor_admin.apps.cms.template_router import router as template_router
+from cenkor_admin.apps.cms.url_rules_router import router as cms_url_rules_router
 from cenkor_admin.apps.notification.router import router as notification_router
 from cenkor_admin.apps.portal.admin_router import router as portal_admin_router
 from cenkor_admin.apps.portal.router import router as portal_router
@@ -63,6 +64,23 @@ api_v1_router.include_router(cms_tracking_router, prefix="/public", tags=["track
 from cenkor_admin.apps.cms.cms_fallback_router import router as cms_fallback_router
 
 api_v1_router.include_router(cms_fallback_router, prefix="/public", tags=["public"])
+
+# ============================================================
+# 页面渲染前缀 /page
+# ============================================================
+# 为什么要有这个独立前缀：
+#
+# nginx 把站点上「静态文件没命中」的任意路径转发回后端，让后端按后台配置的
+# URL 规则反解。以前它转发到 /api/v1/public$uri —— 那是 JSON 接口的地盘，
+# 一旦用户把某条内容的地址配成 /site、/news、/products、/search 这类名字，
+# 转发过去就会撞上同名 JSON 接口：浏览器拿到一段 JSON，状态码 200，
+# 页面渲染彻底错乱，而且日志里一条错都看不到（那本来就是合法接口）。
+#
+# 所以页面渲染单独占一个前缀 /api/v1/page —— 里面只有页面路由和兜底反解，
+# 不跟任何 JSON 接口抢名字。官网静态站读 JSON 仍然走 /api/v1/public。
+from cenkor_admin.apps.cms.cms_page_router import router as cms_page_router
+
+api_v1_router.include_router(cms_page_router, prefix="/page", tags=["page"])
 
 
 # ============================================================
@@ -139,6 +157,11 @@ api_v1_router.include_router(
 # V2 内容引擎
 api_v1_router.include_router(
     content_engine_router, prefix="/cms", tags=["content-engine"],
+    dependencies=[Depends(get_current_user)],
+)
+# URL 伪静态规则管理（站点默认规则 / 预览 / 冲突检测 / 存档）
+api_v1_router.include_router(
+    cms_url_rules_router, prefix="/cms", tags=["cms-url-rules"],
     dependencies=[Depends(get_current_user)],
 )
 # GraphQL（M2·P1 2.1，受保护；REST 并存）

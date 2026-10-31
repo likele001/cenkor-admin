@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 interface Category {
   id: number; content_type_id: number; parent_id: number | null
   slug: string; name: string; icon: string | null; color: string | null
-  sort: number; status: string; children?: Category[]
+  sort: number; status: string; url_pattern?: string | null; children?: Category[]
 }
 
 interface ContentType { id: number; key: string; name: string; icon: string | null }
@@ -20,7 +20,7 @@ const loading = ref(true)
 const saving = ref(false)
 const showModal = ref(false)
 const editing = ref<Category | null>(null)
-const form = ref({ name: '', slug: '', parent_id: null as number | null, icon: '', color: '', sort: 0 })
+const form = ref({ name: '', slug: '', parent_id: null as number | null, icon: '', color: '', sort: 0, url_pattern: '' })
 
 const selectedCtName = computed(() => contentTypes.value.find(c => c.key === selectedCtKey.value)?.name || selectedCtKey.value)
 
@@ -48,7 +48,7 @@ async function loadCategories() {
 
 function openCreate(parentId: number | null = null) {
   editing.value = null
-  form.value = { name: '', slug: '', parent_id: parentId, icon: '', color: '', sort: 0 }
+  form.value = { name: '', slug: '', parent_id: parentId, icon: '', color: '', sort: 0, url_pattern: '' }
   showModal.value = true
 }
 
@@ -57,6 +57,7 @@ function openEdit(cat: Category) {
   form.value = {
     name: cat.name, slug: cat.slug, parent_id: cat.parent_id,
     icon: cat.icon || '', color: cat.color || '', sort: cat.sort,
+    url_pattern: cat.url_pattern || '',
   }
   showModal.value = true
 }
@@ -69,6 +70,7 @@ async function save() {
         name: form.value.name, slug: form.value.slug,
         parent_id: form.value.parent_id, icon: form.value.icon || null,
         color: form.value.color || null, sort: form.value.sort,
+        url_pattern: form.value.url_pattern.trim() || null,
       })
     } else {
       await api.post('/api/v1/cms/categories', {
@@ -76,6 +78,7 @@ async function save() {
         name: form.value.name, slug: form.value.slug,
         parent_id: form.value.parent_id, icon: form.value.icon || null,
         color: form.value.color || null, sort: form.value.sort,
+        url_pattern: form.value.url_pattern.trim() || null,
       })
     }
     showModal.value = false
@@ -137,6 +140,7 @@ onMounted(async () => {
             <span class="font-medium">{{ cat.name }}</span>
             <code class="text-xs text-ink-400 ml-2">{{ cat.slug }}</code>
             <span v-if="cat.color" class="inline-block w-3 h-3 rounded-full ml-2" :style="{ backgroundColor: cat.color }"></span>
+            <code v-if="cat.url_pattern" class="block text-xs text-green-700 mt-1">{{ cat.url_pattern }}</code>
           </div>
           <span class="text-xs text-ink-400">{{ cat.children?.length || 0 }} 子分类</span>
           <div class="flex gap-1">
@@ -153,6 +157,7 @@ onMounted(async () => {
               <span class="font-medium text-sm">{{ child.name }}</span>
               <code class="text-xs text-ink-400 ml-2">{{ child.slug }}</code>
               <span v-if="child.color" class="inline-block w-2 h-2 rounded-full ml-2" :style="{ backgroundColor: child.color }"></span>
+              <code v-if="child.url_pattern" class="block text-xs text-green-700 mt-1">{{ child.url_pattern }}</code>
             </div>
             <div class="flex gap-1">
               <button class="btn-ghost text-xs" @click="openCreate(child.id)">{{ t('categories.text_11zpjk') }}</button>
@@ -199,6 +204,19 @@ onMounted(async () => {
                 {{ c.parent_id ? '  └ ' : '' }}{{ c.name }}
               </option>
             </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">栏目页地址规则（可选）</label>
+            <input
+              v-model="form.url_pattern"
+              class="input font-mono text-sm"
+              placeholder="留空 = 用站点默认，例如 category/{slug}/"
+            />
+            <p class="text-xs text-ink-500 mt-1">
+              只决定这个「栏目页」自己的地址，不管栏目下文章的地址。
+              可用变量：<code>{catdir}</code> 栏目目录链、<code>{slug}</code> 栏目别名、
+              <code>{id}</code> 栏目 ID、<code>{parent}</code> 父栏目目录链。
+            </p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
