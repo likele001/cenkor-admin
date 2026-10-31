@@ -920,3 +920,5 @@ class EntryPreview(Base):
 # ------------------------------------------------------------
 from cenkor_admin.apps.cms import analytics_models as _analytics_models  # noqa: F401
 from cenkor_admin.apps.cms import knowledge_models as _knowledge_models  # noqa: F401
+from cenkor_admin.apps.cms import template_models as _template_models  # noqa: F401
+from cenkor_admin.apps.cms.template_models import CmsTemplate  # noqa: F401

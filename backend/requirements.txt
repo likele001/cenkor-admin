@@ -32,8 +32,9 @@ email-validator>=2.1.0
 python-slugify>=8.0.0
 Pillow>=10.0.0
 
-# Liquid 模板引擎 + Markdown 渲染（M3-B）
-python-liquid>=2.2.0
+# 模板引擎（用户可自定义主题，后台「CMS → 模板工作台」在线编辑，Jinja2>=3.1.6 修 CVE-2025-27516）
+Jinja2>=3.1.6
+python-liquid>=2.2.0   # @deprecated 过渡期保留，随下个版本移除
 markdown>=3.5.0
 pgvector>=0.3.0
 PyYAML>=6.0

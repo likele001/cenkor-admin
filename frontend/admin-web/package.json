@@ -11,6 +11,9 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.12",
+    "@codemirror/lint": "^6.9.7",
     "@tanstack/vue-query": "^5.28.0",
     "@tiptap/extension-color": "^2.27.2",
     "@tiptap/extension-image": "^2.27.2",
@@ -27,6 +30,7 @@
     "@tiptap/starter-kit": "^2.27.2",
     "@tiptap/vue-3": "^2.27.2",
     "axios": "^1.6.7",
+    "codemirror": "^6.0.2",
     "dompurify": "^3.4.13",
     "echarts": "^5.5.0",
     "pinia": "^2.1.7",

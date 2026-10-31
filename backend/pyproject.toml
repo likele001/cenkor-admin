@@ -44,6 +44,11 @@ dependencies = [
     "email-validator>=2.1.0",
     "python-slugify>=8.0.0",
     "Pillow>=10.0.0",
+
+    # 模板引擎（用户可自定义主题，后台模板工作台在线编辑）
+    "Jinja2>=3.1.6",
+    "markdown>=3.5.0",
+    "python-liquid>=2.2.0",   # @deprecated 过渡期保留
 ]
 
 [project.optional-dependencies]

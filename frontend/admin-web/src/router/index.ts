@@ -31,7 +31,6 @@ import RedirectsView from '@/views/system/RedirectsView.vue'
 import CommentsView from '@/views/system/CommentsView.vue'
 import FormsView from '@/views/system/FormsView.vue'
 import BuilderPagesView from '@/views/builder/BuilderPagesView.vue'
-import TemplatePreviewView from '@/views/cms/TemplatePreviewView.vue'
 import UsersListView from '@/views/system/UsersListView.vue'
 import RolesView from '@/views/system/RolesView.vue'
 import MenusView from '@/views/system/MenusView.vue'
@@ -73,7 +72,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/entries', name: 'cms-entries', component: EntryListView, meta: { permission: 'cms:entries:read' } },
       { path: 'cms/entries/new', name: 'cms-entry-new', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
       { path: 'cms/entries/:id', name: 'cms-entry-edit', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
-      { path: 'cms/templates', name: 'cms-templates', component: TemplatePreviewView, meta: { permission: 'cms:site:read' } },
+      { path: 'cms/templates', name: 'cms-templates', component: () => import('@/views/cms/TemplateStudioView.vue'), meta: { permission: 'cms:site:read' } },
       { path: 'cms/languages', name: 'cms-languages', component: LanguagesView, meta: { permission: 'cms:entries:read' } },
       { path: 'cms/search', name: 'cms-search', component: SearchResultsView, meta: { permission: 'cms:entries:read' } },
       { path: 'builder/pages', name: 'builder-pages', component: BuilderPagesView, meta: { permission: 'settings:read' } },

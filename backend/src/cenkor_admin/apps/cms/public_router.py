@@ -12,6 +12,7 @@ from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import models
+from cenkor_admin.apps.cms.render import render_page
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.db import AsyncSessionLocal, get_db
 from cenkor_admin.core.storage import s3
@@ -798,7 +799,7 @@ def _page_description(item: dict) -> str:
     return str(desc).strip()[:200]
 
 
-def _render_page_html(
+async def _render_page_html(
     item: dict,
     *,
     base: str,
@@ -806,17 +807,21 @@ def _render_page_html(
     kind: str = "article",
     site_name: str = "Cenkor",
     site_desc: str = "",
+    site_id: int | None = None,
 ) -> str:
-    """把一条公开内容渲染成完整 HTML（含 JSON-LD / OG / 正文）。"""
-    import html as _h
+    """把一条公开内容渲染成完整 HTML（含 JSON-LD / OG / 正文）。
+
+    版式本身交给 Jinja2 主题（DB 可覆盖内置），这里只负责把 item 整理成
+    模板上下文，并保证 SEO 元信息与旧版硬编码页面完全对齐。
+    """
     import json as _json
 
     content = item.get("content") or {}
     body_html = str(content.get("text") or content.get("html") or "")
 
-    title = _h.escape(str(item.get("title") or item.get("name") or ""))
-    desc = _h.escape(_page_description(item) or site_desc or "")
-    full_title = _h.escape(f"{item.get('title') or item.get('name') or ''} · {site_name}")
+    raw_title = str(item.get("title") or item.get("name") or "")
+    desc = _page_description(item) or site_desc or ""
+    full_title = f"{raw_title} · {site_name}"
 
     pub = item.get("published_at")
     pub_iso, pub_text = None, ""
@@ -842,65 +847,53 @@ def _render_page_html(
     # 提前闭合 </script> 会截断页面
     ld_json = _json.dumps(ld, ensure_ascii=False).replace("</", "<\\/")
 
-    og_image = _abs_url(base, (item.get("seo") or {}).get("og_image")
-                        or (item.get("content") or {}).get("cover_image"))
-    img_meta = (
-        f'<meta property="og:image" content="{_h.escape(og_image)}" />\n'
-        f'<meta name="twitter:image" content="{_h.escape(og_image)}" />\n'
-        if og_image else ""
-    )
-    # og:video / og:video:type：正文里有 <video> 时补上。
-    # 社交平台（微信、抖音、LinkedIn）抓 og:video 才会把视频渲染成可播卡片，
-    # 只给 og:image 的话分享出去仍然只是一张封面图 —— 视频白做了。
+    # og:image 兼容 seo.og_image 与正文封面两种来源
+    og_image = _abs_url(base, (item.get("seo") or {}).get("og_image") or content.get("cover_image"))
+    # og:video：正文里有 <video> 时补上，社交平台才会渲染成可播卡片
     og_video = _first_video_src(item)
-    video_meta = (
-        f'<meta property="og:video" content="{_h.escape(og_video)}" />\n'
-        f'<meta property="og:video:type" content="video/mp4" />\n'
-        f'<meta property="og:video:width" content="1280" />\n'
-        f'<meta property="og:video:height" content="720" />\n'
-        if og_video else ""
-    )
-    ai_origin = item.get("ai_origin") or ("1" if item.get("ai_generated") else None)
-    ai_badge = '<span class="badge">AI 辅助生成 · 已人工审核</span>' if ai_origin else ""
 
-    return f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{full_title}</title>
-<meta name="description" content="{desc}">
-<link rel="canonical" href="{_h.escape(canonical)}">
-<meta property="og:type" content="{kind}">
-<meta property="og:site_name" content="{_h.escape(site_name)}">
-<meta property="og:title" content="{title}" />
-<meta property="og:description" content="{desc}" />
-<meta property="og:url" content="{_h.escape(canonical)}" />
-{f'<meta property="article:published_time" content="{pub_iso}" />' if pub_iso else ""}
-{img_meta}{video_meta}<meta name="twitter:card" content="summary_large_image" />
-<script type="application/ld+json">{ld_json}</script>
-<style>{_PAGE_CSS}</style>
-</head>
-<body>
-<header>
-<a class="brand" href="{_h.escape(base)}/">{_h.escape(site_name)}</a>
-<nav><a href="{_h.escape(base)}/">返回首页</a></nav>
-</header>
-<main>
-<article>
-<h1>{title}</h1>
-<div class="meta">
-{f'<time datetime="{pub_iso}">{pub_text}</time>' if pub_text else ""}
-{ai_badge}
-</div>
-<div class="body">{body_html}</div>
-</article>
-</main>
-<footer>
-<p>{_h.escape(site_name)} · <a href="{_h.escape(base)}/llms.txt">llms.txt</a> · 本文内容可被 AI 助手检索与引用</p>
-</footer>
-</body>
-</html>"""
+    ai_origin = item.get("ai_origin") or ("1" if item.get("ai_generated") else None)
+
+    model = {
+        "kind": kind,
+        "title": raw_title,
+        "full_title": full_title,
+        "description": desc,
+        "canonical": canonical,
+        "base": base,
+        "site_name": site_name,
+        "site_desc": site_desc,
+        "og": {
+            "type": kind,
+            "site_name": site_name,
+            "title": raw_title,
+            "description": desc,
+            "url": canonical,
+            "image": og_image,
+            "video": og_video,
+        },
+        "json_ld": ld_json,
+        "published_at": pub_iso,
+        "published_text": pub_text,
+        "updated_at": upd.isoformat() if hasattr(upd, "isoformat") else (str(upd) if upd else None),
+        "ai_origin": ai_origin,
+        "item": {
+            **{k: v for k, v in item.items() if k not in ("content", "custom_fields")},
+            "title": raw_title,
+            "body_html": body_html,
+            "cover": og_image,
+            "excerpt": desc,
+            "tags": item.get("tags") or [],
+            "ai_generated": bool(ai_origin),
+        },
+        "items": [],
+        "pagination": None,
+    }
+    return await render_page(
+        model,
+        site_id=site_id or item.get("site_id") or 1,
+        base=base,
+    )
 
 
 def _render_404_html(base: str, site_name: str = "Cenkor") -> str:
@@ -942,7 +935,11 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
                 models.Product.deleted_at.is_(None),
             )
         )).scalar_one_or_none()
-        return _product_to_item(row) if row else None
+        if row is None:
+            return None
+        item = _product_to_item(row)
+        item["site_id"] = getattr(row, "site_id", None)
+        return item
 
     if kind == "news":
         row = (await db.execute(
@@ -951,7 +948,11 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
                 models.News.deleted_at.is_(None),
             )
         )).scalar_one_or_none()
-        return _news_to_item(row) if row else None
+        if row is None:
+            return None
+        item = _news_to_item(row)
+        item["site_id"] = getattr(row, "site_id", None)
+        return item
 
     if kind == "case":
         row = (await db.execute(
@@ -960,7 +961,11 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
                 models.Case.deleted_at.is_(None),
             )
         )).scalar_one_or_none()
-        return _case_to_item(row) if row else None
+        if row is None:
+            return None
+        item = _case_to_item(row)
+        item["site_id"] = getattr(row, "site_id", None)
+        return item
 
     # article：内容引擎条目，必须已发布
     row = (await db.execute(
@@ -974,6 +979,7 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
         return None
     return {
         "id": row.id,
+        "site_id": row.site_id,
         "slug": row.slug,
         "title": row.title,
         "content": row.content or {},
@@ -1008,9 +1014,10 @@ async def _serve_public_page(
         )
     canonical = f"{base}{_page_path(kind, slug)}"
     return Response(
-        content=_render_page_html(
+        content=await _render_page_html(
             item, base=base, canonical=canonical, kind=kind,
             site_name=site_name, site_desc=site_desc,
+            site_id=item.get("site_id"),
         ),
         media_type="text/html; charset=utf-8",
         # 内容更新要能反映到爬虫，5 分钟足够；再长会被 AI 索引成旧版
