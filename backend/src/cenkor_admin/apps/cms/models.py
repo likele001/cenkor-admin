@@ -262,6 +262,10 @@ class Category(Base):
 
     slug: Mapped[str] = mapped_column(String(80), nullable=False)
 
+    # URL 规则覆盖，留空 = 继承站点默认。可用变量见 apps/cms/permalink.py：
+    # {type} {catdir} {cat} {parent} {slug} {id}
+    url_pattern: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     name: Mapped[str] = mapped_column(String(80), nullable=False)
 
     icon: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -325,6 +329,9 @@ class Tag(Base):
 
     slug: Mapped[str] = mapped_column(String(80), nullable=False)
 
+    # URL 规则覆盖，留空 = 继承站点默认。可用变量：{type} {slug} {id}
+    url_pattern: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     name: Mapped[str] = mapped_column(String(80), nullable=False)
 
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -387,6 +394,10 @@ class Entry(Base):
     )
 
     slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    # 手填的完整路径（如 /hangye/xinwen/abc.html），留空 = 按站点/栏目规则生成。
+    # 反解时优先于所有规则：填了就等于给这条内容钉死一个地址。
+    url_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
 
@@ -454,6 +465,10 @@ class Entry(Base):
         ),
 
         Index("ix_cms_entries_ct_status", "content_type_id", "status"),
+
+        # 手填路径必须全站唯一，否则两条内容抢同一个地址。
+        # PostgreSQL 唯一索引允许多个 NULL，未手填的内容互不影响。
+        Index("uq_cms_entries_site_url_path", "site_id", "url_path", unique=True),
 
         Index("ix_cms_entries_custom_fields", "custom_fields", postgresql_using="gin"),
 

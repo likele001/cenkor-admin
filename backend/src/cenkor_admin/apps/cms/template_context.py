@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from cenkor_admin.apps.cms import models
+from cenkor_admin.apps.cms import models, url_resolver
 
 __all__ = ["TemplateContext", "build_pagination", "cms_api", "get_session_factory"]
 
@@ -171,11 +171,39 @@ class TemplateContext:
         self.base = (base or "").rstrip("/")
         # content_type_id → key 的懒加载缓存，一次渲染里最多查一次
         self._ct_keys: dict[int, str] | None = None
+        # URL 规则集，同样一次渲染只取一次
+        self._rules = None
 
     # ------------------------------------------------------------ 内部
 
     def _type_key(self, type_key: str) -> str:
         return (type_key or "article").strip().lower()
+
+    def url_rules(self) -> url_resolver.RuleSet:
+        """本站在用的 URL 规则。一次渲染只加载一次。"""
+        if self._rules is None:
+            self._rules = url_resolver.load_rules_sync(self.session, self.site_id)
+        return self._rules
+
+    def _catdir(self, category: Any) -> str | None:
+        """栏目从根到自身的目录链（`hangye/xinwen`）。
+
+        层级上限 6 和 permalink 里 `{catdir}` 的正则保持一致。
+        脏数据里如果有循环父级，靠 guard 断掉而不是死循环。
+        """
+        if category is None:
+            return None
+        parts: list[str] = []
+        cur = category
+        guard = 0
+        while cur is not None and guard < 6:
+            slug = getattr(cur, "slug", None)
+            if not slug:
+                break
+            parts.append(str(slug))
+            cur = getattr(cur, "parent", None)
+            guard += 1
+        return "/".join(reversed(parts)) or None
 
     def _type_keys(self) -> dict[int, str]:
         if self._ct_keys is None:
@@ -208,7 +236,16 @@ class TemplateContext:
             "title": row.title,
             "excerpt": seo.get("description") or _plain(content.get("text") or content.get("html"), 160),
             "cover": content.get("cover_image") or seo.get("og_image"),
-            "url": self.url(ct_key, row.slug),
+            "url": self.url(
+                ct_key,
+                row.slug,
+                catdir=self._catdir(category),
+                cat=category.slug if category is not None else None,
+                entry_id=row.id,
+                category_id=category.id if category is not None else None,
+                published=row.published_at,
+                url_path=row.url_path,
+            ),
             "published_at": _iso(row.published_at),
             "updated_at": _iso(row.updated_at),
             "view_count": row.view_count or 0,
@@ -218,7 +255,17 @@ class TemplateContext:
             "custom_fields": dict(row.custom_fields or {}),
             "seo": seo,
             "category": (
-                {"id": category.id, "slug": category.slug, "name": category.name, "url": self.url("category", category.slug)}
+                {
+                    "id": category.id,
+                    "slug": category.slug,
+                    "name": category.name,
+                    "url": self.url(
+                        "category",
+                        category.slug,
+                        catdir=self._catdir(category),
+                        category_id=category.id,
+                    ),
+                }
                 if category is not None else None
             ),
             "tags": [],
@@ -248,7 +295,7 @@ class TemplateContext:
         return {
             "id": row.id, "type": "product", "slug": row.slug, "title": row.name,
             "excerpt": _plain(row.tagline or row.desc, 160),
-            "cover": None, "url": self.url("product", row.slug),
+            "cover": None, "url": self.url("product", row.slug, entry_id=row.id),
             "published_at": None, "updated_at": None,
             "view_count": 0, "sort": row.sort or 0, "ai_generated": False,
             "content": {
@@ -267,7 +314,7 @@ class TemplateContext:
         return {
             "id": row.id, "type": "news", "slug": row.slug, "title": row.title,
             "excerpt": row.excerpt or _plain(row.content_md, 160),
-            "cover": row.cover_image, "url": self.url("news", row.slug),
+            "cover": row.cover_image, "url": self.url("news", row.slug, entry_id=row.id),
             "published_at": _iso(row.published_at), "updated_at": None,
             "view_count": row.view_count or 0, "sort": 0, "ai_generated": False,
             "content": {"excerpt": row.excerpt, "text": row.content_md, "cover_image": row.cover_image},
@@ -279,7 +326,7 @@ class TemplateContext:
         return {
             "id": row.id, "type": "case", "slug": row.name, "title": row.name,
             "excerpt": _plain(row.desc, 160), "cover": None,
-            "url": self.url("case", row.name),
+            "url": self.url("case", row.name, entry_id=row.id),
             "published_at": None, "updated_at": None,
             "view_count": 0, "sort": row.sort or 0, "ai_generated": False,
             "content": {"industry": row.industry, "desc": row.desc, "tag": row.tag, "href": row.href},
@@ -525,7 +572,9 @@ class TemplateContext:
                 "id": r.id, "slug": r.slug, "name": r.name, "icon": r.icon,
                 "color": r.color, "parent_id": r.parent_id,
                 "count": int(counts.get(r.id, 0)),
-                "url": self.url("category", r.slug),
+                "url": self.url(
+                    "category", r.slug, catdir=self._catdir(r), category_id=r.id
+                ),
             }
             for r in rows
         ]
@@ -558,7 +607,7 @@ class TemplateContext:
         ).scalars().all()
         return [
             {"id": r.id, "slug": r.slug, "name": r.name, "color": r.color,
-             "url": self.url("tag", r.slug)}
+             "url": self.url("tag", r.slug, entry_id=r.id)}
             for r in rows
         ]
 
@@ -644,7 +693,28 @@ class TemplateContext:
     # ------------------------------------------------------------ 12. url
 
     @cms_api
-    def url(self, kind: str = "home", slug: str | None = None, page: int | None = None) -> str:
+    def url(
+        self,
+        kind: str = "home",
+        slug: str | None = None,
+        page: int | None = None,
+        *,
+        catdir: str | None = None,
+        cat: str | None = None,
+        entry_id: int | None = None,
+        category_id: int | None = None,
+        published: datetime | None = None,
+        url_path: str | None = None,
+    ) -> str:
+        """按后台配置的 URL 规则生成地址。
+
+        规则优先级：手填路径 > 栏目规则 > 站点默认 > 内置兜底，
+        细节见 ``apps/cms/url_resolver.py``。
+
+        ``catdir`` 要传栏目从根到自身的完整链（``hangye/xinwen``）：规则里
+        一旦用到 ``{catdir}``，只给 slug 是拼不出正确地址的。模板里直接用
+        ``url('article', 'x')`` 仍然可用，只是走站点默认规则。
+        """
         kind = (kind or "home").strip().lower()
         if kind == "home":
             return f"{self.base}/" if self.base else "/"
@@ -653,16 +723,40 @@ class TemplateContext:
             tail = f"&page={page}" if page else ""
             # 带尾斜杠：/search 是 JSON 接口，HTML 搜索页在 /search/
             return f"{self.base}/search/{q}{tail}"
+
+        rules = self.url_rules()
+
         if kind == "category":
-            return f"{self.base}{page_url(f'/category/{slug}/', page or 1)}"
+            path = url_resolver.category_url(
+                rules,
+                slug=slug or "",
+                catdir=catdir,
+                category_id=category_id,
+                page=page or 1,
+            )
+            return f"{self.base}{path}"
+
         if kind == "tag":
-            return f"{self.base}{page_url(f'/tag/{slug}/', page or 1)}"
-        prefix = PAGE_PREFIX.get(kind, "article")
+            path = url_resolver.tag_url(rules, slug=slug or "", page=page or 1)
+            return f"{self.base}{path}"
+
         if not slug:
             # 列表页翻页走路径式：/article/page/2/，不是 ?page=2
-            return f"{self.base}{page_url(f'/{prefix}/', page or 1)}"
+            return f"{self.base}{url_resolver.list_url(rules, kind, page or 1)}"
+
         # 详情页再挂 ?page= 没有意义，忽略掉比生成一个脏链接好
-        return f"{self.base}/{prefix}/{slug}.html"
+        path = url_resolver.detail_url(
+            rules,
+            kind,
+            slug=slug,
+            entry_id=entry_id,
+            catdir=catdir,
+            cat=cat,
+            category_id=category_id,
+            published=published,
+            url_path=url_path,
+        )
+        return f"{self.base}{path}"
 
     # ------------------------------------------------------------ 13. comments
 

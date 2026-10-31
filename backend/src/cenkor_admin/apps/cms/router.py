@@ -1,6 +1,7 @@
 """CMS App · 后台管理路由（需要鉴权 - MVP 阶段先放开）"""
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms import models, schemas
+from cenkor_admin.apps.cms import models, permalink, schemas, url_resolver
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
@@ -354,15 +355,86 @@ async def upsert_site_config(
     key: str, body: schemas.SiteConfigUpdate, db: AsyncSession = Depends(get_db)
 ):
     obj = await db.get(models.SiteConfig, key)
+    old_value = obj.value if obj is not None else None
     if obj:
         obj.value = body.value
         obj.description = body.description
     else:
         obj = models.SiteConfig(key=key, value=body.value, description=body.description)
         db.add(obj)
+    # 改 URL 规则时把旧规则存档 —— 老地址要 301 到新地址，不能 404。
+    #
+    # 让一个站从搜索引擎消失最快的方式，就是把有排名的页面全变成 404。
+    # 存档必须在覆盖之前拿旧值，覆盖之后就找不回来了。
+    is_url_rule = key.startswith("url.") and key != url_resolver.HISTORY_KEY
+    if is_url_rule:
+        await _archive_url_rule(db, key, old_value)
     await db.commit()
+    # 缓存必须在 commit 之后清：commit 前清的话，并发请求会在 commit 前
+    # 把**旧**规则重新写回缓存，改动等于没生效。
+    if is_url_rule:
+        url_resolver.invalidate()
     await db.refresh(obj)
     return obj
+
+
+async def _archive_url_rule(db: AsyncSession, key: str, old_value: Any) -> None:
+    """把改掉的 URL 规则追加进历史存档。
+
+    只记规则本身，不记内容 —— 历史规则只用来「把老地址反解出来，
+    再按当前规则算出新地址，301 过去」，内容还是从库里现查。
+    """
+    kind = key[len("url.") :]
+    if kind in ("", "_list", "history"):
+        return
+
+    # 旧值可能不在库里：默认规则是代码里的 DEFAULT_PATTERNS，
+    # 用户第一次在后台改规则时，库里根本没有这个 key。
+    # 这时候必须拿默认规则来存档 —— 那才是线上正在用的形态，
+    # 漏掉它意味着「所有已收录的老地址在改规则那一刻集体 404」。
+    if isinstance(old_value, str) and old_value.strip():
+        effective_old = old_value
+    else:
+        effective_old = permalink.DEFAULT_PATTERNS.get(kind)
+    if not effective_old:
+        return
+
+    try:
+        permalink.validate_pattern(effective_old, kind)
+    except permalink.RuleError:
+        # 旧规则本身就不合法（可能是手改库改坏的），存了也没法反解，跳过
+        return
+
+    row = (
+        await db.execute(
+            select(models.SiteConfig).where(models.SiteConfig.key == url_resolver.HISTORY_KEY)
+        )
+    ).scalars().first()
+    raw = row.value if row is not None else None
+    history: list[dict[str, str]] = []
+    if isinstance(raw, list):
+        history = [h for h in raw if isinstance(h, dict)]
+    elif isinstance(raw, str) and raw.strip():
+        # 兼容早期存成 JSON 字符串的脏数据
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            parsed = []
+        if isinstance(parsed, list):
+            history = [h for h in parsed if isinstance(h, dict)]
+
+    entry = {"kind": kind, "pattern": effective_old}
+    # 同一条规则已经在存档里就不重复记，避免存档越滚越长
+    if any(h.get("kind") == kind and h.get("pattern") == effective_old for h in history):
+        return
+    history.append(entry)
+    # 只留最近 50 条：存档是给「刚改过的规则」用的，不是无限追溯
+    history = history[-50:]
+
+    if row is None:
+        db.add(models.SiteConfig(key=url_resolver.HISTORY_KEY, value=history))
+    else:
+        row.value = history
 
 
 # ---- helpers ----

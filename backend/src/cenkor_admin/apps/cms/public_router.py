@@ -1,4 +1,5 @@
 """CMS App · 公开接口（公网站点读取，无需鉴权）"""
+
 from __future__ import annotations
 
 import re
@@ -12,10 +13,9 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.cms import models, static_cache
+from cenkor_admin.apps.cms import models, permalink, static_cache, url_resolver
 from cenkor_admin.apps.cms.render import render_page
 from cenkor_admin.apps.cms.template_context import (
-    PAGE_PREFIX,
     absolutize_pagination,
     build_pagination,
     page_url,
@@ -42,12 +42,14 @@ async def _apply_entry_translation(db: AsyncSession, item: dict, lang: str | Non
     """多语言 i18n：指定 lang 且存在翻译时，用翻译覆盖 title/content/custom_fields/slug。"""
     if not lang:
         return item
-    tr = (await db.execute(
-        select(models.EntryTranslation).where(
-            models.EntryTranslation.entry_id == item["id"],
-            models.EntryTranslation.lang == lang,
+    tr = (
+        await db.execute(
+            select(models.EntryTranslation).where(
+                models.EntryTranslation.entry_id == item["id"],
+                models.EntryTranslation.lang == lang,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
     if not tr:
         return item
     fv = tr.field_values or {}
@@ -63,16 +65,23 @@ def _build_og(item: dict) -> dict:
     """M4·P3 4.1 Open Graph：从内容/SEO 字段推导 og 元数据。"""
     seo = item.get("seo") or {}
     content = item.get("content") or {}
-    title = (seo.get("og_title") or seo.get("seo_title") or item.get("title") or "")
+    title = seo.get("og_title") or seo.get("seo_title") or item.get("title") or ""
     description = (
-        seo.get("og_description") or seo.get("seo_description")
-        or item.get("excerpt") or content.get("text") or content.get("excerpt") or ""
+        seo.get("og_description")
+        or seo.get("seo_description")
+        or item.get("excerpt")
+        or content.get("text")
+        or content.get("excerpt")
+        or ""
     )
     if isinstance(description, str) and len(description) > 200:
         description = description[:200] + "…"
     image = (
-        seo.get("og_image") or item.get("cover_image")
-        or content.get("image") or content.get("cover_image") or ""
+        seo.get("og_image")
+        or item.get("cover_image")
+        or content.get("image")
+        or content.get("cover_image")
+        or ""
     )
     return {
         "og_type": seo.get("og_type", "article"),
@@ -139,10 +148,16 @@ def _build_json_ld(item: dict, *, url: str | None = None, kind: str = "article")
     content = item.get("content") or {}
     title = str(item.get("title") or "")
     description = (
-        seo.get("seo_description") or seo.get("og_description")
+        seo.get("seo_description")
+        or seo.get("og_description")
         or _strip_html(
-            str(content.get("excerpt") or content.get("desc")
-                or content.get("text") or content.get("content_md") or "")
+            str(
+                content.get("excerpt")
+                or content.get("desc")
+                or content.get("text")
+                or content.get("content_md")
+                or ""
+            )
         )
     )
     image = seo.get("og_image") or item.get("cover_image") or content.get("cover_image")
@@ -193,6 +208,7 @@ def _build_json_ld(item: dict, *, url: str | None = None, kind: str = "article")
 # 公共内容类型 API
 # ============================================================
 
+
 @router.get("/content-types", response_model=list[dict[str, Any]])
 async def get_public_content_types(
     db: AsyncSession = Depends(get_db),
@@ -218,6 +234,7 @@ async def get_public_content_types(
 # 公共分类 API
 # ============================================================
 
+
 @router.get("/categories", response_model=list[dict[str, Any]])
 async def get_public_categories(
     db: AsyncSession = Depends(get_db),
@@ -225,9 +242,11 @@ async def get_public_categories(
     status: str = Query("active"),
 ):
     """获取指定内容类型的分类列表"""
-    ct = (await db.execute(
-        select(models.ContentType).where(models.ContentType.key == content_type_key)
-    )).scalar_one_or_none()
+    ct = (
+        await db.execute(
+            select(models.ContentType).where(models.ContentType.key == content_type_key)
+        )
+    ).scalar_one_or_none()
     if not ct:
         return []
     result = await db.execute(
@@ -240,7 +259,15 @@ async def get_public_categories(
         .order_by(models.Category.sort)
     )
     return [
-        {"id": c.id, "name": c.name, "slug": c.slug, "icon": c.icon, "color": c.color, "parent_id": c.parent_id, "sort": c.sort}
+        {
+            "id": c.id,
+            "name": c.name,
+            "slug": c.slug,
+            "icon": c.icon,
+            "color": c.color,
+            "parent_id": c.parent_id,
+            "sort": c.sort,
+        }
         for c in result.scalars().all()
     ]
 
@@ -252,9 +279,11 @@ async def get_public_category_tree(
     status: str = Query("active"),
 ):
     """获取分类树"""
-    ct = (await db.execute(
-        select(models.ContentType).where(models.ContentType.key == content_type_key)
-    )).scalar_one_or_none()
+    ct = (
+        await db.execute(
+            select(models.ContentType).where(models.ContentType.key == content_type_key)
+        )
+    ).scalar_one_or_none()
     if not ct:
         return []
     result = await db.execute(
@@ -272,7 +301,14 @@ async def get_public_category_tree(
         tree = []
         for c in all_cats:
             if c.parent_id == parent_id:
-                node = {"id": c.id, "name": c.name, "slug": c.slug, "icon": c.icon, "color": c.color, "sort": c.sort}
+                node = {
+                    "id": c.id,
+                    "name": c.name,
+                    "slug": c.slug,
+                    "icon": c.icon,
+                    "color": c.color,
+                    "sort": c.sort,
+                }
                 children = build_tree(c.id)
                 if children:
                     node["children"] = children
@@ -286,15 +322,18 @@ async def get_public_category_tree(
 # 公共标签 API
 # ============================================================
 
+
 @router.get("/tags", response_model=list[dict[str, Any]])
 async def get_public_tags(
     db: AsyncSession = Depends(get_db),
     content_type_key: str = Query(...),
 ):
     """获取指定内容类型的标签列表"""
-    ct = (await db.execute(
-        select(models.ContentType).where(models.ContentType.key == content_type_key)
-    )).scalar_one_or_none()
+    ct = (
+        await db.execute(
+            select(models.ContentType).where(models.ContentType.key == content_type_key)
+        )
+    ).scalar_one_or_none()
     if not ct:
         return []
     result = await db.execute(
@@ -310,37 +349,59 @@ async def get_public_tags(
 # 公共内容查询 API
 # ============================================================
 
+
 def _product_to_item(p: models.Product) -> dict[str, Any]:
     return {
-        "id": p.id, "slug": p.slug, "title": p.name,
-        "content": {"tagline": p.tagline, "line": p.line, "stack": p.stack,
-                     "desc": p.desc, "features": p.features or [],
-                     "chineseName": p.chinese_name},
+        "id": p.id,
+        "slug": p.slug,
+        "title": p.name,
+        "content": {
+            "tagline": p.tagline,
+            "line": p.line,
+            "stack": p.stack,
+            "desc": p.desc,
+            "features": p.features or [],
+            "chineseName": p.chinese_name,
+        },
         "custom_fields": p.custom_fields or {},
-        "status": p.status, "published_at": None, "sort": p.sort, "view_count": 0,
-        "is_flagship": p.is_flagship, "is_open_source": p.is_open_source,
-        "github": p.github_url or None, "demo": p.demo_url or None,
-        "website": p.website_url or None, "license": p.license or None,
+        "status": p.status,
+        "published_at": None,
+        "sort": p.sort,
+        "view_count": 0,
+        "is_flagship": p.is_flagship,
+        "is_open_source": p.is_open_source,
+        "github": p.github_url or None,
+        "demo": p.demo_url or None,
+        "website": p.website_url or None,
+        "license": p.license or None,
     }
 
 
 def _case_to_item(c: models.Case) -> dict[str, Any]:
     return {
-        "id": c.id, "slug": c.name, "title": c.name,
+        "id": c.id,
+        "slug": c.name,
+        "title": c.name,
         "content": {"industry": c.industry, "desc": c.desc, "tag": c.tag, "href": c.href},
         "custom_fields": c.custom_fields or {},
-        "status": c.status, "published_at": None, "sort": c.sort, "view_count": 0,
+        "status": c.status,
+        "published_at": None,
+        "sort": c.sort,
+        "view_count": 0,
     }
 
 
 def _news_to_item(n: models.News) -> dict[str, Any]:
     return {
-        "id": n.id, "slug": n.slug, "title": n.title,
+        "id": n.id,
+        "slug": n.slug,
+        "title": n.title,
         "content": {"excerpt": n.excerpt, "content_md": n.content_md, "cover_image": n.cover_image},
         "custom_fields": n.custom_fields or {},
         "status": n.status,
         "published_at": n.published_at.isoformat() if n.published_at else None,
-        "sort": 0, "view_count": n.view_count or 0,
+        "sort": 0,
+        "view_count": n.view_count or 0,
     }
 
 
@@ -356,47 +417,93 @@ async def get_public_entries(
     from sqlalchemy import func as sqlfunc
 
     if content_type_key == "product":
-        stmt = (select(models.Product)
-                .where(models.Product.deleted_at.is_(None), models.Product.status == "published")
-                .order_by(models.Product.sort, models.Product.id)
-                .offset((page - 1) * page_size).limit(page_size))
+        stmt = (
+            select(models.Product)
+            .where(models.Product.deleted_at.is_(None), models.Product.status == "published")
+            .order_by(models.Product.sort, models.Product.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         items = [_product_to_item(p) for p in (await db.execute(stmt)).scalars().all()]
-        total = (await db.execute(select(sqlfunc.count()).select_from(models.Product)
-                .where(models.Product.deleted_at.is_(None), models.Product.status == "published"))).scalar() or 0
+        total = (
+            await db.execute(
+                select(sqlfunc.count())
+                .select_from(models.Product)
+                .where(models.Product.deleted_at.is_(None), models.Product.status == "published")
+            )
+        ).scalar() or 0
     elif content_type_key == "case":
-        stmt = (select(models.Case)
-                .where(models.Case.deleted_at.is_(None), models.Case.status == "published")
-                .order_by(models.Case.sort, models.Case.id)
-                .offset((page - 1) * page_size).limit(page_size))
+        stmt = (
+            select(models.Case)
+            .where(models.Case.deleted_at.is_(None), models.Case.status == "published")
+            .order_by(models.Case.sort, models.Case.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         items = [_case_to_item(c) for c in (await db.execute(stmt)).scalars().all()]
-        total = (await db.execute(select(sqlfunc.count()).select_from(models.Case)
-                .where(models.Case.deleted_at.is_(None), models.Case.status == "published"))).scalar() or 0
+        total = (
+            await db.execute(
+                select(sqlfunc.count())
+                .select_from(models.Case)
+                .where(models.Case.deleted_at.is_(None), models.Case.status == "published")
+            )
+        ).scalar() or 0
     elif content_type_key == "news":
-        stmt = (select(models.News)
-                .where(models.News.deleted_at.is_(None), models.News.status == "published")
-                .order_by(models.News.published_at.desc(), models.News.id.desc())
-                .offset((page - 1) * page_size).limit(page_size))
+        stmt = (
+            select(models.News)
+            .where(models.News.deleted_at.is_(None), models.News.status == "published")
+            .order_by(models.News.published_at.desc(), models.News.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         items = [_news_to_item(n) for n in (await db.execute(stmt)).scalars().all()]
-        total = (await db.execute(select(sqlfunc.count()).select_from(models.News)
-                .where(models.News.deleted_at.is_(None), models.News.status == "published"))).scalar() or 0
+        total = (
+            await db.execute(
+                select(sqlfunc.count())
+                .select_from(models.News)
+                .where(models.News.deleted_at.is_(None), models.News.status == "published")
+            )
+        ).scalar() or 0
     else:
-        ct = (await db.execute(
-            select(models.ContentType).where(models.ContentType.key == content_type_key)
-        )).scalar_one_or_none()
+        ct = (
+            await db.execute(
+                select(models.ContentType).where(models.ContentType.key == content_type_key)
+            )
+        ).scalar_one_or_none()
         if not ct:
             raise HTTPException(404, f"Content type '{content_type_key}' not found")
-        conds = [models.Entry.content_type_id == ct.id, models.Entry.status == "published",
-                 models.Entry.deleted_at.is_(None)]
-        total = (await db.execute(select(sqlfunc.count()).select_from(models.Entry).where(*conds))).scalar() or 0
-        stmt = (select(models.Entry).where(*conds)
-                .order_by(models.Entry.sort, models.Entry.published_at.desc())
-                .offset((page - 1) * page_size).limit(page_size))
+        conds = [
+            models.Entry.content_type_id == ct.id,
+            models.Entry.status == "published",
+            models.Entry.deleted_at.is_(None),
+        ]
+        total = (
+            await db.execute(select(sqlfunc.count()).select_from(models.Entry).where(*conds))
+        ).scalar() or 0
+        stmt = (
+            select(models.Entry)
+            .where(*conds)
+            .order_by(models.Entry.sort, models.Entry.published_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         entries = (await db.execute(stmt)).scalars().all()
-        items = [{"id": e.id, "slug": e.slug, "title": e.title, "content": e.content or {},
-                  "custom_fields": e.custom_fields or {}, "seo": e.seo or {}, "status": e.status,
-                  "published_at": e.published_at.isoformat() if e.published_at else None,
-                  "sort": e.sort, "view_count": e.view_count,
-                  "ai_generated": e.ai_origin is not None} for e in entries]
+        items = [
+            {
+                "id": e.id,
+                "slug": e.slug,
+                "title": e.title,
+                "content": e.content or {},
+                "custom_fields": e.custom_fields or {},
+                "seo": e.seo or {},
+                "status": e.status,
+                "published_at": e.published_at.isoformat() if e.published_at else None,
+                "sort": e.sort,
+                "view_count": e.view_count,
+                "ai_generated": e.ai_origin is not None,
+            }
+            for e in entries
+        ]
         if lang:
             items = [await _apply_entry_translation(db, it, lang) for it in items]
         for it in items:
@@ -418,57 +525,93 @@ async def get_public_entry_detail(
     base = str(request.base_url).rstrip("/")
     if content_type_key == "product":
         if id_or_slug.isdigit():
-            p = (await db.execute(select(models.Product).where(models.Product.id == int(id_or_slug)))).scalar_one_or_none()
+            p = (
+                await db.execute(select(models.Product).where(models.Product.id == int(id_or_slug)))
+            ).scalar_one_or_none()
         else:
-            p = (await db.execute(select(models.Product).where(models.Product.slug == id_or_slug))).scalar_one_or_none()
+            p = (
+                await db.execute(select(models.Product).where(models.Product.slug == id_or_slug))
+            ).scalar_one_or_none()
         if not p:
             raise HTTPException(404, "Product not found")
+
         async def increment_product_view():
             async with AsyncSessionLocal() as session:
-                await session.execute(update(models.Product).where(models.Product.id == p.id).values(
-                    view_count=models.Product.view_count + 1))
+                await session.execute(
+                    update(models.Product)
+                    .where(models.Product.id == p.id)
+                    .values(view_count=models.Product.view_count + 1)
+                )
                 await session.commit()
+
         background_tasks.add_task(increment_product_view)
         item = _product_to_item(p)
         item["json_ld"] = _build_json_ld(
-            item, url=f"{base}{_page_path('product', p.slug)}" if p.slug else None, kind="product"
+            item,
+            url=f"{base}{await _page_path(db, 'product', p.slug)}" if p.slug else None,
+            kind="product",
         )
         return item
     elif content_type_key == "case":
         if id_or_slug.isdigit():
-            c = (await db.execute(select(models.Case).where(models.Case.id == int(id_or_slug)))).scalar_one_or_none()
+            c = (
+                await db.execute(select(models.Case).where(models.Case.id == int(id_or_slug)))
+            ).scalar_one_or_none()
         else:
-            c = (await db.execute(select(models.Case).where(models.Case.name == id_or_slug))).scalar_one_or_none()
+            c = (
+                await db.execute(select(models.Case).where(models.Case.name == id_or_slug))
+            ).scalar_one_or_none()
         if not c:
             raise HTTPException(404, "Case not found")
         item = _case_to_item(c)
         item["json_ld"] = _build_json_ld(
-            item, url=f"{base}{_page_path('case', c.name)}" if c.name else None, kind="article"
+            item,
+            url=f"{base}{await _page_path(db, 'case', c.name)}" if c.name else None,
+            kind="article",
         )
         return item
     elif content_type_key == "news":
         if id_or_slug.isdigit():
-            n = (await db.execute(select(models.News).where(models.News.id == int(id_or_slug)))).scalar_one_or_none()
+            n = (
+                await db.execute(select(models.News).where(models.News.id == int(id_or_slug)))
+            ).scalar_one_or_none()
         else:
-            n = (await db.execute(select(models.News).where(models.News.slug == id_or_slug))).scalar_one_or_none()
+            n = (
+                await db.execute(select(models.News).where(models.News.slug == id_or_slug))
+            ).scalar_one_or_none()
         if not n:
             raise HTTPException(404, "News not found")
+
         async def increment_news_view():
             async with AsyncSessionLocal() as session:
-                await session.execute(update(models.News).where(models.News.id == n.id).values(
-                    view_count=models.News.view_count + 1))
+                await session.execute(
+                    update(models.News)
+                    .where(models.News.id == n.id)
+                    .values(view_count=models.News.view_count + 1)
+                )
                 await session.commit()
+
         background_tasks.add_task(increment_news_view)
         item = _news_to_item(n)
         item["json_ld"] = _build_json_ld(
-            item, url=f"{base}{_page_path('news', n.slug)}" if n.slug else None, kind="article"
+            item,
+            url=f"{base}{await _page_path(db, 'news', n.slug)}" if n.slug else None,
+            kind="article",
         )
         return item
     else:
-        ct = (await db.execute(select(models.ContentType).where(models.ContentType.key == content_type_key))).scalar_one_or_none()
+        ct = (
+            await db.execute(
+                select(models.ContentType).where(models.ContentType.key == content_type_key)
+            )
+        ).scalar_one_or_none()
         if not ct:
             raise HTTPException(404, f"Content type '{content_type_key}' not found")
-        conds = [models.Entry.content_type_id == ct.id, models.Entry.status == "published", models.Entry.deleted_at.is_(None)]
+        conds = [
+            models.Entry.content_type_id == ct.id,
+            models.Entry.status == "published",
+            models.Entry.deleted_at.is_(None),
+        ]
         if id_or_slug.isdigit():
             conds.append(models.Entry.id == int(id_or_slug))
         else:
@@ -476,16 +619,26 @@ async def get_public_entry_detail(
         entry = (await db.execute(select(models.Entry).where(*conds))).scalar_one_or_none()
         if not entry:
             raise HTTPException(404, "Entry not found")
-        item = {"id": entry.id, "slug": entry.slug, "title": entry.title, "content": entry.content or {},
-                "custom_fields": entry.custom_fields or {}, "seo": entry.seo or {}, "status": entry.status,
-                "published_at": entry.published_at.isoformat() if entry.published_at else None,
-                "sort": entry.sort, "view_count": (entry.view_count or 0) + 1,
-                # AI 内容对外标记（P1-6）：合规与信任需要
-                "ai_generated": entry.ai_origin is not None}
+        item = {
+            "id": entry.id,
+            "slug": entry.slug,
+            "title": entry.title,
+            "content": entry.content or {},
+            "custom_fields": entry.custom_fields or {},
+            "seo": entry.seo or {},
+            "status": entry.status,
+            "published_at": entry.published_at.isoformat() if entry.published_at else None,
+            "sort": entry.sort,
+            "view_count": (entry.view_count or 0) + 1,
+            # AI 内容对外标记（P1-6）：合规与信任需要
+            "ai_generated": entry.ai_origin is not None,
+        }
         item = await _apply_entry_translation(db, item, lang)
         item["og"] = _build_og(item)
         item["json_ld"] = _build_json_ld(
-            item, url=f"{base}{_page_path('article', entry.slug)}" if entry.slug else None, kind="article"
+            item,
+            url=f"{base}{await _page_path(db, 'article', entry.slug)}" if entry.slug else None,
+            kind="article",
         )
         return item
 
@@ -496,9 +649,11 @@ async def get_public_field_definitions(
     content_type_key: str = Query(...),
 ):
     """获取字段定义（供前台渲染动态字段）"""
-    ct = (await db.execute(
-        select(models.ContentType).where(models.ContentType.key == content_type_key)
-    )).scalar_one_or_none()
+    ct = (
+        await db.execute(
+            select(models.ContentType).where(models.ContentType.key == content_type_key)
+        )
+    ).scalar_one_or_none()
     if not ct:
         return []
 
@@ -524,25 +679,28 @@ async def get_public_field_definitions(
             {"value": o.value, "label": o.label, "color": o.color}
             for o in opts_result.scalars().all()
         ]
-        items.append({
-            "id": fd.id,
-            "field_key": fd.field_key,
-            "label": fd.label,
-            "field_type": fd.field_type,
-            "required": fd.required,
-            "default_value": fd.default_value,
-            "options": fd.options,
-            "validation": fd.validation,
-            "group_id": fd.group_id,
-            "sort": fd.sort,
-            "field_options": options,
-        })
+        items.append(
+            {
+                "id": fd.id,
+                "field_key": fd.field_key,
+                "label": fd.label,
+                "field_type": fd.field_type,
+                "required": fd.required,
+                "default_value": fd.default_value,
+                "options": fd.options,
+                "validation": fd.validation,
+                "group_id": fd.group_id,
+                "sort": fd.sort,
+                "field_options": options,
+            }
+        )
     return items
 
 
 # ============================================================
 # 现有公开接口（保持兼容）
 # ============================================================
+
 
 @router.get("/site", response_model=dict[str, Any], summary="公开站点数据（公网/官网读取）")
 async def get_public_site_data(db: AsyncSession = Depends(get_db)):
@@ -557,12 +715,21 @@ async def get_public_site_data(db: AsyncSession = Depends(get_db)):
     )
     products = [
         {
-            "id": p.id, "key": p.slug, "name": p.name, "chineseName": p.chinese_name,
-            "tagline": p.tagline, "line": p.line, "stack": p.stack,
-            "desc": p.desc, "features": p.features or [],
-            "isFlagship": p.is_flagship, "isOpenSource": p.is_open_source,
-            "github": p.github_url, "demo": p.demo_url,
-            "website": p.website_url, "license": p.license,
+            "id": p.id,
+            "key": p.slug,
+            "name": p.name,
+            "chineseName": p.chinese_name,
+            "tagline": p.tagline,
+            "line": p.line,
+            "stack": p.stack,
+            "desc": p.desc,
+            "features": p.features or [],
+            "isFlagship": p.is_flagship,
+            "isOpenSource": p.is_open_source,
+            "github": p.github_url,
+            "demo": p.demo_url,
+            "website": p.website_url,
+            "license": p.license,
             "custom_fields": p.custom_fields or {},
         }
         for p in prod_result.scalars().all()
@@ -590,12 +757,20 @@ async def get_public_products(db: AsyncSession = Depends(get_db)):
     )
     return [
         {
-            "key": p.slug, "name": p.name, "chineseName": p.chinese_name,
-            "tagline": p.tagline, "line": p.line, "stack": p.stack,
-            "desc": p.desc, "features": p.features or [],
-            "isFlagship": p.is_flagship, "isOpenSource": p.is_open_source,
-            "github": p.github_url, "demo": p.demo_url,
-            "website": p.website_url, "license": p.license,
+            "key": p.slug,
+            "name": p.name,
+            "chineseName": p.chinese_name,
+            "tagline": p.tagline,
+            "line": p.line,
+            "stack": p.stack,
+            "desc": p.desc,
+            "features": p.features or [],
+            "isFlagship": p.is_flagship,
+            "isOpenSource": p.is_open_source,
+            "github": p.github_url,
+            "demo": p.demo_url,
+            "website": p.website_url,
+            "license": p.license,
             "custom_fields": p.custom_fields or {},
         }
         for p in result.scalars().all()
@@ -625,7 +800,10 @@ async def get_public_news(db: AsyncSession = Depends(get_db), limit: int = 20):
     )
     return [
         {
-            "id": n.id, "slug": n.slug, "title": n.title, "excerpt": n.excerpt,
+            "id": n.id,
+            "slug": n.slug,
+            "title": n.title,
+            "excerpt": n.excerpt,
             "cover_image": n.cover_image,
             "published_at": n.published_at.isoformat() if n.published_at else None,
         }
@@ -647,8 +825,11 @@ async def get_public_news_detail(
         return await _serve_public_page(request, db, slug, kind="news")
 
     result = await db.execute(
-        select(models.News)
-        .where(models.News.deleted_at.is_(None), models.News.slug == slug, models.News.status == "published")
+        select(models.News).where(
+            models.News.deleted_at.is_(None),
+            models.News.slug == slug,
+            models.News.status == "published",
+        )
     )
     n = result.scalar_one_or_none()
     if not n:
@@ -657,13 +838,18 @@ async def get_public_news_detail(
     background_tasks.add_task(_increment_news_view_count, n.id)
     view_count = (n.view_count or 0) + 1
     item = {
-        "id": n.id, "slug": n.slug, "title": n.title, "excerpt": n.excerpt,
-        "content_md": n.content_md, "cover_image": n.cover_image,
+        "id": n.id,
+        "slug": n.slug,
+        "title": n.title,
+        "excerpt": n.excerpt,
+        "content_md": n.content_md,
+        "cover_image": n.cover_image,
         "published_at": n.published_at.isoformat() if n.published_at else None,
         "view_count": view_count,
     }
     item["json_ld"] = _build_json_ld(
-        item, url=f"{str(request.base_url).rstrip('/')}/news/{n.slug}" if n.slug else None,
+        item,
+        url=f"{str(request.base_url).rstrip('/')}/news/{n.slug}" if n.slug else None,
         kind="article",
     )
     return item
@@ -673,12 +859,14 @@ async def get_public_news_detail(
 # 暂存预览（M4·P3 4.4 staging）
 # ============================================================
 
+
 async def _resolve_preview_entry(db: AsyncSession, token: str):
     """解析预览 token → entry；已过期/已发布/不存在返回 None。"""
     from datetime import datetime
-    pv = (await db.execute(
-        select(models.EntryPreview).where(models.EntryPreview.token == token)
-    )).scalar_one_or_none()
+
+    pv = (
+        await db.execute(select(models.EntryPreview).where(models.EntryPreview.token == token))
+    ).scalar_one_or_none()
     if not pv:
         return None, "预览不存在"
     if pv.expires_at and pv.expires_at < datetime.now(UTC):
@@ -697,11 +885,18 @@ async def preview_entry_json(token: str, db: AsyncSession = Depends(get_db)):
     entry, err = await _resolve_preview_entry(db, token)
     if not entry:
         raise HTTPException(404 if "失效" not in (err or "") else 410, err or "预览不可用")
-    item = {"id": entry.id, "slug": entry.slug, "title": entry.title,
-            "content": entry.content or {}, "custom_fields": entry.custom_fields or {},
-            "seo": entry.seo or {}, "status": entry.status,
-            "published_at": entry.published_at.isoformat() if entry.published_at else None,
-            "sort": entry.sort, "view_count": entry.view_count}
+    item = {
+        "id": entry.id,
+        "slug": entry.slug,
+        "title": entry.title,
+        "content": entry.content or {},
+        "custom_fields": entry.custom_fields or {},
+        "seo": entry.seo or {},
+        "status": entry.status,
+        "published_at": entry.published_at.isoformat() if entry.published_at else None,
+        "sort": entry.sort,
+        "view_count": entry.view_count,
+    }
     item["og"] = _build_og(item)
     item["preview"] = True
     return item
@@ -711,8 +906,13 @@ def _render_preview_html(entry: models.Entry) -> str:
     """把条目渲染成完整 HTML 文档（彩排页，顶部带预览横幅）。"""
     import html as _h
 
-    item = {"title": entry.title, "slug": entry.slug, "content": entry.content or {},
-            "custom_fields": entry.custom_fields or {}, "seo": entry.seo or {}}
+    item = {
+        "title": entry.title,
+        "slug": entry.slug,
+        "content": entry.content or {},
+        "custom_fields": entry.custom_fields or {},
+        "seo": entry.seo or {},
+    }
     og = _build_og(item)
     title = _h.escape(item.get("title") or "")
     content = item.get("content") or {}
@@ -747,7 +947,7 @@ code{{background:#f3f4f6;padding:1px 5px;border-radius:4px}}
 <div class="banner">🖥 暂存预览 · 非正式页面（内容为草稿/待审核状态）</div>
 <div class="wrap">
 <h1>{title}</h1>
-<div class="slug">{_h.escape(entry.slug or '')}</div>
+<div class="slug">{_h.escape(entry.slug or "")}</div>
 <div>{body_html}</div>
 </div>
 </body>
@@ -804,8 +1004,12 @@ def _page_description(item: dict) -> str:
     seo = item.get("seo") or {}
     content = item.get("content") or {}
     desc = (
-        seo.get("seo_description") or seo.get("og_description") or seo.get("description")
-        or content.get("excerpt") or content.get("desc") or ""
+        seo.get("seo_description")
+        or seo.get("og_description")
+        or seo.get("description")
+        or content.get("excerpt")
+        or content.get("desc")
+        or ""
     )
     if not desc:
         desc = _strip_html(str(content.get("text") or content.get("html") or ""), 200)
@@ -947,8 +1151,15 @@ async def _render_404_html(base: str, site_name: str = "Cenkor", *, site_id: int
         "base": base,
         "site_name": site_name,
         "site_desc": "",
-        "og": {"type": "website", "site_name": site_name, "title": "页面不存在",
-               "description": "", "url": "", "image": "", "video": ""},
+        "og": {
+            "type": "website",
+            "site_name": site_name,
+            "title": "页面不存在",
+            "description": "",
+            "url": "",
+            "image": "",
+            "video": "",
+        },
         "json_ld": "",
         "published_at": None,
         "published_text": "",
@@ -975,9 +1186,7 @@ async def _site_meta(db: AsyncSession) -> tuple[str, str]:
 
 async def _type_key_map(db: AsyncSession) -> dict[int, str]:
     """content_type_id → key。卡片 URL、sitemap 都要按条目真实类型算路径。"""
-    rows = (await db.execute(
-        select(models.ContentType.id, models.ContentType.key)
-    )).all()
+    rows = (await db.execute(select(models.ContentType.id, models.ContentType.key))).all()
     return dict(rows)
 
 
@@ -992,9 +1201,11 @@ async def _load_entry_page_item(
     ]
     if strict:
         # 类型必须匹配：/news/{slug}.html 不该把一篇文章当成新闻返回
-        conds.append(models.Entry.content_type_id.in_(
-            select(models.ContentType.id).where(models.ContentType.key == kind)
-        ))
+        conds.append(
+            models.Entry.content_type_id.in_(
+                select(models.ContentType.id).where(models.ContentType.key == kind)
+            )
+        )
     row = (await db.execute(select(models.Entry).where(*conds))).scalars().first()
     if not row:
         return None
@@ -1003,22 +1214,37 @@ async def _load_entry_page_item(
     # 缺这两个键时链式 Undefined 会静默渲染成空，分类和标签在线上永远不显示。
     category = None
     if row.category_id:
-        cat = (await db.execute(
-            select(models.Category).where(models.Category.id == row.category_id)
-        )).scalars().first()
+        cat = (
+            (await db.execute(select(models.Category).where(models.Category.id == row.category_id)))
+            .scalars()
+            .first()
+        )
         if cat is not None:
+            # 栏目链接也走规则：以前这里硬编码 /category/{slug}/，后台把栏目
+            # 规则改成 /{catdir}/ 之后，详情页面包屑里还是旧形态，点过去 404。
+            rules = await url_resolver.load_rules(db, row.site_id or 1)
+            catdir = await url_resolver.category_chain(db, cat.id, row.site_id or 1)
             category = {
-                "id": cat.id, "slug": cat.slug, "name": cat.name,
-                # 与 TemplateContext.url("category", slug) 同形，模板里也能用 url()
-                "url": f"/category/{cat.slug}/",
+                "id": cat.id,
+                "slug": cat.slug,
+                "name": cat.name,
+                "url": url_resolver.category_url(
+                    rules, slug=cat.slug, catdir=catdir, category_id=cat.id
+                ),
             }
 
-    tag_names = list((await db.execute(
-        select(models.Tag.name)
-        .join(models.ContentTag, models.ContentTag.tag_id == models.Tag.id)
-        .where(models.ContentTag.content_id == row.id)
-        .order_by(models.Tag.id.asc())
-    )).scalars().all())
+    tag_names = list(
+        (
+            await db.execute(
+                select(models.Tag.name)
+                .join(models.ContentTag, models.ContentTag.tag_id == models.Tag.id)
+                .where(models.ContentTag.content_id == row.id)
+                .order_by(models.Tag.id.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     return {
         "id": row.id,
@@ -1034,6 +1260,10 @@ async def _load_entry_page_item(
         "ai_origin": row.ai_origin,
         "ai_generated": row.ai_origin is not None,
         "category": category,
+        "category_id": row.category_id,
+        # 手填路径：详情页 canonical 和落盘路径都要用它，否则用户钉死的地址
+        # 会被规则重新算一遍，等于白填
+        "url_path": row.url_path,
         "tags": tag_names,
         # 真实类型：article 走非严格匹配时可能捞到 case/news 的条目，
         # canonical 得按条目自己的类型算，否则同一个内容会有两个地址
@@ -1057,18 +1287,26 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
         item = await _load_entry_page_item(db, slug, "product")
         if item is not None:
             return item
-        row = (await db.execute(
-            select(models.Product).where(
-                models.Product.slug == slug,
-                models.Product.deleted_at.is_(None),
+        row = (
+            await db.execute(
+                select(models.Product).where(
+                    models.Product.slug == slug,
+                    models.Product.deleted_at.is_(None),
+                )
             )
-        )).scalar_one_or_none()
-        if row is None:
-            return None
-        item = _product_to_item(row)
-        item["site_id"] = getattr(row, "site_id", None)
-        item["content_type"] = "product"
-        return item
+        ).scalar_one_or_none()
+        if row is not None:
+            item = _product_to_item(row)
+            item["site_id"] = getattr(row, "site_id", None)
+            item["content_type"] = "product"
+            return item
+        # 两套来源都没有：再不限类型找一次。
+        #
+        # 这一步不能省。slug 是内容自己起的，不受类型约束 —— 有条 news 类型
+        # 的内容 slug 叫 "product-update-batch-review"，从 `/product/{slug}`
+        # 进来时严格类型匹配必然落空，直接 404 就再也走不到 canonical 自愈，
+        # 用户永远拿不到「该跳到 /news/...」的提示。
+        return await _load_entry_page_item(db, slug, "article", strict=False)
 
     if kind in ("case", "news"):
         item = await _load_entry_page_item(db, slug, kind)
@@ -1076,25 +1314,31 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
             return item
         # 兜底：还没迁到内容引擎的老数据
         if kind == "news":
-            row = (await db.execute(
-                select(models.News).where(
-                    models.News.slug == slug,
-                    models.News.deleted_at.is_(None),
+            row = (
+                await db.execute(
+                    select(models.News).where(
+                        models.News.slug == slug,
+                        models.News.deleted_at.is_(None),
+                    )
                 )
-            )).scalar_one_or_none()
-            if row is None:
-                return None
-            item = _news_to_item(row)
+            ).scalar_one_or_none()
+            if row is not None:
+                item = _news_to_item(row)
+            else:
+                return await _load_entry_page_item(db, slug, "article", strict=False)
         else:
-            row = (await db.execute(
-                select(models.Case).where(
-                    models.Case.name == slug,
-                    models.Case.deleted_at.is_(None),
+            row = (
+                await db.execute(
+                    select(models.Case).where(
+                        models.Case.name == slug,
+                        models.Case.deleted_at.is_(None),
+                    )
                 )
-            )).scalar_one_or_none()
-            if row is None:
-                return None
-            item = _case_to_item(row)
+            ).scalar_one_or_none()
+            if row is not None:
+                item = _case_to_item(row)
+            else:
+                return await _load_entry_page_item(db, slug, "article", strict=False)
         item["site_id"] = getattr(row, "site_id", None)
         item["content_type"] = kind
         return item
@@ -1110,14 +1354,38 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
     return await _load_entry_page_item(db, slug, "article", strict=False)
 
 
-def _page_path(kind: str, slug: str) -> str:
-    """公开页面路径（llms.txt / sitemap / JSON-LD 共用同一套规则）。
+async def _page_path(
+    db: AsyncSession,
+    kind: str,
+    slug: str | None,
+    *,
+    site_id: int = 1,
+    catdir: str | None = None,
+    category_id: int | None = None,
+    published: datetime | None = None,
+    url_path: str | None = None,
+) -> str:
+    """公开页面路径 —— llms.txt / sitemap / JSON-LD / 模板共用的唯一入口。
 
-    单页（page 类型，如「关于我们」）走 `/p/{slug}.html`：这类页面和文章共用
-    `/article/` 会让面包屑和 canonical 都指向错的栏目，必须有自己的命名空间。
+    改造前这里是 `/{prefix}/{slug}.html` 硬编码，和 `TemplateContext.url()`
+    各写一套。两份实现一旦分叉，页面上点着都对、爬虫看到的 canonical 全错，
+    只能靠比对页面源码才发现 —— 所以统一收敛到 url_resolver。
+
+    单页（page 类型，如「关于我们」）的默认规则是 `/p/{slug}.html`：这类页面
+    和文章共用 `/article/` 会让面包屑和 canonical 都指向错的栏目。
     """
-    prefix = PAGE_PREFIX.get(kind, "article")
-    return f"/{prefix}/{slug}.html"
+    if not slug:
+        return ""
+    rules = await url_resolver.load_rules(db, site_id)
+    return url_resolver.detail_url(
+        rules,
+        kind,
+        slug=slug,
+        catdir=catdir,
+        category_id=category_id,
+        published=published,
+        url_path=url_path,
+    )
 
 
 def _list_base_path(
@@ -1169,7 +1437,7 @@ def request_host(request: Request) -> str:
     """
     raw = (request.headers.get("host") or "").strip()
     if raw.startswith("["):
-        return raw[1:raw.find("]")].lower() if "]" in raw else raw.lower()
+        return raw[1 : raw.find("]")].lower() if "]" in raw else raw.lower()
     return raw.split(":")[0].strip().lower()
 
 
@@ -1182,20 +1450,25 @@ async def _resolve_site(db: AsyncSession, request: Request) -> tuple[int, str, s
     host = request_host(request)
     row = None
     if host:
-        row = (await db.execute(
-            select(models.Site).where(func.lower(models.Site.domain) == host)
-        )).scalars().first()
+        row = (
+            (await db.execute(select(models.Site).where(func.lower(models.Site.domain) == host)))
+            .scalars()
+            .first()
+        )
     if row is None:
-        row = (await db.execute(select(models.Site).order_by(models.Site.id.asc()))).scalars().first()
+        row = (
+            (await db.execute(select(models.Site).order_by(models.Site.id.asc()))).scalars().first()
+        )
     site_id = row.id if row is not None else 1
     name, desc = await _site_meta(db)
     return site_id, name, desc
 
 
 def _entry_excerpt(content: dict, seo: dict, limit: int = 160) -> str:
-    return str(seo.get("description") or _strip_html(
-        str(content.get("text") or content.get("html") or ""), limit
-    )).strip()
+    return str(
+        seo.get("description")
+        or _strip_html(str(content.get("text") or content.get("html") or ""), limit)
+    ).strip()
 
 
 async def _entry_cards(
@@ -1215,20 +1488,28 @@ async def _entry_cards(
     cat_ids = {e.category_id for e in entries if e.category_id}
     cats: dict[int, Any] = {}
     if cat_ids:
-        rows = (await db.execute(
-            select(models.Category).where(models.Category.id.in_(cat_ids))
-        )).scalars().all()
+        rows = (
+            (await db.execute(select(models.Category).where(models.Category.id.in_(cat_ids))))
+            .scalars()
+            .all()
+        )
         cats = {c.id: c for c in rows}
 
     tag_map: dict[int, list[str]] = {}
-    rows = (await db.execute(
-        select(models.ContentTag.content_id, models.Tag.name)
-        .join(models.Tag, models.Tag.id == models.ContentTag.tag_id)
-        .where(models.ContentTag.content_id.in_(ids))
-        .order_by(models.Tag.id.asc())
-    )).all()
+    rows = (
+        await db.execute(
+            select(models.ContentTag.content_id, models.Tag.name)
+            .join(models.Tag, models.Tag.id == models.ContentTag.tag_id)
+            .where(models.ContentTag.content_id.in_(ids))
+            .order_by(models.Tag.id.asc())
+        )
+    ).all()
     for cid, name in rows:
         tag_map.setdefault(cid, []).append(name)
+
+    # 栏目目录链：规则用到 {catdir} 时卡片链接才拼得对。一次查完，几十条而已。
+    chains = await url_resolver.category_chains(db)
+    rules = await url_resolver.load_rules(db)
 
     out: list[dict[str, Any]] = []
     for e in entries:
@@ -1236,35 +1517,55 @@ async def _entry_cards(
         seo = dict(e.seo or {})
         cat = cats.get(e.category_id)
         ct_key = keys.get(e.content_type_id) or "article"
-        out.append({
-            "id": e.id,
-            "type": ct_key,
-            "slug": e.slug,
-            "title": e.title,
-            "excerpt": _entry_excerpt(content, seo),
-            "cover": content.get("cover_image") or seo.get("og_image"),
-            "url": f"{base}{_page_path(ct_key, e.slug)}",
-            "published_at": e.published_at.isoformat() if e.published_at else None,
-            "updated_at": e.updated_at.isoformat() if e.updated_at else None,
-            "view_count": e.view_count or 0,
-            "sort": e.sort or 0,
-            "ai_generated": e.ai_origin is not None,
-            "content": content,
-            "custom_fields": dict(e.custom_fields or {}),
-            "seo": seo,
-            "category": (
-                {"id": cat.id, "slug": cat.slug, "name": cat.name,
-                 "url": f"{base}/category/{cat.slug}/"}
-                if cat is not None else None
-            ),
-            "tags": tag_map.get(e.id, []),
-        })
+        out.append(
+            {
+                "id": e.id,
+                "type": ct_key,
+                "slug": e.slug,
+                "title": e.title,
+                "excerpt": _entry_excerpt(content, seo),
+                "cover": content.get("cover_image") or seo.get("og_image"),
+                "url": f"{base}{await _page_path(db, ct_key, e.slug, catdir=chains.get(e.category_id) if e.category_id else None, category_id=e.category_id, published=e.published_at, url_path=e.url_path)}",
+                "published_at": e.published_at.isoformat() if e.published_at else None,
+                "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+                "view_count": e.view_count or 0,
+                "sort": e.sort or 0,
+                "ai_generated": e.ai_origin is not None,
+                "content": content,
+                "custom_fields": dict(e.custom_fields or {}),
+                "seo": seo,
+                "category": (
+                    {
+                        "id": cat.id,
+                        "slug": cat.slug,
+                        "name": cat.name,
+                        "url": f"{base}"
+                        + url_resolver.category_url(
+                            rules,
+                            slug=cat.slug,
+                            catdir=chains.get(cat.id),
+                            category_id=cat.id,
+                        ),
+                    }
+                    if cat is not None
+                    else None
+                ),
+                "tags": tag_map.get(e.id, []),
+            }
+        )
     return out
 
 
 def _list_model(
-    *, base: str, site_name: str, site_desc: str, title: str, description: str,
-    canonical: str, items: list[dict[str, Any]], pagination: dict[str, Any],
+    *,
+    base: str,
+    site_name: str,
+    site_desc: str,
+    title: str,
+    description: str,
+    canonical: str,
+    items: list[dict[str, Any]],
+    pagination: dict[str, Any],
 ) -> dict[str, Any]:
     """列表页的 page 对象。字段与详情页保持同构，模板不用为列表页写第二套。"""
     return {
@@ -1277,9 +1578,13 @@ def _list_model(
         "site_name": site_name,
         "site_desc": site_desc,
         "og": {
-            "type": "website", "site_name": site_name, "title": title,
-            "description": description or site_desc, "url": canonical,
-            "image": "", "video": "",
+            "type": "website",
+            "site_name": site_name,
+            "title": title,
+            "description": description or site_desc,
+            "url": canonical,
+            "image": "",
+            "video": "",
         },
         "json_ld": "",
         "published_at": None,
@@ -1292,7 +1597,7 @@ def _list_model(
     }
 
 
-def _product_cards(rows: list, base: str) -> list[dict[str, Any]]:
+async def _product_cards(db: AsyncSession, rows: list, base: str) -> list[dict[str, Any]]:
     """Product 表 → 模板卡片。
 
     注意：`/product/{slug}.html` 详情查的是 **Product 表**，不是
@@ -1301,24 +1606,40 @@ def _product_cards(rows: list, base: str) -> list[dict[str, Any]]:
     """
     out: list[dict[str, Any]] = []
     for p in rows:
-        out.append({
-            "id": p.id, "type": "product", "slug": p.slug, "title": p.name,
-            "excerpt": _strip_html(str(p.tagline or p.desc or ""), 160),
-            "cover": None,
-            "url": f"{base}{_page_path('product', p.slug)}",
-            "published_at": None, "updated_at": None,
-            "view_count": 0, "sort": p.sort or 0, "ai_generated": False,
-            "content": {
-                "tagline": p.tagline, "line": p.line, "stack": p.stack,
-                "desc": p.desc, "features": p.features or [],
-                "chinese_name": p.chinese_name,
-            },
-            "custom_fields": dict(p.custom_fields or {}),
-            "seo": {}, "category": None, "tags": [],
-            "is_flagship": p.is_flagship, "is_open_source": p.is_open_source,
-            "github": p.github_url, "demo": p.demo_url,
-            "website": p.website_url, "license": p.license,
-        })
+        out.append(
+            {
+                "id": p.id,
+                "type": "product",
+                "slug": p.slug,
+                "title": p.name,
+                "excerpt": _strip_html(str(p.tagline or p.desc or ""), 160),
+                "cover": None,
+                "url": f"{base}{await _page_path(db, 'product', p.slug)}",
+                "published_at": None,
+                "updated_at": None,
+                "view_count": 0,
+                "sort": p.sort or 0,
+                "ai_generated": False,
+                "content": {
+                    "tagline": p.tagline,
+                    "line": p.line,
+                    "stack": p.stack,
+                    "desc": p.desc,
+                    "features": p.features or [],
+                    "chinese_name": p.chinese_name,
+                },
+                "custom_fields": dict(p.custom_fields or {}),
+                "seo": {},
+                "category": None,
+                "tags": [],
+                "is_flagship": p.is_flagship,
+                "is_open_source": p.is_open_source,
+                "github": p.github_url,
+                "demo": p.demo_url,
+                "website": p.website_url,
+                "license": p.license,
+            }
+        )
     return out
 
 
@@ -1334,8 +1655,14 @@ async def _html_404(request: Request, db: AsyncSession) -> Response:
 
 
 async def _serve_product_list(
-    db: AsyncSession, *, site_id: int, base: str, page: int,
-    site_name: str, site_desc: str, from_query: bool = False,
+    db: AsyncSession,
+    *,
+    site_id: int,
+    base: str,
+    page: int,
+    site_name: str,
+    site_desc: str,
+    from_query: bool = False,
 ) -> Response:
     """产品列表：直接查 Product 表，与 /product/{slug}.html 详情同源。"""
     conds: list[Any] = [models.Product.deleted_at.is_(None), models.Product.status == "published"]
@@ -1343,9 +1670,9 @@ async def _serve_product_list(
         # 历史数据里 site_id 可能是 NULL，不能简单等值过滤，否则整页空
         conds.append(or_(models.Product.site_id == site_id, models.Product.site_id.is_(None)))
 
-    total = (await db.execute(
-        select(func.count()).select_from(models.Product).where(*conds)
-    )).scalar() or 0
+    total = (
+        await db.execute(select(func.count()).select_from(models.Product).where(*conds))
+    ).scalar() or 0
     base_path = _list_base_path("product")
     pg = build_pagination(page, total, LIST_PER_PAGE, 5, base_path=base_path)
 
@@ -1354,20 +1681,30 @@ async def _serve_product_list(
         return RedirectResponse(f"{base}{page_url(base_path, pg['page'])}", status_code=301)
     absolutize_pagination(pg, base)
 
-    rows = (await db.execute(
-        select(models.Product)
-        .where(*conds)
-        .order_by(models.Product.sort.asc(), models.Product.id.asc())
-        .offset((pg["page"] - 1) * LIST_PER_PAGE)
-        .limit(LIST_PER_PAGE)
-    )).scalars().all()
+    rows = (
+        (
+            await db.execute(
+                select(models.Product)
+                .where(*conds)
+                .order_by(models.Product.sort.asc(), models.Product.id.asc())
+                .offset((pg["page"] - 1) * LIST_PER_PAGE)
+                .limit(LIST_PER_PAGE)
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     title, description = _LIST_META["product"]
     model = _list_model(
-        base=base, site_name=site_name, site_desc=site_desc,
-        title=title, description=description,
+        base=base,
+        site_name=site_name,
+        site_desc=site_desc,
+        title=title,
+        description=description,
         canonical=f"{base}{page_url(base_path, pg['page'])}",
-        items=_product_cards(rows, base), pagination=pg,
+        items=await _product_cards(db, rows, base),
+        pagination=pg,
     )
     return Response(
         content=await render_page(model, site_id=site_id, base=base),
@@ -1398,16 +1735,23 @@ async def _serve_list_page(
     # 产品走 Product 表（与 /product/{slug}.html 同源），其余走内容引擎条目
     if kind == "product":
         return await _serve_product_list(
-            db, site_id=site_id, base=base, page=page,
-            site_name=site_name, site_desc=site_desc, from_query=from_query,
+            db,
+            site_id=site_id,
+            base=base,
+            page=page,
+            site_name=site_name,
+            site_desc=site_desc,
+            from_query=from_query,
         )
 
     async def not_found() -> Response:
         return await _html_404(request, db)
 
-    ct = (await db.execute(
-        select(models.ContentType).where(models.ContentType.key == kind)
-    )).scalars().first()
+    ct = (
+        (await db.execute(select(models.ContentType).where(models.ContentType.key == kind)))
+        .scalars()
+        .first()
+    )
     if ct is None:
         return await not_found()
 
@@ -1418,12 +1762,18 @@ async def _serve_list_page(
     title, description = _LIST_META.get(kind, (kind, ""))
 
     if category_slug:
-        cat = (await db.execute(
-            select(models.Category).where(
-                models.Category.site_id == site_id,
-                models.Category.slug == category_slug,
+        cat = (
+            (
+                await db.execute(
+                    select(models.Category).where(
+                        models.Category.site_id == site_id,
+                        models.Category.slug == category_slug,
+                    )
+                )
             )
-        )).scalars().first()
+            .scalars()
+            .first()
+        )
         if cat is None:
             return await not_found()
         type_id = cat.content_type_id or ct.id
@@ -1431,28 +1781,40 @@ async def _serve_list_page(
         title = cat.name
         description = f"{cat.name} 分类下的全部内容"
     elif tag_slug:
-        tag = (await db.execute(
-            select(models.Tag).where(models.Tag.site_id == site_id, models.Tag.slug == tag_slug)
-        )).scalars().first()
+        tag = (
+            (
+                await db.execute(
+                    select(models.Tag).where(
+                        models.Tag.site_id == site_id, models.Tag.slug == tag_slug
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
         if tag is None:
             return await not_found()
         type_id = tag.content_type_id or ct.id
-        extra.append(models.Entry.id.in_(
-            select(models.ContentTag.content_id)
-            .join(models.Tag, models.Tag.id == models.ContentTag.tag_id)
-            .where(models.Tag.id == tag.id)
-        ))
+        extra.append(
+            models.Entry.id.in_(
+                select(models.ContentTag.content_id)
+                .join(models.Tag, models.Tag.id == models.ContentTag.tag_id)
+                .where(models.Tag.id == tag.id)
+            )
+        )
         title = f"标签：{tag.name}"
         description = f"带「{tag.name}」标签的内容"
     elif kw:
         kw = kw.strip()
         if kw:
             like = f"%{kw}%"
-            extra.append(or_(
-                models.Entry.title.ilike(like),
-                models.Entry.slug.ilike(like),
-                cast(models.Entry.content, Text).ilike(like),
-            ))
+            extra.append(
+                or_(
+                    models.Entry.title.ilike(like),
+                    models.Entry.slug.ilike(like),
+                    cast(models.Entry.content, Text).ilike(like),
+                )
+            )
             title = f"搜索：{kw}"
             description = f"含「{kw}」的内容"
 
@@ -1474,9 +1836,9 @@ async def _serve_list_page(
     else:
         canonical = f"{base}/{kind}/"
 
-    total = (await db.execute(
-        select(func.count()).select_from(models.Entry).where(*conds)
-    )).scalar() or 0
+    total = (
+        await db.execute(select(func.count()).select_from(models.Entry).where(*conds))
+    ).scalar() or 0
 
     base_path = _list_base_path(kind, category_slug=category_slug, tag_slug=tag_slug)
     # 搜索页的筛选条件在 query 上，页码没法塞进路径，保持 `?kw=x&page=n`
@@ -1494,19 +1856,34 @@ async def _serve_list_page(
         absolutize_pagination(pg, base)
         canonical = pg["url"]
 
-    rows = (await db.execute(
-        select(models.Entry)
-        .where(*conds)
-        .order_by(models.Entry.sort.asc(), models.Entry.published_at.desc().nullslast(), models.Entry.id.desc())
-        .offset((pg["page"] - 1) * LIST_PER_PAGE)
-        .limit(LIST_PER_PAGE)
-    )).scalars().all()
+    rows = (
+        (
+            await db.execute(
+                select(models.Entry)
+                .where(*conds)
+                .order_by(
+                    models.Entry.sort.asc(),
+                    models.Entry.published_at.desc().nullslast(),
+                    models.Entry.id.desc(),
+                )
+                .offset((pg["page"] - 1) * LIST_PER_PAGE)
+                .limit(LIST_PER_PAGE)
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     items = await _entry_cards(db, rows, base, await _type_key_map(db))
     model = _list_model(
-        base=base, site_name=site_name, site_desc=site_desc,
-        title=title, description=description, canonical=canonical,
-        items=items, pagination=pg,
+        base=base,
+        site_name=site_name,
+        site_desc=site_desc,
+        title=title,
+        description=description,
+        canonical=canonical,
+        items=items,
+        pagination=pg,
     )
     headers = {"Cache-Control": "public, max-age=120"}
     if kw:
@@ -1521,7 +1898,9 @@ async def _serve_list_page(
 
 @router.get("/article/", include_in_schema=False)
 async def article_index(
-    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+    request: Request,
+    page: int = Query(1),
+    db: AsyncSession = Depends(get_db),
 ):
     """文章列表页（走主题 list.html）。`?page=N` 会被 301 到 `/article/page/N/`。"""
     return await _serve_list_page(
@@ -1531,7 +1910,9 @@ async def article_index(
 
 @router.get("/product/", include_in_schema=False)
 async def product_index(
-    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+    request: Request,
+    page: int = Query(1),
+    db: AsyncSession = Depends(get_db),
 ):
     """产品列表页。"""
     return await _serve_list_page(
@@ -1541,7 +1922,9 @@ async def product_index(
 
 @router.get("/case/", include_in_schema=False)
 async def case_index(
-    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+    request: Request,
+    page: int = Query(1),
+    db: AsyncSession = Depends(get_db),
 ):
     """案例列表页（走主题 list.html）。"""
     return await _serve_list_page(
@@ -1551,7 +1934,9 @@ async def case_index(
 
 @router.get("/news/", include_in_schema=False)
 async def news_index(
-    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+    request: Request,
+    page: int = Query(1),
+    db: AsyncSession = Depends(get_db),
 ):
     """新闻列表页。注意 `/news` 那几条是 JSON 接口，和带斜杠的两套。"""
     return await _serve_list_page(
@@ -1561,29 +1946,46 @@ async def news_index(
 
 @router.get("/category/{slug}/", include_in_schema=False)
 async def category_page(
-    slug: str, request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+    slug: str,
+    request: Request,
+    page: int = Query(1),
+    db: AsyncSession = Depends(get_db),
 ):
     """分类列表页。"""
     return await _serve_list_page(
-        request, db, kind="article", page=page, category_slug=slug,
+        request,
+        db,
+        kind="article",
+        page=page,
+        category_slug=slug,
         from_query="page" in request.query_params,
     )
 
 
 @router.get("/tag/{slug}/", include_in_schema=False)
 async def tag_page(
-    slug: str, request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+    slug: str,
+    request: Request,
+    page: int = Query(1),
+    db: AsyncSession = Depends(get_db),
 ):
     """标签列表页。"""
     return await _serve_list_page(
-        request, db, kind="article", page=page, tag_slug=slug,
+        request,
+        db,
+        kind="article",
+        page=page,
+        tag_slug=slug,
         from_query="page" in request.query_params,
     )
 
 
 @router.get("/{kind}/page/{n}/", include_in_schema=False)
 async def kind_paged(
-    kind: str, n: str, request: Request, db: AsyncSession = Depends(get_db),
+    kind: str,
+    n: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """列表分页页：`/article/page/2/`。
 
@@ -1611,7 +2013,10 @@ async def kind_paged(
 
 @router.get("/category/{slug}/page/{n}/", include_in_schema=False)
 async def category_paged(
-    slug: str, n: str, request: Request, db: AsyncSession = Depends(get_db),
+    slug: str,
+    n: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """分类分页页：`/category/{slug}/page/2/`。"""
     try:
@@ -1620,15 +2025,18 @@ async def category_paged(
         return await _html_404(request, db)
     if page_no <= 1:
         return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}"
-            f"{_list_base_path('article', category_slug=slug)}", status_code=301
+            f"{str(request.base_url).rstrip('/')}{_list_base_path('article', category_slug=slug)}",
+            status_code=301,
         )
     return await _serve_list_page(request, db, kind="article", page=page_no, category_slug=slug)
 
 
 @router.get("/tag/{slug}/page/{n}/", include_in_schema=False)
 async def tag_paged(
-    slug: str, n: str, request: Request, db: AsyncSession = Depends(get_db),
+    slug: str,
+    n: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """标签分页页：`/tag/{slug}/page/2/`。"""
     try:
@@ -1637,8 +2045,8 @@ async def tag_paged(
         return await _html_404(request, db)
     if page_no <= 1:
         return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}"
-            f"{_list_base_path('article', tag_slug=slug)}", status_code=301
+            f"{str(request.base_url).rstrip('/')}{_list_base_path('article', tag_slug=slug)}",
+            status_code=301,
         )
     return await _serve_list_page(request, db, kind="article", page=page_no, tag_slug=slug)
 
@@ -1667,11 +2075,38 @@ async def _serve_public_page(
     item = await _load_page_item(db, slug, kind)
     if not item:
         return await _html_404(request, db)
-    canonical = f"{base}{_page_path(item.get('content_type') or kind, slug)}"
+    # 栏目链一次算好，canonical 和落盘路径共用：两处各算一次的话，
+    # 规则一变就可能出现「页面 canonical 是 A、静态文件在 B」的对不上。
+    catdir = await url_resolver.category_chain(db, item.get("category_id"))
+    page_path = await _page_path(
+        db,
+        item.get("content_type") or kind,
+        slug,
+        catdir=catdir,
+        category_id=item.get("category_id"),
+        published=item.get("published_at"),
+        url_path=item.get("url_path"),
+    )
+    canonical = f"{base}{page_path}"
     kind = item.get("content_type") or kind
+
+    # 规范地址自愈：page_path 就是这条内容在**当前规则**下的规范地址。
+    # 请求路径跟它不一致就 301 —— 规则改过之后老地址（/article/x.html）
+    # 必须跳到新地址，否则同一份内容会有两个可访问 URL，爬虫收录哪个全看运气。
+    #
+    # 这也顺带纠正了「类型猜错」：page_path 用条目真实 content_type 算的，
+    # 所以 /article/ 开头但实际是 product 的条目会被纠正到 /product/ 下。
+    origin = _origin_path(request)
+    if page_path and origin != page_path:
+        return RedirectResponse(canonical, status_code=301)
+
     html = await _render_page_html(
-        item, base=base, canonical=canonical, kind=kind,
-        site_name=site_name, site_desc=site_desc,
+        item,
+        base=base,
+        canonical=canonical,
+        kind=kind,
+        site_name=site_name,
+        site_desc=site_desc,
         site_id=item.get("site_id"),
     )
     # P2：渲染成功就地落盘，nginx 下次直接出文件，不再进 Python。
@@ -1680,7 +2115,7 @@ async def _serve_public_page(
         db,
         site_id=item.get("site_id") or 1,
         host=request_host(request),
-        url_path=_page_path(kind, slug),
+        url_path=page_path,
         html=html,
     )
     return Response(
@@ -1817,30 +2252,56 @@ async def sitemap_xml(request: Request, db: AsyncSession = Depends(get_db)):
     urls: list[tuple[str, datetime | None]] = []
 
     # 内容引擎条目（含 slug 的已发布、未过期）
-    entries = (await db.execute(
-        select(models.Entry).where(
-            models.Entry.deleted_at.is_(None),
-            models.Entry.status == "published",
-            models.Entry.slug.is_not(None),
-            or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
+    entries = (
+        (
+            await db.execute(
+                select(models.Entry).where(
+                    models.Entry.deleted_at.is_(None),
+                    models.Entry.status == "published",
+                    models.Entry.slug.is_not(None),
+                    or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     # 按条目真实类型拼路径。之前一律当 article，case/news 的条目被列成
     # /article/{slug}.html —— 能打开但地址是错的，等于把错误 URL 教给爬虫。
     type_keys = await _type_key_map(db)
+    # 栏目目录链一次查完：规则里用到 {catdir} 时，sitemap 也必须生成同一种地址，
+    # 否则用户一改规则，站点页面全对、sitemap 里全是 404。
+    chains = await url_resolver.category_chains(db)
     for e in entries:
         ct_key = type_keys.get(e.content_type_id) or "article"
-        urls.append((f"{base}{_page_path(ct_key, e.slug)}", e.updated_at or e.created_at))
+        path = await _page_path(
+            db,
+            ct_key,
+            e.slug,
+            catdir=chains.get(e.category_id) if e.category_id else None,
+            category_id=e.category_id,
+            published=e.published_at,
+            url_path=e.url_path,
+        )
+        urls.append((f"{base}{path}", e.updated_at or e.created_at))
 
     # 传统产品 / 新闻
-    prods = (await db.execute(
-        select(models.Product).where(
-            models.Product.deleted_at.is_(None), models.Product.status == "published"
+    prods = (
+        (
+            await db.execute(
+                select(models.Product).where(
+                    models.Product.deleted_at.is_(None), models.Product.status == "published"
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     for p in prods:
         if p.slug:
-            urls.append((f"{base}{_page_path('product', p.slug)}", p.updated_at or p.created_at))
+            urls.append(
+                (f"{base}{await _page_path(db, 'product', p.slug)}", p.updated_at or p.created_at)
+            )
 
     # News 表不进 sitemap：它现在是空的（0 行），新闻数据都在内容引擎里，
     # 上面那个按类型的循环已经覆盖到了。
@@ -1851,9 +2312,11 @@ async def sitemap_xml(request: Request, db: AsyncSession = Depends(get_db)):
     for ct_key in ("article", "product", "case", "news"):
         urls.append((f"{base}/{ct_key}/", now))
 
-    cats = (await db.execute(
-        select(models.Category).where(models.Category.status == "active")
-    )).scalars().all()
+    cats = (
+        (await db.execute(select(models.Category).where(models.Category.status == "active")))
+        .scalars()
+        .all()
+    )
     for c in cats:
         if c.slug:
             stamp = getattr(c, "updated_at", None) or getattr(c, "created_at", None) or now
@@ -1901,52 +2364,93 @@ async def llms_txt(request: Request, db: AsyncSession = Depends(get_db)):
         sections.append("\n".join(lines))
 
     # 内容引擎条目（按类型分组）
-    cts = (await db.execute(
-        select(models.ContentType).where(models.ContentType.deleted_at.is_(None))
-    )).scalars().all()
+    cts = (
+        (
+            await db.execute(
+                select(models.ContentType).where(models.ContentType.deleted_at.is_(None))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    chains = await url_resolver.category_chains(db)
     for ct in cts:
-        rows_q = (await db.execute(
-            select(models.Entry).where(
-                models.Entry.content_type_id == ct.id,
-                models.Entry.status == "published",
-                models.Entry.deleted_at.is_(None),
-                models.Entry.slug.is_not(None),
-                or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
-            ).order_by(*order_nulls_last(models.Entry.published_at)).limit(100)
-        )).scalars().all()
+        rows_q = (
+            (
+                await db.execute(
+                    select(models.Entry)
+                    .where(
+                        models.Entry.content_type_id == ct.id,
+                        models.Entry.status == "published",
+                        models.Entry.deleted_at.is_(None),
+                        models.Entry.slug.is_not(None),
+                        or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
+                    )
+                    .order_by(*order_nulls_last(models.Entry.published_at))
+                    .limit(100)
+                )
+            )
+            .scalars()
+            .all()
+        )
         sec(
             ct.name,
             [
                 (
                     e.title,
-                    f"{base}{_page_path(ct.key, e.slug)}",
+                    f"{base}"
+                    + await _page_path(
+                        db,
+                        ct.key,
+                        e.slug,
+                        catdir=chains.get(e.category_id) if e.category_id else None,
+                        category_id=e.category_id,
+                        published=e.published_at,
+                        url_path=e.url_path,
+                    ),
                     _strip_html(str((e.content or {}).get("text") or ""), 120),
                 )
                 for e in rows_q
             ],
         )
 
-    prods = (await db.execute(
-        select(models.Product).where(
-            models.Product.deleted_at.is_(None), models.Product.status == "published"
+    prods = (
+        (
+            await db.execute(
+                select(models.Product).where(
+                    models.Product.deleted_at.is_(None), models.Product.status == "published"
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     # 注意分组名不能用「产品」：上面按 ContentType 遍历时，库里有个
     # content_type.name 就叫「产品」，两节同名会让 AI 助手分不清是
     # 内容条目还是产品目录。
-    sec("产品目录", [
-        (p.name, f"{base}{_page_path('product', p.slug)}", p.tagline or "")
-        for p in prods if p.slug
-    ])
+    sec(
+        "产品目录",
+        [
+            (p.name, f"{base}{await _page_path(db, 'product', p.slug)}", p.tagline or "")
+            for p in prods
+            if p.slug
+        ],
+    )
 
     # 「客户案例」这一节读的是传统 Case 表，只有 `href` 外链（官网那几张卡片），
     # 和内容引擎里的 case 条目不是一回事——后者已在上面按 ContentType 列全。
 
-    cases = (await db.execute(
-        select(models.Case).where(
-            models.Case.deleted_at.is_(None), models.Case.status == "published"
+    cases = (
+        (
+            await db.execute(
+                select(models.Case).where(
+                    models.Case.deleted_at.is_(None), models.Case.status == "published"
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     sec("客户案例", [(c.name, c.href or base, c.desc or "") for c in cases if c.href])
 
     body = f"# {site_name}\n\n> {site_desc or ''}\n\n本站内容对 AI 助手与爬虫开放检索。\n\n"
@@ -1975,22 +2479,39 @@ async def search_public_entries(
         ),
     ]
     if content_type_key:
-        ct = (await db.execute(
-            select(models.ContentType).where(models.ContentType.key == content_type_key)
-        )).scalar_one_or_none()
+        ct = (
+            await db.execute(
+                select(models.ContentType).where(models.ContentType.key == content_type_key)
+            )
+        ).scalar_one_or_none()
         if ct:
             conds.append(models.Entry.content_type_id == ct.id)
-    total = (await db.execute(select(func.count()).select_from(models.Entry).where(*conds))).scalar() or 0
+    total = (
+        await db.execute(select(func.count()).select_from(models.Entry).where(*conds))
+    ).scalar() or 0
     stmt = (
-        select(models.Entry).where(*conds)
+        select(models.Entry)
+        .where(*conds)
         .order_by(models.Entry.published_at.desc(), models.Entry.id.desc())
-        .offset((page - 1) * page_size).limit(page_size)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
     entries = (await db.execute(stmt)).scalars().all()
-    items = [{"id": e.id, "slug": e.slug, "title": e.title, "content": e.content or {},
-              "custom_fields": e.custom_fields or {}, "seo": e.seo or {}, "status": e.status,
-              "published_at": e.published_at.isoformat() if e.published_at else None,
-              "sort": e.sort, "view_count": e.view_count} for e in entries]
+    items = [
+        {
+            "id": e.id,
+            "slug": e.slug,
+            "title": e.title,
+            "content": e.content or {},
+            "custom_fields": e.custom_fields or {},
+            "seo": e.seo or {},
+            "status": e.status,
+            "published_at": e.published_at.isoformat() if e.published_at else None,
+            "sort": e.sort,
+            "view_count": e.view_count,
+        }
+        for e in entries
+    ]
     if lang:
         items = [await _apply_entry_translation(db, it, lang) for it in items]
     for it in items:
@@ -2001,6 +2522,7 @@ async def search_public_entries(
 # ============================================================
 # 公共模板渲染
 # ============================================================
+
 
 @router.post("/templates/render")
 async def render_public_template(
@@ -2102,7 +2624,9 @@ def _ask_rate_ok(ip: str) -> bool:
     hits.append(now)
     _ASK_RATE[ip] = hits
     if len(_ASK_RATE) > _ASK_RATE_SWEEP:
-        for k in [k for k, v in _ASK_RATE.items() if not any(now - t < _ASK_RATE_WINDOW for t in v)]:
+        for k in [
+            k for k, v in _ASK_RATE.items() if not any(now - t < _ASK_RATE_WINDOW for t in v)
+        ]:
             _ASK_RATE.pop(k, None)
     return True
 
@@ -2163,3 +2687,291 @@ async def public_ask(
         if c.get("source_url"):
             c["source_url"] = f"{base}{c['source_url']}"
     return result
+
+
+# ---------------------------------------------------------------- 兜底解析
+
+
+# {type} 是自由匹配的正则片段，反解出来可能是任意串。未知类型一律按 article
+# 处理 —— 它是非严格匹配，能捞到所有内容类型的条目；反过来把脏值丢给
+# _serve_public_page 会让模板找不到对应模板文件。
+_KNOWN_DETAIL_KINDS = frozenset({"article", "product", "news", "case", "page"})
+
+
+def _expand_rules(rules: url_resolver.RuleSet) -> list[permalink.Rule]:
+    """把规则集展开成可反解的 Rule 列表。
+
+    栏目 / 标签级规则给 priority=1，站点默认给 0：后台配了栏目规则的栏目，
+    反向解析时要先于全站规则被尝试，否则 `/mes/abc.html` 可能被站点默认的
+    `{type}/{slug}.html` 先认走（type=mes）。
+    """
+    out: list[permalink.Rule] = []
+    for kind, pattern in rules.defaults.items():
+        if kind == "_list":
+            continue
+        try:
+            out.append(permalink.Rule(kind, pattern, source="site"))
+        except permalink.RuleError:
+            continue
+    for cid, pattern in rules.category_patterns.items():
+        try:
+            out.append(permalink.Rule("category", pattern, source=f"category:{cid}", priority=1))
+        except permalink.RuleError:
+            continue
+    for tid, pattern in rules.tag_patterns.items():
+        try:
+            out.append(permalink.Rule("tag", pattern, source=f"tag:{tid}", priority=1))
+        except permalink.RuleError:
+            continue
+    return out
+
+
+def _origin_path(request: Request) -> str:
+    """用户在浏览器里请求的那条路径（已剥掉后端挂载前缀）。
+
+    nginx 把站点路径原样拼在 ``/api/v1/public`` 后面转给后端，所以这里
+    把前缀剥掉，拿到的就是浏览器和爬虫看到的那条路径。
+
+    比对规范地址必须用它：拿后端的路由路径去比会把每个页面都判成「不一致」，
+    于是所有请求都被 301 到自己身上，直接死循环。
+    """
+    p = request.url.path
+    if p.startswith("/api/v1/public"):
+        p = p[len("/api/v1/public") :]
+    return p or "/"
+
+
+async def _entry_by_slug_any(db: AsyncSession, slug: str) -> models.Entry | None:
+    """按 slug 找任意类型的已发布条目。
+
+    反解时不知道内容类型 —— 规则里可能压根没有 ``{type}`` 这个变量
+    （比如 ``{catdir}/{slug}.html``），靠规则猜类型必然猜错。只能先按 slug
+    捞出来，再用条目自己的 content_type 决定最终地址。
+    """
+    return (
+        (
+            await db.execute(
+                select(models.Entry).where(
+                    models.Entry.slug == slug,
+                    models.Entry.deleted_at.is_(None),
+                    models.Entry.status == "published",
+                    or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+async def _entry_by_url_path(db: AsyncSession, path: str) -> models.Entry | None:
+    """手填路径精确匹配。只认已发布且未过期的，草稿的定制地址不该对外可访问。"""
+    return (
+        (
+            await db.execute(
+                select(models.Entry).where(
+                    models.Entry.url_path == path,
+                    models.Entry.deleted_at.is_(None),
+                    models.Entry.status == "published",
+                    or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+async def _entry_by_id(db: AsyncSession, raw_id: str) -> models.Entry | None:
+    try:
+        entry_id = int(raw_id)
+    except (TypeError, ValueError):
+        return None
+    return (
+        (
+            await db.execute(
+                select(models.Entry).where(
+                    models.Entry.id == entry_id,
+                    models.Entry.deleted_at.is_(None),
+                    models.Entry.status == "published",
+                    or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > func.now()),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+async def _redirect_from_history(
+    request: Request,
+    db: AsyncSession,
+    rules: url_resolver.RuleSet,
+    path: str,
+    site_id: int,
+) -> Response:
+    """旧格式地址 → 301 到新地址。
+
+    后台每改一次 URL 规则，全站链接就搬一次家。已经收录的地址如果直接 404，
+    等于主动把有排名的页面清空 —— 所以拿历史规则再匹配一次，命中就用解析出的
+    参数按**当前**规则重新生成地址跳过去。
+
+    新旧地址算出来一样时返回 404 而不是 301：这是规则回滚或历史存档重复的场景，
+    再跳就是自己指自己，浏览器会报重定向循环。
+    """
+    if not rules.history:
+        return await _html_404(request, db)
+
+    old = permalink.parse_path(path, list(rules.history))
+    if old is None:
+        return await _html_404(request, db)
+
+    kind = (old.get("type") or old.kind or "article").strip().lower()
+    if kind not in _KNOWN_DETAIL_KINDS:
+        kind = "article"
+
+    new_path = ""
+    if old.kind == "category":
+        slug = old.get("slug") or (old.get("catdir") or "").rsplit("/", 1)[-1]
+        if slug:
+            new_path = url_resolver.category_url(
+                rules, slug=slug, catdir=old.get("catdir"), type_key=kind
+            )
+    elif old.kind == "tag":
+        slug = old.get("slug")
+        if slug:
+            new_path = url_resolver.tag_url(rules, slug=slug, type_key=kind)
+    else:
+        slug = old.get("slug")
+        if not slug and old.get("id"):
+            row = await _entry_by_id(db, old.get("id") or "")
+            slug = row.slug if row else None
+        if slug:
+            catdir = old.get("catdir")
+            category_id = None
+            if catdir:
+                chains = await url_resolver.category_chains(db, site_id)
+                category_id = next((cid for cid, ch in chains.items() if ch == catdir), None)
+            new_path = url_resolver.detail_url(
+                rules, kind, slug=slug, catdir=catdir, category_id=category_id
+            )
+
+    if not new_path or new_path == path:
+        return await _html_404(request, db)
+
+    base = str(request.base_url).rstrip("/")
+    return RedirectResponse(f"{base}{new_path}", status_code=301)
+
+
+async def resolve_custom_path(request: Request, full_path: str, db: AsyncSession) -> Response:
+    """兜底解析：按后台配置的 URL 规则反解地址。
+
+    ⚠️ 本函数**不在**本文件的 router 上注册 —— 它注册在
+    ``cms_fallback_router``，且必须排在所有 public 子路由之后。
+    原因见那个文件的说明：`{full_path:path}` 会遮蔽后面注册的路径，
+    留在 `cms_public_router` 里会把 /public/comments、/public/track 这些
+    接口全吃掉。
+
+    三级优先级：
+    ① ``cms_entries.url_path`` 精确匹配 —— 用户在手填路径，钉死不动
+    ② 栏目 / 标签 / 站点规则匹配
+    ③ 都不中 → 404
+
+    规则解析出来之后还要用参数回库校验（比如 catdir 必须真对应一个栏目），
+    否则 `/随便/什么.html` 也会被 ``{catdir}/{slug}.html`` 认领成一篇不存在的文章。
+    """
+    raw = "/" + full_path
+    base_path, page = permalink.split_page(raw)
+    site_id, _, _ = await _resolve_site(db, request)
+
+    # ① 手填路径
+    hit = await _entry_by_url_path(db, base_path)
+    if hit is not None and hit.slug:
+        type_keys = await _type_key_map(db)
+        return await _serve_public_page(
+            request, db, hit.slug, kind=type_keys.get(hit.content_type_id) or "article"
+        )
+
+    # ② 规则匹配
+    rules = await url_resolver.load_rules(db, site_id)
+    match = permalink.parse_path(base_path, _expand_rules(rules))
+    if match is None:
+        # ③ 旧格式兜底：改过规则的老地址 301 到新地址，不能直接 404
+        return await _redirect_from_history(request, db, rules, base_path, site_id)
+
+    kind = (match.get("type") or match.kind or "article").strip().lower()
+    if kind not in _KNOWN_DETAIL_KINDS:
+        kind = "article"
+
+    if match.kind == "category":
+        slug = match.get("slug") or (match.get("catdir") or "").rsplit("/", 1)[-1]
+        if not slug:
+            return await _html_404(request, db)
+        # 栏目必须真实存在，{catdir} 只是路径片段，不代表库里有这个目录
+        exists = (
+            await db.execute(
+                select(models.Category.id).where(
+                    models.Category.site_id == site_id,
+                    models.Category.slug == slug,
+                    models.Category.deleted_at.is_(None),
+                )
+            )
+        ).scalar()
+        if exists is None:
+            return await _html_404(request, db)
+        return await _serve_list_page(request, db, kind=kind, page=page, category_slug=slug)
+
+    if match.kind == "tag":
+        slug = match.get("slug")
+        if not slug:
+            return await _html_404(request, db)
+        exists = (
+            await db.execute(
+                select(models.Tag.id).where(
+                    models.Tag.site_id == site_id,
+                    models.Tag.slug == slug,
+                )
+            )
+        ).scalar()
+        if exists is None:
+            return await _html_404(request, db)
+        return await _serve_list_page(request, db, kind=kind, page=page, tag_slug=slug)
+
+    # ③ 详情页
+    #
+    # 这里有个坑：规则的 ``{type}`` 变量不可靠。``{catdir}/{slug}.html`` 这种
+    # 规则里压根没有 {type}，反解出来的 kind 只能是规则的默认类型，猜不准。
+    # 正确做法是**先按 slug 回库找条目，用条目自己的 content_type 定类型**。
+    slug = match.get("slug")
+    entry: models.Entry | None = None
+    if slug:
+        entry = await _entry_by_slug_any(db, slug)
+    elif match.get("id"):
+        entry = await _entry_by_id(db, match.get("id") or "")
+    if entry is None or not entry.slug:
+        # 规则认领了但库里没有这条内容 —— 不是有效的页面
+        return await _html_404(request, db)
+
+    type_keys = await _type_key_map(db)
+    real_kind = type_keys.get(entry.content_type_id) or kind
+
+    # 规范地址自愈：回算这条内容在**当前规则**下的规范地址，跟请求路径比对。
+    # 不一致就 301。这一个动作同时解决三件事：
+    #   · 规则改过之后的老地址（/article/x.html）301 到新地址，不再是假 200
+    #   · 类型用条目真实类型算，不会拿 product 的地址渲染成 article
+    #   · {catdir} 认领错栏目（比如把 "article" 当成栏目目录名）也能纠正
+    canonical_path = await _page_path(
+        db,
+        real_kind,
+        entry.slug,
+        site_id=site_id,
+        catdir=await url_resolver.category_chain(db, entry.category_id, site_id),
+        category_id=entry.category_id,
+        published=entry.published_at,
+        url_path=entry.url_path,
+    )
+    if canonical_path and canonical_path != base_path:
+        base = str(request.base_url).rstrip("/")
+        return RedirectResponse(f"{base}{canonical_path}", status_code=301)
+
+    return await _serve_public_page(request, db, entry.slug, kind=real_kind)

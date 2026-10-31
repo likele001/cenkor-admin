@@ -56,6 +56,15 @@ from cenkor_admin.apps.cms.tracking_router import router as cms_tracking_router
 
 api_v1_router.include_router(cms_tracking_router, prefix="/public", tags=["tracking"])
 
+# CMS 兜底路由（按后台配置的 URL 规则反解地址）
+# ⚠️ 必须放在所有 public 子路由**之后**：/{full_path:path} 是通配路由，
+# 排在前面会把 /public/comments、/public/forms、/public/track、/public/lp/*
+# 全吃掉（表现为接口返回 CMS 的 HTML 404，且日志里一条 ERROR 都没有）。
+from cenkor_admin.apps.cms.cms_fallback_router import router as cms_fallback_router
+
+api_v1_router.include_router(cms_fallback_router, prefix="/public", tags=["public"])
+
+
 # ============================================================
 # 鉴权
 # ============================================================
