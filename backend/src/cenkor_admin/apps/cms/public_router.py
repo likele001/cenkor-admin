@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.cms import models
+from cenkor_admin.apps.cms import models, static_cache
 from cenkor_admin.apps.cms.render import render_page
 from cenkor_admin.apps.cms.template_context import build_pagination
 from cenkor_admin.core.compat import order_nulls_last
@@ -1043,6 +1043,14 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
     名当 URL，`News` 表干脆是空的（0 行），只查它等于公开页永远 404。
     """
     if kind == "product":
+        # 内容引擎优先，Product 表兜底 —— 产品数据历史上是两套并存的：
+        #   · Product 表：官网产品页（17 行，`/product/` 列表读的就是它）
+        #   · 内容引擎 product 类型条目（AI 生产的方案型内容，slug 是英文）
+        # 只查 Product 表，sitemap 里收录的后者会集体 404。两套 slug 目前无重叠，
+        # 真撞了也是新数据优先，符合直觉。
+        item = await _load_entry_page_item(db, slug, "product")
+        if item is not None:
+            return item
         row = (await db.execute(
             select(models.Product).where(
                 models.Product.slug == slug,
@@ -1112,13 +1120,24 @@ _LIST_META = {
 LIST_PER_PAGE = 12
 
 
+def request_host(request: Request) -> str:
+    """请求 Host（去端口、转小写）。站点解析与静态缓存共用同一口径。
+
+    IPv6 字面量形如 `[::1]:8002`，按冒号切会切碎，单独处理。
+    """
+    raw = (request.headers.get("host") or "").strip()
+    if raw.startswith("["):
+        return raw[1:raw.find("]")].lower() if "]" in raw else raw.lower()
+    return raw.split(":")[0].strip().lower()
+
+
 async def _resolve_site(db: AsyncSession, request: Request) -> tuple[int, str, str]:
     """按 Host 解析当前站点，解析不到就用第一个站点。
 
     品牌名仍读 SiteConfig（与详情页 _site_meta 保持同一口径），
     站点 id 单独查 Site 表 —— 列表页要按 site_id 过滤条目。
     """
-    host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+    host = request_host(request)
     row = None
     if host:
         row = (await db.execute(
@@ -1496,12 +1515,22 @@ async def _serve_public_page(
         )
     canonical = f"{base}{_page_path(item.get('content_type') or kind, slug)}"
     kind = item.get("content_type") or kind
+    html = await _render_page_html(
+        item, base=base, canonical=canonical, kind=kind,
+        site_name=site_name, site_desc=site_desc,
+        site_id=item.get("site_id"),
+    )
+    # P2：渲染成功就地落盘，nginx 下次直接出文件，不再进 Python。
+    # 只在「请求 Host == 站点规范域名」时写，否则会把错误 canonical 写进静态文件。
+    await static_cache.record_public_page(
+        db,
+        site_id=item.get("site_id") or 1,
+        host=request_host(request),
+        url_path=_page_path(kind, slug),
+        html=html,
+    )
     return Response(
-        content=await _render_page_html(
-            item, base=base, canonical=canonical, kind=kind,
-            site_name=site_name, site_desc=site_desc,
-            site_id=item.get("site_id"),
-        ),
+        content=html,
         media_type="text/html; charset=utf-8",
         # 内容更新要能反映到爬虫，5 分钟足够；再长会被 AI 索引成旧版
         headers={"Cache-Control": "public, max-age=300"},
