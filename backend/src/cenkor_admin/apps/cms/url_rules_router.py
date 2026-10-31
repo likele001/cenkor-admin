@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.api.deps import get_current_user
+from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import models, permalink, url_resolver
 from cenkor_admin.core.db import get_db
@@ -114,7 +114,7 @@ def _kind_label(kind: str) -> str:
 @router.get("/url-rules", response_model=dict[str, Any])
 async def list_url_rules(
     db: AsyncSession = Depends(get_db),
-    current: auth_models.User = Depends(get_current_user),
+    current: auth_models.User = Depends(require_permission("cms:site:read")),
 ):
     """列出当前生效的全部规则（站点默认 + 栏目覆盖 + 标签覆盖）。"""
     site_id = 1
@@ -180,7 +180,7 @@ async def list_url_rules(
 async def preview_url_rule(
     body: UrlRulePreviewIn,
     db: AsyncSession = Depends(get_db),
-    current: auth_models.User = Depends(get_current_user),
+    current: auth_models.User = Depends(require_permission("cms:site:read")),
 ):
     """预览一条规则：校验合法性 + 列出示例地址 + 检测与现有规则的冲突。
 
@@ -291,7 +291,9 @@ async def preview_url_rule(
 async def save_url_rule(
     body: UrlRuleSaveIn,
     db: AsyncSession = Depends(get_db),
-    current: auth_models.User = Depends(get_current_user),
+    # 写接口必须收紧到 cms:site:write：规则是全站生效的，
+    # 只读角色（viewer）能改的话，一次误操作全站地址全变。
+    current: auth_models.User = Depends(require_permission("cms:site:write")),
 ):
     """保存站点级默认规则，并存档旧规则。
 

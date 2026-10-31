@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+// 规则是全站生效的：只读角色可以看、可以预览，但不能保存。
+const canWrite = computed(() => auth.hasPermission('cms:site:write'))
 
 interface RuleVar { name: string; desc: string }
 
@@ -208,10 +213,16 @@ onMounted(load)
             <button class="btn-outline" :disabled="previewing === rule.kind" @click="preview(rule)">
               {{ previewing === rule.kind ? '预览中…' : '预览' }}
             </button>
-            <button class="btn-primary" :disabled="saving === rule.kind" @click="save(rule)">
+            <button
+              v-if="canWrite"
+              class="btn-primary"
+              :disabled="saving === rule.kind"
+              @click="save(rule)"
+            >
               {{ saving === rule.kind ? '保存中…' : '保存' }}
             </button>
-            <button class="btn-ghost" @click="resetDraft(rule)">填回默认值</button>
+            <button v-if="canWrite" class="btn-ghost" @click="resetDraft(rule)">填回默认值</button>
+            <span v-else class="text-xs text-ink-400 self-center">只读权限，无法修改规则</span>
           </div>
 
           <!-- 预览结果：示例地址 + 冲突 -->
