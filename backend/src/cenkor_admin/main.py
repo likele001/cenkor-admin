@@ -77,7 +77,8 @@ async def lifespan(app: FastAPI):
         log.error("app.schema.sync_fail", error=str(e), hint="应用表可能缺失")
 
     # CMS AI 层表（条目向量 / AI 生成溯源）
-    # 幂等建表，失败只告警：AI 是可选增强，不能因为它拖垮主链路
+    # 2026-10-31 起建表由 alembic 负责（core/20261031_1310_cms_ai_tables.py），
+    # 这里只校验表在不在；失败只告警：AI 是可选增强，不能拖垮主链路
     try:
         from cenkor_admin.apps.cms.ai.bootstrap import ensure_cms_ai_schema
 

@@ -162,12 +162,19 @@ POST /api/v1/cms/ai/vectors/rebuild
 | `cms_embeddings` | 条目向量 | `entry_id` / `field` / `lang` / `vector` / `dim` / `content_hash` / `model` |
 | `cms_ai_generations` | 生成溯源 | `kind` / `target` / `provider` / `model` / `prompt_digest` / `tokens_in/out` / `latency_ms` / `status` |
 
-**建表方式**：不走 alembic（原因见下文），走 `apps/cms/ai/schema.sql` +
-启动时 `ensure_cms_ai_schema()` 幂等执行，版本记在 `app_schema_versions`（`app_key='cms_ai'`）。
+**建表方式**：走 alembic —— `core/20261031_1310_cms_ai_tables.py`
+（五张表：`cms_embeddings` / `cms_ai_generations` / `cms_ai_providers` /
+`cms_ai_capabilities` / `cms_ai_prompts`）。启动时 `ensure_cms_ai_schema()`
+只剩校验职责，不再执行任何 DDL。
 
-> 为什么不走 alembic：这两张表属公开模块，但当前迁移链尾是闭源 revision（`0100_app_schema`）。
-> 挂到链尾 → 公开仓库单独建图找不到 parent；插到公开链中间 → 生产已越过该点，alembic 不会回头执行。
-> 所以复用项目已有的「应用自带 schema」机制。
+> 2026-10-31 起所有 DDL 统一收进 alembic。原先的 `apps/cms/ai/schema.sql` 已删除：
+> 它在**应用启动后**执行，而 alembic 在**启动前**执行，两者顺序相反，
+> 导致 `003_embed_dims` / `004_vector_pgvector` 这类 ALTER 永远等不到表 ——
+> 那两条 SQL 从来没被任何脚本自动执行过，只在生产手工跑过一次。
+>
+> pgvector 是可选依赖：装了就用 `vector(1024)` + HNSW 余弦索引；
+> 没装（CI / docker 的 `postgres:16-alpine`）自动降级为 `double precision[]`，
+> 检索走应用内余弦，不报错。装好后跑 `backend/scripts/enable_pgvector.py` 升级列类型。
 
 ---
 

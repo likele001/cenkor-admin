@@ -32,16 +32,16 @@ $PY ../scripts/check-migration-graph.py --tracked-only   # 公开仓库视图：
 
 | 目录 | 迁移数 | 入库(git) | 归属 |
 |---|---|---|---|
-| `core/` | 29 | 全部 29 | 平台核心（cms/auth/rbac/portal/app store/i18n…） |
-| `ext/` | 12 | 8 | 平台扩展（cloud_storage / codegen / upgrade / inventory / ai_video_jobs…） |
+| `core/` | 31 | 全部 31 | 平台核心（cms/auth/rbac/portal/app store/i18n…） |
+| `ext/` | 13 | 9 | 平台扩展（cloud_storage / codegen / upgrade / inventory / ai_video_jobs…） |
 | `commerce/` | 9 | 3（白名单） | 交易层（定价/订单/授权/结算），大部分闭源 |
 | `erp/` | 19 | 0 | ERP 应用（闭源） |
 | `crm/` | 6 | 0 | CRM 应用（闭源） |
 | `mes/` | 9 | 0 | MES 应用（闭源） |
-| **合计** | **84** | **40** | |
+| **合计** | **87** | **43** | |
 
 ```
-/web 版本目录不是「一个目录一棵树」，而是 6 个目录里的 84 个 revision
+/web 版本目录不是「一个目录一棵树」，而是 6 个目录里的 87 个 revision
 被跨目录的 down_revision 串成【一条线】，只有 1 个 base、1 个 head。
 ```
 
@@ -49,13 +49,13 @@ $PY ../scripts/check-migration-graph.py --tracked-only   # 公开仓库视图：
 
 | 视图 | 文件数 | head | 说明 |
 |---|---|---|---|
-| 完整工作区（服务器 / 有闭源代码的开发者） | 84 | `20261027_0100_app_schema` | 闭源链末端 |
-| git 跟踪视图（公开仓库 / CI / 新克隆） | 40 | `20261029_1500_ai_video_jobs` | 公开链末端 = 挂载点的父 |
+| 完整工作区（服务器 / 有闭源代码的开发者） | 87 | `20261027_0100_app_schema` | 闭源链末端 |
+| git 跟踪视图（公开仓库 / CI / 新克隆） | 43 | `20261031_1310_cms_ai_tables` | 公开链末端 = 挂载点的父 |
 
 ### 1.3 真实链路
 
 ```
-公开/基础链（40 个，进公开仓库）
+公开/基础链（43 个，进公开仓库）
   20260107_0001_initial
     → 0002_auth_rbac → 0003_media_news_audit → 0004_platform_apps
     → 20260108_0001_website_url → 20260608_0001_notif → 20260608_0002_apikey
@@ -69,7 +69,10 @@ $PY ../scripts/check-migration-graph.py --tracked-only   # 公开仓库视图：
     → 20261007_0028_product_axis → 20261009_0030_app_intro → 20261010_0031_dev_method
     → 20261015_0032_codegen_runs → 20261015_0033_upgrade_runs → 20261018_0034_upgrade_notes
     → 20261014_124126_gen_inventory → 20261014_124200_schema_versions
-    → 20261029_1500_ai_video_jobs          ← 公开 head
+    → 20261029_1500_ai_video_jobs
+    → 20261031_1100_cms_templates（CMS 主题模板表）
+    → 20261031_1300_cms_multisite（多站点地基，接管原 001/002/005 SQL）
+    → 20261031_1310_cms_ai_tables（AI 五表，接管原 003/004/006 SQL）  ← 公开 head
                     │
                     │  挂载点（闭源、不入库）
                     ▼
@@ -137,16 +140,67 @@ file_template = %%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev)
 
 ### 规则二：挂载点跟随公开 head
 
-当前挂载点 = `20261020_0035_app_publish`（闭源链第一环），它的 `down_revision` **必须等于最新公开 revision**（现在是 `20261029_1500_ai_video_jobs`）。
+当前挂载点 = `20261020_0035_app_publish`（闭源链第一环），它的 `down_revision` **必须等于最新公开 revision**（现在是 `20261031_1310_cms_ai_tables`）。
 
 > 每新增一条公开迁移，就要把挂载点的 `down_revision` 顺延到它。**先执行、后顺延**，顺序见 §4.1。
 
 ### 规则三：两种视图都只能有一个 head
 
 - 完整工作区：head = 闭源链末端（当前 `20261027_0100_app_schema`）
-- git 跟踪视图：head = 公开链末端（当前 `20261029_1500_ai_video_jobs`）
+- git 跟踪视图：head = 公开链末端（当前 `20261031_1310_cms_ai_tables`）
 
-`check-migration-graph.py` 的两种模式各查一遍，就是这两条。
+### 规则四：所有 DDL 必须走 alembic，禁止另开 SQL 迁移目录
+
+2026-10-31 之前，`backend/migrations/` 下躺着 6 个旁路 SQL（多站点、embedding 维度、
+pgvector、提示词表）。**没有任何脚本执行它们**：不入 docker entrypoint、不入
+bootstrap、不入 CI —— 只有当初手工跑过一次。后果是开源用户 clone 之后
+`cms_sites` / `cms_ai_prompts` 这两张地基表根本不存在，而线上老库因为早建好了，
+一切正常 —— 最容易被忽略的那类问题。
+
+现在已全部并入 alembic：
+
+| 原文件 | 现迁移 |
+|---|---|
+| `001_multisite.sql` + `002_multisite_tags.sql` + `005_page_form_site.sql` | `20261031_1300_cms_multisite` |
+| `003_embed_dims.sql` + `004_vector_pgvector.sql` + `006_ai_prompts.sql` + `apps/cms/ai/schema.sql` | `20261031_1310_cms_ai_tables` |
+
+两条硬要求：
+
+1. **新表 / 新列一律写 alembic 迁移**。不要再建 `*.sql` 迁移目录；也不要往
+   `apps/*/schema.sql` 里加 DDL（那是闭源应用的方案 D 专用，见 §8）。
+2. **依赖可选扩展的迁移必须能降级**。`cms_ai_tables` 对 pgvector 的处理是范例：
+   扩展能建就用 `vector(1024)` + HNSW，建不了（CI / docker 的 `postgres:16-alpine`
+   没有 pgvector，应用账号通常也没权限建扩展）就退回 `double precision[]`
+   并打一条带处理指引的告警，**绝不让迁移失败**。
+   装好扩展后跑 `backend/scripts/enable_pgvector.py` 把列升级上去。
+
+> 自查方法：按 §6 在空库跑一遍「git 跟踪视图」的 `upgrade head`。
+> 线上能跑通不代表新装能跑通 —— 这是本次两个事故的共同成因。
+
+### 规则五：收口挂载点之后要清理 `alembic_version` 的多余行
+
+§4.1 的流程有一个隐蔽副作用：中间态「2 个 head」时执行 `upgrade heads`，
+`alembic_version` 会记 **2 行**；挂载点顺延让其中一个变成另一个的祖先之后，
+alembic 只是「显示上」合并（`alembic current` 只打 head），表里那行脏数据还在。
+
+后果是 `check_alembic_drift.py` 直接炸在 `scalar_one()`：
+
+```
+sqlalchemy.exc.MultipleResultsFound: Multiple rows were found when exactly one was required
+```
+
+收口后固定查一次：
+
+```bash
+$PY -c "from sqlalchemy import create_engine,text; from cenkor_admin.core.config import get_settings; \
+        print([r[0] for r in create_engine(get_settings().DATABASE_URL_SYNC).connect() \
+               .execute(text('select version_num from alembic_version'))])"
+# 必须只有 1 行；多出来的那行是祖先 revision，删掉即可
+```
+
+> `alembic stamp <head>` **不会**帮你删掉这行 —— 它认为目标已达成，直接 no-op。
+> 必须显式 `DELETE FROM alembic_version WHERE version_num = '<祖先 revision>'`，
+> 且删之前先确认它确实出现在 head 的祖先链里（2026-10-31 就是这么处理的）。
 
 ---
 
@@ -164,13 +218,18 @@ $PY -m alembic revision --autogenerate -m "add_xxx_table" --version-path alembic
 
 打开生成的文件，**手工确认 `down_revision`**：
 
-- 必须是当前**公开 head**（现在是 `20261029_1500_ai_video_jobs`）；
+- 必须是当前**公开 head**（现在是 `20261031_1100_cms_templates`）；
 - **不能**是 `alembic heads` 打出来的闭源 head（`20261027_0100_app_schema`）——autogenerate 默认就取它；
 - **不能**是挂载点 `0035_app_publish`（那会变成挂载点之后的第二个 head）。
 
 ```bash
 # 2) 先让线上库真正执行（此刻图上有 2 个 head 是正常中间态）
 $PY -m alembic upgrade heads
+#    ⚠️ 演练想指到别的库，不能用环境变量：
+#    get_settings() 会用 .env 强行覆盖（core/config.py:233「覆盖可能继承的旧环境变量」），
+#    `DATABASE_URL_SYNC=xxx $PY -m alembic ...` 会静默连回 .env 里那个库。
+#    正确做法：在一个临时工作目录放 .env（_find_env_file 第一候选是 Path.cwd()/.env），
+#    并在该目录用 `-c` 指定 alembic.ini 运行。
 
 # 3) 验证对象真的建出来了（表/列/索引），再动挂载点
 #    新建表看一眼： psql -c '\d+ new_table'
@@ -234,7 +293,7 @@ CI（`.github/workflows/ci.yml`）固定两步：
 - run: cd backend && alembic upgrade heads     # 在干净的 PostgreSQL 上真跑一遍
 ```
 
-> CI 是「干净克隆」，只有 40 个公开迁移，跑到 `ai_video_jobs` 为止。CI 绿 ≠ 线上闭源链没问题，闭源部分由完整工作区的自检负责。
+> CI 是「干净克隆」，只有 41 个公开迁移，跑到 `cms_templates` 为止。CI 绿 ≠ 线上闭源链没问题，闭源部分由完整工作区的自检负责。
 
 ---
 
@@ -331,7 +390,7 @@ backend/src/apps/                    # 外置应用（payment / commerce …）�
 
 | 场景 | 结果 |
 |---|---|
-| `alembic heads` | 1 个：`20261029_1500_ai_video_jobs` |
+| `alembic heads` | 1 个：`20261031_1310_cms_ai_tables` |
 | `alembic upgrade heads` | 成功，但只建平台表；crm/erp/mes 表不存在 |
 | crm/erp/mes 应用 | 目录本身不在仓库里，不存在「装了但缺表」 |
 | CI | 只对公开链负责，绿了不代表闭源链 OK |
@@ -351,7 +410,7 @@ backend/src/apps/                    # 外置应用（payment / commerce …）�
 | erp | `apps/erp/schema.sql` | 全部 ERP 表 |
 | crm | `apps/crm/schema.sql` | 全部 CRM 表 |
 | mes | `apps/mes/schema.sql` | 全部 MES 表 |
-| cms/ai | `apps/cms/ai/schema.sql` | AI 相关表（启动 bootstrap） |
+| ~~cms/ai~~ | 已于 2026-10-31 迁回 alembic | AI 五表见 `20261031_1310_cms_ai_tables`，`bootstrap.py` 只做校验不再建表 |
 
 要点：
 
@@ -367,7 +426,7 @@ backend/src/apps/                    # 外置应用（payment / commerce …）�
 
 | 入口 | 命令/行为 | 备注 |
 |---|---|---|
-| 服务启动 | **不跑 alembic**（只跑各 app 的 `schema.sql` bootstrap） | `main.py` 里没有 `upgrade` 调用 |
+| 服务启动 | **不跑 alembic**（erp/crm/mes 跑 `schema.sql` bootstrap；cms/ai 只校验表存在） | `main.py` 里没有 `upgrade` 调用 |
 | 后台「系统 > 在线升级」 | `git pull --ff-only` → `alembic upgrade heads` → 提示重启 | `apps/system/upgrade_service.py` |
 | CI | `alembic upgrade heads`（干净 PostgreSQL） | 只看公开链 |
 | 手工 | 见下 | 发版 / 排障 |
@@ -406,7 +465,7 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 
 1. **优先向前修**：新增一条修正迁移（补列 / 补索引 / 补数据），生产上比 downgrade 安全。
 2. `alembic downgrade -1` 只适用于**你自己刚加的、还没被业务写入依赖**的迁移。
-3. 真正回退发版：代码 `git checkout <tag>` + **数据库用升级前的备份**（PostgreSQL 用 `pg_dump` 快照），不要指望 `alembic downgrade` 走完 84 个迁移。
+3. 真正回退发版：代码 `git checkout <tag>` + **数据库用升级前的备份**（PostgreSQL 用 `pg_dump` 快照），不要指望 `alembic downgrade` 走完 85 个迁移。
 4. stamp 有风险：`alembic stamp <rev>` 只改版本号不动结构。stamp 前必须 `check_alembic_drift.py` 全绿，否则等于把真问题藏起来。
 
 ---
@@ -418,6 +477,7 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 - [ ] 迁移文件放在**正确的应用目录**
 - [ ] `down_revision` 指向正确视图的 head（公开 → 公开 head；闭源 → 闭源 head）
 - [ ] 若为公开迁移：挂载点 `0035_app_publish` 已顺延，且与迁移**同一次提交**
+- [ ] 顺延后 `alembic_version` **只剩 1 行**（`clean_alembic_version_rows.py` 可查可清）
 - [ ] 若为闭源迁移：`git check-ignore -v <file>` 有输出（确实被忽略）
 - [ ] `upgrade()` 与 `downgrade()` 都写全（downgrade 可留最小实现，但不能 `pass` 掉 DDL）
 - [ ] revision 字符串 ≤ 32
@@ -443,14 +503,14 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 
 ## 13. 附录
 
-### 13.1 关键常量（2026-10-30）
+### 13.1 关键常量（2026-10-31）
 
 | 项 | 值 |
 |---|---|
 | 完整工作区 head | `20261027_0100_app_schema` |
-| 公开仓库 head | `20261029_1500_ai_video_jobs` |
-| 挂载点 | `20261020_0035_app_publish`（down → `20261029_1500_ai_video_jobs`） |
-| 迁移总数 / 公开数 | 84 / 40 |
+| 公开仓库 head | `20261031_1310_cms_ai_tables` |
+| 挂载点 | `20261020_0035_app_publish`（down → `20261031_1310_cms_ai_tables`） |
+| 迁移总数 / 公开数 | 87 / 43 |
 | Python 解释器 | `/www/server/pyporject_evn/cenkor/bin/python3` |
 | 数据库 | 仅 PostgreSQL（`DATABASE_URL_SYNC`，psycopg2） |
 
@@ -463,6 +523,9 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 | `backend/scripts/check_schema_drift.py` | metadata vs 库，表级差异应为 0 |
 | `backend/scripts/check_hub_schema.py` | hub 关键表存在性 |
 | `backend/scripts/apply_app_publish_ddl.py` | 历史事故的补 DDL 脚本（一次性，勿当常规手段） |
+| `backend/scripts/enable_pgvector.py` | 扩展装晚了用它把 `cms_embeddings.vector` 升级成 pgvector |
+| `backend/scripts/seed_ai_prompts.py` | 把代码里的 5 套默认提示词种进 `cms_ai_prompts`（幂等） |
+| `backend/scripts/clean_alembic_version_rows.py` | 收口挂载点后清掉 `alembic_version` 里的冗余祖先行（见规则五） |
 | `backend/src/cenkor_admin/codegen/builder.py::rebase_closed_chain` | codegen 内置模式：顺延闭源链入口（改挂载点的程序化版本） |
 
 ### 13.3 术语
