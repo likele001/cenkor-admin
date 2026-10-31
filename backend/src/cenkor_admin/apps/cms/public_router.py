@@ -977,6 +977,28 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
     )).scalars().first()
     if not row:
         return None
+
+    # 分类与标签：详情页模板要用。内置 detail.html 引了 item.category / item.tags，
+    # 缺这两个键时链式 Undefined 会静默渲染成空，分类和标签在线上永远不显示。
+    category = None
+    if row.category_id:
+        cat = (await db.execute(
+            select(models.Category).where(models.Category.id == row.category_id)
+        )).scalars().first()
+        if cat is not None:
+            category = {
+                "id": cat.id, "slug": cat.slug, "name": cat.name,
+                # 与 TemplateContext.url("category", slug) 同形，模板里也能用 url()
+                "url": f"/category/{cat.slug}/",
+            }
+
+    tag_names = list((await db.execute(
+        select(models.Tag.name)
+        .join(models.ContentTag, models.ContentTag.tag_id == models.Tag.id)
+        .where(models.ContentTag.content_id == row.id)
+        .order_by(models.Tag.id.asc())
+    )).scalars().all())
+
     return {
         "id": row.id,
         "site_id": row.site_id,
@@ -990,6 +1012,8 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
         "updated_at": row.updated_at,
         "ai_origin": row.ai_origin,
         "ai_generated": row.ai_origin is not None,
+        "category": category,
+        "tags": tag_names,
     }
 
 
