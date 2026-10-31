@@ -49,7 +49,7 @@
 
 | 路径 | 目标 |
 |---|---|
-| 详情页 `/article/{slug}.html`、`/product/{slug}.html`、`/case/`、`/news/` | `/api/v1/public/$1/$2.html`（**后缀要保留**，后端靠它区分 HTML 与 JSON） |
+| 详情页 `/article/{slug}.html`、`/product/{slug}.html`、`/case/`、`/news/` | 先 `try_files` 找静态文件，miss 再转 `/api/v1/public/$1/$2.html`（**后缀要保留**，后端靠它区分 HTML 与 JSON）。见第十四节 |
 | `/article/`、`/product/`、`/case/`、`/news/` | `/api/v1/public/<类型>/` |
 | `/category/{slug}/`、`/tag/{slug}/` | `/api/v1/public/category/$1/`、`/api/v1/public/tag/$1/` |
 | `/search/` | `/api/v1/public/search/`（注意尾斜杠，`/search` 是 JSON 接口） |
@@ -691,3 +691,113 @@ Jinja 取属性时先 `getattr` 再 `getitem`。而 `dict.items` / `keys` / `val
 
 `docs/dev_guide.md` 里那章「Liquid 模板开发」是历史内容，讲的是这个兼容端点。
 写主题请以本文为准。
+
+
+---
+
+## 十四、静态落盘：详情页不再每次都进后端
+
+详情页是流量和 SEO 的主体，但每开一次都要查条目 + 查分类标签 + Jinja 渲染。
+这一层把渲染结果落成静态 HTML，nginx `try_files` 命中就直接出，
+**同一页渲染过一次之后不再进 Python**。
+
+### 只落详情页
+
+| 页面 | 落盘 | 原因 |
+|---|---|---|
+| `/article/{slug}.html`、`/product/{slug}.html`、`/case/...`、`/news/...` | 是 | URL 可枚举、无查询参数、SEO 权重最高 |
+| 列表页 / 分页 / 搜索 | 否 | 带 `?page=` `?kw=`，URL 空间不可枚举；后端已给 120s 缓存头 |
+| 404 | 否 | 不该被缓存 |
+
+### 开启方式
+
+后端 `.env`：
+
+```
+CMS_STATIC_CACHE=1
+CMS_STATIC_CACHE_ROOT=/www/wwwroot/cenkor-admin/backend/var/htmlcache
+```
+
+改完重启后端（宝塔会自动接管端口，不要手工 nohup）。
+
+nginx 侧（宝塔站点配置，不在仓库内）：
+
+```nginx
+location ~ ^/(article|product|news|case)/([^/]+)\.html$ {
+    root /www/wwwroot/cenkor-admin/backend/var/htmlcache/www.cenkor.cn;
+    try_files $uri @cms_dynamic;
+    expires 300s;
+}
+
+location @cms_dynamic {
+    proxy_pass http://127.0.0.1:8002/api/v1/public$uri$is_args$args;
+    proxy_set_header Host $host;
+    # ... 其余 header 同其他 location
+}
+```
+
+`root` 里的域名目录必须**等于实际访问的 Host**。后端按请求 Host 建目录，
+两边对不上就是「文件写了但永远 miss」，表现为「开了缓存但一点没快」。
+所以用 IP、localhost、内网域名访问时后端不会落盘 —— 那些请求渲染出的
+canonical / og:url 是错的，写进静态文件会把全站 SEO 打脏。
+
+### 什么时候自动失效
+
+改完内容不需要手动清缓存：
+
+| 操作 | 失效范围 |
+|---|---|
+| 保存条目（正文、标题、SEO、分类、标签、状态） | 该条目的详情页 |
+| 改 slug | 旧地址 + 新地址 |
+| 删除 / 批量删除 / 批量改状态 | 涉及的条目 |
+| 审核通过或驳回、版本回滚、批量导入 | 涉及的条目 |
+| 分类或标签改名（会进面包屑与 chip） | **整站** |
+| 保存模板 / 切主题 / 导入主题包 | **整站** |
+| 改站点域名或品牌名 | 该站点 |
+
+「整站」是几十个文件的重渲染，只出现在低频操作上。
+
+### 运维命令
+
+```bash
+cd /www/wwwroot/cenkor-admin/backend
+
+python3 scripts/build_static_cache.py --stats         # 文件数、占用、开关状态
+python3 scripts/build_static_cache.py --purge         # 清空全部
+python3 scripts/build_static_cache.py --purge-entry <slug>
+python3 scripts/build_static_cache.py --warm https://www.cenkor.cn   # 按 sitemap 预热
+```
+
+清空是安全且幂等的：nginx 全部 miss → 回落动态渲染 → 顺手重新落盘。
+
+### 回退
+
+**只改 `.env` 不够。** 磁盘上的旧文件 nginx 照样会读，只是不再更新，
+结果就是「已经改了模板，线上永远旧版」。完整回退两步：
+
+1. `.env` 改 `CMS_STATIC_CACHE=0`，重启后端
+2. `python3 scripts/build_static_cache.py --purge`
+
+如果问题出在静态文件本身（权限、挂载），临时把 nginx 那条 `try_files` 换成
+直接 `proxy_pass`，效果等同关闭。
+
+### 排错
+
+| 现象 | 原因 |
+|---|---|
+| 改了内容，线上还是旧的 | 开关没真开（用 `--stats` 看）／nginx `root` 的域名目录与实际 Host 不一致 |
+| 开了但一点没快 | 后端只在规范域名下落盘，用 IP 或 localhost 预热无效 |
+| 目录里一个文件都没有 | `cms_sites.domain` 和 `cms_site_config['brand.domain']` 都没配 |
+| 列表页突然全是旧数据 | 列表页本来就不落盘，查的是后端 120s 缓存头，等两分钟或看数据库 |
+
+### 目录长什么样
+
+```
+backend/var/htmlcache/
+└── www.cenkor.cn/
+    ├── article/tech-doc-length.html
+    ├── case/discrete-vs-process-mes.html
+    └── product/lightmes.html
+```
+
+`backend/var/` 已进 `.gitignore` —— 这是机器本地状态，换台机器会自己重建。
