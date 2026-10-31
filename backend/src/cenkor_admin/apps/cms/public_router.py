@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import models
 from cenkor_admin.apps.cms.render import render_page
+from cenkor_admin.apps.cms.template_context import build_pagination
 from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.db import AsyncSessionLocal, get_db
 from cenkor_admin.core.storage import s3
@@ -896,8 +897,11 @@ async def _render_page_html(
     )
 
 
-def _render_404_html(base: str, site_name: str = "Cenkor") -> str:
-    """内容不存在时返回 HTML 而不是 JSON —— 爬虫和用户看到的都该是个页面。"""
+def _render_404_fallback(base: str, site_name: str = "Cenkor") -> str:
+    """404 的最后一道兜底：连 404.html 主题都渲染不出来时用。
+
+    正常路径走 _render_404_html()，它会让用户改的 404.html 生效。
+    """
     import html as _h
 
     return f"""<!DOCTYPE html>
@@ -915,6 +919,37 @@ def _render_404_html(base: str, site_name: str = "Cenkor") -> str:
 <p><a href="{_h.escape(base)}/">返回首页</a></p></main>
 </body>
 </html>"""
+
+
+async def _render_404_html(base: str, site_name: str = "Cenkor", *, site_id: int = 1) -> str:
+    """404 页走主题的 404.html；渲染失败回退硬编码。
+
+    以前这里是写死的 f-string，用户在模板工作台里改 404.html 完全没效果。
+    """
+    model = {
+        "kind": "404",
+        "title": "页面不存在",
+        "full_title": f"页面不存在 · {site_name}",
+        "description": "",
+        "canonical": "",
+        "base": base,
+        "site_name": site_name,
+        "site_desc": "",
+        "og": {"type": "website", "site_name": site_name, "title": "页面不存在",
+               "description": "", "url": "", "image": "", "video": ""},
+        "json_ld": "",
+        "published_at": None,
+        "published_text": "",
+        "updated_at": None,
+        "ai_origin": None,
+        "item": None,
+        "items": [],
+        "pagination": None,
+    }
+    try:
+        return await render_page(model, site_id=site_id, base=base)
+    except Exception:  # pragma: no cover - render_page 内部已兜底
+        return _render_404_fallback(base, site_name)
 
 
 async def _site_meta(db: AsyncSession) -> tuple[str, str]:
@@ -1023,6 +1058,367 @@ def _page_path(kind: str, slug: str) -> str:
     return f"/{prefix}/{slug}.html"
 
 
+# ============================================================
+# 列表页（主题 list.html）
+# ============================================================
+
+# kind -> (标题, 默认描述)
+_LIST_META = {
+    "article": ("文章", "全部已发布的文章与动态"),
+    "product": ("产品", "可私有化部署的企业级软件产品"),
+    "news": ("新闻", "公司新闻与行业动态"),
+    "case": ("案例", "客户实践与落地案例"),
+}
+
+LIST_PER_PAGE = 12
+
+
+async def _resolve_site(db: AsyncSession, request: Request) -> tuple[int, str, str]:
+    """按 Host 解析当前站点，解析不到就用第一个站点。
+
+    品牌名仍读 SiteConfig（与详情页 _site_meta 保持同一口径），
+    站点 id 单独查 Site 表 —— 列表页要按 site_id 过滤条目。
+    """
+    host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+    row = None
+    if host:
+        row = (await db.execute(
+            select(models.Site).where(func.lower(models.Site.domain) == host)
+        )).scalars().first()
+    if row is None:
+        row = (await db.execute(select(models.Site).order_by(models.Site.id.asc()))).scalars().first()
+    site_id = row.id if row is not None else 1
+    name, desc = await _site_meta(db)
+    return site_id, name, desc
+
+
+def _entry_excerpt(content: dict, seo: dict, limit: int = 160) -> str:
+    return str(seo.get("description") or _strip_html(
+        str(content.get("text") or content.get("html") or ""), limit
+    )).strip()
+
+
+async def _entry_cards(db: AsyncSession, entries: list, base: str) -> list[dict[str, Any]]:
+    """条目 → 模板卡片。字段与 TemplateContext._entry_card 对齐。
+
+    分类和标签是**批量**查的：列表 12 条不能退化成 24 次 SQL。
+    """
+    if not entries:
+        return []
+    ids = [e.id for e in entries]
+
+    cat_ids = {e.category_id for e in entries if e.category_id}
+    cats: dict[int, Any] = {}
+    if cat_ids:
+        rows = (await db.execute(
+            select(models.Category).where(models.Category.id.in_(cat_ids))
+        )).scalars().all()
+        cats = {c.id: c for c in rows}
+
+    tag_map: dict[int, list[str]] = {}
+    rows = (await db.execute(
+        select(models.ContentTag.content_id, models.Tag.name)
+        .join(models.Tag, models.Tag.id == models.ContentTag.tag_id)
+        .where(models.ContentTag.content_id.in_(ids))
+        .order_by(models.Tag.id.asc())
+    )).all()
+    for cid, name in rows:
+        tag_map.setdefault(cid, []).append(name)
+
+    out: list[dict[str, Any]] = []
+    for e in entries:
+        content = dict(e.content or {})
+        seo = dict(e.seo or {})
+        cat = cats.get(e.category_id)
+        out.append({
+            "id": e.id,
+            "type": "article",
+            "slug": e.slug,
+            "title": e.title,
+            "excerpt": _entry_excerpt(content, seo),
+            "cover": content.get("cover_image") or seo.get("og_image"),
+            "url": f"{base}{_page_path('article', e.slug)}",
+            "published_at": e.published_at.isoformat() if e.published_at else None,
+            "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+            "view_count": e.view_count or 0,
+            "sort": e.sort or 0,
+            "ai_generated": e.ai_origin is not None,
+            "content": content,
+            "custom_fields": dict(e.custom_fields or {}),
+            "seo": seo,
+            "category": (
+                {"id": cat.id, "slug": cat.slug, "name": cat.name,
+                 "url": f"{base}/category/{cat.slug}/"}
+                if cat is not None else None
+            ),
+            "tags": tag_map.get(e.id, []),
+        })
+    return out
+
+
+def _list_model(
+    *, base: str, site_name: str, site_desc: str, title: str, description: str,
+    canonical: str, items: list[dict[str, Any]], pagination: dict[str, Any],
+) -> dict[str, Any]:
+    """列表页的 page 对象。字段与详情页保持同构，模板不用为列表页写第二套。"""
+    return {
+        "kind": "list",
+        "title": title,
+        "full_title": f"{title} · {site_name}",
+        "description": description or site_desc,
+        "canonical": canonical,
+        "base": base,
+        "site_name": site_name,
+        "site_desc": site_desc,
+        "og": {
+            "type": "website", "site_name": site_name, "title": title,
+            "description": description or site_desc, "url": canonical,
+            "image": "", "video": "",
+        },
+        "json_ld": "",
+        "published_at": None,
+        "published_text": "",
+        "updated_at": None,
+        "ai_origin": None,
+        "item": None,
+        "items": items,
+        "pagination": pagination,
+    }
+
+
+def _product_cards(rows: list, base: str) -> list[dict[str, Any]]:
+    """Product 表 → 模板卡片。
+
+    注意：`/product/{slug}.html` 详情查的是 **Product 表**，不是
+    `ContentType(key='product')` 的条目 —— 项目里这两套是并存的（产品目录 17 行
+    vs 产品类型条目 5 条）。列表必须跟详情同源，否则点进去就 404。
+    """
+    out: list[dict[str, Any]] = []
+    for p in rows:
+        out.append({
+            "id": p.id, "type": "product", "slug": p.slug, "title": p.name,
+            "excerpt": _strip_html(str(p.tagline or p.desc or ""), 160),
+            "cover": None,
+            "url": f"{base}{_page_path('product', p.slug)}",
+            "published_at": None, "updated_at": None,
+            "view_count": 0, "sort": p.sort or 0, "ai_generated": False,
+            "content": {
+                "tagline": p.tagline, "line": p.line, "stack": p.stack,
+                "desc": p.desc, "features": p.features or [],
+                "chinese_name": p.chinese_name,
+            },
+            "custom_fields": dict(p.custom_fields or {}),
+            "seo": {}, "category": None, "tags": [],
+            "is_flagship": p.is_flagship, "is_open_source": p.is_open_source,
+            "github": p.github_url, "demo": p.demo_url,
+            "website": p.website_url, "license": p.license,
+        })
+    return out
+
+
+async def _serve_product_list(
+    db: AsyncSession, *, site_id: int, base: str, page: int,
+    site_name: str, site_desc: str,
+) -> Response:
+    """产品列表：直接查 Product 表，与 /product/{slug}.html 详情同源。"""
+    conds: list[Any] = [models.Product.deleted_at.is_(None), models.Product.status == "published"]
+    if hasattr(models.Product, "site_id"):
+        # 历史数据里 site_id 可能是 NULL，不能简单等值过滤，否则整页空
+        conds.append(or_(models.Product.site_id == site_id, models.Product.site_id.is_(None)))
+
+    total = (await db.execute(
+        select(func.count()).select_from(models.Product).where(*conds)
+    )).scalar() or 0
+    pg = build_pagination(page, total, LIST_PER_PAGE, 5)
+    rows = (await db.execute(
+        select(models.Product)
+        .where(*conds)
+        .order_by(models.Product.sort.asc(), models.Product.id.asc())
+        .offset((pg["page"] - 1) * LIST_PER_PAGE)
+        .limit(LIST_PER_PAGE)
+    )).scalars().all()
+
+    title, description = _LIST_META["product"]
+    model = _list_model(
+        base=base, site_name=site_name, site_desc=site_desc,
+        title=title, description=description, canonical=f"{base}/product/",
+        items=_product_cards(rows, base), pagination=pg,
+    )
+    return Response(
+        content=await render_page(model, site_id=site_id, base=base),
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=120"},
+    )
+
+
+async def _serve_list_page(
+    request: Request,
+    db: AsyncSession,
+    *,
+    kind: str = "article",
+    page: int = 1,
+    category_slug: str | None = None,
+    tag_slug: str | None = None,
+    kw: str | None = None,
+) -> Response:
+    """列表页统一入口：文章列表 / 分类 / 标签 / 搜索共用一套查询与分页。"""
+    base = str(request.base_url).rstrip("/")
+    site_id, site_name, site_desc = await _resolve_site(db, request)
+
+    # 产品走 Product 表（与 /product/{slug}.html 同源），其余走内容引擎条目
+    if kind == "product":
+        return await _serve_product_list(
+            db, site_id=site_id, base=base, page=page,
+            site_name=site_name, site_desc=site_desc,
+        )
+
+    async def not_found() -> Response:
+        return Response(
+            content=await _render_404_html(base, site_name, site_id=site_id),
+            status_code=404,
+            media_type="text/html; charset=utf-8",
+        )
+
+    ct = (await db.execute(
+        select(models.ContentType).where(models.ContentType.key == kind)
+    )).scalars().first()
+    if ct is None:
+        return await not_found()
+
+    # 分类 / 标签各自属于某个内容类型。不能固定用 kind 的类型去过滤：
+    # 「产品动态」这个分类挂的是 product 类型，按 article 过滤永远 0 条。
+    type_id = ct.id
+    extra: list[Any] = []
+    title, description = _LIST_META.get(kind, (kind, ""))
+
+    if category_slug:
+        cat = (await db.execute(
+            select(models.Category).where(
+                models.Category.site_id == site_id,
+                models.Category.slug == category_slug,
+            )
+        )).scalars().first()
+        if cat is None:
+            return await not_found()
+        type_id = cat.content_type_id or ct.id
+        extra.append(models.Entry.category_id == cat.id)
+        title = cat.name
+        description = f"{cat.name} 分类下的全部内容"
+    elif tag_slug:
+        tag = (await db.execute(
+            select(models.Tag).where(models.Tag.site_id == site_id, models.Tag.slug == tag_slug)
+        )).scalars().first()
+        if tag is None:
+            return await not_found()
+        type_id = tag.content_type_id or ct.id
+        extra.append(models.Entry.id.in_(
+            select(models.ContentTag.content_id)
+            .join(models.Tag, models.Tag.id == models.ContentTag.tag_id)
+            .where(models.Tag.id == tag.id)
+        ))
+        title = f"标签：{tag.name}"
+        description = f"带「{tag.name}」标签的内容"
+    elif kw:
+        kw = kw.strip()
+        if kw:
+            like = f"%{kw}%"
+            extra.append(or_(
+                models.Entry.title.ilike(like),
+                models.Entry.slug.ilike(like),
+                cast(models.Entry.content, Text).ilike(like),
+            ))
+            title = f"搜索：{kw}"
+            description = f"含「{kw}」的内容"
+
+    conds: list[Any] = [
+        models.Entry.site_id == site_id,
+        models.Entry.content_type_id == type_id,
+        models.Entry.status == "published",
+        models.Entry.deleted_at.is_(None),
+        or_(models.Entry.expire_at.is_(None), models.Entry.expire_at > datetime.now(tz=UTC)),
+        *extra,
+    ]
+
+    if category_slug:
+        canonical = f"{base}/category/{category_slug}/"
+    elif tag_slug:
+        canonical = f"{base}/tag/{tag_slug}/"
+    elif kw:
+        canonical = f"{base}/search/?kw={kw}"
+    else:
+        canonical = f"{base}/{kind}/"
+
+    total = (await db.execute(
+        select(func.count()).select_from(models.Entry).where(*conds)
+    )).scalar() or 0
+
+    pg = build_pagination(page, total, LIST_PER_PAGE, 5)
+    rows = (await db.execute(
+        select(models.Entry)
+        .where(*conds)
+        .order_by(models.Entry.sort.asc(), models.Entry.published_at.desc().nullslast(), models.Entry.id.desc())
+        .offset((pg["page"] - 1) * LIST_PER_PAGE)
+        .limit(LIST_PER_PAGE)
+    )).scalars().all()
+
+    items = await _entry_cards(db, rows, base)
+    model = _list_model(
+        base=base, site_name=site_name, site_desc=site_desc,
+        title=title, description=description, canonical=canonical,
+        items=items, pagination=pg,
+    )
+    return Response(
+        content=await render_page(model, site_id=site_id, base=base),
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=120"},
+    )
+
+
+@router.get("/article/", include_in_schema=False)
+async def article_index(
+    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+):
+    """文章列表页（走主题 list.html）。"""
+    return await _serve_list_page(request, db, kind="article", page=page)
+
+
+@router.get("/product/", include_in_schema=False)
+async def product_index(
+    request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+):
+    """产品列表页。"""
+    return await _serve_list_page(request, db, kind="product", page=page)
+
+
+@router.get("/category/{slug}/", include_in_schema=False)
+async def category_page(
+    slug: str, request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+):
+    """分类列表页。"""
+    return await _serve_list_page(request, db, kind="article", page=page, category_slug=slug)
+
+
+@router.get("/tag/{slug}/", include_in_schema=False)
+async def tag_page(
+    slug: str, request: Request, page: int = Query(1), db: AsyncSession = Depends(get_db),
+):
+    """标签列表页。"""
+    return await _serve_list_page(request, db, kind="article", page=page, tag_slug=slug)
+
+
+@router.get("/search/", include_in_schema=False)
+async def search_page(
+    request: Request,
+    kw: str = Query("", description="关键词"),
+    page: int = Query(1),
+    db: AsyncSession = Depends(get_db),
+):
+    """搜索页（HTML）。JSON 版仍是 /api/v1/public/search，两者互不影响。"""
+    if not kw.strip():
+        return await _serve_list_page(request, db, kind="article", page=page)
+    return await _serve_list_page(request, db, kind="article", page=page, kw=kw)
+
+
 async def _serve_public_page(
     request: Request, db: AsyncSession, raw_slug: str, *, kind: str
 ) -> Response:
@@ -1031,8 +1427,9 @@ async def _serve_public_page(
     site_name, site_desc = await _site_meta(db)
     item = await _load_page_item(db, slug, kind)
     if not item:
+        site_id, _, _ = await _resolve_site(db, request)
         return Response(
-            content=_render_404_html(base, site_name),
+            content=await _render_404_html(base, site_name, site_id=site_id),
             status_code=404,
             media_type="text/html; charset=utf-8",
         )
@@ -1187,6 +1584,25 @@ async def sitemap_xml(request: Request, db: AsyncSession = Depends(get_db)):
             urls.append((f"{base}{_page_path('product', p.slug)}", p.updated_at or p.created_at))
 
     # News 表不进 sitemap：没有对应公开页（见 llms.txt 处的说明）
+
+    # 列表页：文章汇总 / 产品汇总 / 有内容的分类与标签。
+    # 这些是可索引的落地页，不列出来爬虫只能靠内链发现，收录会很慢。
+    now = datetime.now(tz=UTC)
+    urls.append((f"{base}/article/", now))
+    urls.append((f"{base}/product/", now))
+
+    cats = (await db.execute(
+        select(models.Category).where(models.Category.status == "active")
+    )).scalars().all()
+    for c in cats:
+        if c.slug:
+            stamp = getattr(c, "updated_at", None) or getattr(c, "created_at", None) or now
+            urls.append((f"{base}/category/{c.slug}/", stamp))
+
+    for t in (await db.execute(select(models.Tag))).scalars().all():
+        if t.slug:
+            stamp = getattr(t, "created_at", None) or now
+            urls.append((f"{base}/tag/{t.slug}/", stamp))
 
     items = "\n".join(
         f"  <url><loc>{loc}</loc><lastmod>{last.date().isoformat()}</lastmod></url>"

@@ -9,22 +9,45 @@
 
 ---
 
-## 一、先搞清楚：哪些页面现在真的走模板
+## 一、模板与页面的对应关系
 
-这条放在最前面，因为它决定了你改完文件能不能看到效果。
-
-| 访问路径 | 用哪个模板 | 现在生效吗 |
+| 访问路径 | 用哪个模板 | 说明 |
 |---|---|---|
-| `/article/{slug}.html` | `detail.html` | ✅ 生效 |
-| `/product/{slug}.html` | `detail.html` | ✅ 生效 |
-| 列表页 / 分类页 / 搜索页 | `list.html` | ⛔ 仍是旧版硬编码，**改了不生效** |
-| 不存在的页面（404） | `404.html` | ⛔ 仍是旧版硬编码，**改了不生效** |
-| 单页（`kind=page`） | `page.html` | ⛔ 目前没有对外路由 |
+| `/article/{slug}.html` | `detail.html` | 文章详情 |
+| `/product/{slug}.html` | `detail.html` | 产品详情 |
+| `/article/`、`/article/?page=2` | `list.html` | 文章列表（分页 12 条/页） |
+| `/product/` | `list.html` | 产品列表 |
+| `/category/{slug}/` | `list.html` | 分类列表 |
+| `/tag/{slug}/` | `list.html` | 标签列表 |
+| `/search/?kw=xxx` | `list.html` | 搜索结果 |
+| 任何不存在的页面 | `404.html` | 返回 404 状态码 |
 
-也就是说：**现在能改的是详情页**（文章 / 产品）。`list.html`、`404.html`、`page.html`
-是提前备好的位置，等列表页接入后自动生效，你现在写进去的语法会被校验，但线上还看不到。
+`page.html`（单页类型）目前没有对外路由，写了也不生效。
 
-`layout.html`、`partials/*`、`macros/*`、`assets/style.css` 是详情页的组成部分，**改它们立刻生效**。
+`layout.html`、`partials/*`、`macros/*`、`assets/style.css` 是所有页面的组成部分，改它们立刻生效。
+
+### 列表页和详情页的差别
+
+`list.html` 里 `item` 是 `None`、`items` 有数据、`page.pagination` 是真实分页对象；
+`detail.html` 里反过来。同一个 `page` 对象，字段完全同构，只是 `page.kind` 不同
+（`list` vs `article`/`product`/……）。所以你可以让两个模板共用一套 header 和卡片。
+
+### 部署前提：nginx 必须把这些路径转给后端
+
+官网是纯静态站，nginx 有 `try_files ... /index.html` 兜底。**少一条代理规则，
+对应页面就会静默返回官网首页（状态码还是 200）**，看起来像「点了没反应」，极难排查。
+
+需要代理的路径（配置在宝塔 `/www/server/panel/vhost/nginx/<域名>.conf`，不在仓库内）：
+
+| 路径 | 目标 |
+|---|---|
+| `/article/{slug}.html`、`/product/{slug}.html` 等详情页 | `/api/v1/public/$1/$2` |
+| `/article/`、`/product/` | `/api/v1/public/article/`、`/api/v1/public/product/` |
+| `/category/{slug}/`、`/tag/{slug}/` | `/api/v1/public/category/$1/`、`/api/v1/public/tag/$1/` |
+| `/search/` | `/api/v1/public/search/`（注意尾斜杠，`/search` 是 JSON 接口） |
+| `/sitemap.xml`、`/llms.txt` | 同名后端路径 |
+
+新环境部署时若发现列表页变成官网首页，先查这个，不是模板问题。
 
 ---
 
@@ -98,9 +121,9 @@ assets/style.css         全站样式，会被内联进 <style>
 | 变量 | 类型 | 说明 |
 |---|---|---|
 | `page` | dict | 页面元信息，见下表 |
-| `item` | dict 或 null | 当前这条内容，见下表 |
-| `items` | list | 详情页恒为 `[]`，列表页才是数据。要列表自己调 `content_list()` |
-| `pagination` | dict | 分页对象，详情页是「空分页」（`total=0`） |
+| `item` | dict 或 null | 当前这条内容，见下表。列表页为 `None` |
+| `items` | list | 当前页的卡片数组。详情页是 `[]`，列表页有数据 |
+| `pagination` | dict | 分页对象。详情页是「空分页」（`total=0`） |
 | `base_url` | str | 站点根地址，如 `https://www.cenkor.cn`，没有尾部斜杠 |
 | `theme_css` | str | `assets/style.css` 的内容，用 `{{ theme_css\|safe }}` 输出 |
 | `theme_name` | str | 当前主题名 |
@@ -132,8 +155,8 @@ assets/style.css         全站样式，会被内联进 <style>
 | `page.updated_at` | ISO 时间字符串，可能为 `None` |
 | `page.ai_origin` | AI 生成溯源，人工写的为 `None` |
 | `page.item` | 同顶层 `item` |
-| `page.items` | 同顶层 `items` |
-| `page.pagination` | 详情页为 `None` |
+| `page.items` | 同顶层 `items`（注意 `page.items` 撞 dict 方法，见第七节，用顶层 `items`） |
+| `page.pagination` | 列表页是真实分页对象，详情页为 `None` |
 
 ### `item` 对象（详情页）
 
@@ -301,7 +324,7 @@ assets/style.css         全站样式，会被内联进 <style>
 | `kind` | 结果 |
 |---|---|
 | `home` | `/` |
-| `search` | `/search?kw=...` |
+| `search` | `/search/?kw=...` |
 | `category` | `/category/{slug}/` |
 | `tag` | `/tag/{slug}/` |
 | `article` | `/article/{slug}.html` |
@@ -496,6 +519,40 @@ Jinja 取属性时先 `getattr` 再 `getitem`。而 `dict.items` / `keys` / `val
 
 `macros/ui.html` 自带 `button(label, href, kind='primary')` 和 `tag_list(tags)`。
 
+### 列表页的完整骨架
+
+`list.html` 同时服务文章列表、产品列表、分类、标签、搜索五种页面，
+靠 `page.title` / `page.description` 区分标题，不用另写五套模板：
+
+```jinja
+{% extends "layout.html" %}
+{% block content %}
+<section class="section">
+  <h1 class="section-title">{{ page.title }}</h1>
+  {% if page.description %}<p class="section-desc">{{ page.description }}</p>{% endif %}
+
+  {# 搜索框：提交到 /search/ #}
+  <form action="{{ url('search') }}" method="get">
+    <input type="search" name="kw" placeholder="搜索…">
+    <button type="submit">搜索</button>
+  </form>
+
+  <div class="cards">
+    {% for r in items %}
+      {% include "partials/card.html" %}
+    {% else %}
+      <p class="empty">暂无内容</p>
+    {% endfor %}
+  </div>
+
+  {% include "partials/pagination.html" %}
+</section>
+{% endblock %}
+```
+
+`partials/pagination.html` 用 `page.pagination`，链接形如 `?page=2`（相对当前路径），
+所以同一个片段在 `/article/`、`/category/x/`、`/search/?kw=x` 下都能正确跳转。
+
 ---
 
 ## 九、别弄丢 SEO 与 GEO
@@ -553,7 +610,9 @@ Jinja 取属性时先 `getattr` 再 `getitem`。而 `dict.items` / `keys` / `val
 | 现象 | 原因 | 处理 |
 |---|---|---|
 | 页面显示的是旧内容 | 缓存 30 秒没到，或你绕过后台直接改了数据库 | 等半分钟；从工作台保存会立刻清缓存 |
-| 改了 `list.html` 没反应 | 列表页还没接模板 | 见第一节，当前只有详情页生效 |
+| 改了 `page.html` 没反应 | 单页类型没有对外路由 | 见第一节 |
+| 列表页卡片空白 | `partials/card.html` 里取的变量名不是 `r` | 循环变量必须叫 `r` |
+| 分页条不显示 | `total_pages` 为 1 时按设计隐藏 | 数据少于 12 条时不显示，正常 |
 | 正文变成一堆 `&lt;p&gt;` | 忘了 `\|safe` | `{{ item.body_html\|safe }}` |
 | 分类 / 标签不显示 | 这条内容没设分类，或模板用了 `item.category.name` 但 `item.category` 是 `None` | 用 `{% if item.category %}` 包起来 |
 | `{{ x.y }}` 输出空 | 变量名拼错，或该 key 是 dict 方法名 | 检查拼写；方法名改用 `x['y']` |

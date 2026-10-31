@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from cenkor_admin.apps.cms import models
 
-__all__ = ["TemplateContext", "cms_api", "get_session_factory"]
+__all__ = ["TemplateContext", "build_pagination", "cms_api", "get_session_factory"]
 
 _engine = None
 _factory: sessionmaker | None = None
@@ -85,6 +85,28 @@ def _body_html(content: dict) -> str:
 
 
 PAGE_PREFIX = {"product": "product", "news": "news", "case": "case", "article": "article", "page": "p"}
+
+
+def build_pagination(page: int = 1, total: int = 0, per_page: int = 20, window: int = 5) -> dict[str, Any]:
+    """分页对象。纯函数，模板 API 与列表页路由共用同一份算法，避免两处算出不同的页码。"""
+    page = max(1, int(page or 1))
+    per_page = max(1, int(per_page or 20))
+    total = max(0, int(total or 0))
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    half = max(1, window // 2)
+    start = max(1, page - half)
+    end = min(total_pages, start + window - 1)
+    start = max(1, end - window + 1)
+    return {
+        "page": page, "per_page": per_page, "total": total,
+        "total_pages": total_pages, "window": list(range(start, end + 1)),
+        "has_prev": page > 1, "has_next": page < total_pages,
+        "prev_page": page - 1 if page > 1 else None,
+        "next_page": page + 1 if page < total_pages else None,
+        "range_start": 0 if total == 0 else (page - 1) * per_page + 1,
+        "range_end": min(page * per_page, total),
+    }
 
 _SORT_FIELDS = {
     "published_at": "published_at",
@@ -508,24 +530,7 @@ class TemplateContext:
 
     @cms_api
     def pagination(self, page: int = 1, total: int = 0, per_page: int = 20, window: int = 5) -> dict[str, Any]:
-        page = max(1, int(page or 1))
-        per_page = max(1, int(per_page or 20))
-        total = max(0, int(total or 0))
-        total_pages = max(1, (total + per_page - 1) // per_page)
-        page = min(page, total_pages)
-        half = max(1, window // 2)
-        start = max(1, page - half)
-        end = min(total_pages, start + window - 1)
-        start = max(1, end - window + 1)
-        return {
-            "page": page, "per_page": per_page, "total": total,
-            "total_pages": total_pages, "window": list(range(start, end + 1)),
-            "has_prev": page > 1, "has_next": page < total_pages,
-            "prev_page": page - 1 if page > 1 else None,
-            "next_page": page + 1 if page < total_pages else None,
-            "range_start": 0 if total == 0 else (page - 1) * per_page + 1,
-            "range_end": min(page * per_page, total),
-        }
+        return build_pagination(page, total, per_page, window)
 
     # ------------------------------------------------------------ 11. asset
 
@@ -548,7 +553,8 @@ class TemplateContext:
         if kind == "search":
             q = f"?kw={slug}" if slug else ""
             tail = f"&page={page}" if page else ""
-            return f"{self.base}/search{q}{tail}"
+            # 带尾斜杠：/search 是 JSON 接口，HTML 搜索页在 /search/
+            return f"{self.base}/search/{q}{tail}"
         if kind == "category":
             return f"{self.base}/category/{slug}/"
         if kind == "tag":
