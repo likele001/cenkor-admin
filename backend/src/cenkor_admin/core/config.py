@@ -184,6 +184,14 @@ class Settings(BaseSettings):
     # 默认开启；出问题置 false 可退回「登录即可」。
     CMS_RBAC_ENFORCE: bool = True
 
+    # ---- CMS 公开页静态缓存（模板系统 P2）----
+    # 后端渲染详情页后把 HTML 落盘，nginx try_files 命中就不回源。
+    # 关掉 = 全部 miss = 自动回落动态渲染，等于没开过，可随时应急。
+    # 注意字段必须声明在这里：只在代码里 os.environ 读取的话，.env 怎么配都不生效。
+    CMS_STATIC_CACHE: bool = False
+    # 落盘根目录，留空用 backend/var/htmlcache
+    CMS_STATIC_CACHE_ROOT: str = ""
+
     @property
     def ai_ready(self) -> bool:
         """AI 是否真正可用（开关 + 密钥双检）"""

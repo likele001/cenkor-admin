@@ -15,6 +15,7 @@ import difflib
 import hashlib
 import io
 import json
+import logging
 import re
 import zipfile
 from datetime import datetime
@@ -25,7 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.cms import builtin_theme, models
+from cenkor_admin.apps.cms import builtin_theme, models, static_cache
 from cenkor_admin.apps.cms.render import (
     KIND_TEMPLATE,
     RENDER_TIMEOUT,
@@ -40,6 +41,8 @@ from cenkor_admin.core.db import get_db
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_SITE_ID = 1
 
 # 主题名同时是 URL 片段和磁盘标识，收紧到小写字母数字
@@ -53,6 +56,25 @@ MAX_ZIP_BYTES = 5 * 1024 * 1024
 MAX_ZIP_FILES = 300
 MAX_ZIP_FILE_BYTES = 1024 * 1024
 _SKIP_PARTS = ("__MACOSX", ".DS_Store", "Thumbs.db", "manifest.json")
+
+
+async def _invalidate_all(db: AsyncSession, site_id: int | None, theme: str | None = None) -> None:
+    """模板/主题变更后统一失效：Jinja 模板缓存 + 已落盘的静态页。
+
+    版式一动，之前落盘的 HTML 全是旧版，不整站撤掉就会出现
+    「后台改了模板，线上还是老样子」——这正是静态化最容易被骂的坑。
+    site_id 为空表示影响全部站点。
+    """
+    invalidate_theme_cache(site_id, theme)
+    if not static_cache.cache_enabled():
+        return
+    try:
+        if site_id:
+            await static_cache.purge_site_by_id(db, site_id)
+        else:
+            static_cache.purge_all()
+    except Exception as exc:
+        logger.warning("模板变更后清理静态缓存失败 site_id=%s theme=%s: %s", site_id, theme, exc)
 
 
 class TemplateRenderRequest(BaseModel):
@@ -314,7 +336,7 @@ async def templates_theme_create(body: ThemeCreateRequest, db: AsyncSession = De
             kind=_kind_of(path), content=content, checksum=_md5(content),
         ))
     await db.commit()
-    invalidate_theme_cache(body.site_id, theme)
+    await _invalidate_all(db, body.site_id, theme)
     return {"ok": True, "theme": theme, "from_theme": from_theme, "files": len(docs)}
 
 
@@ -338,7 +360,7 @@ async def templates_theme_delete(
         )
     )
     await db.commit()
-    invalidate_theme_cache(site_id, theme)
+    await _invalidate_all(db, site_id, theme)
     return {"ok": True, "theme": theme, "deleted": result.rowcount or 0,
             "reverted_to_builtin": bool(is_builtin)}
 
@@ -365,7 +387,7 @@ async def templates_theme_active(body: ThemeActiveRequest, db: AsyncSession = De
     settings["cms.theme"] = theme
     row.settings = settings
     await db.commit()
-    invalidate_theme_cache(body.site_id)
+    await _invalidate_all(db, body.site_id)
     return {"ok": True, "active": theme}
 
 
@@ -465,7 +487,7 @@ async def templates_file_save(body: TemplateSaveRequest, db: AsyncSession = Depe
         if body.kind:
             row.kind = body.kind
     await db.commit()
-    invalidate_theme_cache(body.site_id, body.theme)
+    await _invalidate_all(db, body.site_id, body.theme)
     return {"ok": True, "path": body.path, "checksum": checksum}
 
 
@@ -488,7 +510,7 @@ async def templates_file_delete(
         raise HTTPException(404, "没有该覆盖文件")
     await db.delete(row)
     await db.commit()
-    invalidate_theme_cache(site_id, theme)
+    await _invalidate_all(db, site_id, theme)
     return {"ok": True, "path": path, "reverted_to": "builtin"}
 
 
@@ -659,7 +681,7 @@ async def templates_import(
         written += 1
 
     await db.commit()
-    invalidate_theme_cache(site_id, theme)
+    await _invalidate_all(db, site_id, theme)
     return {"ok": True, "theme": theme, "written": written, "skipped": skipped,
             "files": sorted(accepted)}
 

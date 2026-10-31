@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms import models, schemas
+from cenkor_admin.apps.cms import models, schemas, static_cache
 from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.core.db import get_db
@@ -76,6 +76,43 @@ async def _snapshot_version(
     await db.commit()
     await db.refresh(snap)
     return snap
+
+
+async def _purge_static(db: AsyncSession, site_id: int | None, slugs: Any) -> None:
+    """[P2] 条目变更后清掉已落盘的静态详情页。
+
+    一律在 **commit 之后** 调：先删文件后提交，一旦事务回滚就会留下「文件没了但
+    数据库没变」的空洞（虽然下次访问会自动重建，但中间必然多一次回源）；
+    反过来最多多渲染一次，结果始终正确。
+    缓存失效失败只记日志，永不影响主流程。
+    """
+    if not static_cache.cache_enabled() or not site_id:
+        return
+    if isinstance(slugs, str):
+        slugs = [slugs]
+    targets = {s for s in (slugs or []) if isinstance(s, str) and s}
+    if not targets:
+        return
+    try:
+        for slug in targets:
+            await static_cache.purge_entry_by_site(db, site_id, slug)
+    except Exception as exc:
+        log.warning("static_cache.purge_failed", slugs=sorted(targets), error=str(exc))
+
+
+async def _purge_site_static(db: AsyncSession, site_id: int | None) -> None:
+    """[P2] 清掉整站静态页。
+
+    分类/标签改名会出现在该分类下**所有**条目的详情页（面包屑、分类 chip），
+    精确算出受影响的 slug 得把条目表拉一遍，不如整站撤掉让下次访问重建。
+    这是低频操作，代价只是几十个页面重渲染一次。
+    """
+    if not static_cache.cache_enabled() or not site_id:
+        return
+    try:
+        await static_cache.purge_site_by_id(db, site_id)
+    except Exception as exc:
+        log.warning("static_cache.purge_site_failed", site_id=site_id, error=str(exc))
 
 
 # ============================================================
@@ -571,6 +608,8 @@ async def update_category(
             setattr(obj, k, body[k])
     await db.commit()
     await db.refresh(obj)
+    # [P2] 分类名会出现在该分类下每条详情页的面包屑里，整站静态页撤掉重建
+    await _purge_site_static(db, obj.site_id)
     return _category_to_dict(obj)
 
 
@@ -593,6 +632,8 @@ async def delete_category(
         update(models.Category).where(models.Category.id == cat_id).values(deleted_at=func.now())
     )
     await db.commit()
+    # [P2] 分类没了，详情页面包屑跟着变
+    await _purge_site_static(db, obj.site_id)
 
 
 @router.post("/categories/reorder", status_code=200)
@@ -697,6 +738,8 @@ async def update_tag(
             setattr(obj, k, body[k])
     await db.commit()
     await db.refresh(obj)
+    # [P2] 标签名也会渲染进详情页，整站静态页撤掉重建
+    await _purge_site_static(db, obj.site_id)
     return _tag_to_dict(obj)
 
 
@@ -709,8 +752,10 @@ async def delete_tag(
     obj = await db.get(models.Tag, tag_id)
     if not obj:
         raise HTTPException(404, "Tag not found")
+    site_id = obj.site_id
     await db.delete(obj)
     await db.commit()
+    await _purge_site_static(db, site_id)
 
 
 # ============================================================
@@ -839,6 +884,8 @@ async def create_entry(
         await _snapshot_version(db, obj, current.id, note="创建")
     except Exception as e:
         log.warning("version.snapshot_failed", entry_id=obj.id, error=str(e))
+    # [P2] 同名 slug 的旧静态页可能还躺在盘上（条目删过又新建），先清掉
+    await _purge_static(db, obj.site_id, [obj.slug])
     return _entry_to_dict(obj)
 
 
@@ -863,6 +910,7 @@ async def update_entry(
 
     tag_ids = body.pop("tag_ids", None)
     old_status = obj.status  # [P2C] 判断是否发生了「变成已发布」
+    old_slug = obj.slug      # [P2] slug 改了要连旧文件一起清
     for k in ("title", "slug", "content", "custom_fields", "seo", "category_id", "status", "sort"):
         if k in body:
             setattr(obj, k, body[k])
@@ -903,6 +951,8 @@ async def update_entry(
         await _snapshot_version(db, obj, current.id, note="更新")
     except Exception as e:
         log.warning("version.snapshot_failed", entry_id=obj.id, error=str(e))
+    # [P2] 改标题/正文/状态/分类都要让静态页失效；改 slug 连旧地址一起清
+    await _purge_static(db, obj.site_id, [old_slug, obj.slug])
     return _entry_to_dict(obj)
 
 
@@ -958,6 +1008,7 @@ async def restore_entry_version(
         raise HTTPException(404, f"Version {version} not found")
 
     # 先快照当前状态（回滚本身也是可回滚的）
+    old_slug = entry.slug  # [P2] 回滚可能把 slug 改回去，旧地址的静态页要一起清
     try:
         await _snapshot_version(db, entry, current.id, note=f"回滚前 v{version}")
     except Exception as e:
@@ -981,6 +1032,8 @@ async def restore_entry_version(
         await _snapshot_version(db, entry, current.id, note=f"回滚自 v{version}")
     except Exception as e:
         log.warning("version.snapshot_failed", entry_id=entry.id, error=str(e))
+    # [P2] 回滚后内容变了，静态页必须重建
+    await _purge_static(db, entry.site_id, [old_slug, entry.slug])
     return _entry_to_dict(entry)
 
 
@@ -1002,6 +1055,8 @@ async def delete_entry(
         await dispatch("entry.deleted", entry_id=entry_id, db=db, user=current)
     except Exception as e:
         log.warning("hook.dispatch_failed", hook="entry.deleted", error=str(e))
+    # [P2] 软删后公开页立即 404，静态文件必须撤掉，否则链接永远能开
+    await _purge_static(db, obj.site_id, [obj.slug])
 
 
 @router.post("/entries/batch-delete", status_code=200)
@@ -1009,10 +1064,15 @@ async def batch_delete_entries(body: dict, db: AsyncSession = Depends(get_db)):
     ids = body.get("ids") or []
     if not isinstance(ids, list) or not ids:
         raise HTTPException(400, "ids 必须是非空数组")
+    rows = (await db.execute(
+        select(models.Entry.slug, models.Entry.site_id).where(models.Entry.id.in_(ids))
+    )).all()
     await db.execute(
         update(models.Entry).where(models.Entry.id.in_(ids)).values(deleted_at=func.now())
     )
     await db.commit()
+    for site_id in {r.site_id for r in rows}:
+        await _purge_static(db, site_id, [r.slug for r in rows if r.site_id == site_id])
     return {"deleted": len(ids)}
 
 
@@ -1022,10 +1082,16 @@ async def batch_update_entry_status(body: dict, db: AsyncSession = Depends(get_d
     new_status = body.get("status")
     if not isinstance(ids, list) or not ids or new_status not in ("draft", "published", "archived"):
         raise HTTPException(400, "参数错误")
+    rows = (await db.execute(
+        select(models.Entry.slug, models.Entry.site_id).where(models.Entry.id.in_(ids))
+    )).all()
     await db.execute(
         update(models.Entry).where(models.Entry.id.in_(ids)).values(status=new_status)
     )
     await db.commit()
+    # [P2] 批量下线要撤静态页；批量上线要删掉可能的旧文件让下次访问重建
+    for site_id in {r.site_id for r in rows}:
+        await _purge_static(db, site_id, [r.slug for r in rows if r.site_id == site_id])
     return {"updated": len(ids), "status": new_status}
 
 
@@ -1144,6 +1210,7 @@ async def import_entries(
                 await db.refresh(existing)
                 with contextlib.suppress(Exception):
                     await _snapshot_version(db, existing, current.id, note="批量导入更新")
+                await _purge_static(db, existing.site_id, [existing.slug])
                 updated += 1
                 results.append({"row": i, "ok": True, "action": "updated", "id": existing.id})
             else:
@@ -1167,6 +1234,7 @@ async def import_entries(
                 await db.refresh(obj)
                 with contextlib.suppress(Exception):
                     await _snapshot_version(db, obj, current.id, note="批量导入创建")
+                await _purge_static(db, obj.site_id, [obj.slug])
                 created += 1
                 results.append({"row": i, "ok": True, "action": "created", "id": obj.id})
         except Exception as e:
@@ -1255,6 +1323,8 @@ async def review_entry(
             await dispatch("entry.published", entry=entry, db=db, user=current)
         except Exception as e:
             log.warning("hook.dispatch_failed", hook="entry.published", error=str(e))
+    # [P2] 审核通过 = 对外可见，静态页要重建；驳回则要撤掉
+    await _purge_static(db, entry.site_id, [entry.slug])
     return _entry_to_dict(entry)
 
 

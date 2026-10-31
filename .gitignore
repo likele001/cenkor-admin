@@ -56,6 +56,9 @@ backend/dist/
 # ============ Uploads / Runtime ============
 uploads/
 runtime/
+# CMS 公开页静态缓存（模板系统 P2）：后端渲染产物，nginx 直接读。
+# 属于机器本地状态，换台机器会自己重建，入库只会制造无意义的 diff。
+backend/var/
 *.sqlite
 *.db
 cloud_storage-1.0.0.zip

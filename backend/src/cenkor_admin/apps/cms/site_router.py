@@ -27,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 
 from cenkor_admin.apps.builder.models import Page
+from cenkor_admin.apps.cms import static_cache
 from cenkor_admin.apps.cms.models import Case, Category, Entry, Media, News, Product, Site, Tag
 from cenkor_admin.apps.forms.models import Form
 from cenkor_admin.core.db import DBSession
@@ -281,6 +282,7 @@ async def get_site(site_id: int, db: DBSession) -> SiteWithStats:
 @router.put("/{site_id}", response_model=SiteOut, summary="更新站点")
 async def update_site(site_id: int, body: SiteUpdate, db: DBSession) -> SiteOut:
     site = await _one(db, site_id)
+    old_domain = site.domain
     data = body.model_dump(exclude_unset=True)
 
     if "kind" in data and data["kind"] is not None:
@@ -298,6 +300,14 @@ async def update_site(site_id: int, body: SiteUpdate, db: DBSession) -> SiteOut:
     await db.commit()
     await db.refresh(site)
     await invalidate_site_cache()
+    # [P2] 站点信息（域名/品牌名）会进详情页的 title 与 canonical，
+    # 旧域名下的静态目录直接撤掉，新域名第一次访问时重建。
+    if static_cache.cache_enabled():
+        try:
+            static_cache.purge_site_domain(old_domain)
+            static_cache.purge_site_domain(site.domain)
+        except Exception as exc:
+            log.warning("cms.site.static_purge_failed", site_id=site_id, error=str(exc))
     log.info("cms.site.updated", site_id=site.id, fields=sorted(data))
     return SiteOut.model_validate(site)
 
@@ -325,6 +335,9 @@ async def delete_site(site_id: int, db: DBSession) -> dict[str, Any]:
     await db.delete(site)
     await db.commit()
     await invalidate_site_cache()
+    # [P2] 站点没了，静态文件不该还活着
+    if static_cache.cache_enabled() and site.domain:
+        static_cache.purge_site_domain(site.domain)
     log.info("cms.site.deleted", site_id=site_id, key=site.key)
     return {"deleted": True, "site_id": site_id, "key": site.key}
 
