@@ -43,20 +43,45 @@
 
 ### 部署前提：nginx 必须把这些路径转给后端
 
-官网是纯静态站，nginx 有 `try_files ... /index.html` 兜底。**少一条代理规则，
-对应页面就会静默返回官网首页（状态码还是 200）**，看起来像「点了没反应」，极难排查。
+官网是纯静态站，nginx 用 `try_files` 兜底。**少一条代理规则，对应页面就会静默返回
+官网首页（状态码还是 200）**，看起来像「点了没反应」，极难排查。
 
-需要代理的路径（配置在宝塔 `/www/server/panel/vhost/nginx/<域名>.conf`，不在仓库内）：
+所有**页面**统一转到 `/api/v1/page`，不要转到 `/api/v1/public`：
 
 | 路径 | 目标 |
 |---|---|
-| 详情页 `/article/{slug}.html`、`/product/{slug}.html`、`/case/`、`/news/` | 先 `try_files` 找静态文件，miss 再转 `/api/v1/public/$1/$2.html`（**后缀要保留**，后端靠它区分 HTML 与 JSON）。见第十四节 |
-| `/article/`、`/product/`、`/case/`、`/news/` | `/api/v1/public/<类型>/` |
-| `/category/{slug}/`、`/tag/{slug}/` | `/api/v1/public/category/$1/`、`/api/v1/public/tag/$1/` |
-| `/search/` | `/api/v1/public/search/`（注意尾斜杠，`/search` 是 JSON 接口） |
-| `/sitemap.xml`、`/llms.txt` | 同名后端路径 |
+| 任何页面地址 | `/api/v1/page$uri$is_args$args` |
+| `/sitemap.xml`、`/llms.txt` | 同名后端路径（同上，走 `/api/v1/page` 前缀） |
+| `/api/v1/...` | JSON 接口，原样转发 |
+| `/lp/...` | 落地页构建器，走 `/api/v1/public/lp/` |
 
-新环境部署时若发现列表页变成官网首页，先查这个，不是模板问题。
+**为什么页面不能转 `/api/v1/public`**：那是 JSON 接口的地盘。用户把内容地址配成
+`/site`、`/news`、`/products`、`/search` 时，转发过去会撞上同名 JSON 接口 ——
+浏览器拿到一段 JSON、状态码还是 200，页面错乱且日志里一条错都没有。
+`/api/v1/page` 下只挂页面处理器，没有 JSON 路由，撞不上。
+
+**不要为详情页写死前缀**（比如 `location ~ ^/(article|product|news|case|p)/`）：
+地址规则在后台可配（见第九·补节），前缀本身是可变的。写死的结果是「后台配了规则，
+新地址不走这条 location，直接落进兜底」或者更糟 —— 读到上一次落盘的陈旧 HTML。
+
+参考配置（宝塔站点配置，不在仓库内）：
+
+```nginx
+# 页面全部回源后端，未知路径真 404（不要兜底到 /index.html，那是软 404）
+location / {
+    try_files $uri $uri/ @cms_page;
+}
+
+location @cms_page {
+    proxy_pass http://127.0.0.1:8002/api/v1/page$uri$is_args$args;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+新环境部署时若发现页面变成官网首页，先查这个，不是模板问题。
 
 ---
 
@@ -89,6 +114,338 @@ default 主题的内置文件
 
 ---
 
+## 二·补、从零做一个自己的主题（完整实战）
+
+上一节只改了一句话。这一节从头做一个**完全不同风格**的主题，全程在后台点，不碰服务器、不重启。
+
+目标：把默认的「白底蓝字单栏」改成杂志风 —— 大字品牌头、封面卡片、正文首字下沉。
+
+### 动手前必须知道的三件事
+
+**1. 首页不归主题管。**
+`https://你的域名/` 是 nginx 直接吐的静态 `index.html`（官网那个文件），**不经过模板引擎**。
+主题管的是「内容页」：文章/产品/案例/新闻的详情页、各类列表页、分类页、标签页、搜索页、404。
+
+所以改了半天模板发现首页没变，不是没生效，是首页根本不在这套机制里。
+想让首页也走模板，把首页指向一条 `page` 类型的内容，再把静态站的 `/` 转给后端（见第一节「部署前提」）。
+
+**2. 主题是「覆盖」机制，不是「整套替换」。**
+数据库里有的文件用你的，没有的自动回退到 `default` 主题。所以只改 3 个文件也算一个完整主题。
+
+**3. 保存即生效，不用重启也不用手动清缓存。**
+保存会同时清模板缓存，线上下一请求就是新版。
+
+---
+
+### 第 1 步：复制一份主题
+
+后台 → **CMS → 模板工作台**（`/cms/templates`）→ 左侧文件树**最底部**的输入框，
+填个主题名（只能小写字母数字加 `-` `_`，比如 `magazine`），点 **「从当前主题复制一份」**。
+
+它会把当前主题的 12 个文件整份复制过来，然后切到新主题上编辑。
+
+**为什么不从空白开始**：`layout.html`、`partials/meta.html`、`404.html` 这些是「漏一个就白屏或丢 SEO」的骨架。
+从零写等于把踩坑机会乘以 12；复制一份只改想改的，其余自动跟随。
+
+**复制完线上还没变。** 顶部主题下拉里能看到 `magazine`，但没有「· 生效中」标记 ——
+现在只是在编辑它。要上线得做第 7 步。
+
+顺手认识一下文件树那三个圆点：
+
+| 圆点 / 标记 | 含义 |
+|---|---|
+| 蓝色 +「改」 | 数据库里有你改过的版本，正在生效 |
+| 灰色 | 主题自带，内容和内置一致 |
+| 浅灰 | 没动过，继承自 `default` |
+
+---
+
+### 第 2 步：先换配色
+
+打开 `assets/style.css`，**只改最上面那段变量**就能整体换风格：
+
+```css
+:root {
+  --bg: #fbf9f6;
+  --fg: #171512;
+  --muted: #7a7268;
+  --line: #e6e0d8;
+  --brand: #b4472a;
+  --brand-soft: #fbeee9;
+  --radius: 4px;
+  --maxw: 1040px;
+}
+
+/* 深色模式：不想支持就删掉这三条 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14120f; --fg: #f0ece6; --muted: #9c9388;
+    --line: #2c2823; --brand: #e0704f; --brand-soft: #2a1c17;
+  }
+}
+```
+
+右侧预览区大约 0.8 秒后自动变色。
+
+> **这个文件会被整段塞进 `<style>` 标签**，所以里面不能出现 `</style>` 字样，
+> 也不能用 `@import`（内联后失效）。要引外部字体就用 `<link>`，写在 `layout.html` 的 `{% block head %}` 里。
+
+---
+
+### 第 3 步：换掉站头
+
+打开 `partials/header.html`，整份替换成：
+
+```jinja
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="{{ url('home') }}">
+      <span class="brand-mark">{{ (site['brand.name'] or site.name or 'Cenkor') }}</span>
+      {% if site['brand.slogan'] %}<span class="brand-slogan">{{ site['brand.slogan'] }}</span>{% endif %}
+    </a>
+    <nav class="nav">
+      {% for item in nav('main') %}
+        <a href="{{ item.url }}"{% if item.target and item.target != '_self' %} target="{{ item.target }}" rel="noopener"{% endif %}>{{ item.label }}</a>
+      {% endfor %}
+      <a href="{{ url('search') }}">搜索</a>
+    </nav>
+  </div>
+</header>
+```
+
+三个要点：
+
+- `url('home')` 生成站点根地址，**不要手写 `/`** —— 换域名、换子目录时会错
+- `nav('main')` 返回菜单数组，每项是 `{label, url, target}`
+- `site['brand.name']` 读站点配置里的品牌名；`site.name` 是兜底
+
+再往 `assets/style.css` 末尾加：
+
+```css
+.header-inner { flex-direction: column; align-items: flex-start; gap: 6px; padding: 18px 0 12px; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand-mark { font-size: 26px; font-weight: 800; letter-spacing: -0.6px; color: var(--fg); }
+.brand-slogan { font-size: 13px; color: var(--muted); }
+.nav { gap: 20px; font-size: 13.5px; letter-spacing: 0.3px; }
+```
+
+---
+
+### 第 4 步：换卡片
+
+`partials/card.html` 是**所有列表卡片**的唯一来源，循环变量固定叫 `r`：
+
+```jinja
+<a class="card" href="{{ r.url }}">
+  {% if r.cover %}
+    <div class="card-media">
+      <img src="{{ r.cover|asset_url }}" alt="{{ r.title }}" loading="lazy">
+      {% if r.category %}<span class="card-badge">{{ r.category.name }}</span>{% endif %}
+    </div>
+  {% endif %}
+  <div class="card-body">
+    <h3>{{ r.title }}</h3>
+    {% if r.excerpt %}<p class="card-desc">{{ r.excerpt }}</p>{% endif %}
+    {% if r.published_at %}<time class="card-date" datetime="{{ r.published_at }}">{{ r.published_at|date }}</time>{% endif %}
+  </div>
+</a>
+```
+
+**`r.cover` 可能是空串，必须用 `{% if %}` 包住**，否则会输出 `<img src="">`（浏览器会拿当前页地址当图片地址，多一次 404 请求）。
+
+配套 CSS：
+
+```css
+.card { display: flex; flex-direction: column; border: 0; border-radius: var(--radius); overflow: hidden; background: transparent; }
+.card-media { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: var(--radius); }
+.card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s ease; }
+.card:hover .card-media img { transform: scale(1.04); }
+.card-badge { position: absolute; left: 10px; top: 10px; padding: 2px 9px; border-radius: 999px;
+  background: rgba(0,0,0,.62); color: #fff; font-size: 11.5px; }
+.card-body { padding: 12px 2px 0; }
+.card-body h3 { font-size: 16.5px; line-height: 1.45; margin: 0 0 6px; color: var(--fg); }
+.card-desc { font-size: 13.5px; color: var(--muted); margin: 0 0 8px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-date { font-size: 12px; color: var(--muted); letter-spacing: .4px; }
+```
+
+---
+
+### 第 5 步：换详情页
+
+`detail.html` 整份替换（注意里面 `|safe` 的位置，删了正文会变成一堆转义字符）：
+
+```jinja
+{% extends "layout.html" %}
+{% block content %}
+<article class="post">
+  <header class="post-head">
+    {% if item.category %}
+      <a class="post-kicker" href="{{ item.category.url }}">{{ item.category.name }}</a>
+    {% endif %}
+    <h1>{{ item.title }}</h1>
+    {% if item.excerpt %}<p class="post-lead">{{ item.excerpt }}</p>{% endif %}
+    <div class="post-meta">
+      {% if item.published_at %}<time datetime="{{ item.published_at }}">{{ item.published_at|date }}</time>{% endif %}
+      {% if item.view_count %}<span>{{ item.view_count }} 次阅读</span>{% endif %}
+      {% if item.ai_generated %}<span class="badge">AI 辅助 · 已人工审核</span>{% endif %}
+    </div>
+  </header>
+
+  {% if item.cover %}<img class="post-cover" src="{{ item.cover|asset_url }}" alt="{{ item.title }}">{% endif %}
+
+  <div class="post-body">{{ item.body_html|safe }}</div>
+
+  {% if item.tags %}
+    <div class="chips">
+      {% for t in item.tags %}<span class="chip">{{ t }}</span>{% endfor %}
+    </div>
+  {% endif %}
+</article>
+
+{% set rel = related(item, 3) %}
+{% if rel %}
+<section class="section">
+  <h2 class="section-title">相关阅读</h2>
+  <div class="cards">
+    {% for r in rel %}{% include "partials/card.html" %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+```
+
+`item.tags` 是**名称字符串数组**（`["智能制造", "案例"]`），不是对象，所以直接 `{{ t }}`，别写 `{{ t.name }}`。
+
+首字下沉和导语样式：
+
+```css
+.post-head { margin-bottom: 26px; }
+.post-kicker { font-size: 12px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--brand); }
+.post-head h1 { font-size: 34px; line-height: 1.28; margin: 8px 0 12px; letter-spacing: -0.5px; }
+.post-lead { font-size: 17px; color: var(--muted); line-height: 1.7; margin: 0 0 14px; }
+.post-body > p:first-of-type::first-letter {
+  float: left; font-size: 54px; line-height: .92; padding: 4px 8px 0 0; font-weight: 700; color: var(--brand);
+}
+```
+
+---
+
+### 第 6 步：换列表页
+
+`list.html` 同时服务**七种**页面（文章/产品/案例/新闻/分类/标签/搜索），靠 `page.title` 区分，不用写七套：
+
+```jinja
+{% extends "layout.html" %}
+{% block content %}
+<section class="section">
+  <header class="list-head">
+    <h1 class="section-title">{{ page.title }}</h1>
+    {% if page.description %}<p class="section-desc">{{ page.description }}</p>{% endif %}
+    <form class="list-search" action="{{ url('search') }}" method="get">
+      <input type="search" name="kw" placeholder="搜索文章…" aria-label="搜索">
+      <button type="submit">搜索</button>
+    </form>
+  </header>
+
+  <div class="cards">
+    {% for r in items %}
+      {% include "partials/card.html" %}
+    {% else %}
+      <div class="empty">
+        <p>这里还没有内容。</p>
+        <p><a class="btn btn-primary" href="{{ url('home') }}">回首页看看</a></p>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% include "partials/pagination.html" %}
+</section>
+{% endblock %}
+```
+
+`{% for ... %}{% else %}` 里的 `else` 是「一次都没循环」时执行 —— 空列表提示就靠它，不用另外判 `items|length`。
+
+分页**不要自己拼 `?page=N`**，直接 include 那个 partial，里面的地址都是后端算好的绝对路径。
+
+---
+
+### 第 7 步：让线上用上它
+
+顶部主题下拉选到 `magazine`，点 **「设为生效」**。
+
+这是**整站级**切换：所有内容页立刻换版式。回退就是下拉切回 `default` 再点一次「设为生效」。
+
+如果按钮是灰的，说明当前主题已经是生效主题（下拉里带「· 生效中」）。
+
+---
+
+### 第 8 步：上线前自检
+
+做完对着这张表过一遍，每一条都能在预览里直接看：
+
+| 检查项 | 怎么看 | 为什么重要 |
+|---|---|---|
+| `<title>` 正确 | 浏览器标签 / 预览区源码 | 别改成写死的站名，要用 `page.full_title` |
+| `canonical` 在 | 看源码 `<link rel="canonical">` | 缺了会有重复页面问题 |
+| `meta description` 在 | 看源码 | 搜索结果摘要 |
+| `partials/meta.html` 没删 | 看 `layout.html` | OG / Twitter / JSON-LD 全在里面 |
+| JSON-LD 在 | 源码搜 `application/ld+json` | 富摘要与 AI 引用准确度 |
+| 正文没被转义 | 详情页看有没有 `&lt;p&gt;` | 少了 `\|safe` 的典型症状 |
+| 图片都有 alt | 看 `card.html` / `detail.html` | 无障碍 + 图片 SEO |
+| 空列表有提示 | 找一个没内容的分类 | 否则一片空白像坏了 |
+| 手机上不横向滚动 | 预览区拉窄 | 定宽元素最常见 |
+
+---
+
+### 改坏了怎么退回去
+
+| 情况 | 怎么办 |
+|---|---|
+| 单个文件改坏 | 编辑器右上 **「还原」**（只对「已覆盖」的文件有效；本来就是内置的会提示无需还原） |
+| 语法写错存不进去 | 编辑器会标红并给出行列号；保存也会被拒，不会污染线上 |
+| 整站版式乱了 | 顶部下拉切回 `default` → **「设为生效」** |
+| 新主题彻底失败 | 「删除主题」，然后重新「从当前主题复制一份」 |
+
+**「删除主题」不可恢复**，删之前先「导出 zip」留个底。
+
+---
+
+### 导出，搬去别的站
+
+- **导出**：顶部 **「导出 zip」** → 拿到完整主题包
+- **导入**：目标站点的模板工作台 → **「导入 zip」**
+
+导入有四道闸：整包 5MB / 最多 300 个文件 / 单文件 1MB / 路径白名单。
+而且**所有模板会先做一遍语法校验，错一处整包拒绝** —— 所以导不进去基本可以断定包里真有错，不是网络问题。
+
+---
+
+### 常见需求该改哪个文件
+
+| 想要的效果 | 改这里 |
+|---|---|
+| 换整体配色 / 字号 / 圆角 | `assets/style.css` 的 `:root` |
+| 换站头、导航、logo | `partials/header.html` |
+| 换页脚、备案号、友链 | `partials/footer.html` |
+| 换列表卡片样式 | `partials/card.html` |
+| 换分页条样式 | `partials/pagination.html` |
+| 详情页版式 | `detail.html` |
+| 列表页（含分类/标签/搜索）版式 | `list.html` |
+| 单页（关于我们等） | `page.html` |
+| 404 页面 | `404.html` |
+| 全站 `<head>`、字体、脚本 | `layout.html` 的 `{% block head %}` |
+| 按钮、标签组这些可复用件 | `macros/ui.html` |
+
+想加一个**主题级**的小组件（比如「回到顶部」按钮）：写进 `partials/footer.html`，
+样式写进 `assets/style.css`，脚本用 `<script>` 内联在 footer 里 —— 没有单独的 js 文件入口。
+
+> **预览区不执行脚本。** 右侧预览是个禁脚本的 iframe（防止模板里的脚本影响后台），
+> 所以加了 JS 之后预览里看不到效果，**保存并打开线上页面**才能验证。
+> CSS 和 HTML 的改动在预览里是实时的，只有 JS 需要这一步。
+
+---
+
 ## 三、文件约定
 
 ### 目录结构
@@ -96,9 +453,9 @@ default 主题的内置文件
 ```
 layout.html              布局骨架：<head>、header、<main>、footer，子模板 extends 它
 detail.html              详情页（article / product / news / case 共用）
-page.html                单页
-list.html                列表页（当前未启用）
-404.html                 未找到（当前未启用）
+page.html                单页（关于我们 / 联系我们这类）
+list.html                列表页（文章/产品/案例/新闻/分类/标签/搜索，七种共用）
+404.html                 未找到（必须输出 404 状态码，否则爬虫会收录空页面）
 partials/meta.html       OG / Twitter / JSON-LD 元信息
 partials/header.html     站头 + 主菜单
 partials/footer.html     页脚
@@ -195,6 +552,8 @@ assets/style.css         全站样式，会被内联进 <style>
 ## 五、数据 API（16 个）
 
 只能用这 16 个函数取数据。它们是**只读**的，绑定当前站点，查不到别的站点。
+
+下面列了 17 条：第 9 项 `site` 是预注入的 dict，不是函数，其余 16 个才是可调用的 API。
 
 所有 `limit` 都有上限，超了会被夹到上限值，不会报错。
 
@@ -778,23 +1137,31 @@ tag                               tag/{slug}/
 
 ---
 
-## 十四、静态落盘：详情页不再每次都进后端
+## 十四、静态落盘（已默认关闭，别急着开）
 
-详情页是流量和 SEO 的主体，但每开一次都要查条目 + 查分类标签 + Jinja 渲染。
-这一层把渲染结果落成静态 HTML，nginx `try_files` 命中就直接出，
-**同一页渲染过一次之后不再进 Python**。
+详情页是流量主体，每开一次都要查数据 + 渲染。这层功能把渲染结果落成静态 HTML，
+nginx `try_files` 命中就直接出，同一页渲染过一次不再进 Python。
 
-### 只落详情页
+**但它在当前版本里默认是关的，而且不建议开。** 原因很实在：
 
-| 页面 | 落盘 | 原因 |
-|---|---|---|
-| `/article/{slug}.html`、`/product/{slug}.html`、`/case/...`、`/news/...` | 是 | URL 可枚举、无查询参数、SEO 权重最高 |
-| 列表页 / 分页 / 搜索 | 否 | 条目一增一减就要清掉所有分页，漏一处分页就是「新内容不出现」；详情页是「一条内容一个文件」，失效才精确 |
-| 404 | 否 | 不该被缓存 |
+地址规则现在后台可配（第九·补节）。落盘文件的路径是「当时那套规则」算出来的，
+一旦改了规则，磁盘上的旧文件还在原处 ——
 
-### 开启方式
+- 新地址没有对应文件 → 回源渲染，正常
+- **老地址的文件还在 → nginx 直接供应上去，内容陈旧、你还以为规则没生效**
+- 更麻烦的是把内容下线（到期归档、改状态为草稿）后，文件仍在，线上照样 200 返回全文
 
-后端 `.env`：
+这不是理论风险，是真实发生过的线上故障。
+
+### 如果你确实需要它
+
+先确认这三件事都能接受，再动手：
+
+1. 地址规则近期不会改（或者每次改完都手动清缓存）
+2. 内容下线流程里有额外的清缓存步骤
+3. 你有办法验证「线上返回的就是库里最新的」
+
+开启方式（后端 `.env`）：
 
 ```
 CMS_STATIC_CACHE=1
@@ -803,30 +1170,20 @@ CMS_STATIC_CACHE_ROOT=/www/wwwroot/cenkor-admin/backend/var/htmlcache
 
 改完重启后端（宝塔会自动接管端口，不要手工 nohup）。
 
-nginx 侧（宝塔站点配置，不在仓库内）：
+nginx 侧只需要一条**不写死地址前缀**的规则，`root` 里的域名目录必须等于实际访问的 Host：
 
 ```nginx
-location ~ ^/(article|product|news|case)/([^/]+)\.html$ {
+location / {
     root /www/wwwroot/cenkor-admin/backend/var/htmlcache/www.cenkor.cn;
-    try_files $uri @cms_dynamic;
+    try_files $uri $uri/ @cms_page;
     expires 300s;
-}
-
-location @cms_dynamic {
-    proxy_pass http://127.0.0.1:8002/api/v1/public$uri$is_args$args;
-    proxy_set_header Host $host;
-    # ... 其余 header 同其他 location
 }
 ```
 
-`root` 里的域名目录必须**等于实际访问的 Host**。后端按请求 Host 建目录，
-两边对不上就是「文件写了但永远 miss」，表现为「开了缓存但一点没快」。
-所以用 IP、localhost、内网域名访问时后端不会落盘 —— 那些请求渲染出的
-canonical / og:url 是错的，写进静态文件会把全站 SEO 打脏。
+后端只在**站点规范域名**下落盘。用 IP、localhost、内网域名访问时不落盘 ——
+那些请求渲染出的 canonical / og:url 是错的，写进文件会把全站 SEO 打脏。
 
 ### 什么时候自动失效
-
-改完内容不需要手动清缓存：
 
 | 操作 | 失效范围 |
 |---|---|
@@ -838,13 +1195,16 @@ canonical / og:url 是错的，写进静态文件会把全站 SEO 打脏。
 | 保存模板 / 切主题 / 导入主题包 | **整站** |
 | 改站点域名或品牌名 | 该站点 |
 
-「整站」是几十个文件的重渲染，只出现在低频操作上。
+**改地址规则不在上面这张表里** —— 这是它最大的坑。改规则后必须手动清：
+
+```bash
+cd /www/wwwroot/cenkor-admin/backend
+python3 scripts/build_static_cache.py --purge
+```
 
 ### 运维命令
 
 ```bash
-cd /www/wwwroot/cenkor-admin/backend
-
 python3 scripts/build_static_cache.py --stats         # 文件数、占用、开关状态
 python3 scripts/build_static_cache.py --purge         # 清空全部
 python3 scripts/build_static_cache.py --purge-entry <slug>
@@ -855,23 +1215,20 @@ python3 scripts/build_static_cache.py --warm https://www.cenkor.cn   # 按 sitem
 
 ### 回退
 
-**只改 `.env` 不够。** 磁盘上的旧文件 nginx 照样会读，只是不再更新，
-结果就是「已经改了模板，线上永远旧版」。完整回退两步：
+**只改 `.env` 不够。** 磁盘上的旧文件 nginx 照样会读，结果就是「已经改了模板/规则，
+线上永远旧版」。完整回退两步：
 
 1. `.env` 改 `CMS_STATIC_CACHE=0`，重启后端
 2. `python3 scripts/build_static_cache.py --purge`
-
-如果问题出在静态文件本身（权限、挂载），临时把 nginx 那条 `try_files` 换成
-直接 `proxy_pass`，效果等同关闭。
 
 ### 排错
 
 | 现象 | 原因 |
 |---|---|
-| 改了内容，线上还是旧的 | 开关没真开（用 `--stats` 看）／nginx `root` 的域名目录与实际 Host 不一致 |
+| 改了内容，线上还是旧的 | 开关还开着且文件没清（用 `--stats` 看）／nginx `root` 的域名目录与实际 Host 不一致 |
+| 改了地址规则，老地址还能打开 | 落盘文件没清 —— 见上一节 |
 | 开了但一点没快 | 后端只在规范域名下落盘，用 IP 或 localhost 预热无效 |
 | 目录里一个文件都没有 | `cms_sites.domain` 和 `cms_site_config['brand.domain']` 都没配 |
-| 列表页突然全是旧数据 | 列表页本来就不落盘，查的是后端 120s 缓存头，等两分钟或看数据库 |
 
 ### 目录长什么样
 

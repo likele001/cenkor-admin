@@ -227,6 +227,10 @@ def _preview_page_sync(body: PreviewRequest) -> str:
             "theme_css": resolver("assets/style.css") or "",
             "theme_name": theme,
         }
+        # 预览的 resolver 带有编辑器里**还没保存**的内容。Jinja 按模板名缓存编译产物
+        # （key 不含源码），不清的话 {% include %} 出来的 partial 永远是上一次的版本，
+        # 用户会看到「改了 header，预览没变」。保存路径有自己的失效钩子，这里只处理预览。
+        jinja_env.flush_compiled_templates()
         token = jinja_env.set_resolver(resolver)
         return jinja_env.render_template_file(_preview_template_name(body.path, body.kind), context)
     finally:

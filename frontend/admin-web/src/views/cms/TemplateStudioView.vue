@@ -51,6 +51,9 @@ const previewKind = ref('article')
 const previewSlug = ref('')
 
 const showDiff = ref(false)
+// 使用说明面板：第一次进来的人不知道「覆盖机制」「首页不归主题管」这些前提，
+// 光给一个编辑器，改半天发现没变化，会以为坏了。
+const showHelp = ref(false)
 const diffText = ref('')
 const diffStat = ref({ added: 0, removed: 0 })
 
@@ -448,6 +451,7 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
       </div>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
+        <button class="btn-ghost text-sm" @click="showHelp = true">使用说明</button>
         <select :value="currentTheme" class="input w-44 text-sm" @change="onThemeChange">
           <option v-for="t in themes" :key="t.theme" :value="t.theme">
             {{ t.name }}（{{ t.theme }}）{{ t.active ? '· 生效中' : '' }}
@@ -564,6 +568,85 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
           :srcdoc="previewHtml || '<p style=&quot;padding:24px;color:#888;font:13px sans-serif&quot;>改一下左侧模板，这里会实时渲染</p>'"
         />
       </section>
+    </div>
+
+    <!-- 使用说明：把「第一次打开一定会踩的坑」摆在最前面 -->
+    <div
+      v-if="showHelp"
+      class="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-6"
+      @click.self="showHelp = false"
+    >
+      <div class="w-full max-w-3xl rounded-lg bg-white p-6 text-sm leading-relaxed shadow-xl">
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold">主题模板使用说明</h2>
+            <p class="mt-1 text-xs text-ink-500">只需要会 HTML + 一点 Jinja 语法，不用懂框架</p>
+          </div>
+          <button class="btn-ghost text-xs" @click="showHelp = false">关闭</button>
+        </div>
+
+        <div class="mb-5 rounded border border-amber-200 bg-amber-50 p-3 text-[13px]">
+          <p class="font-medium text-amber-800">动手前先知道这三件事</p>
+          <ol class="mt-2 list-decimal space-y-1 pl-5 text-amber-900">
+            <li>
+              <b>首页不归主题管。</b>站点根地址返回的是静态站的
+              <code class="rounded bg-amber-100 px-1">index.html</code>，不经过模板引擎。
+              主题管的是内容页：详情页、列表页、分类页、标签页、搜索页、404。
+            </li>
+            <li>
+              <b>主题是「覆盖」机制。</b>数据库里有的文件用你的，没有的自动回退到
+              <code class="rounded bg-amber-100 px-1">default</code> 主题，
+              所以只改 3 个文件也算一个完整主题。
+            </li>
+            <li>
+              <b>保存即生效。</b>不用重启、不用清缓存，保存会同时清掉模板缓存。
+              但要点<b>「设为生效」</b>才算上线 —— 只是保存并不会切换线上使用的主题。
+            </li>
+          </ol>
+        </div>
+
+        <div class="mb-5">
+          <h3 class="mb-2 font-semibold">三步做第一个主题</h3>
+          <ol class="list-decimal space-y-1 pl-5">
+            <li>左下角输入主题名（小写字母数字，如 <code class="rounded bg-ink-100 px-1">magazine</code>），点「从当前主题复制一份」—— 12 个文件整体复制，不用从空白开始。</li>
+            <li>改文件：先改 <code class="rounded bg-ink-100 px-1">assets/style.css</code> 顶部的配色变量，效果最直观。</li>
+            <li>右上角点「设为生效」，线上全站换版式。回退就是把下拉切回 <code class="rounded bg-ink-100 px-1">default</code> 再点一次。</li>
+          </ol>
+        </div>
+
+        <div class="mb-5">
+          <h3 class="mb-2 font-semibold">文件对照</h3>
+          <table class="w-full text-[13px]">
+            <tbody class="[&_td]:border-b [&_td]:border-ink-100 [&_td]:py-1.5 [&_td]:align-top">
+              <tr><td class="w-56 pr-3"><code>partials/header.html</code></td><td>站头、品牌、主菜单</td></tr>
+              <tr><td class="pr-3"><code>partials/footer.html</code></td><td>页脚；想加「回到顶部」这类小组件也写这里</td></tr>
+              <tr><td class="pr-3"><code>partials/card.html</code></td><td>列表卡片，循环变量固定叫 <code>r</code></td></tr>
+              <tr><td class="pr-3"><code>partials/pagination.html</code></td><td>分页条，地址都是后端算好的，别自己拼 ?page=</td></tr>
+              <tr><td class="pr-3"><code>detail.html</code></td><td>文章 / 产品 / 案例 / 新闻详情页</td></tr>
+              <tr><td class="pr-3"><code>list.html</code></td><td>七种列表页共用（含分类、标签、搜索）</td></tr>
+              <tr><td class="pr-3"><code>layout.html</code></td><td>全站 head、字体、脚本入口</td></tr>
+              <tr><td class="pr-3"><code>assets/style.css</code></td><td>全站样式，整段内联进 &lt;style&gt;</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mb-5">
+          <h3 class="mb-2 font-semibold">最容易踩的五个坑</h3>
+          <ul class="list-disc space-y-1 pl-5">
+            <li>正文变量不加 <code class="rounded bg-ink-100 px-1">| safe</code>，页面会显示一堆 <code class="rounded bg-ink-100 px-1">&amp;lt;p&amp;gt;</code>。</li>
+            <li><code class="rounded bg-ink-100 px-1">item.cover</code> 可能是空串，要用 <code class="rounded bg-ink-100 px-1">if</code> 包着，否则输出 <code class="rounded bg-ink-100 px-1">&lt;img src=""&gt;</code> 多一次 404 请求。</li>
+            <li>列表数据用顶层 <code class="rounded bg-ink-100 px-1">items</code>，别用 <code class="rounded bg-ink-100 px-1">page.items</code>（会撞上 dict 的方法名）。</li>
+            <li>别删 <code class="rounded bg-ink-100 px-1">partials/meta.html</code>，OG、Twitter Card、JSON-LD 全在里面，删了不影响人看但会掉搜索富摘要。</li>
+            <li>预览区是禁用脚本的 iframe：<b>加了 JS 在预览里不会执行</b>，保存后线上才生效。</li>
+          </ul>
+        </div>
+
+        <p class="border-t border-ink-100 pt-3 text-xs text-ink-500">
+          完整教程（目录约定、16 个数据 API、过滤器、沙箱边界、导入导出、排错）见仓库
+          <code class="rounded bg-ink-100 px-1">docs/template-guide.md</code>，
+          其中「二·补、从零做一个自己的主题」是一份可以照着做的完整实战。
+        </p>
+      </div>
     </div>
   </div>
 </template>

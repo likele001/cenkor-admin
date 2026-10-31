@@ -34,6 +34,7 @@ __all__ = [
     "CmsSandbox",
     "TemplateSyntaxError",
     "clear_template_cache",
+    "flush_compiled_templates",
     "get_env",
     "get_template_meta",
     "is_safe_template_name",
@@ -417,6 +418,24 @@ def clear_template_cache() -> None:
         _TEMPLATE_CACHE.clear()
     if _ENV is not None:
         _ENV.cache.clear()
+
+
+def flush_compiled_templates() -> None:
+    """只清 Jinja 自身按**模板名**缓存的编译产物。
+
+    这一层缓存的 key 是 (loader, name)，**不含源码**。预览时用不同的 resolver
+    解析同名模板（编辑器里还没保存的内容），不清就会一直拿到上一次编译的旧版本 ——
+    现象是「改了 partials/header.html，预览还是老样子」，而保存后又能变
+    （保存走 invalidate，把两层都清了），于是用户会以为是编辑器坏了。
+
+    比 clear_template_cache() 轻：不动按源码 md5 缓存的那层，
+    重新编译后立刻又能命中。
+    """
+    env = _ENV
+    if env is None:
+        return
+    with _CACHE_LOCK:
+        env.cache.clear()
 
 
 def _compile(source: str, name: str = "<template>") -> Template:
