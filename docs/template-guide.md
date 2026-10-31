@@ -17,16 +17,17 @@
 | `/product/{slug}.html` | `detail.html` | 产品详情 |
 | `/case/{slug}.html` | `detail.html` | 案例详情 |
 | `/news/{slug}.html` | `detail.html` | 新闻详情 |
-| `/article/`、`/article/?page=2` | `list.html` | 文章列表（分页 12 条/页） |
+| `/p/{slug}.html` | `page.html` | 单页（关于我们 / 联系我们这类独立页面） |
+| `/article/`、`/article/page/2/` | `list.html` | 文章列表（分页 12 条/页） |
 | `/product/` | `list.html` | 产品列表 |
 | `/case/` | `list.html` | 案例列表 |
 | `/news/` | `list.html` | 新闻列表 |
-| `/category/{slug}/` | `list.html` | 分类列表 |
-| `/tag/{slug}/` | `list.html` | 标签列表 |
+| `/category/{slug}/`、`/category/{slug}/page/2/` | `list.html` | 分类列表 |
+| `/tag/{slug}/`、`/tag/{slug}/page/2/` | `list.html` | 标签列表 |
 | `/search/?kw=xxx` | `list.html` | 搜索结果 |
 | 任何不存在的页面 | `404.html` | 返回 404 状态码 |
 
-`page.html`（单页类型）目前没有对外路由，写了也不生效。
+**分页一律走路径式**：第 2 页是 `/article/page/2/`，不是 `/article/?page=2`。老地址和 `/article/page/1/` 都会 301 到规范地址，页码非数字直接 404 —— 这条路径是固定的，模板里照此拼链接即可。
 
 > `/news`（无斜杠）和 `/news/{slug}`（无 `.html`）是既有的 **JSON 接口**，给前端和
 > AI 助手读数据；`/news/` 和 `/news/{slug}.html` 才是给人看的页面。同一段 URL 模式
@@ -308,15 +309,27 @@ assets/style.css         全站样式，会被内联进 <style>
 
 不传 `key` 返回整个 dict（和 `site` 一样）。`site` 已经预注入了，一般不用这个。
 
-### 11. `pagination(page=1, total=0, per_page=20, window=5)` — 分页对象
+### 11. `pagination(page=1, total=0, per_page=20, window=5, base_path=None)` — 分页对象
 
 返回：
 
 ```
 {page, per_page, total, total_pages,
  window: [页码数组], has_prev, has_next, prev_page, next_page,
- range_start, range_end}
+ range_start, range_end,
+ # 下面五个只有传了 base_path 才有值，否则是 None：
+ url, first_url, last_url, prev_url, next_url,
+ pages: [{n, url, current}, ...]}
 ```
+
+`base_path` 传列表基路径，生成的链接是**绝对地址**，可以直接当 href：
+
+```jinja
+{% set pg = pagination(1, 128, 12, 5, '/article/') %}
+{{ pg.next_url }}   {# https://www.cenkor.cn/article/page/2/ #}
+```
+
+列表页直接用 `page.pagination` 即可，路由已经填好了 base_path。
 
 `window` 是当前显示的几个页码，直接循环渲染即可。`page` 会被夹到 `[1, total_pages]` 之间。
 
@@ -344,7 +357,7 @@ assets/style.css         全站样式，会被内联进 <style>
 | `page` | `/p/{slug}.html` |
 | 其它 | 按 `article` 处理 |
 
-传 `page=` 会追加 `?page=N`（`search` 是 `&page=N`）。
+传 `page=` 时，列表类（`article` / `product` / `news` / `case` / `category` / `tag`）生成路径式分页 `/article/page/2/`；`search` 仍是 `&page=N`（关键词在 query 上，页码塞不进路径）。详情页传 `page=` 会被忽略。
 
 ### 14. `comments(target, limit=20)` — 评论
 
@@ -560,8 +573,9 @@ Jinja 取属性时先 `getattr` 再 `getitem`。而 `dict.items` / `keys` / `val
 {% endblock %}
 ```
 
-`partials/pagination.html` 用 `page.pagination`，链接形如 `?page=2`（相对当前路径），
-所以同一个片段在 `/article/`、`/category/x/`、`/search/?kw=x` 下都能正确跳转。
+`partials/pagination.html` 用 `page.pagination`，直接取 `pg.prev_url` / `pg.next_url` /
+`pg.pages[].url`，都是后端算好的绝对地址 —— 不要自己拼 `?page=N`，那样会被 301，
+多一跳且爬虫收不到规范地址。
 
 ---
 
@@ -706,7 +720,7 @@ Jinja 取属性时先 `getattr` 再 `getitem`。而 `dict.items` / `keys` / `val
 | 页面 | 落盘 | 原因 |
 |---|---|---|
 | `/article/{slug}.html`、`/product/{slug}.html`、`/case/...`、`/news/...` | 是 | URL 可枚举、无查询参数、SEO 权重最高 |
-| 列表页 / 分页 / 搜索 | 否 | 带 `?page=` `?kw=`，URL 空间不可枚举；后端已给 120s 缓存头 |
+| 列表页 / 分页 / 搜索 | 否 | 条目一增一减就要清掉所有分页，漏一处分页就是「新内容不出现」；详情页是「一条内容一个文件」，失效才精确 |
 | 404 | 否 | 不该被缓存 |
 
 ### 开启方式
