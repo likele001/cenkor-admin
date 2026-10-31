@@ -293,6 +293,13 @@ curl "http://localhost:8000/api/v1/cms/entries?content_type_key=product&custom.l
 
 ## Liquid 模板开发
 
+> **写前台主题请先看 [template-guide.md](template-guide.md)。**
+>
+> 2026-10-31 起前台 HTML 由 **Jinja2 主题**渲染：模板存在数据库，后台「CMS → 模板工作台」
+> 在线编辑、实时预览、可导入导出。本章讲的 Liquid 引擎目前只剩
+> `POST /api/v1/public/templates/render` 一个兼容端点在用（供老的 portal-web 调用），
+> **不要用它写站点主题**。
+
 ### 基础语法
 
 ```liquid
