@@ -96,4 +96,5 @@ Cenkor Admin 文档目录。按用途选择。
 | `scripts/deploy.sh` | Docker 部署（`--mode docker\|baota\|baota-static`） | [fullstack_deploy.md](fullstack_deploy.md) |
 | `scripts/install-native.sh` | systemd 安装 | [native_deploy.md](native_deploy.md) |
 | `scripts/check-migration-graph.py` | 迁移图自检（断链 / 重复 / head 数量） | [migrations.md](migrations.md) |
+| `scripts/check-doc-facts.py` | **文档事实自检**（md 里的表名 / 前端路由 / API 前缀 对代码与库核一遍） | 本文档 |
 | `scripts/setup-domain.sh` | 域名与证书辅助 | [domain_setup.md](domain_setup.md) |

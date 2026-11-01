@@ -41,7 +41,9 @@ cenkor-admin/
 | **中间件** | PostgreSQL 16、Redis 7、MinIO —— **宿主机原生服务**，非容器 |
 | **对象存储** | 主存储为云端七牛云 Kodo，本地 MinIO 作双写备份 |
 
-CMS 模块含**公开只读 API**（`/api/v1/public/*`），供任意前端消费；
+CMS 模块含**公开只读 API**（`/api/v1/public/*`，给前端 JS 取 JSON），
+另有 **`/api/v1/page/*`** 专供站点页面渲染（直接出 HTML，接 nginx；2026-10 新增，见
+[`architecture.md`](../architecture.md) 第 5.2 节）；
 **不要求**本仓库内必须有官网项目。
 
 ---

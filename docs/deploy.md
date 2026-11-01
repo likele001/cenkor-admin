@@ -95,11 +95,17 @@ flowchart TB
 | 端口 | 用途 | 归属 |
 |---|---|---|
 | `8002` | cenkor-admin 后端 API | 宝塔 Python 项目 `cenkor` |
+| `8008` | **AI 网关**（OpenAI 兼容） | 宝塔 Python 项目 `backend`（`/www/wwwroot/openai/backend`），nginx `python_backend.conf` 反代 |
+| `8009` | 容器内 uvicorn 服务 | Docker（cwd `/app`），未挂 nginx 反代，**端口已占** |
 | `5432` | PostgreSQL | 宝塔 PG 16（**全平台主库**，多项目共用） |
 | `6379` | Redis | 宝塔 Redis（**全平台共用**，db0~db15 按项目划分） |
 | `9000` | MinIO API | systemd `minio` |
 | `9003` | MinIO Console | systemd `minio` |
 | `80` / `443` | nginx | 宝塔 |
+
+> 端口台账以 **`ss -tlnp` 实跑结果**为准，不凭记忆填。8008 / 8009 此前漏记，
+> 就是照着"实际占用"一句却漏了两项 —— 新建服务前请先自己跑一遍
+> `ss -tlnp | grep -E ':80[0-9][0-9]|:900[0-9]'` 再定端口。
 
 **已被其他项目占用的 Redis 库**：`db1`、`db2`、`db9`（AI 网关 `ch_health:*` / `gateway:rr_offset:*`）、`db10`。
 **cenkor-admin 使用 `db5`。**

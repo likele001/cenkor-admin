@@ -1,8 +1,11 @@
 # Cenkor Admin Platform — V2 架构文档
 
-> **版本**: v2.0.0
-> **更新日期**: 2026-06-10
-> **状态**: 实施中（M1-M3 已完成）
+> **版本**: v3.0.0
+> **更新日期**: 2026-11-01
+> **状态**: 已上线运行。M1–M3 完成；2026-10 起新增 **主题模板工作台（Jinja2）· URL 伪静态规则 · 页面构建器 · AI 内容中心 · 多站点隔离**，见第十一章。
+>
+> ⚠️ **本文档以「当前代码实际行为」为准。** 与历史规划不一致处已直接改写，不保留旧结论；
+> 只有确实还在跑的兼容逻辑才会标注为「历史兼容」。
 
 ---
 
@@ -12,12 +15,13 @@
 2. [V2 核心创新](#二v2-核心创新)
 3. [内容引擎架构](#三内容引擎架构)
 4. [双用户体系架构](#四双用户体系架构)
-5. [模板引擎集成](#五模板引擎集成)
+5. [模板引擎](#五模板引擎)
 6. [App 中心 V2](#六app-中心-v2)
 7. [安全架构](#七安全架构)
 8. [API 清单](#八api-清单)
 9. [数据模型总览](#九数据模型总览)
 10. [测试与部署](#十测试与部署)
+11. [2026-10 新增能力](#十一2026-10-新增能力)
 
 ---
 
@@ -28,54 +32,38 @@
 | 目标 | V1 状态 | V2 改进 |
 |------|---------|--------|
 | 通用内容引擎 | 3 张硬编码表（products/cases/news） | 通用 cms_entries + 动态字段定义 |
-| 字段管理 | 改代码才能改字段 | 后台 UI 增删改 + 21 种字段类型 |
+| 字段管理 | 改代码才能改字段 | 后台 UI 增删改 + **21 种**字段类型 |
 | 分类标签 | 无 | 3+ 级分类树 + 标签系统 |
 | 双用户体系 | auth_users 一套 | auth_users（后台）+ portal_users（前台）隔离 |
-| 模板引擎 | 无 | Liquid 前后端一致 |
+| 模板引擎 | 无 | **Jinja2**（站点主题渲染）；Liquid 仅保留一个兼容端点，见第五章 |
 | App 中心 | 仅 manifest 声明 | manifest 声明 + 自动注册内容/字段/分类 |
 
 ### 1.2 V2 架构总览
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                    Cenkor Platform V2                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  admin-web   │  │  portal-web  │  │  公网站点    │           │
-│  │  (B 端后台)  │  │  (C 端前台)  │  │ (template)   │           │
-│  │   Vue 3 SPA  │  │   Vue 3 SPA  │  │              │           │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
-│         │                 │                 │                   │
-│         │ admin JWT       │ portal JWT      │ 不需 token        │
-│         │ (cenkor-admin)  │ (cenkor-portal) │                   │
-│         └────────────────┴─────────────────┘                   │
-│                          ↓                                      │
-│       ┌──────────────────────────────────────┐                 │
-│       │       FastAPI 后端 (V2)            │                 │
-│       │  ┌────────────┐  ┌────────────┐    │                 │
-│       │  │ 内容引擎   │  │ App 中心   │    │                 │
-│       │  │ Engine     │  │ Registry   │    │                 │
-│       │  └────┬───────┘  └──────┬─────┘    │                 │
-│       │       │                │           │                 │
-│       │  ┌────▼────────────────▼─────┐    │                 │
-│       │  │  FieldRegistry 自动注册    │    │                 │
-│       │  └────┬───────────────────────┘    │                 │
-│       │       │                            │                 │
-│       │  ┌────▼──────────────────────────┐ │                 │
-│       │  │  cms_content_types (3)         │ │                 │
-│       │  │  cms_field_definitions (21 类) │ │                 │
-│       │  │  cms_categories (3+ 级)        │ │                 │
-│       │  │  cms_tags                      │ │                 │
-│       │  │  cms_entries (通用内容)        │ │                 │
-│       │  └──────────────────────────────┘ │                 │
-│       └────────────────┬─────────────────┘                 │
-│                        ↓                                    │
-│        ┌─────────────────────────────┐                     │
-│        │ PostgreSQL + JSONB 索引     │                     │
-│        │ Redis 缓存 + Celery       │                     │
-│        │ MinIO 对象存储            │                     │
-│        └─────────────────────────────┘                     │
-└────────────────────────────────────────────────────────────────┘
+前端层
+├── admin-web        B 端后台       Vue 3 SPA     admin JWT
+├── portal-web       C 端前台       Vue 3 SPA     portal JWT
+├── developer-web    开发者门户      Vue 3 SPA     admin JWT
+└── 官网 / 公站       Jinja2 主题     nginx 出 HTML  免 token（读只读 API）
+         │
+         ↓
+后端层  FastAPI（127.0.0.1:8002，宝塔 Python 项目 cenkor 托管）
+├── 内容引擎         内容类型 / 字段定义 / 条目（cms_entries）
+├── App 中心         manifest 声明 + 启动自动注册 + FieldRegistry
+├── 模板工作台       Jinja2 主题文件 / 在线编辑 / 预览 / 切换生效
+├── 页面渲染         /api/v1/page/*  →  HTML 直出（2026-10 新增）
+├── URL 规则         四层就近优先，老地址 301
+└── AI 内容中心      17 个菜单：生产 / 质检 / 分发 / 配置
+         │
+         ↓
+数据层
+├── PostgreSQL 16    主库，public schema 共 256 张表
+├── Redis 7          db5（宿主机共享实例，按库号给各项目分）
+└── 对象存储          七牛云 Kodo（主）+ 本地 MinIO（双写备份）
 ```
+
+> 上图是**当前实际形态**，不是设计稿。改之前请先用 `ss -tlnp`、`\dt` 自己对一遍。
 
 ---
 
@@ -99,6 +87,12 @@ V2:
   ↓ 增删字段 → 后台 UI 操作，零代码
 ```
 
+> ⚠️ **「统一」指的是「自定义内容都走 cms_entries」，不是「原来的三张表已废弃」。**
+> `cms_products` / `cms_cases` / `cms_news` **仍在生产使用**（固定表单，字段写死、不能加），
+> 与 `cms_entries` 并存、互不干扰。这是有意的：
+> 官网三个固定板块的表单稳定，不需要为它们引入动态字段的开销。
+> 后台菜单也如实分两套：产品 / 案例 / 新闻 vs 通用内容。
+
 ### 2.2 双用户体系
 
 **核心原则**：前后台用户完全隔离，路由级强制鉴权。
@@ -115,9 +109,13 @@ auth_users (后台)        portal_users (前台)
  后台 API                  前台 API
  /api/v1/cms/*             /api/v1/public/portal/*
  /api/v1/auth/*            /api/v1/public/site/*
+                           /api/v1/page/*（站点页面渲染，见 5.2）
    ↓                          ↓
    拒绝 portal token (403)    拒绝 admin token (401)
 ```
+
+> `/api/v1/page/*` 是 **2026-10 新加的独立前缀**，专门接站点页面渲染（原来是 nginx 直出静态页）。
+> 它和 `/api/v1/public/*` 的区别：`public` 给前端 JS 取数据用（JSON），`page` 直接出 HTML 给爬虫和首屏。
 
 ---
 
@@ -147,13 +145,27 @@ cms_field_definitions (
 -- 字段候选项（select / multiselect）
 cms_field_options (definition_id FK, value, label, color, sort)
 
--- 通用内容表
+-- 通用内容表（实际列，2026-11 核实）
 cms_entries (
   id, content_type_id FK,
-  title, content JSONB, custom_fields JSONB,  -- ← 核心：动态字段
-  category_id FK, status, author_id,
-  published_at, view_count
+  slug,                       -- 网址短名
+  title,
+  content JSONB,              -- ← 固定字段
+  custom_fields JSONB,        -- ← 动态字段（GIN 索引）
+  category_id FK, status, author_id, sort, view_count,
+  seo JSONB,                  -- SEO 三件套
+  site_id FK,                 -- 多站点隔离
+  url_path,                   -- URL 伪静态自定义地址
+  ai_origin, ai_generation_id,-- AI 产出标记（人写的内容为 NULL）
+  published_at, scheduled_at, expire_at,
+  created_at, updated_at, deleted_at
 )
+
+-- 关键唯一约束（语义上很重要，别忽略）
+--   uq_entry_site_ct_slug      (site_id, content_type_id, slug)
+--     → slug 只在「同一站点 + 同一内容类型」内唯一，跨类型可重名
+--   uq_cms_entries_site_url_path (site_id, url_path)
+--     → 自定义地址全站唯一，冲突会直接写不进去
 
 -- 分类（3+ 级自引用）
 cms_categories (id, content_type_id FK, parent_id FK, slug, name, ...)
@@ -170,11 +182,12 @@ cms_content_tags (content_type_id, content_id, tag_id)
 | 类别 | 数量 | 类型 |
 |------|------|------|
 | 文本 | 4 | text, longtext, richtext, markdown |
-| 数字/布尔/日期 | 5 | number, boolean, date, datetime, color |
+| 数字/布尔/日期 | 4 | number, boolean, date, datetime |
 | 联系 | 3 | url, email, phone |
 | 媒体 | 4 | image, images, file, files |
 | 选择 | 2 | select, multiselect |
 | 高级 | 3 | json, repeater, relation |
+| 其他 | 1 | color（色值，默认 `#000000`） |
 
 详见 `apps/cms/field_types.py`。
 
@@ -253,42 +266,101 @@ async def get_current_user(creds, db):
 
 ---
 
-## 五、模板引擎集成
+## 五、模板引擎
 
-### 5.1 为什么选 Liquid
+> ⚠️ **选型结论已变更。** V2 设计阶段选的是 Liquid，实际落地改成 **Jinja2（服务端渲染）**。
+> Liquid 只剩一个历史兼容端点还在跑（见 5.6），新代码不要再用。
 
-| 候选 | 优点 | 缺点 | 决定 |
-|------|------|------|------|
-| Jinja2 | 强大 | 沙箱需自实现 | ❌ |
-| **Liquid (Shopify)** | 沙箱原生、Shopify 用、liquidjs ~30KB | 学习成本 | ✅ |
-| Mustache | 极简 | 无逻辑控制 | ❌ |
-| Handlebars | 流行 | 沙箱需自实现 | ❌ |
+### 5.1 现状：Jinja2 服务端渲染
 
-### 5.2 前后端一致
+站点主题由后端用 **Jinja2** 渲染成 HTML 直出。核心实现：
+
+| 文件 | 职责 |
+|---|---|
+| `core/jinja_env.py` | 环境管理、resolver 切换、编译缓存、`validate_source` / `render_source` |
+| `apps/cms/render.py` | 主题解析（DB 主题 > 内置主题）、渲染超时、缓存失效 |
+| `apps/cms/template_router.py` | 模板 API：校验 / 预览 / 文件读写 / 主题管理 |
+| `apps/cms/cms_page_router.py` | 站点页面入口（`/api/v1/page/*`），接手原来 nginx 直出的动态页面 |
+
+对比 Liquid 方案的实际取舍：
+
+| 维度 | Liquid（原选型） | Jinja2（实际采用） |
+|---|---|---|
+| 渲染位置 | 前后端同构（liquidjs + python-liquid） | **仅服务端**，前端拿 HTML |
+| 沙箱 | 原生沙箱 | 靠 resolver 白名单 + 禁用危险全局实现 |
+| 能力 | 需自定义 filters | 模板继承、宏、include 齐全，写主题更快 |
+| SEO | 需前端渲染后再爬 | **HTML 直出**，爬虫拿到的就是最终内容 |
+
+关键收益是最后一条：直出 HTML 对 SEO 和首屏都更稳，代价是失去了前端同构能力（不再需要）。
+
+### 5.2 渲染链路
 
 ```
-后端：python-liquid + markdown
-  ↓
-公共 API /api/v1/cms/templates/render
-
-前端：liquidjs (TypeScript)
-  ↓
-window.cmsRender(template, data, globals)
+浏览器 GET /article/xxx.html
+   ↓
+nginx  →  /api/v1/page/article/xxx.html
+   ↓
+cms_page_router（按 URL 规则反解出 类型/栏目/标签/详情）
+   ↓
+resolve_theme（先查 DB 主题，没有则用 builtin_theme）
+   ↓
+jinja_env 渲染 layout.html + detail.html + partials/*
+   ↓
+HTML 直出（可选落盘到静态缓存，默认关闭）
 ```
 
-### 5.3 全局变量
+**首页是例外**：`GET /` 由 nginx 直接返回静态 `index.html`，**不经过主题渲染**。改模板永远改不动首页。
 
-```javascript
-cmsRender(template, data, {
-  now: new Date().toISOString(),
-  site: { name: '辰科', logo: '...' },
-  theme: { primary_color: '#3b82f6' },
-  current_user: { id, username, nickname, avatar },
-  request: { path, params, query }
-})
+### 5.3 主题文件结构
+
+```
+layout.html          # 骨架（header / footer / 插槽）
+detail.html          # 详情页
+page.html            # 单页（关于我们等）
+list.html            # 列表页
+404.html             # 找不到
+partials/meta.html   # <head> 内的 meta / SEO
+partials/header.html # 站头
+partials/footer.html # 站尾
+partials/card.html   # 列表卡片
+partials/pagination.html
+macros/ui.html       # 可复用宏
+assets/style.css     # 内联进 <style>，无独立 js 入口
 ```
 
-### 5.4 业务 Filters
+### 5.4 模板 API（后台，需 `cms:site:read` / `write`）
+
+| 端点 | 用途 |
+|---|---|
+| `POST /api/v1/cms/templates/validate` | 编译期报错定位到**行 / 列**，编辑器标红用 |
+| `POST /api/v1/cms/templates/preview` | 渲染任意模板字符串（带 data） |
+| `POST /api/v1/cms/templates/preview-page` | **按主题上下文预览**：能调 `content_list` / `site` / `nav` 全部数据 API，支持未保存的跨文件覆盖 |
+| `GET/PUT /api/v1/cms/templates/files` | 主题文件读写（在线编辑器后端） |
+| `.../themes` | 主题增删、**切换生效**、与内置版逐行对比、zip 导入导出 |
+
+> **`preview-page` 的语义坑**：要渲染的目标模板放 `source`，其它未保存文件放 `overrides`。
+> `overrides[path]` 会覆盖同名文件，把目标模板也塞进 `overrides` 会被自己的空串盖掉。
+
+### 5.5 三个必须知道的约束
+
+1. **编译缓存按模板名缓存、key 不含源码。** `{% include %}` 出来的 partial 一旦编译过，
+   换 resolver 也拿不到新内容 → 预览渲染前必须 `flush_compiled_templates()`。
+   `render_source` 那层按源码 md5 缓存，不受影响。
+2. **预览 iframe 是 `sandbox=""`**，禁脚本。主题 JS 改动保存生效后线上才看得到。
+3. **保存 ≠ 生效**，要显式「设为生效」。
+
+### 5.6 历史兼容：还在跑的 Liquid
+
+只有一个端点仍用 Liquid（`core/template_engine.py`，python-liquid）：
+
+```
+POST /api/v1/public/templates/render   ← 供老的 portal-web 调用
+```
+
+它**不参与站点主题渲染**，返回结构固定为 `{rendered}`。新功能不要再接这个端点；
+`docs/dev_guide.md` 里的「Liquid 模板开发」章节讲的是这一段历史内容。
+
+### 5.7 主题级业务 Filters
 
 | Filter | 用途 |
 |--------|------|
@@ -368,10 +440,14 @@ class FieldRegistry:
 
 ### 7.1 JWT 双签发
 
-| Token | Issuer | Secret | 前缀 | 用途 |
+| Token | Issuer（`iss` 声明） | Secret 派生 | 客户端携带 | 用途 |
 |-------|--------|--------|------|------|
-| admin | `cenkor-admin` | `SECRET_KEY` | admin_token | 后台所有路由 |
-| portal | `cenkor-portal` | `SECRET_KEY + ":portal"` | portal_token | 前台 portal-web |
+| admin | `cenkor-admin` | `SECRET_KEY` | `Authorization: Bearer`；admin-web 存 localStorage `cenkor_token` | 后台所有路由 |
+| portal | `cenkor-portal` | `SECRET_KEY + ":portal"` | `Authorization: Bearer` | 前台 portal-web |
+
+> 两个 token **不是一个东西**：用错会在服务端被识别并明确拒绝 ——
+> portal token 打后台接口返回 **403**（「前台用户无法访问后台管理接口」），
+> admin token 打前台接口返回 **401**。别把它当成「权限不够」，是走错了门。
 
 ### 7.2 SECRET_KEY 轮换
 
@@ -420,27 +496,35 @@ app.add_middleware(
 
 ### 8.1 后台 API（需 admin JWT）
 
-| 模块 | 端点数 | 路径前缀 |
-|------|--------|----------|
-| Auth | 15+ | `/api/v1/auth/*` |
-| RBAC | 20+ | `/api/v1/rbac/*` |
-| CMS 内容引擎 | 39 | `/api/v1/cms/*` |
-| CMS 模板 | 3 | `/api/v1/cms/templates/*` |
-| Notifications | 5 | `/api/v1/notifications/*` |
-| API Keys | 5 | `/api/v1/api-keys/*` |
-| System (audit/apps/settings/tasks) | 15+ | `/api/v1/system/*` |
+| 模块 | 路径前缀 | 职责 |
+|------|----------|------|
+| Auth | `/api/v1/auth/*` | 登录 / 刷新 / 用户信息 |
+| RBAC | `/api/v1/rbac/*` | 用户、角色、菜单、权限 |
+| CMS 内容引擎 | `/api/v1/cms/*` | 内容类型 / 字段 / 分类 / 标签 / 条目 / 审核 / 版本 |
+| CMS 模板 | `/api/v1/cms/templates/*` | 主题文件读写、校验、预览、主题切换（见 5.4） |
+| CMS 站点与规则 | `/api/v1/cms/site*`、`/api/v1/cms/url-rules*` | 站点配置、多站点、URL 伪静态规则 |
+| CMS AI | `/api/v1/cms/ai*` | AI 起草 / 批量 / 知识库 / 质检 / 分发 |
+| 页面构建 | `/api/v1/builder/*` | 可视化搭建的页面与区块 |
+| Notifications | `/api/v1/notifications/*` | 站内通知 |
+| API Keys | `/api/v1/api-keys/*` | 对外开放密钥 |
+| System | `/api/v1/system/*` | 审计 / 应用 / 设置 / 任务 / 代码生成 |
+
+> 这里**不写端点数** —— 每加一个功能数字就假，靠不住。要看实时清单，开发环境启动后访问 `/api/docs`。
 
 ### 8.2 公共 API（无需鉴权）
 
-| 模块 | 端点数 | 路径 |
-|------|--------|------|
-| CMS 公共内容 | 6 | `/api/v1/public/*` |
-| CMS 公共分类/标签 | 3 | `/api/v1/public/categories|tags|field-definitions` |
-| CMS 公共模板渲染 | 1 | `/api/v1/public/templates/render` |
-| Portal Auth | 5 | `/api/v1/public/portal/auth/*` |
-| Portal Me | 3 | `/api/v1/public/portal/me/*` |
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| CMS 公共内容 | `/api/v1/public/*` | 内容类型 / 分类 / 标签 / 字段定义 / 条目（JSON） |
+| 固定板块 | `/api/v1/public/products` · `/cases` · `/news` | 三个固定板块的公开列表与详情 |
+| 公共模板渲染 | `/api/v1/public/templates/render` | **Liquid 历史兼容**，仅老 portal-web 用（见 5.6） |
+| 站点页面渲染 | `/api/v1/page/*` | **直接出 HTML**，接 nginx 的站点页面请求（见 5.2） |
+| Portal Auth | `/api/v1/public/portal/auth/*` | 前台会员登录 / 注册 |
+| Portal Me | `/api/v1/public/portal/me/*` | 前台会员自身信息 |
+| RAG 检索 | `/api/v1/public/rag` | 对外 chunk 检索，给外部 AI / Agent 接入（配了 `MCP_API_KEY` 就要带 key） |
+| 表单 / 评论 / 埋点 | `/api/v1/public/*` | 表单提交、评论、访问统计 |
 
-完整 API 文档：访问 `/api/docs`（Swagger UI）或 `/api/redoc`。
+完整 API 文档：**开发环境**访问 `/api/docs`（Swagger UI）或 `/api/redoc`；生产环境已关闭文档端点。
 
 ---
 
@@ -448,21 +532,38 @@ app.add_middleware(
 
 ### 9.1 V2 新增表
 
-| 表 | 说明 |
-|----|------|
-| cms_content_types | 内容类型（3 行：product/case/news） |
-| cms_field_groups | 字段分组（4 行） |
-| cms_field_definitions | 字段定义（8 行） |
-| cms_field_options | 字段候选项（7 行） |
-| cms_entries | 通用内容（已迁移 11 行） |
-| cms_categories | 分类（10 行，3+ 级） |
-| cms_tags | 标签（0 行） |
-| cms_content_tags | 内容-标签多对多 |
-| portal_users | 前台用户 |
-| portal_user_oauth | 前台用户 OAuth |
-| portal_login_logs | 前台登录日志 |
+| 表 | 说明 | 2026-11-01 实测行数 |
+|----|------|------|
+| cms_content_types | 内容类型 | **5** |
+| cms_field_groups | 字段分组 | — |
+| cms_field_definitions | 字段定义（21 种类型可选） | **14** |
+| cms_field_options | 字段候选项 | — |
+| cms_entries | 通用内容 | **53** |
+| cms_categories | 分类（3+ 级） | **12** |
+| cms_tags | 标签 | **3** |
+| cms_content_tags | 内容-标签多对多 | — |
+| portal_users | 前台用户 | **24** |
+| portal_user_oauth | 前台用户 OAuth | — |
+| portal_login_logs | 前台登录日志 | — |
 
-### 9.2 现有表扩展
+> **行数是快照，不是契约。** 写在这里只为让人有个量级概念（比如「这站到底用了多少内容」）。
+> 需要准数直接查库：`select count(*) from cms_entries;`。别把行数当断言写进文档。
+>
+> 2026-10 起另有站点隔离相关列与表（`cms_sites` 等），见第十一章。
+
+### 9.2 固定表单三表：仍在生产使用
+
+| 表 | 2026-11-01 实测 |
+|----|------|
+| cms_products | **25 行** |
+| cms_cases | **3 行** |
+| cms_news | **16 行** |
+
+三张表都带 `custom_fields` 列。它们**没有**被 `cms_entries` 取代，后台菜单里也仍是独立入口
+（产品 / 案例 / 新闻）。新增字段的 `custom_fields` 是这个板块自己的扩展位，
+与「内容类型 → 字段定义」那套动态机制**互不干扰** —— 在内容类型里加字段，不会改变这三张表的表单。
+
+### 9.3 现有表扩展
 
 | 表 | 新增列 |
 |----|--------|
@@ -478,19 +579,26 @@ app.add_middleware(
 
 ### 10.1 测试覆盖
 
-| 类型 | 文件 | 数量 |
-|------|------|------|
-| 单元测试 | `tests/test_field_types.py` | 28 |
-| E2E 测试 | `tests/test_content_engine.py` | 25 |
-| 旧测试 | `tests/test_*.py` | 47 (部分因 V2 数据迁移需更新) |
+最近一次全量跑（2026-10-31）：
 
-**总测试数：100+，新代码 100% 覆盖。**
+```
+pytest   → 93 passed / 25 skipped
+ruff     → All checks passed
+vue-tsc  → 零错误
+vite build → 成功
+```
+
+> 以前这里写的是「总测试数 100+，新代码 100% 覆盖」——**别信这种话**。
+> 覆盖率没有接 CI 度量，写「100%」只是自我安慰。要看真实情况就跑 pytest，
+> 看 passed / skipped 各多少；skipped 里有一部分是依赖外部服务（七牛、模型 API）的用例。
 
 ### 10.2 部署
 
 > **生产部署见 [`docs/deploy.md`](docs/deploy.md)** —— 本机生产是「宿主机 + 宝塔」：
 > 后端由宝塔 Python 项目 `cenkor` 托管（用户 `www`，端口 `8002`），
-> PostgreSQL / Redis / MinIO 为宿主机原生服务。以下为**本地开发**启动方式。
+> PostgreSQL / Redis 为宿主机原生服务；
+> **对象存储主用七牛云 Kodo，本地 MinIO 仅作双写备份**（`cloud_storage_config.active_provider = qiniu`）。
+> 以下为**本地开发**启动方式。
 
 ```bash
 # 1. 安装依赖
@@ -503,6 +611,10 @@ alembic upgrade heads
 # 3. 本地开发启动
 uvicorn cenkor_admin.main:app --host 0.0.0.0 --port 8000
 ```
+
+> ⚠️ 生产**禁止**手动 `kill` / `nohup` 起 Python 进程：宝塔自带守护与自愈，
+> 手动起的进程会抢端口，让宝塔反复 `address already in use`。
+> 需要重启时：先 kill 掉占端口的残留，**不要手动拉起**，等宝塔自愈接管。
 
 ### 10.3 数据迁移
 
@@ -526,8 +638,113 @@ python -m cenkor_admin.scripts.migrate_to_entries
 | W3 | 分类表 + 后台 | ✅ |
 | W4 | 标签 + 通用内容接入 + 数据迁移 | ✅ |
 | W5 | 公共 API + Portal Auth | ✅ |
-| W6 | Liquid 模板引擎集成 | ✅ |
+| W6 | 模板引擎集成（**原计划 Liquid，实际落地为 Jinja2**，见第五章） | ✅ |
 | W7 | 网站静态页 + App 中心增强 | ✅ |
-| W8 | 测试 + 文档 | 🔄 |
-| W9 | 用户体系拆分收尾 | ⏳ |
-| W10 | 联调 + 上线 | ⏳ |
+| W8 | 测试 + 文档 | ✅ |
+| W9 | 用户体系拆分收尾 | ✅ |
+| W10 | 联调 + 上线 | ✅ |
+| **W11+** | **2026-10 起的新增能力，见第十一章** | ✅ 已上线 |
+
+---
+
+## 十一、2026-10 新增能力
+
+V2 之后又落了一整批能力。**本章是本文档此前完全缺失的部分** —— 如果你只看了前九章，
+会以为这个系统还停在「内容引擎 + 双用户体系」的阶段。
+
+### 11.1 主题模板工作台（Jinja2）
+
+见第五章。要点：后台在线编辑主题文件、实时预览（支持未保存的跨文件覆盖）、
+与内置主题逐行对比、zip 导入导出、切换生效。
+
+- 表：`cms_templates`
+- 入口：后台「内容管理 → 模板预览」（`/cms/templates`）
+- 模板文件落在主题目录，DB 里存版本与生效状态
+
+### 11.2 URL 伪静态规则
+
+全站地址形态后台可配，**四层就近优先**：
+
+| 层级 | 配在哪 | 作用范围 |
+|---|---|---|
+| 1（最优先） | 内容编辑页「自定义地址」 | 单条内容 |
+| 2 | 栏目（分类）管理 | 该栏目**自己的页面地址** |
+| 3 | 标签管理 | 该标签页的地址 |
+| 4（兜底） | 站点配置 → URL 规则 | 其余全部 |
+
+**语义红线**：栏目级规则**不改**该栏目下内容的详情页地址。否则改一次栏目，
+底下几百篇文章链接全变，SEO 直接崩。
+
+改完老地址 **301 跳新地址**，canonical 跟着收敛。保存需 `cms:site:write` 权限
+（只读角色能看能预览，保存按钮不显示）。
+
+### 11.3 页面构建器
+
+可视化拖拽搭页面：区块库拖到画布、点区块改属性（图片 src / alt / 自定义 HTML 等）。
+
+- 表：`cms_pages`
+- API：`/api/v1/builder/*`，公开侧走 `/api/v1/public/*`
+- 入口：后台「内容管理 → 页面构建」（`/builder/pages`），权限 `settings:read`
+
+### 11.4 AI 内容中心
+
+整块 AI 生产链路，后台独立顶级菜单，**17 个二级菜单**。按职责分四组：
+
+| 组 | 菜单 | 落表 |
+|---|---|---|
+| 生产 | AI 驾驶舱、AI 内容工作台、批量生产、AI 建模向导、落地页工坊、知识库 | `cms_ai_sessions` / `cms_ai_generations` / `cms_ai_batch_jobs` / `cms_ai_batch_items` |
+| 质检 | 内容体检、AI 质量台、问答自测、选题缺口、内容效果 | `cms_ai_reviews` / `cms_ai_entry_digests` / `cms_entry_stats_daily` |
+| 分发 | 分发渠道、工作流编排 | `cms_publish_channels` / `cms_publish_jobs` / `cms_workflows` / `cms_workflow_runs` / `cms_workflow_steps` |
+| 配置 | AI 能力配置、提示词管理、AI 用量、AI 记忆 | `cms_ai_providers` / `cms_ai_capabilities` / `cms_ai_prompts` / `cms_ai_prices` / `cms_ai_memory` |
+
+约束：AI 产出**全部落草稿**，不自动发布；批量单次上限 200 篇；并发 1 稳、4 易被服务商限流。
+
+### 11.5 多站点隔离
+
+一份部署跑多个站点，内容与配置按站点隔离。
+
+- 表：`cms_sites`、`cms_site_config`
+- API：`/api/v1/cms/sites*`
+- 与「站点配置」的区别：`cms_site_config` 是**当前站点**的键值对（品牌名、邮箱等），
+  `cms_sites` 是站点清单本身
+
+### 11.6 知识库与 RAG
+
+把产品手册 / FAQ / 历史方案切成分片做向量检索，让 AI 写稿和问答有据可依。
+
+- 表：`cms_kb_docs`（源文档）→ `cms_kb_chunks`（分片）→ `cms_embeddings`（向量，pgvector）
+- 对外检索：`GET /api/v1/public/rag`，返回带 `source_url` / `heading_path` 的片段，可直接拼进 RAG prompt
+- 鉴权：配了 `MCP_API_KEY` 就必须带 `X-MCP-Key` 或 Bearer
+
+### 11.7 内容分发
+
+把站内内容推到站外渠道（公众号等），带任务队列与结果记录。
+
+- 表：`cms_publish_channels`、`cms_publish_jobs`
+- 失败原因写在任务记录里，不吞错
+
+### 11.8 表单 / 评论 / 埋点
+
+| 能力 | 表 | 说明 |
+|---|---|---|
+| 表单问卷 | `cms_forms` / `cms_form_submissions` | 落地页表单直接进线索池 |
+| 评论 | `cms_comments` | 内容下的评论，有后台审核入口 |
+| 访问埋点 | `cms_track_events` | 页面访问统计，喂给「内容效果」 |
+| 内容健康 | `cms_ai_entry_digests` / `cms_entry_stats_daily` | 体检与每日统计 |
+
+### 11.9 数据表全景
+
+到 2026-11-01，`public` schema 共 **256 张表**。其中 `cms_*` 约 40 张。
+
+查法：
+
+```sql
+select count(*) from information_schema.tables where table_schema='public';
+select table_name from information_schema.tables
+ where table_schema='public' and table_name like 'cms_%' order by 1;
+```
+
+> 文档里**不要再逐表罗列全部** —— 会立刻过时。上面按能力分组列关键表，
+> 要全量就查库。
+
+
