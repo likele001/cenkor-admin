@@ -1,9 +1,11 @@
 # 内容标签
 
-取内容数据的四个 API：`content_list`、`content`、`related`、`search`。
-全部只读、绑定当前站点。教程级的完整实战看[主题模板开发](/cenkor-admin/template-guide)。
+取内容数据的四个 API。全部只读、绑定当前站点。
+每个标签统一按 **语法 → 参数 → 返回 → 示例** 四段说明。
 
 ## `content_list(...)` — 条目列表
+
+**语法**
 
 ```jinja
 {% for r in content_list('article', limit=6, category='news') %}
@@ -11,27 +13,80 @@
 {% endfor %}
 ```
 
-| 参数 | 默认 | 说明 |
-|---|---|---|
-| `type` | `'article'` | `article` / `product` / `news` / `case`，或任意内容类型的 key |
-| `limit` | `20` | 上限 **100** |
-| `offset` | `0` | 跳过条数 |
-| `category` | `None` | 分类 slug |
-| `tag` | `None` | 标签 slug（仅 article） |
-| `sort` | `'-published_at'` | 前缀 `-` 表示倒序；可选 `published_at`、`updated_at`、`created_at`、`sort`、`view_count`、`id` |
-| `exclude` | `None` | 排除某条 id（做「相关推荐」用） |
+**参数**
 
-### 返回字段（卡片）
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `type` | str | `'article'` | `article` / `product` / `news` / `case`，或任意内容类型的 key |
+| `limit` | int | `20` | 上限 **100** |
+| `offset` | int | `0` | 跳过条数 |
+| `category` | str | `None` | 分类 slug |
+| `tag` | str | `None` | 标签 slug（仅 article） |
+| `sort` | str | `'-published_at'` | 前缀 `-` 表示倒序；可选 `published_at`、`updated_at`、`created_at`、`sort`、`view_count`、`id` |
+| `exclude` | int | `None` | 排除某条 id（做「相关推荐」用） |
 
-`id`、`type`、`slug`、`title`、`excerpt`、`cover`、`url`、`published_at`、`updated_at`、
-`view_count`、`sort`、`ai_generated`、`content`、`custom_fields`、`seo`、`category`、`tags`。
+**返回**
+
+卡片数组，每张卡片：
+
+```text
+{
+  "id": 1, "type": "article", "slug": "my-post",
+  "title": "标题",
+  "excerpt": "摘要（纯文本）",
+  "cover": "封面绝对地址，可能为空串",
+  "url": "/article/my-post.html",
+  "published_at": "datetime", "updated_at": "datetime",
+  "view_count": 0, "sort": 0, "ai_generated": false,
+  "content": { "该类型原始内容字典": "..." },
+  "custom_fields": { },
+  "seo": { "title": "", "description": "", "og_image": "" },
+  "category": { "id": 1, "slug": "news", "name": "新闻", "url": "..." },
+  "tags": ["标签名", "..."]
+}
+```
 
 > `product` 读的是产品目录表，卡片字段不同（`is_flagship`、`github_url`、`demo_url` 等）；
-> `article` / `news` / `case` 读同一套内容引擎，卡片**完全同构**，可以共用一套卡片模板。
+> `article` / `news` / `case` 读同一套内容引擎，卡片**完全同构**，可共用一套卡片模板。
 > 卡片里的 `type` 是条目自己的类型，`url` 也按它拼 —— `/news/` 列表里的卡片
 > 不会错误地指向 `/article/`。
 
+**示例**
+
+首页「最新文章」区块：
+
+```jinja
+{% for r in content_list('article', limit=6) %}
+  <article class="card">
+    {% if r.cover %}<img src="{{ r.cover }}" alt="{{ r.title }}">{% endif %}
+    <h3><a href="{{ r.url }}">{{ r.title }}</a></h3>
+    <p>{{ r.excerpt|excerpt(80) }}</p>
+    <time>{{ r.published_at|date('%Y-%m-%d') }}</time>
+  </article>
+{% endfor %}
+```
+
 ## `content(type, slug)` — 单条详情
+
+**语法**
+
+```jinja
+{% set it = content('article', 'my-post') %}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `type` | str | `'article'` | 内容类型 key |
+| `slug` | str | `''` | 条目 slug |
+
+**返回**
+
+和 `content_list` 卡片同构，**额外带 `body_html`**（正文 HTML）。
+查不到返回 `None`，先判空再取字段。
+
+**示例**
 
 ```jinja
 {% set it = content('article', 'my-post') %}
@@ -41,11 +96,28 @@
 {% endif %}
 ```
 
-返回和 `content_list` 卡片同构，**额外带 `body_html`**。查不到返回 `None`，先判空再取字段。
-
 ## `related(item, limit=4)` — 相关推荐
 
-同分类优先，不够时用同类型最新补齐，已排除自己。`limit` 上限 12。
+**语法**
+
+```jinja
+{% for r in related(item, 3) %} ... {% endfor %}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `item` | dict | 必填 | 当前内容（详情页的 `item`） |
+| `limit` | int | `4` | 上限 12 |
+
+**返回**
+
+卡片数组，同 `content_list`。同分类优先，不够时用同类型最新补齐，已排除自己。
+
+**示例**
+
+详情页底部「相关内容」：
 
 ```jinja
 {% if item %}
@@ -58,6 +130,34 @@
 
 ## `search(kw, limit=20, page=1)` — 站内搜索
 
+**语法**
+
+```jinja
+{% set res = search(request_kw) %}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `kw` | str | `''` | 关键词，为空返回空结果（不报错） |
+| `limit` | int | `20` | 上限 50 |
+| `page` | int | `1` | 页码 |
+
+**返回**
+
+```text
+{
+  "items": [ "卡片数组，同 content_list" ],
+  "total": 0, "page": 1, "per_page": 20, "total_pages": 0,
+  "kw": "搜索词"
+}
+```
+
+当前匹配标题和 slug。
+
+**示例**
+
 ```jinja
 {% set res = search(request_kw) %}
 <p>共 {{ res.total }} 条</p>
@@ -66,32 +166,54 @@
 {% endfor %}
 ```
 
-返回结构：`items`、`total`、`page`、`per_page`、`total_pages`、`kw`。
-`limit` 上限 50。`kw` 为空时返回空结果，不报错。当前匹配标题和 slug。
+## `item` 对象 — 详情页当前内容
 
-搜索页拿关键词用 `page.pagination` 配合 `url('search')`，参见[站点与配置](/cenkor-admin/template/config)。
+详情页渲染时注入的顶层变量，列表页为 `None`。不是函数，没有语法。
 
-## `item` 对象字段表（详情页）
+**返回**
 
-详情页渲染时注入的 `item`，列表页为 `None`：
+```text
+{
+  "id": 1, "slug": "my-post", "title": "标题",
+  "body_html": "正文 HTML —— 必须 |safe 输出",
+  "excerpt": "摘要（纯文本）",
+  "cover": "封面绝对地址，可能为空串",
+  "seo": { "title": "", "description": "", "og_image": "" },
+  "content": { "原始内容字典，字段随类型而不同": "..." },
+  "custom_fields": { },
+  "category": { "id": 1, "slug": "news", "name": "新闻", "url": "..." },
+  "tags": ["标签名", "..."],
+  "published_at": "datetime", "updated_at": "datetime",
+  "view_count": 0, "ai_generated": false
+}
+```
 
-| 字段 | 说明 |
-|---|---|
-| `item.id` / `item.slug` / `item.title` | 基本信息 |
-| `item.body_html` | **正文 HTML，必须 `\|safe`**，否则会被转义成一堆 `&lt;p&gt;` |
-| `item.excerpt` | 摘要（纯文本） |
-| `item.cover` | 封面**绝对地址**，可能为空串 |
-| `item.seo` | 原始 SEO 字典：`seo.title` / `seo.description` / `seo.og_image` |
-| `item.content` | 原始内容字典，字段随内容类型而不同：`content.text` / `content.cover_image` / `content.tagline` 等 |
-| `item.custom_fields` | 自定义字段字典 |
-| `item.category` | `{id, slug, name, url}` 或 `None` |
-| `item.tags` | 标签**名称**数组，如 `["智能制造", "案例"]`（不是对象） |
-| `item.published_at` / `item.updated_at` | datetime 或 `None`，配合 `|date` 过滤 |
-| `item.view_count` | 阅读数 |
-| `item.ai_generated` | bool |
-
-`article` 之外的 `kind`（product / news / case）字段是各自表结构的投影，
-`item.content` 里放该类型专有字段：产品有 `content.tagline` / `content.features`，
-案例有 `content.industry` / `content.desc`。
-
+> `article` 之外的 `kind`（product / news / case）字段是各自表结构的投影，
+> `item.content` 里放该类型专有字段：产品有 `content.tagline` / `content.features`，
+> 案例有 `content.industry` / `content.desc`。
 > `item` 里没有 `status`、`site_id` 这类内部敏感字段，也没有 ORM 对象 —— 全是普通 dict。
+
+**示例**
+
+详情页主体：
+
+```jinja
+<article>
+  <h1>{{ item.title }}</h1>
+  <time>{{ item.published_at|date('%Y年%m月%d日') }}</time>
+  {% if item.cover %}<img src="{{ item.cover }}" alt="{{ item.title }}">{% endif %}
+  <div class="content">{{ item.body_html|safe }}</div>
+
+  {% if item.tags %}
+    <div class="tags">
+      {% for name in item.tags %}<span>{{ name }}</span>{% endfor %}
+    </div>
+  {% endif %}
+</article>
+```
+
+## 相关阅读
+
+- [全量速查](/cenkor-admin/template/methods) — 一页查全所有标签
+- [结构标签](/cenkor-admin/template/tag) — 分类 / 标签 / 菜单 / 友链
+- [站点与配置](/cenkor-admin/template/config) — `page` 对象 / `url` / 分页

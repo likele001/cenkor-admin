@@ -1,11 +1,38 @@
 # 结构标签：分类 · 标签 · 菜单 · 友链
 
 给页面搭骨架的数据源。全部只读、绑定当前站点。
+每个标签统一按 **语法 → 参数 → 返回 → 示例** 四段说明。
 
 ## `categories(type='article')` — 分类列表
 
-返回 `[{id, slug, name, icon, color, parent_id, count, url}]`，按 `sort`、`id` 升序。
-`count` 是该分类下已发布条目数。
+**语法**
+
+```jinja
+{% for c in categories('article') %} ... {% endfor %}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `type` | str | `'article'` | 内容类型 key |
+
+**返回**
+
+按 `sort`、`id` 升序；`count` 是该分类下已发布条目数。
+
+```text
+[
+  {
+    "id": 1, "slug": "news", "name": "新闻",
+    "icon": "", "color": "",
+    "parent_id": null, "count": 12,
+    "url": "/category/news/"
+  }
+]
+```
+
+**示例**
 
 ```jinja
 <ul class="cat-nav">
@@ -17,7 +44,34 @@
 
 ## `category_tree(type='article')` — 分类树
 
-字段同上，每个节点多一个 `children` 数组，只返回顶层节点。
+**语法**
+
+```jinja
+{% for cat in category_tree() %} ... {% endfor %}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `type` | str | `'article'` | 内容类型 key |
+
+**返回**
+
+字段同 `categories`，每个节点多一个 `children` 数组；只返回顶层节点，子分类在 `children` 里。
+
+```text
+[
+  {
+    "id": 1, "slug": "news", "name": "新闻", "count": 12, "url": "...",
+    "children": [
+      { "id": 5, "slug": "company", "name": "公司动态", "count": 3, "url": "...", "children": [] }
+    ]
+  }
+]
+```
+
+**示例**
 
 ```jinja
 {% for cat in category_tree() %}
@@ -30,9 +84,30 @@
 
 ## `tags(type='article', limit=50)` — 标签列表
 
-返回 `[{id, slug, name, color, url}]`，`limit` 上限 200。
+**语法**
 
-标签云示例（按条目数排大小需要自己另想，当前返回没有 count）：
+```jinja
+{% for t in tags('article', limit=30) %} ... {% endfor %}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `type` | str | `'article'` | 内容类型 key |
+| `limit` | int | `50` | 上限 200 |
+
+**返回**
+
+```text
+[
+  { "id": 1, "slug": "mes", "name": "智能制造", "color": "", "url": "/tag/mes/" }
+]
+```
+
+**示例**
+
+标签云：
 
 ```jinja
 <div class="tag-cloud">
@@ -42,22 +117,46 @@
 </div>
 ```
 
-详情页里给当前内容挂标签链接（`item.tags` 是名称数组，不是对象）：
+详情页里给当前内容挂标签（`item.tags` 是名称数组，不是对象）：
 
 ```jinja
 {% if item and item.tags %}
   <div class="article-tags">
-    {% for name in item.tags %}
-      <span>{{ name }}</span>
-    {% endfor %}
+    {% for name in item.tags %}<span>{{ name }}</span>{% endfor %}
   </div>
 {% endif %}
 ```
 
 ## `nav(key='main')` — 菜单
 
-优先读站点配置 `nav.main`，没配就用顶部分类兜底。
-返回 `[{label, url, target, children}]`。
+**语法**
+
+```jinja
+{% for m in nav('main') %} ... {% endfor %}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `key` | str | `'main'` | 菜单标识，读站点配置 `nav.main`，没配用顶部分类兜底 |
+
+**返回**
+
+```text
+[
+  {
+    "label": "首页",
+    "url": "/",
+    "target": "_self",
+    "children": [ { "label": "...", "url": "...", "target": "...", "children": [] } ]
+  }
+]
+```
+
+**示例**
+
+平铺导航：
 
 ```jinja
 <nav class="site-nav">
@@ -67,7 +166,7 @@
 </nav>
 ```
 
-带下拉的写法：
+带下拉：
 
 ```jinja
 {% for m in nav('main') %}
@@ -82,22 +181,39 @@
 {% endfor %}
 ```
 
-## 友链（links App 注册标签）
+## `links_list(...)` — 友情链接列表
 
-这两个标签由 **links 应用**通过 `template_tags.py` 注册，应用停用/卸载后自动消失。
-机制见[自定义标签开发](/cenkor-admin/template/develop)。
+links 应用注册的标签，应用停用/卸载后自动消失。机制见[自定义标签开发](/cenkor-admin/template/develop)。
 
-### `links_list(category=None, limit=10, only_favorite=False)`
+**语法**
 
-友情链接列表，收藏优先、点击数次之。`limit` 上限 50。
+```jinja
+{% for l in links_list(category='dev', limit=8) %} ... {% endfor %}
+```
 
-| 参数 | 默认 | 说明 |
-|---|---|---|
-| `category` | `None` | 按分类过滤 |
-| `limit` | `10` | 上限 50 |
-| `only_favorite` | `False` | 只看收藏 |
+**参数**
 
-返回 `[{id, title, url, description, category, favicon, is_favorite}]`。
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `category` | str | `None` | 按分类过滤 |
+| `limit` | int | `10` | 上限 50 |
+| `only_favorite` | bool | `False` | 只看收藏 |
+
+**返回**
+
+收藏优先、点击数次之。
+
+```text
+[
+  {
+    "id": 1, "title": "站点名", "url": "https://...",
+    "description": "描述", "category": "dev",
+    "favicon": "图标地址", "is_favorite": true
+  }
+]
+```
+
+**示例**
 
 ```jinja
 <aside class="friend-links">
@@ -110,9 +226,27 @@
 </aside>
 ```
 
-### `link_domain` — 过滤器
+## `link_domain` — 过滤器（URL 取域名）
 
-从 URL 取主机名，去掉 `www.`，显示来源域名用：
+从 URL 取主机名，去掉 `www.`，显示来源域名用。过滤器，不是函数。
+
+**语法**
+
+```jinja
+{{ l.url|link_domain }}
+```
+
+**参数**
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| （管道左侧值） | str | — | 任意 URL 字符串 |
+
+**返回**
+
+主机名字符串，如 `cenkor.cn`；解析失败返回空串。
+
+**示例**
 
 ```jinja
 <span>{{ l.url|link_domain }}</span>
