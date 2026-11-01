@@ -212,6 +212,51 @@
 </article>
 ```
 
+## 打印与调试
+
+### 两种花括号
+
+| 写法 | 干什么 | 例子 |
+|---|---|---|
+| `{% ... %}` | **逻辑**：循环、判断、赋值，不显示任何东西 | `{% for %}`、`{% if %}`、`{% set %}` |
+| `{{ ... }}` | **打印**：把变量的值输出到页面 | `{{ r.title }}` |
+
+### 传入参数 vs 返回数据
+
+`content_list('article', limit=6, category='news')` 括号里是**筛选条件**，喂给函数的，不用打印。
+函数返回一堆卡片，`for` 一轮轮拿，**每轮的 `r` 就是一条内容**，打印的是 `r` 的字段：
+
+```jinja
+{% for r in content_list('article', limit=6, category='news') %}
+  <div class="card">
+    <a href="{{ r.url }}">{{ r.title }}</a>
+    <img src="{{ r.cover }}" alt="{{ r.title }}">
+    <p>{{ r.excerpt|excerpt(80) }}</p>
+    <time>{{ r.published_at|date('%Y-%m-%d') }}</time>
+  </div>
+{% endfor %}
+```
+
+### 一键打印全部字段
+
+记不住字段名？`|json_safe` 把整条内容打成 JSON 直接看：
+
+```jinja
+{% for r in content_list('article', limit=2) %}
+  <pre>{{ r|json_safe }}</pre>
+{% endfor %}
+```
+
+页面会显示这条内容的所有字段和值。常用调试对象：
+
+```jinja
+<pre>{{ r|json_safe }}</pre>      {# 循环里的卡片 #}
+<pre>{{ item|json_safe }}</pre>   {# 详情页当前内容 #}
+<pre>{{ site|json_safe }}</pre>   {# 站点配置 #}
+```
+
+> 调试完记得删掉。`json_safe` 已转义不会炸页面，但会把数据全量吐给访客。
+
 ## 相关阅读
 
 - [全量速查](/cenkor-admin/template/methods) — 一页查全所有标签
