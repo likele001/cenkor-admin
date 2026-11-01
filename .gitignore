@@ -186,3 +186,10 @@ frontend/landing-web/src/config/docs-manifest.generated.ts
 
 # 文档中心构建产物（copy-docs.mjs 生成）
 frontend/landing-web/public/docs-content/
+
+
+# 内容采集 App（商业闭源）迁移目录
+backend/alembic/versions/collect/
+
+# 内容采集 App（商业闭源，源码外置 backend/src/apps/collect/）
+backend/src/cenkor_admin/static/apps/collect/
