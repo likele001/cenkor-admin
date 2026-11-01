@@ -1,0 +1,102 @@
+# 文档索引
+
+Cenkor Admin 文档目录。按用途选择。
+
+## 主线（本机生产正在用的）
+
+| 文档 | 用途 |
+|------|------|
+| [**deploy.md**](deploy.md) | **部署方案（权威）** —— 架构拓扑 · 端口台账 · 配置五落点与优先级 · 依赖服务 · 发布 · 验证 · 备份回滚 · 排障手册 |
+| [**dev_guide.md**](dev_guide.md) | **开发者指南** —— 创建 App、字段定义、模板开发 |
+| [**migrations.md**](migrations.md) | **数据库迁移规则（必读）** —— 公开链 / 闭源链、挂载点、新增迁移顺序、事故与排查 |
+| [**template/**](template/index.md) | **模板标签参考** —— 总览 · 全量速查 · 内容 / 结构 / 站点配置 / 评论表单 / 自定义开发（仿 iCMS 参考手册式分页） |
+| [**template-guide.md**](template-guide.md) | **站点主题模板开发（教程）** —— 目录约定 · 页面上下文 · 16 个数据 API · 过滤器 · 自定义标签（macro / App 注册）· 沙箱边界 · 导入导出 · 排错 |
+| [**apps/development_guide.md**](apps/development_guide.md) | 应用开发规范（结构 / 字段类型 / 路由 / 迁移 / 打包 / 安全） |
+| [**apps/market_ai_extensions.md**](apps/market_ai_extensions.md) | AI 体系扩展应用上架说明（cenkormes 首批三包：清单 / 发布链路 / 商店取数 / 边界） |
+| [**core_platform.md**](core_platform.md) | 核心平台组成 · 域名规划 · 宝塔建站 |
+| [**architecture.md**](../architecture.md) | V2 架构设计（内容引擎 / 双用户体系 / 模板引擎 / App 中心 / 安全） |
+| [**roadmap.md**](roadmap.md) | 路线图与规划（V2 改造 / 平台重构 / 平台升级 三合一） |
+| [**upgrade.md**](upgrade.md) | 版本升级（用户升级 / 维护者发版 / 回滚） |
+| [**packaging.md**](packaging.md) | 打包交付（产物清单 / 命令 / 接收方部署） |
+| [**domain_setup.md**](domain_setup.md) | 域名绑定 + SSL |
+| [**release/**](release/) | 发布记录与产物说明 |
+| [**addons/website_cms.md**](addons/website_cms.md) | 可选：外部官网 CMS 对接 |
+
+## 面向使用者（给「用系统的人」看）
+
+站点入口：<https://docs.user.023ent.net/cenkor-admin/05-用户手册/>（后台侧栏底部「使用手册」直达当前模块对应的那本）
+
+| 文档 | 用途 |
+|------|------|
+| [**05-用户手册/**](05-用户手册/index.md) | **用户手册总目录** —— 按角色找该看哪本 · 三条通用约定 |
+| [**cms_操作手册.md**](05-用户手册/cms_操作手册.md) | **内容管理** —— 发内容 · 内容类型 / 字段 · 分类标签 · 产品案例新闻 · 媒体库 · 站点配置 · 模板工作台 · URL 规则 · 页面构建 + 整块 **AI 内容中心**（17 项） |
+| [**crm_操作手册.md**](05-用户手册/crm_操作手册.md) | **CRM 销售管理** —— 客户 · 联系人 · 商机 · 跟进 |
+| [**erp_操作手册.md**](05-用户手册/erp_操作手册.md) | **ERP 管理** —— 商品 · 仓库 · 库存 · 采购销售单据 |
+| [**mes_操作手册.md**](05-用户手册/mes_操作手册.md) | **MES 制造执行** —— 生产工单 · 工序报工 · 设备排产 |
+| [**workflow_操作手册.md**](05-用户手册/workflow_操作手册.md) | **工作流审批** —— 发起单据 · 审批 · 画流程 · 条件分支 · 委托代理 · 权限对照 · 常见问题 |
+| [**payment_操作手册.md**](05-用户手册/payment_操作手册.md) | **支付中心** —— 收款 · 订单 · 退款 · 对账 |
+| [**tickets_操作手册.md**](05-用户手册/tickets_操作手册.md) | **工单管理** —— 报修 / 服务 / 内部事务单流转 |
+| [**cloud_storage_操作手册.md**](05-用户手册/cloud_storage_操作手册.md) | **云存储** —— 图片与文件存储后端（CMS 媒体库依赖） |
+| [**notification_操作手册.md**](05-用户手册/notification_操作手册.md) | **通知管理** —— 站内通知下发与查看 |
+| [**announcements_操作手册.md**](05-用户手册/announcements_操作手册.md) | **公告管理** —— 面向全员 / 部分人的公告 |
+| [**links_操作手册.md**](05-用户手册/links_操作手册.md) | **链接收藏** —— 常用网址整理与共享 |
+| [**my_todo_操作手册.md**](05-用户手册/my_todo_操作手册.md) | **My Todo** —— 个人待办 |
+| [**quick_notes_操作手册.md**](05-用户手册/quick_notes_操作手册.md) | **Quick Notes** —— 随手记 |
+
+> **每个应用都必须配一份用户手册**，放在 `docs/05-用户手册/<应用 key>_操作手册.md`。
+> 新增应用时在这里补一行。规范见 [apps/development_guide.md](apps/development_guide.md) §7.3。
+> ⚠️ **这一节不许只留一本** —— 手册写了不列进来，等于客户找不到（2026-11-01 补全，此前只有 workflow 一条）。
+
+## 可选路径（本机生产**未采用**）
+
+本机生产是**纯宿主机 + 宝塔**，以下方案仅在「交付给别人」或「换环境验证」时使用。
+
+| 文档 | 用途 |
+|------|------|
+| [**fullstack_deploy.md**](fullstack_deploy.md) | Docker 全栈部署（一条命令起全栈，**交付演示用**） |
+| [**native_deploy.md**](native_deploy.md) | 裸机 systemd 部署（替代宝塔守护） |
+| [**baota_static_deploy.md**](baota_static_deploy.md) | 宝塔 + Docker 混合部署（**历史方案**，已被 deploy.md 取代） |
+| [**admin_system_comparison.md**](../admin_system_comparison.md) | 同类系统架构对比 |
+
+## 推荐阅读顺序
+
+1. **要部署 / 排障** → `deploy.md`（先读它，再读别的）
+2. 了解平台组成与域名 → `core_platform.md`
+3. 了解 V2 架构设计 → `architecture.md`
+4. 了解下一步要做什么 → `roadmap.md`
+5. 新开发者 → `dev_guide.md` + `apps/development_guide.md`
+6. **动数据库 / 加迁移** → `migrations.md`（先读，再动手）
+7. 打包给别人 → `packaging.md`
+8. 发版 / 升级 → `upgrade.md`
+9. 接官网 → `addons/website_cms.md`
+10. **要上手用某个应用（发起 / 审批单据）** → `05-用户手册/` 里挑对应那份
+
+## 文档维护约定
+
+- **端口、路径、域名只在 `deploy.md` 里维护**，其他文档引用它，不要各写一份。
+- 站点版（<https://docs.user.023ent.net/cenkor-admin/>）由脚本从本目录同步，**不要直接改站点上的文件**。
+- 同步命令：`bash scripts/sync-docs-to-knowledge.sh`
+- **新增应用必须配用户手册**：`docs/05-用户手册/<key>_操作手册.md`，
+  规范见 [apps/development_guide.md](apps/development_guide.md) §7.3。
+  ⚠️ **只能放这个数字前缀目录** —— 放 `docs/` 根级会被侧栏的关键词过滤**静默丢掉**。
+
+## 脚本对照
+
+| 脚本 | 用途 | 文档 |
+|------|------|------|
+| `scripts/backup.sh` | 备份 | [deploy.md](deploy.md) |
+| `scripts/restart-backend-host.sh` | 重启后端（无面板时） | [deploy.md](deploy.md) |
+| `scripts/migrate-and-seed-host.sh` | 宿主机模式迁移 + 播种 | [deploy.md](deploy.md) |
+| `scripts/sync-docs-to-knowledge.sh` | 文档同步到知识库站点 | 本文档 |
+| `scripts/build-frontends.sh` | 构建全部前端 dist | [deploy.md](deploy.md) |
+| `scripts/gen-app.py` | **CRUD 代码生成器**（spec YAML → App：后端 + 前端插件 + 迁移） | [dev_guide.md](dev_guide.md) |
+| `scripts/package-core.sh` | 打核心平台包 | [packaging.md](packaging.md) |
+| `scripts/package-app.sh` | 打单个应用包 | [apps/development_guide.md](apps/development_guide.md) |
+| `scripts/gen-secrets.sh` | 生成 `.env.prod` | [packaging.md](packaging.md) |
+| `scripts/release.sh` | 维护者发版 | [upgrade.md](upgrade.md) |
+| `scripts/upgrade.sh` | 升级 | [upgrade.md](upgrade.md) |
+| `scripts/deploy.sh` | Docker 部署（`--mode docker\|baota\|baota-static`） | [fullstack_deploy.md](fullstack_deploy.md) |
+| `scripts/install-native.sh` | systemd 安装 | [native_deploy.md](native_deploy.md) |
+| `scripts/check-migration-graph.py` | 迁移图自检（断链 / 重复 / head 数量） | [migrations.md](migrations.md) |
+| `scripts/check-doc-facts.py` | **文档事实自检**（md 里的表名 / 前端路由 / API 前缀 对代码与库核一遍） | 本文档 |
+| `scripts/setup-domain.sh` | 域名与证书辅助 | [domain_setup.md](domain_setup.md) |

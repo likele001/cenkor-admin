@@ -32,14 +32,14 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     });
     return (_ctx, _push, _parent, _attrs) => {
       const _component_router_link = resolveComponent("router-link");
-      _push(`<!--[--><nav class="${ssrRenderClass([{ scrolled: isScrolled.value }, "navbar"])}" data-v-f51553a6><div class="container" data-v-f51553a6><div class="navbar-content" data-v-f51553a6>`);
+      _push(`<!--[--><nav class="${ssrRenderClass([{ scrolled: isScrolled.value }, "navbar"])}" data-v-f262eefe><div class="container" data-v-f262eefe><div class="navbar-content" data-v-f262eefe>`);
       _push(ssrRenderComponent(_component_router_link, {
         to: "/",
         class: "logo"
       }, {
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
-            _push2(`<div class="logo-icon" data-v-f51553a6${_scopeId}><svg viewBox="0 0 32 32" fill="none" data-v-f51553a6${_scopeId}><rect width="32" height="32" rx="6" fill="#10b981" data-v-f51553a6${_scopeId}></rect><rect x="7" y="7" width="5" height="5" rx="1.5" fill="white" data-v-f51553a6${_scopeId}></rect><rect x="13.5" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-f51553a6${_scopeId}></rect><rect x="20" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f51553a6${_scopeId}></rect><rect x="7" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f51553a6${_scopeId}></rect><rect x="13.5" y="13.5" width="5" height="5" rx="1.5" fill="white" data-v-f51553a6${_scopeId}></rect><rect x="20" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f51553a6${_scopeId}></rect><rect x="7" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-f51553a6${_scopeId}></rect><rect x="13.5" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f51553a6${_scopeId}></rect><rect x="20" y="20" width="5" height="5" rx="1.5" fill="white" data-v-f51553a6${_scopeId}></rect></svg></div><span class="logo-text" data-v-f51553a6${_scopeId}>辰科 Cenkor Admin</span>`);
+            _push2(`<div class="logo-icon" data-v-f262eefe${_scopeId}><svg viewBox="0 0 32 32" fill="none" data-v-f262eefe${_scopeId}><rect width="32" height="32" rx="6" fill="#10b981" data-v-f262eefe${_scopeId}></rect><rect x="7" y="7" width="5" height="5" rx="1.5" fill="white" data-v-f262eefe${_scopeId}></rect><rect x="13.5" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-f262eefe${_scopeId}></rect><rect x="20" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f262eefe${_scopeId}></rect><rect x="7" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f262eefe${_scopeId}></rect><rect x="13.5" y="13.5" width="5" height="5" rx="1.5" fill="white" data-v-f262eefe${_scopeId}></rect><rect x="20" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f262eefe${_scopeId}></rect><rect x="7" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-f262eefe${_scopeId}></rect><rect x="13.5" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-f262eefe${_scopeId}></rect><rect x="20" y="20" width="5" height="5" rx="1.5" fill="white" data-v-f262eefe${_scopeId}></rect></svg></div><span class="logo-text" data-v-f262eefe${_scopeId}>辰科 Cenkor Admin</span>`);
           } else {
             return [
               createVNode("div", { class: "logo-icon" }, [
@@ -139,7 +139,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
         }),
         _: 1
       }, _parent));
-      _push(`<div class="${ssrRenderClass([{ active: mobileMenuOpen.value }, "nav-links"])}" data-v-f51553a6><a data-v-f51553a6>首页</a><a class="nav-hot" data-v-f51553a6> AI CMS <span class="hot-dot" data-v-f51553a6></span></a><a data-v-f51553a6>功能</a><a data-v-f51553a6>优势</a><a data-v-f51553a6>私有部署</a><div class="dropdown" data-v-f51553a6><span class="dropdown-trigger" data-v-f51553a6>文档</span><div class="dropdown-menu" data-v-f51553a6><a data-v-f51553a6>使用指南</a><a data-v-f51553a6>部署教程</a></div></div></div><div class="nav-actions" data-v-f51553a6><a${ssrRenderAttr("href", unref(urls).contact)} target="_blank" rel="noopener" class="btn btn-ghost btn-small" data-v-f51553a6>联系我们</a><a${ssrRenderAttr("href", unref(urls).github)} target="_blank" rel="noopener" class="btn btn-primary btn-small" data-v-f51553a6>GitHub</a></div><button class="${ssrRenderClass([{ active: mobileMenuOpen.value }, "mobile-toggle"])}" data-v-f51553a6><span data-v-f51553a6></span><span data-v-f51553a6></span><span data-v-f51553a6></span></button></div></div></nav><div class="${ssrRenderClass([{ active: mobileMenuOpen.value }, "mobile-overlay"])}" data-v-f51553a6></div><!--]-->`);
+      _push(`<div class="${ssrRenderClass([{ active: mobileMenuOpen.value }, "nav-links"])}" data-v-f262eefe><a data-v-f262eefe>首页</a><a class="nav-hot" data-v-f262eefe> AI CMS <span class="hot-dot" data-v-f262eefe></span></a><a data-v-f262eefe>功能</a><a data-v-f262eefe>优势</a><a data-v-f262eefe>私有部署</a><div class="dropdown" data-v-f262eefe><span class="dropdown-trigger" data-v-f262eefe>文档</span><div class="dropdown-menu" data-v-f262eefe><a data-v-f262eefe>文档中心</a><a data-v-f262eefe>使用指南</a><a data-v-f262eefe>部署教程</a></div></div></div><div class="nav-actions" data-v-f262eefe><a${ssrRenderAttr("href", unref(urls).contact)} target="_blank" rel="noopener" class="btn btn-ghost btn-small" data-v-f262eefe>联系我们</a><a${ssrRenderAttr("href", unref(urls).github)} target="_blank" rel="noopener" class="btn btn-primary btn-small" data-v-f262eefe>GitHub</a></div><button class="${ssrRenderClass([{ active: mobileMenuOpen.value }, "mobile-toggle"])}" data-v-f262eefe><span data-v-f262eefe></span><span data-v-f262eefe></span><span data-v-f262eefe></span></button></div></div></nav><div class="${ssrRenderClass([{ active: mobileMenuOpen.value }, "mobile-overlay"])}" data-v-f262eefe></div><!--]-->`);
     };
   }
 });
@@ -156,7 +156,7 @@ _sfc_main$2.setup = (props, ctx) => {
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/Navbar.vue");
   return _sfc_setup$2 ? _sfc_setup$2(props, ctx) : void 0;
 };
-const Navbar = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-f51553a6"]]);
+const Navbar = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-f262eefe"]]);
 const contact = ref({
   wechat: "",
   phone: "",
@@ -200,7 +200,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     });
     return (_ctx, _push, _parent, _attrs) => {
       const _component_router_link = resolveComponent("router-link");
-      _push(`<footer${ssrRenderAttrs(mergeProps({ class: "footer" }, _attrs))} data-v-10145ec2><div class="container" data-v-10145ec2><div class="footer-content" data-v-10145ec2><div class="footer-brand" data-v-10145ec2><div class="logo" data-v-10145ec2><div class="logo-icon" data-v-10145ec2><svg viewBox="0 0 32 32" fill="none" data-v-10145ec2><rect width="32" height="32" rx="6" fill="#10b981" data-v-10145ec2></rect><rect x="7" y="7" width="5" height="5" rx="1.5" fill="white" data-v-10145ec2></rect><rect x="13.5" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-10145ec2></rect><rect x="20" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-10145ec2></rect><rect x="7" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-10145ec2></rect><rect x="13.5" y="13.5" width="5" height="5" rx="1.5" fill="white" data-v-10145ec2></rect><rect x="20" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-10145ec2></rect><rect x="7" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-10145ec2></rect><rect x="13.5" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-10145ec2></rect><rect x="20" y="20" width="5" height="5" rx="1.5" fill="white" data-v-10145ec2></rect></svg></div><span class="logo-text" data-v-10145ec2>辰科 Cenkor Admin</span></div><p class="footer-desc" data-v-10145ec2>企业级平台 · 应用中心 + RBAC + 工作流 + AI CMS · FastAPI + Vue3</p></div><div class="footer-links" data-v-10145ec2><div class="link-group" data-v-10145ec2><h4 data-v-10145ec2>产品</h4><ul data-v-10145ec2><li data-v-10145ec2>`);
+      _push(`<footer${ssrRenderAttrs(mergeProps({ class: "footer" }, _attrs))} data-v-d937891f><div class="container" data-v-d937891f><div class="footer-content" data-v-d937891f><div class="footer-brand" data-v-d937891f><div class="logo" data-v-d937891f><div class="logo-icon" data-v-d937891f><svg viewBox="0 0 32 32" fill="none" data-v-d937891f><rect width="32" height="32" rx="6" fill="#10b981" data-v-d937891f></rect><rect x="7" y="7" width="5" height="5" rx="1.5" fill="white" data-v-d937891f></rect><rect x="13.5" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-d937891f></rect><rect x="20" y="7" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-d937891f></rect><rect x="7" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-d937891f></rect><rect x="13.5" y="13.5" width="5" height="5" rx="1.5" fill="white" data-v-d937891f></rect><rect x="20" y="13.5" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-d937891f></rect><rect x="7" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.55" data-v-d937891f></rect><rect x="13.5" y="20" width="5" height="5" rx="1.5" fill="white" opacity="0.8" data-v-d937891f></rect><rect x="20" y="20" width="5" height="5" rx="1.5" fill="white" data-v-d937891f></rect></svg></div><span class="logo-text" data-v-d937891f>辰科 Cenkor Admin</span></div><p class="footer-desc" data-v-d937891f>企业级平台 · 应用中心 + RBAC + 工作流 + AI CMS · FastAPI + Vue3</p></div><div class="footer-links" data-v-d937891f><div class="link-group" data-v-d937891f><h4 data-v-d937891f>产品</h4><ul data-v-d937891f><li data-v-d937891f>`);
       _push(ssrRenderComponent(_component_router_link, { to: "/ai-cms" }, {
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
@@ -213,7 +213,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         }),
         _: 1
       }, _parent));
-      _push(`</li><li data-v-10145ec2>`);
+      _push(`</li><li data-v-d937891f>`);
       _push(ssrRenderComponent(_component_router_link, { to: "/features" }, {
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
@@ -226,7 +226,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         }),
         _: 1
       }, _parent));
-      _push(`</li><li data-v-10145ec2>`);
+      _push(`</li><li data-v-d937891f>`);
       _push(ssrRenderComponent(_component_router_link, { to: "/advantages" }, {
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
@@ -239,7 +239,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         }),
         _: 1
       }, _parent));
-      _push(`</li><li data-v-10145ec2>`);
+      _push(`</li><li data-v-d937891f>`);
       _push(ssrRenderComponent(_component_router_link, { to: "/deploy" }, {
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
@@ -252,7 +252,20 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         }),
         _: 1
       }, _parent));
-      _push(`</li></ul></div><div class="link-group" data-v-10145ec2><h4 data-v-10145ec2>文档</h4><ul data-v-10145ec2><li data-v-10145ec2>`);
+      _push(`</li></ul></div><div class="link-group" data-v-d937891f><h4 data-v-d937891f>文档</h4><ul data-v-d937891f><li data-v-d937891f>`);
+      _push(ssrRenderComponent(_component_router_link, { to: "/docs" }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`文档中心`);
+          } else {
+            return [
+              createTextVNode("文档中心")
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(`</li><li data-v-d937891f>`);
       _push(ssrRenderComponent(_component_router_link, { to: "/docs/guide" }, {
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
@@ -265,7 +278,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         }),
         _: 1
       }, _parent));
-      _push(`</li><li data-v-10145ec2>`);
+      _push(`</li><li data-v-d937891f>`);
       _push(ssrRenderComponent(_component_router_link, { to: "/deploy" }, {
         default: withCtx((_, _push2, _parent2, _scopeId) => {
           if (_push2) {
@@ -278,18 +291,18 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         }),
         _: 1
       }, _parent));
-      _push(`</li><li data-v-10145ec2><a${ssrRenderAttr("href", unref(urls).github)} target="_blank" rel="noopener" data-v-10145ec2>GitHub 仓库</a></li></ul></div><div class="link-group" data-v-10145ec2><h4 data-v-10145ec2>支持</h4><ul data-v-10145ec2><li data-v-10145ec2><a${ssrRenderAttr("href", unref(urls).contact)} target="_blank" rel="noopener" data-v-10145ec2>联系我们</a></li>`);
+      _push(`</li><li data-v-d937891f><a${ssrRenderAttr("href", unref(urls).github)} target="_blank" rel="noopener" data-v-d937891f>GitHub 仓库</a></li></ul></div><div class="link-group" data-v-d937891f><h4 data-v-d937891f>支持</h4><ul data-v-d937891f><li data-v-d937891f><a${ssrRenderAttr("href", unref(urls).contact)} target="_blank" rel="noopener" data-v-d937891f>联系我们</a></li>`);
       if (unref(contact2).wechat) {
-        _push(`<li data-v-10145ec2>微信：${ssrInterpolate(unref(contact2).wechat)}</li>`);
+        _push(`<li data-v-d937891f>微信：${ssrInterpolate(unref(contact2).wechat)}</li>`);
       } else {
         _push(`<!---->`);
       }
       if (unref(contact2).phone) {
-        _push(`<li data-v-10145ec2>电话：${ssrInterpolate(unref(contact2).phone)}</li>`);
+        _push(`<li data-v-d937891f>电话：${ssrInterpolate(unref(contact2).phone)}</li>`);
       } else {
         _push(`<!---->`);
       }
-      _push(`<li data-v-10145ec2><a${ssrRenderAttr("href", `mailto:${unref(contact2).email}`)} data-v-10145ec2>${ssrInterpolate(unref(contact2).email)}</a></li></ul></div></div></div><div class="footer-bottom" data-v-10145ec2><p data-v-10145ec2>© ${ssrInterpolate((/* @__PURE__ */ new Date()).getFullYear())} 辰科科技 Cenkor Admin. 保留所有权利.</p></div></div></footer>`);
+      _push(`<li data-v-d937891f><a${ssrRenderAttr("href", `mailto:${unref(contact2).email}`)} data-v-d937891f>${ssrInterpolate(unref(contact2).email)}</a></li></ul></div></div></div><div class="footer-bottom" data-v-d937891f><p data-v-d937891f>© ${ssrInterpolate((/* @__PURE__ */ new Date()).getFullYear())} 辰科科技 Cenkor Admin. 保留所有权利.</p></div></div></footer>`);
     };
   }
 });
@@ -299,7 +312,7 @@ _sfc_main$1.setup = (props, ctx) => {
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/components/Footer.vue");
   return _sfc_setup$1 ? _sfc_setup$1(props, ctx) : void 0;
 };
-const Footer = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-10145ec2"]]);
+const Footer = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-d937891f"]]);
 const SITE_BASE = "https://admin.cenkor.cn/landing";
 const SHARED_META = [
   { property: "og:type", content: "website" },
@@ -333,6 +346,10 @@ const SEO = {
   "/deploy": {
     title: "辰科Cenkor Admin - 私有部署 | 企业级平台",
     description: "辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal；含 AI 模型接入与在线升级说明。"
+  },
+  "/docs": {
+    title: "辰科Cenkor Admin - 文档中心 | 使用教程与二次开发",
+    description: "辰科Cenkor Admin 文档中心：13 本用户手册、模板标签参考（数据 API / 过滤器 / App 注册标签）、应用开发规范与二次开发指南，全部在线可查。"
   },
   "/docs/guide": {
     title: "辰科Cenkor Admin - 使用指南 | 企业级平台",
@@ -421,6 +438,17 @@ const routes = [
     path: "/docs/guide",
     name: "Guide",
     component: () => import("./assets/Guide-CPqRGShC.js")
+  },
+  {
+    path: "/docs",
+    name: "Docs",
+    component: () => import("./assets/DocsCenter-DoUnXM7Y.js")
+  },
+  {
+    // /docs/<相对路径>：文档阅读页，客户端 fetch docs-content 下的 md 渲染
+    path: "/docs/:pathMatch(.*)*",
+    name: "DocsRead",
+    component: () => import("./assets/DocsCenter-DoUnXM7Y.js")
   }
 ];
 const scrollBehavior = () => ({ top: 0 });
