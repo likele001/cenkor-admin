@@ -4,7 +4,8 @@
 > 以免出现「同一件事三套说法」。
 >
 > 适用范围：本机生产环境 `admin.cenkor.cn` / `portal.cenkor.cn` / `dev.cenkor.cn`
-> 最后核对：2026-09-25（宿主机化改造完成）
+> 最后核对：**2026-11-01**（逐条对 `ss -tlnp` / `/proc/<pid>/environ` /
+> `docker ps -a` / nginx 实际 include 链 / 日志实跑结果核过一遍，不再凭历史记忆）
 
 ---
 
@@ -46,8 +47,9 @@ flowchart TB
   QN[七牛云 Kodo<br/>bucket scanwork1 · CDN img1.images.023ent.net]
 
   B --> NG
-  A1 -->|"/api/ · /api/v1/ws/ · /.app-assets/"| API
-  A2 -->|"/api/"| API
+  A1 -->|"/api/ · /api/v1/ws/ · /.app-assets/ · /api/v1/cms/ai/"| API
+  A2 -->|"/api/ · /llms.txt"| API
+  A3 -->|"/api/"| API
   A4 -->|"/api/"| API
   API --> PG
   API --> RD
@@ -74,17 +76,33 @@ flowchart TB
 
 ## 2. 域名台账
 
-| 域名 | 前端根目录 | API 反代 | 备注 |
+| 域名 | 前端根目录 | API 反代（→ `127.0.0.1:8002`） | 备注 |
 |---|---|---|---|
-| `admin.cenkor.cn` | `frontend/admin-web/dist` | `/api/` `/api/v1/ws/` `/.app-assets/` → `127.0.0.1:8002` | 另有 `^~ /landing/` → `frontend/` |
-| `portal.cenkor.cn` | `frontend/portal-web/dist` | `/api/` → `127.0.0.1:8002` | |
-| `dev.cenkor.cn` | `frontend/developer-web/dist` | ⚠️ **当前无 `/api/` 反代**，见 [§10.6](#106-devcenkercn-无-api-反代) | |
-| `www.cenkor.cn` | `/www/wwwroot/website`（外部） | `/api/` → `127.0.0.1:8002` | 站点文件不属本仓库 |
+| `admin.cenkor.cn` | `frontend/admin-web/dist` | `/api/` · `/api/v1/ws/` · `/.app-assets/` · `/api/v1/cms/ai/` | 另有 `^~ /landing/` → `frontend/` |
+| `portal.cenkor.cn` | `frontend/portal-web/dist` | `/api/` · `= /llms.txt` | `/llms.txt` 单独反代到 `/api/v1/public/llms.txt` |
+| `dev.cenkor.cn` | `frontend/developer-web/dist` | `/api/` | 规则在 `proxy/` 子目录里，见下方警告 |
+| `www.cenkor.cn` | `/www/wwwroot/website`（外部） | `/api/` | 站点文件不属本仓库 |
 
 **nginx 配置位置**：`/www/server/panel/vhost/nginx/<域名>.conf`（宝塔管理，不在仓库内）。
 
-> ⚠️ **`dev.cenkor.cn` 缺 `/api/` 反代**：如果开发者门户需要调用后端接口，它的
-> 请求会打到静态文件 404。需确认开发者门户的 API 地址是绝对 URL 还是同域 `/api/`。
+> ⚠️ **宝塔的反代规则可能不在主文件里。** 主文件通过
+> `include /www/server/panel/vhost/nginx/proxy/<域名>/*.conf;` 把反代**拆到子目录**。
+> 直接 `grep proxy_pass /www/server/panel/vhost/nginx/dev.cenkor.cn.conf` 会**什么都搜不到**，
+> 从而误判「这个域名没配反代」——`dev.cenkor.cn` 就踩过这个坑（主文件无 `proxy_pass`，
+> 规则实际在 `proxy/dev.cenkor.cn/e77989ed….conf`，`/api/health` 实测 200）。
+>
+> 判断某域名是否配了反代，要看**展开后的**结果：
+>
+> ```bash
+> nginx -T 2>/dev/null | awk '/server_name dev.cenkor.cn/,/^}/' | grep -E 'proxy_pass|include'
+> # 或直接实测
+> curl -s -o /dev/null -w '%{http_code}\n' https://dev.cenkor.cn/api/health   # 200 即有
+> ```
+
+> 🔴 **`admin.cenkor.cn` 有单独的 `/api/v1/cms/ai/` 段，别漏。**
+> 它比通用的 `/api/` 段多三项：`proxy_read_timeout 600s`、`proxy_send_timeout 600s`、
+> `proxy_cache off`。AI 生成 / 批量生产是长连接 + 流式返回，落到通用段会**60 秒就 504**。
+> 新部署（换域名、重建 vhost）时漏配这一段，表现为「AI 功能一点就超时」，普通接口却全正常。
 
 ---
 
@@ -99,16 +117,28 @@ flowchart TB
 | `8009` | 容器内 uvicorn 服务 | Docker（cwd `/app`），未挂 nginx 反代，**端口已占** |
 | `5432` | PostgreSQL | 宝塔 PG 16（**全平台主库**，多项目共用） |
 | `6379` | Redis | 宝塔 Redis（**全平台共用**，db0~db15 按项目划分） |
-| `9000` | MinIO API | systemd `minio` |
-| `9003` | MinIO Console | systemd `minio` |
+| `9000` | MinIO API **（控制台同端口）** | systemd `minio` |
 | `80` / `443` | nginx | 宝塔 |
+
+> ⚠️ **「MinIO Console 在 9003」是容器时代的说法，宿主机上没有这个端口。**
+> 宿主 unit 的启动行只有 `minio server /var/minio/data --address :9000`，**没有
+> `--console-address`**，因此控制台与 API 共用 `9000`（新版 MinIO 按路径区分）。
+> 实测 `ss -tlnp | grep 9003` 为空、`curl 127.0.0.1:9003` 直接连接失败。
+> 需要独立控制台端口时，自己在 unit 里补 `--console-address :9003` 后
+> `systemctl daemon-reload && systemctl restart minio`。
 
 > 端口台账以 **`ss -tlnp` 实跑结果**为准，不凭记忆填。8008 / 8009 此前漏记，
 > 就是照着"实际占用"一句却漏了两项 —— 新建服务前请先自己跑一遍
 > `ss -tlnp | grep -E ':80[0-9][0-9]|:900[0-9]'` 再定端口。
 
-**已被其他项目占用的 Redis 库**：`db1`、`db2`、`db9`（AI 网关 `ch_health:*` / `gateway:rr_offset:*`）、`db10`。
+**已被其他项目占用的 Redis 库**：`db1`、`db2`（**占用最多，实测 2900+ key**）、`db9`（AI 网关 `ch_health:*` / `gateway:rr_offset:*`）、`db10`。`db0` 为空。
 **cenkor-admin 使用 `db5`。**
+
+> 判断库是否空闲别靠记忆，一条命令看全部：
+>
+> ```bash
+> for n in $(seq 0 15); do printf 'db%-3s %s\n' "$n" "$(redis-cli -p 6379 -n $n DBSIZE 2>/dev/null)"; done
+> ```
 
 > ⚠️ 曾踩坑：原配置写的是 `db9`，而宿主 Redis 是全平台共享的，`db9` 属于 AI 网关。
 > 迁移时已改到空闲的 `db5`。**改 `REDIS_URL` 前务必先 `redis-cli -n <n> DBSIZE` 确认库是空的。**
@@ -118,8 +148,12 @@ flowchart TB
 | 项目 | 端口段 |
 |---|---|
 | `blog`（容器） | 5434 / 6381 / 9004 / 9005 / 8010 / 5180 / 5190 |
-| `lightmes`（宿主机） | 8000 |
+| `fettle`（容器：milvus + minio） | 19530 / 9091 / 9010 / 9011 |
+| `lightmes`（宿主机，cwd `/www/wwwroot/lightmes/backend`） | 8000 |
 | `cenkormes`（宿主机） | 8500 |
+
+> 上表同样按 `ss -tlnp` 实跑结果填。`fettle` 那组此前漏记（milvus 19530/9091、
+> 其配套 minio 9010/9011），新增容器前一样要避开。
 
 ---
 
@@ -133,7 +167,7 @@ flowchart TB
 | 2 | `backend/.env` | ✅ | 补充 | `config.py` 的 `_find_env_file()` 从**当前工作目录**查找 `.env`；宝塔项目的 `path` 是 `backend/`，故读的就是它 |
 | 3 | `deploy/baota/cenkor-backend.host.env` | ❌ | — | 仅被 `deploy/baota/start-backend.sh` 使用（脱离宝塔的手工启动路径） |
 | 4 | `deploy/examples/env.host.override` | ❌ | — | 被 `deploy/systemd/cenkor-backend.service` 引用 |
-| 5 | `/etc/cenkor/env.host.override` | ❌ | — | 同上，systemd unit 里排在最后 |
+| 5 | `/etc/cenkor/env.host.override` | ❌ | — | 同上，systemd unit 里排在最后。**本机该文件不存在**（只有仓库里的模板） |
 
 ### 4.1 谁提供什么
 
@@ -177,6 +211,31 @@ tr '\0' '\n' < /proc/$PID/environ | grep -E '^(DATABASE_URL|REDIS_URL|S3_ENDPOIN
 
 它们**不影响生产**，但是「另一条路」的模板，会误导后来人（迁移时就发现三处的 Redis 库号
 分别是 `db0` / `db9` / 实际 `db5`）。**改配置时顺手对齐**，模板文件（`.example`）一并更新。
+
+### 4.4 `.env` 到底读的是哪一个 ⭐
+
+`core/config.py` 的 `_find_env_file()` **按顺序取第一个存在的**，不是只认当前目录：
+
+```python
+candidates = [
+    Path.cwd() / ".env",                                      # ① 当前工作目录
+    Path.cwd().parent / ".env",                               # ② 上一级
+    Path(__file__).resolve().parent.parent.parent.parent / ".env",  # ③ 仓库根
+    Path(os.environ.get("HOME", "/tmp")) / ".env",            # ④ HOME
+]
+```
+
+宝塔项目的 `path` 是 `backend/`，进程 `cwd` 就是那里 → 命中 ①，读 `backend/.env`。
+
+> 🔴 **陷阱**：② 是 `cwd.parent/.env`。如果你在**仓库根**手工起后端（`cd /www/wwwroot/cenkor-admin && uvicorn ...`），
+> ① `仓库根/.env` 不存在但 ② 会往上找到 `/www/wwwroot/.env`——**如果那层有 .env，就会静默读到别人的配置**。
+> 排查「本地起的服务连错库」时，第一件事是打印实际读到的文件：
+>
+> ```bash
+> cd /www/wwwroot/cenkor-admin/backend && PYTHONPATH=src \
+>   /www/server/pyporject_evn/cenkor/bin/python -c \
+>   "from cenkor_admin.core.config import _find_env_file; print(_find_env_file())"
+> ```
 
 ---
 
@@ -226,7 +285,7 @@ redis-cli -p 6379 -n 5 DBSIZE       # 本项目的 key 数
 |---|---|
 | 托管 | systemd unit `minio`（unit 文件在 `/etc/systemd/system/minio.service`） |
 | 数据目录 | `/var/minio/data` |
-| 端点 | `http://127.0.0.1:9000`（Console `9003`） |
+| 端点 | `http://127.0.0.1:9000`（**控制台同端口**，本机未单独开 9003，见 §3 说明） |
 | 凭据 | `minio` / `<见 backend/.env>` |
 | bucket | `cenkor-public`、`cenkor-private`、`scanwork1` |
 
@@ -379,14 +438,21 @@ sudo dpkg -i minio_20250907161309.0.0_amd64.deb
 ```bash
 cd /www/wwwroot/cenkor-admin
 
-# 单个构建
+# 单个构建（根 package.json 里有这三个别名）
 npm run build:admin        # → frontend/admin-web/dist
 npm run build:portal       # → frontend/portal-web/dist
 npm run build:developer    # → frontend/developer-web/dist
 
-# 或全部一起
+# landing-web 根 package.json 没有别名，需进目录构建
+cd frontend/landing-web && npm run build && cd ../..
+
+# 或四个一起（admin / portal / developer / landing）
 bash scripts/build-frontends.sh
 ```
+
+> `scripts/build-frontends.sh` 会透传 `VITE_API_BASE_URL`。**留空即走同域 `/api/`**，
+> 这是本机生产的正确取值——填绝对地址会立刻触发 CORS（见 §10.5）。脚本里
+> `developer-web` 缺失时是**跳过而不是报错**（该目录属闭源商业资产，可能不在分发版本里）。
 
 宝塔 nginx 的 root 直接指向 `dist`，**构建完即生效**（无需重启 nginx）。
 
@@ -395,11 +461,12 @@ bash scripts/build-frontends.sh
 >
 > ```bash
 > ls -ld frontend/*/dist
-> # 若为 root，修正：
+> # 期望 www:www；若为 root，修正：
 > chown -R www:www frontend/*/dist
 > ```
 >
-> 现状：`frontend/developer-web/dist` 属主为 `root`，**待修正**。
+> 现状（2026-11-01 实测）：四个 `dist` **均为 `www:www`**，此前记录的
+> 「`developer-web/dist` 属主为 root」已不存在。
 
 若 `vue-tsc` 类型检查失败导致 `npm run build` 中断，可用 `npx vite build` 跳过类型检查。
 
@@ -425,18 +492,38 @@ sudo -u postgres /www/server/pgsql/bin/psql -p 5432 -d cenkor -tAc "SELECT versi
 
 ### 6.4 重启后端
 
-**由人在宝塔面板操作**：宝塔面板 → 网站 → Python 项目 → `cenkor` → **重启**。
+**唯一正确方式：宝塔面板 → 网站 → Python 项目 → `cenkor` → 重启。**
 
-命令行重启（无面板时）：
+无面板时的命令行做法 —— **先释放端口，然后什么都不做**：
 
 ```bash
-bash scripts/restart-backend-host.sh
+# 1. 找到占 8002 的进程
+ss -lntp | grep ':8002'
+# 2. 杀掉它（只杀占端口的那一个），让端口空出来
+kill <pid>
+# 3. 不要手动拉起，等宝塔自愈重新接管（约 10~60 秒）
+sleep 30 && ss -lntp | grep ':8002' && ps -o user= -p $(ss -lntp | grep ':8002' | grep -oP 'pid=\K[0-9]+' | head -1)
 ```
 
-> ⚠️ **不要手动 `kill` 后再裸起 uvicorn 进程。** 宝塔守护进程（`auto_run=true`）会
-> 认不出手动起的进程（用户/参数不匹配），于是在**每 120 秒拉起一个新实例再杀掉**，
-> 表现为 `error.log` 里零 ERROR 却**每 2 分钟刷一轮 `app.starting`**。
-> 判断方法：看日志有没有严格 120 秒周期的启动行。
+> 🔴 **绝对不要 `nohup uvicorn ... &` 手动起后端。** 宝塔守护进程（`auto_run=true`）认不出
+> 手动起的进程（用户 / 参数不匹配），会在**每 120 秒拉起一个新实例再杀掉**，表现为
+> `error.log` 里零 ERROR 却**每 2 分钟刷一轮 `app.starting`**。判断方法：看日志有没有严格
+> 120 秒周期的启动行。
+
+> 🔴 **`scripts/restart-backend-host.sh` 不能在本机用。** 这个脚本是「容器 + 裸进程
+> baota-static」时代的遗留，它做的事恰恰是上面禁止的：`kill` 掉占 8002 的进程 →
+> `nohup uvicorn --workers 2 &` 裸起 → 日志写 `/tmp/cenkor-uvicorn.log`。
+> 而且它的缺省值与宿主机化之后的生产**全不一致**：
+>
+> | 脚本缺省 | 生产实际 |
+> |---|---|
+> | `REDIS_URL=…/0` | `…/5` |
+> | `S3_ENDPOINT=http://127.0.0.1:9002` | `http://127.0.0.1:9000` |
+> | 会去读 `docker inspect cenkor-postgres` 的密码 | 容器已删除，读不到 |
+>
+> 在宝塔托管环境下执行它 = 手动抢端口 + 连错 Redis 库 → 宝塔自愈反复
+> `address already in use`。脚本现已加运行前拦截（检测到宝塔托管会拒绝并提示），
+> 但**文档这边也请别再推荐它**。它只在 `native_deploy.md` 的裸机 systemd 路线下有意义。
 
 ---
 
@@ -462,7 +549,20 @@ redis-cli -p 6379 -n 5 DBSIZE
 curl -s -o /dev/null -w 'minio %{http_code}\n' http://127.0.0.1:9000/minio/health/live
 
 # 4. 后端启动日志里应出现四项 ok
-grep -E 'db\.ok|migration\.ok|redis\.ok|s3\.buckets\.ready' /www/wwwlogs/python/cenkor/error.log | tail -4
+#    注意：error.log 只装「当天」，宝塔每天 00:00 切成 error.log-YYYYMMDD(.gz)。
+#    当天没重启过的话，启动日志在昨天的文件里——只 grep error.log 会以为「什么都没打」。
+zgrep -hE 'app\.starting|db\.ok|migration\.ok|redis\.ok|s3\.buckets\.ready' \
+  /www/wwwlogs/python/cenkor/error.log /www/wwwlogs/python/cenkor/error.log-* 2>/dev/null | tail -5
+```
+
+期望看到一组（同一次启动，时间戳连续）：
+
+```
+2026-11-01 02:31:23 [info] app.starting      env=production version=0.3.0
+2026-11-01 02:31:23 [info] db.ok             dialect=postgresql
+2026-11-01 02:31:24 [info] migration.ok      result=...
+2026-11-01 02:31:24 [info] redis.ok
+2026-11-01 02:31:25 [info] s3.buckets.ready  public=scanwork1
 ```
 
 > ⚠️ **不要只看 `/api/health`。** 它可能在后端启动阶段就返回 200，掩盖依赖故障。
@@ -498,27 +598,46 @@ PG=/www/server/pgsql/bin
 sudo -u postgres $PG/psql -p 5432 -d postgres -c "DROP DATABASE IF EXISTS cenkor;"
 sudo -u postgres $PG/psql -p 5432 -d postgres -c "CREATE DATABASE cenkor OWNER cenkor \
   TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C.UTF-8' LC_CTYPE 'C.UTF-8';"
-sudo -u postgres $PG/restore -p 5432 -d cenkor --no-owner --no-privileges --role=cenkor -j 4 <dump文件>
+sudo -u postgres $PG/pg_restore -p 5432 -d cenkor --no-owner --no-privileges --role=cenkor -j 4 <dump文件>
 ```
+
+> ⚠️ 工具名是 **`pg_restore`**，不是 `restore`。`/www/server/pgsql/bin/` 下只有
+> `psql` / `pg_dump` / `pg_dumpall` / `pg_restore` / `pg_waldump` 这几个可执行文件，
+> 写成 `$PG/restore` 会直接 `No such file or directory`。
+>
+> 🔴 第一行 `DROP DATABASE` 会**整库删除**。执行前先确认 dump 文件存在且非空
+> （`ls -l`、`pg_restore -l <dump> | head`），这是全平台主库，误删会同时影响
+> `ai_platform` 之外的同实例其它库的**操作面**（虽然 DROP 只删 cenkor，但停服期间全平台都在等）。
 
 ### 8.4 回滚到「数据在容器」的旧架构
 
-2026-09-25 迁移时**保留了完整回滚路径**：
+> 🔴 **先看结论：这条路现在走不通了。** 2026-09-25 迁移时确实留了资产，但**大部分已经失效**，
+> 下表是 2026-11-01 的实测状态。**不要以为出了事能一键回滚。**
 
-| 资产 | 位置 | 说明 |
+| 资产 | 位置 | 2026-11-01 实测 |
 |---|---|---|
-| 容器库导出 | `/tmp/pg-backup/cenkor_container_*.dump` | 迁移前容器 PG 的全量 dump |
-| 空壳库 dump | `/tmp/pg-backup/cenkor_host_empty_*.dump` | 宿主 PG 迁移前的原始状态 |
-| 4 个容器 | `cenkor-postgres` / `cenkor-redis` / `cenkor-minio` / `cenkor-admin-web` | **未删除**，数据卷保留 |
-| `.env` 备份 | `backend/.env.bak_<时间戳>` | 配置切换前的版本 |
-| 宝塔 `site.db` 备份 | `/root/backup/site.db.bak_*` | `env_list` 切换前的版本 |
+| 容器库导出 | `/tmp/pg-backup/cenkor_container_*.dump` | ❌ **已丢失**（`/tmp` 被清理，整个目录不存在） |
+| 空壳库 dump | `/tmp/pg-backup/cenkor_host_empty_*.dump` | ❌ **已丢失**（同上） |
+| 4 个容器 | `cenkor-postgres` / `cenkor-redis` / `cenkor-minio` / `cenkor-admin-web` | ❌ **已全部删除**（`docker ps -a \| grep cenkor` 为空） |
+| 容器数据卷 | `cenkor-admin_postgres-data` / `_redis-data` / `_minio-data` | ✅ **仍在**（数据可能可以救出来） |
+| `.env` 备份 | `backend/.env.bak_<时间戳>` | 🟡 有备份，但**没有迁移当时那份**（现存最早为 10-07，迁移是 09-25） |
+| 宝塔 `site.db` 备份 | `/root/backup/site.db.bak_*` | ✅ `site.db.bak_20260925123940` 仍在（迁移当天） |
 
-回滚步骤：恢复 `env_list` 与 `.env` → `docker start censkor-postgres cenkor-redis cenkor-minio` → 重启宝塔项目。
+**真要回滚，得重建容器**（`docker start` 已经没对象可起）：
 
-> ⚠️ **恢复容器不要用 `docker compose up -d`。** minio 服务用的是 `:latest` tag，
-> compose 会尝试拉 `quay.io/minio/minio:latest` 并因 **401** 失败，
-> 导致**整条命令中止，连 pg/redis 都起不来**。
-> 正确做法：`docker start cenkor-postgres cenkor-redis cenkor-minio`。
+```bash
+# 数据卷还在，可以用一次性容器把数据捞出来，而不是"回滚整个架构"
+docker run --rm -v cenkor-admin_postgres-data:/var/lib/postgresql/data \
+  -v /tmp/rescue:/backup alpine \
+  tar czf /backup/pgdata-$(date +%F).tgz -C /var/lib/postgresql/data .
+```
+
+> ⚠️ **不要用 `docker compose up -d` 重建。** minio 服务用的是 `:latest` tag，compose 会尝试
+> 拉 `quay.io/minio/minio:latest` 并因 **401** 失败，**整条命令中止，连 pg/redis 都起不来**。
+> 官方社区版二进制自 2025-10 起已停发（见 §5.3），拉不到是必然的。
+>
+> **更现实的建议**：别指望回滚到容器架构。正确做法是保持现在的 §8.1 / §8.2 日常备份，
+> 出问题用 `pg_restore` 恢复到宿主机。
 
 ---
 
@@ -583,24 +702,36 @@ tail -50 /www/wwwlogs/python/cenkor/error.log | grep -iE 'error|refused|timeout'
 
 ### 10.5 `CORS_ORIGINS` 缺本仓库自有域名
 
-**现状**：`backend/.env` 的 `CORS_ORIGINS` 里有一长串 `*.cenkor.cn` 域名，
-但**没有 `admin.cenkor.cn` / `portal.cenkor.cn` / `dev.cenkor.cn`**。
+**现状（2026-11-01 核对）**：`backend/.env` 的 `CORS_ORIGINS` 是一长串 `*.cenkor.cn`，
+含 `www.cenkor.cn` / `mes.*` / `labor.*` / `fettle.*` 等，
+**确实没有 `admin.cenkor.cn` / `portal.cenkor.cn` / `dev.cenkor.cn`**。
 
-**影响判断**：`admin` / `portal` 的前端与 API **同域**（都走 `<域名>/api/`，由 nginx 反代到 8002），
-浏览器视为同源，**不触发 CORS**，所以目前不影响。
-但 `dev.cenkor.cn` 若直连后端（见 10.6），就会因缺 CORS 头而失败。
+**为什么不影响**：三个前端与 API **同域**（都走 `<域名>/api/`，由 nginx 反代到 8002，
+`proxy_set_header Host $host` 透传），浏览器视为同源，**不触发 CORS 预检**。
 
-**待确认**，不要盲改。
+**什么时候才会炸**：把任一端点的 `VITE_API_BASE_URL` 改成绝对地址（例如指向
+`https://api.cenkor.cn` 直连），立刻变成跨域 → 缺头 → 全部接口失败。
+`scripts/build-frontends.sh` 之所以强调「留空走同域」，就是为了避开这个坑（见 §6.2）。
 
-### 10.6 `dev.cenkor.cn` 无 `/api/` 反代
+> 真要改：在 `CORS_ORIGINS` 里补三个域名，**并同时改宝塔 `env_list`**（它优先级更高，见 §4.2）。
 
-**现状**：`dev.cenkor.cn` 的 vhost 只 serve `frontend/developer-web/dist`，
-**没有任何 `proxy_pass`**，与 `admin` / `portal` 不一致。
+### 10.6 `dev.cenkor.cn` 的 `/api/` 反代（**已确认存在**）
 
-**影响**：开发者门户若用同域 `/api/` 调后端，请求会落到静态文件 404；
-若用绝对 URL 则不受影响（但需 CORS，见 10.5）。
+此前本文写过「`dev.cenkor.cn` 没有任何 `proxy_pass`」——**这是错的**，原因是只 grep 了
+vhost 主文件。宝塔把反代规则拆在子目录里：
 
-**待确认**，先核对 `frontend/developer-web` 里的 API base 配置。
+```
+/www/server/panel/vhost/nginx/dev.cenkor.cn.conf          ← 主文件，无 proxy_pass
+  └─ include .../proxy/dev.cenkor.cn/*.conf               ← 真正规则在这
+       e77989ed….conf → location /api/ { proxy_pass http://127.0.0.1:8002/api/; }
+```
+
+**实测**：`https://dev.cenkor.cn/api/health` → `200 {"status":"ok",…}`、
+`/api/v1/public/portal/auth/login-config` → `200`。开发者门户的 `baseURL` 取
+`import.meta.env.VITE_API_BASE_URL || ''`（默认空 → 同域相对路径），与该反代正好配套。
+
+> 通用教训：**判断「某域名是否配了反代」不要 grep 主文件**，用 `nginx -T` 看展开结果，
+> 或者干脆 `curl` 实测（见 §2 的警告块）。
 
 ### 10.7 上传图片报错
 
@@ -637,7 +768,7 @@ sudo -u postgres /www/server/pgsql/bin/psql -p 5432 -tAc \
 | 后端 | 宿主机（宝塔，**不变**） | 8002 |
 | PostgreSQL | 宿主机原生 | 5432 |
 | Redis | 宿主机原生 | 6379 / **db5** |
-| MinIO | 宿主机原生 | 9000 / 9003 |
+| MinIO | 宿主机原生 | 9000（控制台同端口；当日记的 9003 已不存在） |
 
 ### 做法
 

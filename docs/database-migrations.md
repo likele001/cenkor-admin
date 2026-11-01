@@ -28,34 +28,54 @@ $PY ../scripts/check-migration-graph.py --tracked-only   # 公开仓库视图：
 
 ### 1.1 文件分布
 
-`backend/alembic/versions/` 按应用分 6 个子目录，`alembic.ini` 用 `version_locations` 全部挂进来：
+`backend/alembic/versions/` 按应用分 6 个子目录，`alembic.ini` 用 `version_locations` 全部挂进来。
 
-| 目录 | 迁移数 | 入库(git) | 归属 |
+> 📌 **下表是 2026-10-30 的快照，数字一定会变。把它当"形状"看，不要当"事实"用** ——
+> 真实数字用一条命令拿（本文所有数字类断言都遵循这个原则）：
+>
+> ```bash
+> cd backend/alembic/versions
+> for d in core ext commerce erp crm mes; do
+>   printf '%-10s %s\n' "$d" "$(ls $d/*.py 2>/dev/null | grep -v __init__ | wc -l)"
+> done
+> cd /www/wwwroot/cenkor-admin && git ls-files 'backend/alembic/versions/*.py' | grep -v __init__ | wc -l
+> ```
+
+| 目录 | 迁移数(10-30) | 入库(git) | 归属 |
 |---|---|---|---|
-| `core/` | 31 | 全部 31 | 平台核心（cms/auth/rbac/portal/app store/i18n…） |
-| `ext/` | 13 | 9 | 平台扩展（cloud_storage / codegen / upgrade / inventory / ai_video_jobs…） |
-| `commerce/` | 9 | 3（白名单） | 交易层（定价/订单/授权/结算），大部分闭源 |
+| `core/` | 31 | 全部 | 平台核心（cms/auth/rbac/portal/app store/i18n…） |
+| `ext/` | 13 | 多数 | 平台扩展（cloud_storage / codegen / upgrade / inventory / ai_video_jobs / cms_*…） |
+| `commerce/` | 9 | 少数（白名单） | 交易层（定价/订单/授权/结算），大部分闭源 |
 | `erp/` | 19 | 0 | ERP 应用（闭源） |
 | `crm/` | 6 | 0 | CRM 应用（闭源） |
 | `mes/` | 9 | 0 | MES 应用（闭源） |
-| **合计** | **87** | **43** | |
 
 ```
-/web 版本目录不是「一个目录一棵树」，而是 6 个目录里的 87 个 revision
+/web 版本目录不是「一个目录一棵树」，而是 6 个目录里的全部 revision
 被跨目录的 down_revision 串成【一条线】，只有 1 个 base、1 个 head。
 ```
 
 ### 1.2 两个 head，取决于你站在哪个视图
 
-| 视图 | 文件数 | head | 说明 |
-|---|---|---|---|
-| 完整工作区（服务器 / 有闭源代码的开发者） | 87 | `20261027_0100_app_schema` | 闭源链末端 |
-| git 跟踪视图（公开仓库 / CI / 新克隆） | 43 | `20261031_1310_cms_ai_tables` | 公开链末端 = 挂载点的父 |
+| 视图 | head | 说明 |
+|---|---|---|
+| 完整工作区（服务器 / 有闭源代码的开发者） | 闭源链末端 | 实测 `alembic heads` 只出 1 行 |
+| git 跟踪视图（公开仓库 / CI / 新克隆） | 公开链末端 = 挂载点的父 | 用 `--tracked-only` 查 |
+
+> ⚠️ 这里**故意不写具体 revision 名**：公开链每加一条迁移，这个 head 就会变
+> （10-30 是 `20261031_1310_cms_ai_tables`，10-31 加了 permalink 后已变成
+> `20261031_1600_cms_permalink`）。查当前值：
+>
+> ```bash
+> cd /www/wwwroot/cenkor-admin
+> PYTHONPATH=backend/src python3 scripts/check-migration-graph.py                # 完整工作区 head
+> PYTHONPATH=backend/src python3 scripts/check-migration-graph.py --tracked-only # 公开视图 head
+> ```
 
 ### 1.3 真实链路
 
 ```
-公开/基础链（43 个，进公开仓库）
+公开/基础链（全部进公开仓库，数量见 §1.1）
   20260107_0001_initial
     → 0002_auth_rbac → 0003_media_news_audit → 0004_platform_apps
     → 20260108_0001_website_url → 20260608_0001_notif → 20260608_0002_apikey
@@ -70,15 +90,17 @@ $PY ../scripts/check-migration-graph.py --tracked-only   # 公开仓库视图：
     → 20261015_0032_codegen_runs → 20261015_0033_upgrade_runs → 20261018_0034_upgrade_notes
     → 20261014_124126_gen_inventory → 20261014_124200_schema_versions
     → 20261029_1500_ai_video_jobs
-    → 20261031_1100_cms_templates（CMS 主题模板表）
-    → 20261031_1300_cms_multisite（多站点地基，接管原 001/002/005 SQL）
-    → 20261031_1310_cms_ai_tables（AI 五表，接管原 003/004/006 SQL）  ← 公开 head
+    → 20261031_1100_cms_templates（CMS 主题模板表，在 ext/）
+    → 20261031_1300_cms_multisite（多站点地基，在 core/）
+    → 20261031_1310_cms_ai_tables（AI 五表，在 core/）
+    → 20261031_1600_cms_permalink（CMS 伪静态地址，在 ext/）   ← 公开 head
                     │
                     │  挂载点（闭源、不入库）
+                    │  它的 down_revision 永远等于「最新公开 head」，每加一条公开迁移就顺延一次
                     ▼
   20261020_0035_app_publish（app_submissions 上架/撤回 + manifest 快照）
                     ▼
-闭源链（44 个，全部 .gitignore）
+闭源链（全部 .gitignore）
   erp_init(20260831_0001) → … erp 19 条 … → 20260903_0019_deepen
     → crm_0001 … crm_0006
     → mes_0001 … mes_0009
@@ -140,14 +162,27 @@ file_template = %%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev)
 
 ### 规则二：挂载点跟随公开 head
 
-当前挂载点 = `20261020_0035_app_publish`（闭源链第一环），它的 `down_revision` **必须等于最新公开 revision**（现在是 `20261031_1310_cms_ai_tables`）。
+当前挂载点 = `20261020_0035_app_publish`（闭源链第一环），它的 `down_revision` **必须等于最新公开 revision**（截至 2026-11-01 是 `20261031_1600_cms_permalink`）。
 
 > 每新增一条公开迁移，就要把挂载点的 `down_revision` 顺延到它。**先执行、后顺延**，顺序见 §4.1。
+>
+> 查「最新公开 revision」不要靠翻文档（这个值天天变）：
+>
+> ```bash
+> cd /www/wwwroot/cenkor-admin
+> PYTHONPATH=backend/src python3 scripts/check-migration-graph.py --tracked-only | grep 'head'
+> # 然后核对挂载点的父是否一致：
+> grep -E '^down_revision' backend/alembic/versions/ext/20261020_0035_app_publish.py
+> ```
+>
+> 两者不一致 = 挂载点漏顺延。`check-migration-graph.py` 全量模式会当场报错。
 
 ### 规则三：两种视图都只能有一个 head
 
-- 完整工作区：head = 闭源链末端（当前 `20261027_0100_app_schema`）
-- git 跟踪视图：head = 公开链末端（当前 `20261031_1310_cms_ai_tables`）
+- 完整工作区：head = 闭源链末端
+- git 跟踪视图：head = 公开链末端
+
+两个具体值都不写死（见 §1.2 的说明），用 `check-migration-graph.py` 的两种模式查。
 
 ### 规则四：所有 DDL 必须走 alembic，禁止另开 SQL 迁移目录
 
@@ -390,7 +425,7 @@ backend/src/apps/                    # 外置应用（payment / commerce …）�
 
 | 场景 | 结果 |
 |---|---|
-| `alembic heads` | 1 个：`20261031_1310_cms_ai_tables` |
+| `alembic heads` | 1 个（= 最新公开 head，名字会随新增迁移变化，别写死在脚本里） |
 | `alembic upgrade heads` | 成功，但只建平台表；crm/erp/mes 表不存在 |
 | crm/erp/mes 应用 | 目录本身不在仓库里，不存在「装了但缺表」 |
 | CI | 只对公开链负责，绿了不代表闭源链 OK |
@@ -465,7 +500,7 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 
 1. **优先向前修**：新增一条修正迁移（补列 / 补索引 / 补数据），生产上比 downgrade 安全。
 2. `alembic downgrade -1` 只适用于**你自己刚加的、还没被业务写入依赖**的迁移。
-3. 真正回退发版：代码 `git checkout <tag>` + **数据库用升级前的备份**（PostgreSQL 用 `pg_dump` 快照），不要指望 `alembic downgrade` 走完 85 个迁移。
+3. 真正回退发版：代码 `git checkout <tag>` + **数据库用升级前的备份**（PostgreSQL 用 `pg_dump` 快照），不要指望 `alembic downgrade` 一条条走完整条链（现在 88 个迁移，且途中会穿过闭源链）。
 4. stamp 有风险：`alembic stamp <rev>` 只改版本号不动结构。stamp 前必须 `check_alembic_drift.py` 全绿，否则等于把真问题藏起来。
 
 ---
@@ -503,16 +538,30 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 
 ## 13. 附录
 
-### 13.1 关键常量（2026-10-31）
+### 13.1 关键常量
+
+> 🔴 **这张表是本文件最容易过时的地方。** 下面「值」一列只写**稳定的**东西；
+> 会变的东西（head 名、迁移数）写成**查法**。任何一次新增迁移都别指望回来改这张表。
+
+| 项 | 值 / 查法 |
+|---|---|
+| 完整工作区 head | `PYTHONPATH=backend/src python3 scripts/check-migration-graph.py \| grep head` |
+| 公开仓库 head | `PYTHONPATH=backend/src python3 scripts/check-migration-graph.py --tracked-only \| grep head` |
+| 挂载点（固定不变） | `20261020_0035_app_publish`（`ext/`）；其 `down_revision` = 最新公开 head |
+| 迁移总数 / 公开数 | 见 §1.1 顶部的统计命令 |
+| Python 解释器 | `/www/server/pyporject_evn/cenkor/bin/python3` |
+| 数据库 | 仅 PostgreSQL（`DATABASE_URL_SYNC`，psycopg2） |
+
+<details>
+<summary>2026-11-01 实测快照（仅供对照，会变）</summary>
 
 | 项 | 值 |
 |---|---|
-| 完整工作区 head | `20261027_0100_app_schema` |
-| 公开仓库 head | `20261031_1310_cms_ai_tables` |
-| 挂载点 | `20261020_0035_app_publish`（down → `20261031_1310_cms_ai_tables`） |
-| 迁移总数 / 公开数 | 87 / 43 |
-| Python 解释器 | `/www/server/pyporject_evn/cenkor/bin/python3` |
-| 数据库 | 仅 PostgreSQL（`DATABASE_URL_SYNC`，psycopg2） |
+| 完整工作区 | 88 个迁移，head = `20261027_0100_app_schema` |
+| 公开视图 | 44 个迁移，head = `20261031_1600_cms_permalink` |
+| 挂载点父节点 | `20261031_1600_cms_permalink` |
+
+</details>
 
 ### 13.2 脚本索引
 

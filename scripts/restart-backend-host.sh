@@ -1,5 +1,11 @@
 #!/bin/bash
-# 宿主机 uvicorn 重启（宝塔 baota-static 裸进程模式）
+# 宿主机 uvicorn 重启（「裸进程 / systemd」路线专用）
+#
+# ⚠️ 本机生产不走这条路 —— 后端由宝塔「Python 项目」托管（auto_run=true 自愈）。
+#    在宝塔托管环境下执行本脚本会与守护进程打架：kill 掉宝塔的进程后再 nohup 裸起一个，
+#    宝塔守护认不出（用户/参数不匹配）→ 每 120 秒拉起一个新实例再杀掉，
+#    并且裸起的实例会连到错误的 Redis 库（脚本缺省 db0，生产是 db5）。
+#    因此下面加了运行前拦截，检测到宝塔托管时直接拒绝。
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -8,6 +14,31 @@ ENV_FILE="${ENV_FILE:-.env.prod}"
 PORT="${BACKEND_HOST_PORT:-8002}"
 LOG="${LOG:-/tmp/cenkor-uvicorn.log}"
 PIDFILE="${PIDFILE:-/tmp/cenkor-uvicorn.pid}"
+
+# ---- 宝塔托管检测：命中则拒绝执行，避免抢端口 / 连错库 ----
+BAOTA_PID_DIR="/www/server/python_project/vhost/pids"
+if [ -d "$BAOTA_PID_DIR" ]; then
+  for f in "$BAOTA_PID_DIR"/*.pid; do
+    [ -f "$f" ] || continue
+    bp="$(tr -dc '0-9' < "$f" 2>/dev/null || true)"
+    [ -n "$bp" ] || continue
+    if ! kill -0 "$bp" 2>/dev/null; then continue; fi
+    # 这个宝塔项目是否正占着我们要用的端口
+    if ss -lntp 2>/dev/null | grep -q ":${PORT} .*pid=${bp},"; then
+      echo "✗ 检测到宝塔「Python 项目」$(basename "$f" .pid) 正在托管端口 ${PORT}（pid ${bp}）。" >&2
+      echo "" >&2
+      echo "  本机生产必须由宝塔托管，手动重启会让守护进程失联。" >&2
+      echo "  正确做法（任选其一）：" >&2
+      echo "    1) 宝塔面板 → 网站 → Python 项目 → cenkor → 重启" >&2
+      echo "    2) 命令行：kill ${bp}   然后不要手动拉起，等宝塔自愈（10~60s）" >&2
+      echo "" >&2
+      echo "  仅当确实要脱离宝塔、改走裸进程/systemd 路线时，显式跳过本检查：" >&2
+      echo "    SKIP_BAOTA_GUARD=1 bash scripts/restart-backend-host.sh" >&2
+      [ "${SKIP_BAOTA_GUARD:-0}" = "1" ] || exit 2
+      echo "  （SKIP_BAOTA_GUARD=1，已跳过拦截，继续执行）" >&2
+    fi
+  done
+fi
 
 # Python 解释器：优先 venv（BACKEND_PYTHON 可覆盖），回退 PATH 上的 python3
 PYTHON_BIN="${BACKEND_PYTHON:-/www/server/pyporject_evn/cenkor/bin/python3}"

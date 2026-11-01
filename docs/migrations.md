@@ -1,6 +1,23 @@
 # 数据库迁移：两条链、一个挂载点
 
-> ⚠️ **本文为 2026-10-27 的历史记录与事故复盘，部分结论已过时**（当时的 head 是 `0029_product_commerce`，现在完整 head 是 `20261027_0100_app_schema`）。当前权威规范见 [database-migrations.md](./database-migrations.md)。
+> 🔴 **本文是 2026-10-27 的历史记录与事故复盘，不是操作手册。**
+> 当前唯一权威规范是 [**database-migrations.md**](./database-migrations.md)，冲突时以它为准。
+>
+> **哪些内容还能信、哪些已作废：**
+>
+> | 章节 | 状态 |
+> |---|---|
+> | §1 三条硬规则、§2 两张图、§3「顺延挂载点」的五步 | ⚠️ 描述的是 **10-26 事故后、10-27 校正前**的方案。核心思路仍成立，但**具体 revision 名与"公开 head 是 `gen_inventory`"已作废** |
+> | §4 校验清单 | ⚠️ 命令可用，但注释里的 `0035 → gen_inventory → erp_init` 顺序已过时 |
+> | §5 起（含 §6 事故复盘、§10 护栏、§11 分区、§12 方案 D、§13 .gitignore） | ✅ 仍准确，且比权威文档更详细（历史背景、为什么这么改） |
+>
+> 本文里的数字（迁移条数、表数）都是**当时的快照**，不要当现状引用。查现状：
+>
+> ```bash
+> cd /www/wwwroot/cenkor-admin
+> PYTHONPATH=backend/src python3 scripts/check-migration-graph.py                # 完整工作区
+> PYTHONPATH=backend/src python3 scripts/check-migration-graph.py --tracked-only # 公开视图
+> ```
 
 
 > 适用：cenkor-admin（hub）后端。开源基础框架与商业应用共用同一套 Alembic 迁移目录，
@@ -73,7 +90,9 @@
 cd backend
 alembic heads            # 完整部署：1 个；新增迁移的中间态：2 个
 alembic current          # 线上库当前版本（应为闭源 head）
-alembic history | head   # 确认 0035 → gen_inventory → erp_init 的串联顺序
+alembic history | head   # 确认链尾串联顺序：最新公开 head → 0035_app_publish → erp_init
+                         #（10-27 时是 gen_inventory → 0035；公开链此后不断加迁移，
+                         #  所以「最新公开 head」这个名字会变，别当常量记）
 cd ..
 python3 scripts/check-migration-graph.py                # 完整工作区：必须 1 head
 python3 scripts/check-migration-graph.py --tracked-only # 开源视图：必须 1 head
@@ -316,18 +335,27 @@ python3 scripts/check_schema_drift.py --json   # CI 存档
 
 ### 11.1 目录结构
 
-81 个迁移已按应用移入子目录，`down_revision` 一个字没改 —— **执行顺序仍是原来那条单链**，
+迁移已按应用移入子目录，`down_revision` 一个字没改 —— **执行顺序仍是原来那条单链**，
 这里只是工程分类，不是分支隔离。
 
 ```
 backend/alembic/versions/
-├── core/       28  平台核心（auth / rbac / cms / portal / 通知 / 云存储 / 应用商店）
-├── erp/        19  ERP
-├── crm/         6  CRM
-├── mes/         9  MES
-├── commerce/    9  商业化（定价 / 订单 / 授权 / 支付 / 结算 / 分销 / 促销）
-└── ext/        10  平台扩展（云存储 / 工作流 / 库存 / 代码生成 / 升级 / 应用发布）
+├── core/       平台核心（auth / rbac / cms / portal / 通知 / 云存储 / 应用商店）
+├── erp/        ERP
+├── crm/        CRM
+├── mes/        MES
+├── commerce/   商业化（定价 / 订单 / 授权 / 支付 / 结算 / 分销 / 促销）
+└── ext/        平台扩展（云存储 / 工作流 / 库存 / 代码生成 / 升级 / 应用发布 / cms_*）
 ```
+
+> 目录后面的数字不写，因为每周都在加。实测命令：
+>
+> ```bash
+> cd backend/alembic/versions
+> for d in core erp crm mes commerce ext; do
+>   printf '%-10s %s\n' "$d" "$(ls $d/*.py 2>/dev/null | grep -v __init__ | wc -l)"
+> done
+> ```
 
 `alembic.ini` 里用 `version_locations` 把这 6 个目录全部纳入扫描：
 

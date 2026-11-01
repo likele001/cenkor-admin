@@ -14,7 +14,12 @@
 | **核心包** | `cenkor-admin-core-<version>-<date>.tar.gz` | 可独立部署的完整核心平台 |
 | 官网扩展 | 见 `deploy/addons/website/` | 不单独打大包，按需复制配置 |
 
-当前版本号：`0.1.0`（可通过环境变量 `PACKAGE_VERSION` 覆盖）
+版本号取自 `backend/src/cenkor_admin/VERSION`（该文件是唯一来源，`/api/health` 里的 `version`
+也是它）；`PACKAGE_VERSION=...` 可临时覆盖。当前值用一条命令确认，别信文档：
+
+```bash
+cat backend/src/cenkor_admin/VERSION
+```
 
 ---
 
@@ -42,7 +47,7 @@ npm run package:core
 **产出路径：**
 
 ```
-release/cenkor-admin-core-0.1.0-YYYYMMDD.tar.gz
+release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 ```
 
 压缩包内根目录同名，并附带 `PACKAGE.md` 快速安装说明。
@@ -55,27 +60,22 @@ release/cenkor-admin-core-0.1.0-YYYYMMDD.tar.gz
 
 | 路径 | 说明 |
 |------|------|
-| `backend/` | FastAPI 源码、Alembic 迁移、`pyproject.toml` |
+| `backend/` | FastAPI 源码、**公开链** Alembic 迁移、`pyproject.toml` |
 | `frontend/admin-web/dist/` | 管理后台**已构建**静态文件 |
 | `frontend/admin-web/src/` | 管理后台源码（便于二次开发） |
 | `frontend/portal-web/dist/` | 用户中心**已构建**静态文件 |
 | `frontend/portal-web/src/` | 用户中心源码 |
+| `frontend/landing-web/` | 品牌落地页（源码 + dist） |
 | `frontend/design-tokens/` | 设计 token |
+| `backend/src/cenkor_admin/static/apps/` | **开源**应用的插件产物（`cloud_storage` / `my_todo` / `quick_notes`） |
 | `deploy/baota/` | 宝塔伪静态、API 反代片段 |
 | `deploy/nginx/` | Docker 自管 nginx 配置 |
 | `deploy/systemd/` | 裸机 systemd 单元 |
 | `scripts/` | 构建、部署、备份、打包脚本 |
-| `docs/core_platform.md` | 核心平台文档 |
-| `docs/baota_static_deploy.md` | 宝塔部署文档 |
-| `docs/native_deploy.md` | 裸机部署文档 |
-| `docs/packaging.md` | 本文档 |
-| `docs/index.md` | 文档索引 |
-| `docker-compose.yml` | 开发环境 |
-| `docker-compose.prod.yml` | 生产 Docker |
-| `docker-compose.baota-static.yml` | 宝塔静态模式后端栈 |
-| `docker-compose.baota.yml` | 宝塔反代 Docker 前端 |
+| `docs/` | 全部文档（`addons/` 与 `domain_setup.md` 除外） |
+| `docker-compose*.yml` | 开发 / 生产 / 宝塔各模式 |
 | `.env.example` | 开发环境变量模板 |
-| `PACKAGE.md` | 包内安装速查 |
+| `PACKAGE.md` | 包内安装速查（打包时生成） |
 
 ### 不包含（需目标环境自行准备）
 
@@ -84,9 +84,42 @@ release/cenkor-admin-core-0.1.0-YYYYMMDD.tar.gz
 | `node_modules/` | 体积大；生产只需 `dist` |
 | `.env` / `.env.prod` | 含密钥，接收方自行 `gen-secrets.sh` 生成 |
 | `.git/` | 非必需 |
-| `deploy/addons/` | 官网等可选扩展，与核心解耦 |
-| `docs/addons/` | 同上 |
+| `deploy/addons/` / `docs/addons/` / `deploy/examples/` | 官网等可选扩展，与核心解耦 |
 | `docs/domain_setup.md` | Cenkor 实例专用域名文档 |
+| **`backend/src/cenkor_admin/apps/{erp,crm,mes,workflow,payment}/`** | **闭源商业应用**，见下方 ⚠️ |
+| **`backend/src/apps/`**（外置应用：payment / commerce） | **闭源商业源码** |
+| **`backend/src/cenkor_admin/static/apps/{erp,crm,mes,workflow,payment}/`** | 上述应用的前端插件产物 |
+| **`backend/alembic/versions/{erp,crm,mes}/`** | 上述应用的迁移 |
+| **`frontend/developer-web/`** | 开发者门户，闭源商业资产 |
+
+> ⚠️ **闭源资产排除是硬要求，不是可选项。**
+>
+> 闭源应用在这台服务器上是**物理存在**的（erp 64 个 .py、crm 21、mes 24、workflow 8），
+> 它们只靠 `.gitignore` 阻止进 git。而 `package-core.sh` 用的是 **`tar`**——
+> **tar 读文件系统，不读 `.gitignore`**。漏一条 `--exclude`，整份 ERP/CRM/MES 源码
+> 就会跟着核心包发到客户手里。
+>
+> 因此脚本现在有**两道防线**：
+>
+> 1. `--exclude` 列表显式排除上表所有闭源路径；
+> 2. **压缩后自检**（fail-closed）——扫包内文件名，命中任一闭源特征路径就
+>    **删掉产物并 `exit 1`**，不允许静默产出：
+>
+> ```bash
+> ▸ 自检通过：包内无闭源资产（erp / crm / mes / workflow / payment / src-apps / developer-web）
+> ```
+>
+> 新增一个商业应用时，**必须同时**更新 `--exclude` 与自检正则
+> （`FORBIDDEN_PATTERNS`），否则自检会拦下你——这正是它存在的意义。
+>
+> **交付前自检**（对已有的包也适用）：
+>
+> ```bash
+> tar -tzf release/cenkor-admin-core-*.tar.gz \
+>   | grep -E 'backend/src/apps/|apps/(erp|crm|mes|workflow|payment)/|frontend/developer-web/' \
+>   | head
+> # 输出为空才安全
+> ```
 
 ---
 
@@ -95,8 +128,8 @@ release/cenkor-admin-core-0.1.0-YYYYMMDD.tar.gz
 ### 4.1 解压
 
 ```bash
-tar -xzf cenkor-admin-core-0.1.0-20260607.tar.gz
-cd cenkor-admin-core-0.1.0-20260607
+tar -xzf cenkor-admin-core-<version>-<date>.tar.gz
+cd cenkor-admin-core-<version>-<date>
 ```
 
 ### 4.2 生成生产配置
@@ -143,6 +176,11 @@ docker compose -f docker-compose.baota-static.yml exec -T backend python -m cenk
 | 管理后台 | `frontend/admin-web/dist` | `deploy/baota/rewrite-admin.conf` | `deploy/baota/server-snippet-admin-api.conf` |
 | 用户中心 | `frontend/portal-web/dist` | `deploy/baota/rewrite-portal.conf` | `deploy/baota/server-snippet-portal-api.conf` |
 
+> **只有 2 个站点。** `deploy/baota/` 里还有 `rewrite-developer.conf` /
+> `server-snippet-developer-api.conf`，那是 Cenkor 自有实例的开发者门户
+> （`dev.cenkor.cn`）用的，**`frontend/developer-web` 不在核心包内**（闭源商业资产），
+> 接收方不需要它。
+
 详细步骤：[baota_static_deploy.md](baota_static_deploy.md)
 
 ### 4.5 验证
@@ -166,6 +204,7 @@ curl -s https://admin.your.com/api/health
 | `VITE_API_BASE_URL` | 空 | 通常空 | 构建前端时注入；同域反代留空 |
 | `BACKEND_HOST_PORT` | — | `8002` | 宿主机后端端口 |
 | `DATABASE_URL` | docker | 宿主机或容器 | PostgreSQL 连接串（本机生产指向宿主机 `127.0.0.1:5432`） |
+| `PACKAGE_VERSION` | — | — | **打包时**临时覆盖版本号；不设则读 `backend/src/cenkor_admin/VERSION` |
 
 完整模板见 `.env.example`（开发）与 `scripts/gen-secrets.sh` 生成的 `.env.prod`。
 
@@ -180,6 +219,13 @@ npm install          # 根目录 workspace
 bash scripts/build-frontends.sh
 bash scripts/package-core.sh --skip-build
 ```
+
+> 核心包里没有 `frontend/developer-web`，`build-frontends.sh` 会自动**跳过**它
+> （输出「跳过 developer-web（闭源商业资产，未随仓库分发）」），这是正常现象，
+> 不是构建失败。
+>
+> 重新打包后同样会跑闭源资产自检（见 §三）。如果接收方后来自己加了商业应用，
+> 打包会被自检拦下——按提示更新 `--exclude` 与 `FORBIDDEN_PATTERNS` 即可。
 
 若只改后端：
 
