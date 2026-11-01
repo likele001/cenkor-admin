@@ -66,7 +66,7 @@ RSS 源更简单：通道选 RSS，填 feed 地址（如 `https://example.com/fe
 需要。应用自带 `requirements.txt`（parsel / trafilatura / feedparser），在服务虚拟环境里执行 `pip install -r backend/src/apps/collect/requirements.txt` 后重启服务。
 
 **Q：版权要注意什么？**
-用「AI 改写」把素材消化成原创文章再发布；转出的草稿自带来源标注与 AI 溯源。
+用「AI 改写」把素材消化成原创文章再发布；转出的草稿自带来源标注与 AI 溯源。目标内容类型为「新闻」时，转出/发布直接进入官网新闻（www.cenkor.cn/news.html 实时可见）；其他类型进入内容引擎草稿。
 
 ## AI 改写与发布（全自动链路）
 
