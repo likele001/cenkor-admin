@@ -19,6 +19,57 @@ const expandedGroup = ref<string | null>(null)
 // 核心平台版本号（来自公开 /api/health）
 const appVersion = ref('')
 
+// 使用手册：手册站由仓库 docs/05-用户手册/ 同步而来，顶栏常驻入口，
+// 按当前所在模块直达对应那本（否则客户得凭空记住域名，等于没有）。
+const MANUAL_BASE = 'https://docs.user.023ent.net/cenkor-admin/05-用户手册'
+const MANUAL_MAP: Record<string, string> = {
+  '/cms': 'cms',
+  '/builder': 'cms',
+  '/crm': 'crm',
+  '/erp': 'erp',
+  '/mes': 'mes',
+  '/workflow': 'workflow',
+  '/payment': 'payment',
+  '/tickets': 'tickets',
+  '/cloud_storage': 'cloud_storage',
+  '/cloud-storage': 'cloud_storage',
+  '/announcements': 'announcements',
+  '/notifications': 'notification',
+  '/system/notifications': 'notification',
+  '/links': 'links',
+  '/quick_notes': 'quick_notes',
+  '/quick-notes': 'quick_notes',
+  '/my_todo': 'my_todo',
+  '/my-todo': 'my_todo',
+}
+const MANUAL_LABEL: Record<string, string> = {
+  cms: '内容管理',
+  crm: 'CRM 销售管理',
+  erp: 'ERP 管理',
+  mes: 'MES 制造执行',
+  workflow: '工作流审批',
+  payment: '支付中心',
+  tickets: '工单管理',
+  cloud_storage: '云存储',
+  announcements: '公告管理',
+  notification: '通知管理',
+  links: '链接收藏',
+  quick_notes: 'Quick Notes',
+  my_todo: 'My Todo',
+}
+// 最长前缀优先，避免短前缀误命中
+const manualKey = computed(() => {
+  const p = route.path
+  const hit = Object.keys(MANUAL_MAP)
+    .filter((k) => p === k || p.startsWith(k + '/'))
+    .sort((a, b) => b.length - a.length)[0]
+  return (hit && MANUAL_MAP[hit]) || ''
+})
+const manualUrl = computed(() =>
+  manualKey.value ? `${MANUAL_BASE}/${manualKey.value}_操作手册` : `${MANUAL_BASE}/`,
+)
+const manualLabel = computed(() => MANUAL_LABEL[manualKey.value] || '用户手册总目录')
+
 interface MenuItem {
   id: number
   key: string
@@ -304,6 +355,19 @@ async function logout() {
             />
           </div>
           <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+            <!-- 使用手册：顶栏常驻，按当前模块直达对应那本（侧栏是可滚动长列表，放底部会被挤出去） -->
+            <a
+              :href="manualUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              :title="`打开「${manualLabel}」的使用手册`"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-ink-500 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 shrink-0"
+            >
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.25v13m0-13C10.83 5.48 9.25 5 7.5 5S4.17 5.48 3 6.25v13C4.17 18.48 5.75 18 7.5 18s3.33.48 4.5 1.25m0-13C13.17 5.48 14.75 5 16.5 5c1.75 0 3.33.48 4.5 1.25v13c-1.17-.77-2.75-1.25-4.5-1.25-1.75 0-3.33.48-4.5 1.25" />
+              </svg>
+              <span class="hidden md:inline">{{ t('nav.manual', '使用手册') }}</span>
+            </a>
             <NotificationBell v-if="me" />
             <LocaleSwitcher />
             <span v-if="me" class="text-sm text-ink-500 hidden sm:inline">{{ me.nickname || me.username }}</span>
