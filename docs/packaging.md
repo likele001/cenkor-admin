@@ -56,7 +56,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 ## 三、包内清单
 
-### 包含
+### 3.1 包含
 
 | 路径 | 说明 |
 |------|------|
@@ -77,12 +77,17 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 | `.env.example` | 开发环境变量模板 |
 | `PACKAGE.md` | 包内安装速查（打包时生成） |
 
-### 不包含（需目标环境自行准备）
+### 3.2 不包含（需目标环境自行准备）
 
 | 项 | 原因 |
 |----|------|
 | `node_modules/` | 体积大；生产只需 `dist` |
-| `.env` / `.env.prod` | 含密钥，接收方自行 `gen-secrets.sh` 生成 |
+| `.env` **及所有 `.env.*`**（`.env.prod` / `.env.bak-*` / `.env.local`） | 含密钥；只保留 `.env.example` 模板 |
+| `*.bak` / `*.bak-*` / `*.bak.*` / `_bak-*` / `_rollback_bak_*` | 本地备份目录与旧产物 |
+| `*.log` / `logs/`（含 `backend/logs/`） | 生产日志，单份可达 5 MB+，且含访问 IP |
+| `.stale-apps/`（`backend/.stale-apps/`） | 已卸载应用的残留，含闭源 payment 产物 |
+| `_rollback_bak_*/cenkor_db.sql` 等库备份 | 全量业务数据，单份 1.7 MB+ |
+| `.mimocode/`、`./www`（嵌套误建目录） | 工具元数据、历史误操作残留 |
 | `.git/` | 非必需 |
 | `deploy/addons/` / `docs/addons/` / `deploy/examples/` | 官网等可选扩展，与核心解耦 |
 | `docs/domain_setup.md` | Cenkor 实例专用域名文档 |
@@ -91,6 +96,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 | **`backend/src/cenkor_admin/static/apps/{erp,crm,mes,workflow,payment}/`** | 上述应用的前端插件产物 |
 | **`backend/alembic/versions/{erp,crm,mes}/`** | 上述应用的迁移 |
 | **`frontend/developer-web/`** | 开发者门户，闭源商业资产 |
+| `verify_v11.py` | MES 端到端验证脚本，属闭源模块 |
 
 > ⚠️ **闭源资产排除是硬要求，不是可选项。**
 >
@@ -99,26 +105,66 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 > **tar 读文件系统，不读 `.gitignore`**。漏一条 `--exclude`，整份 ERP/CRM/MES 源码
 > 就会跟着核心包发到客户手里。
 >
-> 因此脚本现在有**两道防线**：
+> 同样的机制还会带走**从来没进过 git 的东西**：`.env.bak-20261007`（带真实密钥）、
+> `backend/logs/hub.log`（5 MB 生产日志）、`_rollback_bak_20261014/cenkor_db.sql`
+> （1.7 MB 全库备份）、`backend/.stale-apps/`（含闭源 payment 残留）。
+> 这些在 2026-11-01 的一次打包里全部出现过，包体积从 3.8 MB 虚涨到 13 MB。
 >
-> 1. `--exclude` 列表显式排除上表所有闭源路径；
-> 2. **压缩后自检**（fail-closed）——扫包内文件名，命中任一闭源特征路径就
->    **删掉产物并 `exit 1`**，不允许静默产出：
+> 因此脚本现在有**五道防线**，任何一道不通过都**删掉产物并 `exit 1`**：
 >
-> ```bash
-> ▸ 自检通过：包内无闭源资产（erp / crm / mes / workflow / payment / src-apps / developer-web）
-> ```
+> | 自检 | 拦什么 | 输出 |
+> |------|--------|------|
+> | 闭源资产 | erp / crm / mes / workflow / payment / src-apps / developer-web / verify_v11.py | `自检通过：包内无闭源资产…` |
+> | 凭据文件 | 任何 `.env` 变体（example 除外）、`*.pem`、`*.key`、`id_rsa*`、`*.bak*` | `自检通过：包内无凭据 / 备份文件…` |
+> | 运行时垃圾 | `logs/`、`*.log`、`_bak-*`、`_rollback_bak_*`、`.bak.`、`.stale-apps/`、`www/wwwroot/` | `自检通过：包内无运行时垃圾…` |
+> | 关键文件在不在 | 后端入口、`alembic.ini`、三套前端 `index.html`、`.env.example`、`PACKAGE.md` | `自检通过：关键文件齐全…` |
+> | 迁移链自洽 | 每个 `down_revision` 都能在包内找到 | `自检通过：包内迁移链自洽…` |
 >
-> 新增一个商业应用时，**必须同时**更新 `--exclude` 与自检正则
-> （`FORBIDDEN_PATTERNS`），否则自检会拦下你——这正是它存在的意义。
+> 最后一道是**正向**检查——防止 `--exclude` 写过头把包打空（包能打出来但缺 dist，
+> 用户部署完是个白屏）。前四道是**反向**检查，防止脏东西出去。
 >
+> 新增一个商业应用时，**必须同时**更新 `--exclude`、`FORBIDDEN_PATTERNS`，
+> 以及上面「不包含」表，否则自检会拦下你——这正是它存在的意义。
+
+### 3.3 迁移链为什么要重接
+
+核心包排除了 `alembic/versions/{erp,crm,mes}/`，但迁移是**一条串行链**：
+
+```
+crm_0006 → mes_0001 → … → mes_0009 → 20260922_0020_commerce → …
+```
+
+`commerce/20260922_0020_commerce.py` 原本 `down_revision = "20260904_mes_0009"`。
+闭源段被整段排除后，这个父节点在包内不存在，`alembic upgrade head` 直接报
+`KeyError: '20260904_mes_0009'`——包能正常解压，但**迁移跑不起来**。
+
+该迁移只新建 `app_pricing` / `app_orders` / `app_licenses` / `app_license_bindings`
+四张自建表，**不引用 MES/ERP/CRM 的任何表或 schema**，所以脚本在打包时把这个父节点
+置空（只改包内副本，不动仓库源码）：
+
+```
+▸ 已重接 commerce 迁移父节点（原 20260904_mes_0009 属闭源段，无表依赖）
+```
+
+交付包实测：
+
+```bash
+cd backend && alembic heads
+# 20261020_0035_app_publish (head)
+# 20261027_0100_app_schema (head)
+```
+
+> **升级路径注意**：核心包与完整仓库的迁移历史在这一处不同。以后接入商业模块时，
+> 用完整仓库的迁移目录，不要把两套迁移目录混用。
+
 > **交付前自检**（对已有的包也适用）：
 >
 > ```bash
-> tar -tzf release/cenkor-admin-core-*.tar.gz \
->   | grep -E 'backend/src/apps/|apps/(erp|crm|mes|workflow|payment)/|frontend/developer-web/' \
->   | head
-> # 输出为空才安全
+> P=release/cenkor-admin-core-<version>-<date>.tar.gz
+> # ① 闭源资产 / 凭据 / 垃圾，输出应为空
+> tar -tzf "$P" | grep -E 'backend/src/apps/|apps/(erp|crm|mes|workflow|payment)/|frontend/developer-web/|\.env\.|\.log$|\.stale-apps/|_bak' | head
+> # ② 迁移链能不能跑
+> tar -xzf "$P" -C /tmp && (cd /tmp/$(basename "$P" .tar.gz)/backend && alembic heads)
 > ```
 
 ---
@@ -224,8 +270,9 @@ bash scripts/package-core.sh --skip-build
 > （输出「跳过 developer-web（闭源商业资产，未随仓库分发）」），这是正常现象，
 > 不是构建失败。
 >
-> 重新打包后同样会跑闭源资产自检（见 §三）。如果接收方后来自己加了商业应用，
+> 重新打包后同样会跑 §3.2 里的五道自检。如果接收方后来自己加了商业应用，
 > 打包会被自检拦下——按提示更新 `--exclude` 与 `FORBIDDEN_PATTERNS` 即可。
+> 若自检报「迁移链不完整」，说明新加的迁移接在了不存在的父节点后面，参照 §3.3 补重接逻辑。
 
 若只改后端：
 
