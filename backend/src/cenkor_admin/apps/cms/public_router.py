@@ -792,23 +792,72 @@ async def get_public_cases(db: AsyncSession = Depends(get_db)):
 
 @router.get("/news", response_model=list[dict[str, Any]], summary="公开新闻列表")
 async def get_public_news(db: AsyncSession = Depends(get_db), limit: int = 20):
-    result = await db.execute(
-        select(models.News)
-        .where(models.News.deleted_at.is_(None), models.News.status == "published")
-        .order_by(*order_nulls_last(models.News.published_at), models.News.id.desc())
-        .limit(limit)
-    )
-    return [
-        {
-            "id": n.id,
-            "slug": n.slug,
-            "title": n.title,
-            "excerpt": n.excerpt,
-            "cover_image": n.cover_image,
-            "published_at": n.published_at.isoformat() if n.published_at else None,
-        }
-        for n in result.scalars().all()
-    ]
+    """官网新闻列表数据源。
+
+    内容引擎的 news 类型条目是新闻的**真源**（详情页反解 / canonical / sitemap
+    都建立在 Entry 上，见 _load_page_item 的说明），这里必须以 Entry 为主 ——
+    只查旧 News 专用表的话，后台发布的新闻列表能看到、点进详情就 404，
+    两边数据源不一致。
+
+    旧 News 专用表作为兜底补位（历史上直接写表的数据），slug 与 Entry 重重的跳过。
+    """
+    items: list[dict[str, Any]] = []
+
+    ct_row = (
+        await db.execute(select(models.ContentType).where(models.ContentType.key == "news"))
+    ).scalar_one_or_none()
+    if ct_row is not None:
+        entries = (
+            await db.execute(
+                select(models.Entry)
+                .where(
+                    models.Entry.content_type_id == ct_row.id,
+                    models.Entry.status == "published",
+                    models.Entry.deleted_at.is_(None),
+                )
+                .order_by(models.Entry.published_at.desc().nullslast(), models.Entry.id.desc())
+                .limit(limit)
+            )
+        ).scalars().all()
+        for e in entries:
+            content = e.content or {}
+            items.append(
+                {
+                    "id": e.id,
+                    "slug": e.slug,
+                    "title": e.title,
+                    "excerpt": str(content.get("summary") or "")[:500],
+                    "cover_image": content.get("cover") if isinstance(content, dict) else None,
+                    "published_at": e.published_at.isoformat() if e.published_at else None,
+                }
+            )
+
+    if len(items) < limit:
+        need = limit - len(items)
+        rows = (
+            await db.execute(
+                select(models.News)
+                .where(models.News.deleted_at.is_(None), models.News.status == "published")
+                .order_by(*order_nulls_last(models.News.published_at), models.News.id.desc())
+                .limit(need)
+            )
+        ).scalars().all()
+        seen_slugs = {i["slug"] for i in items if i.get("slug")}
+        for n in rows:
+            if n.slug in seen_slugs:
+                continue
+            seen_slugs.add(n.slug)
+            items.append(
+                {
+                    "id": n.id,
+                    "slug": n.slug,
+                    "title": n.title,
+                    "excerpt": n.excerpt,
+                    "cover_image": n.cover_image,
+                    "published_at": n.published_at.isoformat() if n.published_at else None,
+                }
+            )
+    return items
 
 
 @router.get("/news/{slug}", response_model=dict[str, Any], summary="公开新闻详情")
@@ -1324,6 +1373,10 @@ async def _load_page_item(db: AsyncSession, slug: str, kind: str) -> dict | None
             ).scalar_one_or_none()
             if row is not None:
                 item = _news_to_item(row)
+                # _news_to_item 把 published_at 转成了 isoformat 字符串（列表 JSON 用），
+                # 但页面渲染链（canonical 计算 _page_path → published.year）需要 datetime，
+                # 字符串传进去直接 AttributeError 500。兜底路径恢复成原始类型。
+                item["published_at"] = row.published_at
             else:
                 return await _load_entry_page_item(db, slug, "article", strict=False)
         else:
