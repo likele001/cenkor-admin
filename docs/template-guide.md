@@ -13,6 +13,11 @@
 >
 > 记不住名字不用背：**后台「CMS → 模板工作台 → 标签速查」**里点一下就能插进模板，
 > 支持按名字或用途搜（搜「分页」「日期」都行）。
+>
+> **配套参考手册（分页版）**：[标签总览](template/index.md) · [全量速查](template/methods.md) ·
+> [内容标签](template/article.md) · [结构标签](template/tag.md) · [站点与配置](template/config.md) ·
+> [评论·表单·媒体·多语言](template/comment.md) · [自定义标签开发](template/develop.md)。
+> 本篇是教程，参考手册是字典，两边内容同源（context-api），随手查用手册更顺手。
 
 ---
 

@@ -28,7 +28,7 @@ echo "▸ 清理旧文档..."
 #    或改名前的 INDEX.md），普通 *.md 通配匹配不到它们，残骸会跨次同步存活，
 #    并触发下面的大小写撞名。
 find "$DEST" -mindepth 1 -maxdepth 1 -iname '*.md' -delete
-rm -rf "$DEST/archive" "$DEST/apps" "$DEST/addons" "$DEST/release"
+rm -rf "$DEST/archive" "$DEST/apps" "$DEST/addons" "$DEST/release" "$DEST/template"
 rm -rf "$DEST"/[0-9][0-9]-*/   # 数字前缀目录每轮重建（见下方「用户手册」说明）
 
 echo "▸ 复制仓库根级文档..."
@@ -44,7 +44,7 @@ cp "$SRC/docs"/*.md "$DEST/"
 echo "▸ 复制子目录..."
 # ⚠️ archive/ 不上线：它是已归档历史文档，其中的模板语法 {{ }} 会被 VitePress 的
 #    Vue 编译器当成插值解析而报错；归档本就不该出现在站点上。
-for d in apps addons release; do
+for d in apps addons release template; do
   if [ -d "$SRC/docs/$d" ]; then
     mkdir -p "$DEST/$d"
     find "$SRC/docs/$d" -maxdepth 1 -name '*.md' -exec cp {} "$DEST/$d/" \;
