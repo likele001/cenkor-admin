@@ -48,7 +48,11 @@ SKIP_STEMS = {
 }
 
 # 代码标识符、MCP 工具名、列名等，不是表名
-NOT_TABLES = {"portal_payload", "portal_token", "cms_page_router"}
+NOT_TABLES = {
+    "portal_payload", "portal_token", "cms_page_router",
+    # 模板 API 的装饰器名，不是表
+    "cms_api",
+}
 
 # 文档示例里虚构的 App key / 占位符：它们的存在意义就是「教你怎么写」，
 # 代码里当然找不到对应前缀，不算硬错误。
@@ -57,17 +61,42 @@ NOT_TABLE_PREFIX = re.compile(r"^cms_(create|update|get|list|search|publish|tran
 NOT_TABLE_SUFFIX = ("_models", "_tables", "_page", "_model", "_id", "_bp")
 
 
+def _dotenv() -> dict[str, str]:
+    """从 backend/.env 读连接参数。
+
+    脚本通常被 CI 或人直接跑，环境里没有 PGPASSWORD —— psql 会转而**交互式等待
+    输入口令**，20 秒后超时，表名校验就被静默跳过了（看上去一切正常，其实没查）。
+    """
+    for p in (REPO / "backend/.env", REPO / ".env"):
+        if not p.exists():
+            continue
+        out: dict[str, str] = {}
+        for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"').strip("'")
+        return out
+    return {}
+
+
 def psql_tables() -> set[str]:
+    dot = _dotenv()
     env = {
         **os.environ,
-        "PGHOST": os.environ.get("PGHOST", "127.0.0.1"),
-        "PGUSER": os.environ.get("PGUSER", "cenkor"),
-        "PGDATABASE": os.environ.get("PGDATABASE", "cenkor"),
-        "PGPASSWORD": os.environ.get("PGPASSWORD", ""),
+        "PGHOST": os.environ.get("PGHOST") or dot.get("POSTGRES_HOST") or "127.0.0.1",
+        "PGPORT": os.environ.get("PGPORT") or dot.get("POSTGRES_PORT") or "5432",
+        "PGUSER": os.environ.get("PGUSER") or dot.get("POSTGRES_USER") or "cenkor",
+        "PGDATABASE": os.environ.get("PGDATABASE") or dot.get("POSTGRES_DB") or "cenkor",
+        "PGPASSWORD": os.environ.get("PGPASSWORD") or dot.get("POSTGRES_PASSWORD") or "",
     }
     sql = "select table_name from information_schema.tables where table_schema='public'"
     try:
-        r = subprocess.run([PG, "-At", "-c", sql], capture_output=True, text=True, env=env, timeout=20)
+        # -w：绝不提示输入口令。缺口令时立即失败，好过挂到超时后静默跳过校验。
+        r = subprocess.run(
+            [PG, "-w", "-At", "-c", sql], capture_output=True, text=True, env=env, timeout=20
+        )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         print(f"⚠️  连不上数据库，跳过表名校验：{exc}", file=sys.stderr)
         return set()
@@ -98,6 +127,25 @@ def backend_source() -> str:
     return "\n".join(
         p.read_text(encoding="utf-8", errors="ignore") for p in root.rglob("*.py")
     )
+
+
+def table_pipe_issues(text: str) -> list[tuple[int, str]]:
+    """表格单元格里的行内 code 含未转义的 ``|``。
+
+    markdown 会把 ``|`` 当列分隔符，把 ``{{ now|date }}`` 劈成两半 ——
+    反引号因此不配对，``{{`` 裸露成正文。文档站点用 VitePress（Vue 渲染），
+    裸 ``{{ }}`` 会被当 JS 表达式解析，构建直接失败，而且报错行号指向
+    别的地方（转成 SFC 后行号偏移），非常难查。
+    """
+    out: list[tuple[int, str]] = []
+    for i, ln in enumerate(text.split("\n"), 1):
+        s = ln.strip()
+        if not (s.startswith("|") and s.endswith("|")):
+            continue
+        for m in re.finditer(r"`([^`]*)`", s):
+            if re.search(r"(?<!\\)\|", m.group(1)):
+                out.append((i, m.group(1)))
+    return out
 
 
 def main() -> int:
@@ -136,6 +184,10 @@ def main() -> int:
                     continue
                 if seg and seg not in src:
                     problems.append((rel, "API 前缀在代码里找不到", p))
+
+        for line_no, snippet in table_pipe_issues(text):
+            problems.append((rel, "表格单元格里的 | 未转义（会导致站点构建失败）",
+                             f"L{line_no} {snippet[:60]}"))
 
     print(f"校验文件 {len(files)} 份 · 表 {len(tables)} 张 · 前端路由 {len(routes)} 条\n")
     if not problems:

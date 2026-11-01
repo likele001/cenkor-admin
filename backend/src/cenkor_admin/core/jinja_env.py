@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import markdown as _md
+import structlog
 from jinja2 import BaseLoader, ChainableUndefined, Template, TemplateNotFound, TemplateSyntaxError
 from jinja2.exceptions import SecurityError
 from jinja2.runtime import Macro
@@ -33,16 +34,23 @@ __all__ = [
     "CmsLoader",
     "CmsSandbox",
     "TemplateSyntaxError",
+    "app_template_filters",
+    "app_template_functions",
+    "bind_app_function",
     "clear_template_cache",
     "flush_compiled_templates",
     "get_env",
     "get_template_meta",
     "is_safe_template_name",
+    "register_template_api",
     "render_source",
     "render_template_file",
     "set_resolver",
+    "unregister_template_api",
     "validate_source",
 ]
+
+log = structlog.get_logger()
 
 # ---------------------------------------------------------------- 常量
 
@@ -357,6 +365,163 @@ def _register_filters(env: CmsSandbox) -> None:
         "highlight": _f_highlight,
         "json_safe": _f_to_json_safe,
     })
+    # 记录「已被占用」的过滤器名：Jinja 内置（abs / default / attr …）+ 上面这 19 个。
+    # App 注册同名过滤器会被拒，避免静默覆盖核心行为。
+    global _BUILTIN_FILTER_NAMES
+    _BUILTIN_FILTER_NAMES = frozenset(env.filters)
+
+
+_BUILTIN_FILTER_NAMES: frozenset[str] = frozenset()
+
+
+# ---------------------------------------------------------------- 第三方模板标签
+#
+# 站点主题的 16 个数据 API + 16 个过滤器属于核心内置（apps/cms/template_context.py），
+# 不在这里。这里管的是 App 自己带进来的标签：
+#
+#     apps/<key>/template_tags.py
+#         FUNCTIONS = {"<name>": fn}   # fn(ctx, *args, **kwargs)
+#         FILTERS   = {"<name>": fn}   # fn(value, *args)
+#
+# 启动时由 api/v1/__init__.py 的 _discover_and_register 自动发现并注册。
+#
+# 为什么函数收 ctx：App 的标签通常不是从零算起，而是「复用已有能力再加工」——
+# 取 6 条内容再补一个 App 自有字段。ctx 是 TemplateContext 实例，
+# 直接调 ctx.content_list(...) 就拿到绑定当前站点的数据，不用自己拿 session。
+#
+# 安全边界：注册进来的函数 = 把能力暴露给**所有能编辑站点模板的人**。
+# 只注册只读、结果可控的纯函数，不要在标签里做写操作或扇出外部请求。
+
+_RESERVED_TEMPLATE_NAMES = frozenset({
+    # 预注入变量
+    "page", "item", "items", "pagination", "base_url", "theme_css", "theme_name", "now",
+    # 内置数据 API
+    "content_list", "content", "related", "search", "categories", "category_tree",
+    "tags", "nav", "site", "site_meta", "asset", "url", "comments", "form",
+    "media_list", "trans",
+})
+
+_TAG_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,39}$")
+_APP_KEY_RE = re.compile(r"^[a-z_][a-z0-9_]{0,49}$")
+
+_APP_FUNCTIONS: dict[str, dict[str, Any]] = {}
+_APP_FILTERS: dict[str, dict[str, Any]] = {}
+_TAG_LOCK = threading.RLock()
+
+
+def _tag_error(app_key: str, name: Any, *, kind: str) -> str | None:
+    """校验标签名格式；不通过返回原因，通过返回 None。"""
+    if not isinstance(name, str) or not _TAG_NAME_RE.match(name):
+        return (
+            f"{kind}名 {name!r} 不合法：只允许小写字母、数字、下划线，"
+            f"不以数字开头，长度 ≤ 40"
+        )
+    return None
+
+
+def register_template_api(
+    app_key: str,
+    *,
+    functions: dict[str, Any] | None = None,
+    filters: dict[str, Any] | None = None,
+) -> dict[str, int]:
+    """注册一个 App 的模板函数 / 过滤器，返回实际接受的数量。
+
+    幂等：同一个 app_key 重复注册会覆盖自己的旧条目（热重载友好）。
+    跨 App 重名、撞内置、名字不合法、不可调用 —— 一律跳过并记 warning，
+    不抛异常，避免一个坏 App 拖垮全站模板。
+    """
+    if not isinstance(app_key, str) or not _APP_KEY_RE.match(app_key):
+        raise ValueError(f"app_key 不合法：{app_key!r}（只允许小写字母、数字、下划线）")
+
+    accepted_fns: dict[str, Any] = {}
+    accepted_flt: dict[str, Any] = {}
+    with _TAG_LOCK:
+        for kind, items, bucket, reserved, out in (
+            ("模板函数", functions or {}, _APP_FUNCTIONS, _RESERVED_TEMPLATE_NAMES, accepted_fns),
+            ("过滤器", filters or {}, _APP_FILTERS, _BUILTIN_FILTER_NAMES, accepted_flt),
+        ):
+            for name, fn in items.items():
+                err = _tag_error(app_key, name, kind=kind)
+                if err is None and name in reserved:
+                    err = f"{kind}名 {name!r} 已被内置占用，换个名字（建议加前缀，如 {app_key}_{name}）"
+                if err is None and not callable(fn):
+                    err = f"{kind} {name!r} 不是可调用对象"
+                if err is None:
+                    owner = next(
+                        (k for k, v in bucket.items() if k != app_key and name in v), None
+                    )
+                    if owner:
+                        err = f"{kind}名 {name!r} 已被 App {owner!r} 占用"
+                if err:
+                    log.warning("template_api.rejected", app=app_key, error=err)
+                    continue
+                bucket.setdefault(app_key, {})[name] = fn
+                out[name] = fn
+
+        if _ENV is not None:
+            for name, fn in accepted_flt.items():
+                _ENV.filters[name] = fn
+
+    if accepted_fns or accepted_flt:
+        # 已编译的模板可能把「未定义名」固化过，清一层编译缓存最稳
+        flush_compiled_templates()
+        log.info(
+            "template_api.registered",
+            app=app_key,
+            functions=len(accepted_fns),
+            filters=len(accepted_flt),
+        )
+    return {"functions": len(accepted_fns), "filters": len(accepted_flt)}
+
+
+def unregister_template_api(app_key: str) -> dict[str, int]:
+    """摘掉某个 App 的全部模板标签（卸载 / 停用时调用）。"""
+    with _TAG_LOCK:
+        fns = _APP_FUNCTIONS.pop(app_key, {})
+        flts = _APP_FILTERS.pop(app_key, {})
+        if _ENV is not None:
+            for name in flts:
+                _ENV.filters.pop(name, None)
+    if fns or flts:
+        flush_compiled_templates()
+        log.info(
+            "template_api.unregistered",
+            app=app_key,
+            functions=len(fns),
+            filters=len(flts),
+        )
+    return {"functions": len(fns), "filters": len(flts)}
+
+
+def app_template_functions() -> dict[str, Any]:
+    """所有 App 注册的模板函数（扁平化，注册时已保证跨 App 不重名）。"""
+    with _TAG_LOCK:
+        return {n: f for items in _APP_FUNCTIONS.values() for n, f in items.items()}
+
+
+def app_template_filters() -> dict[str, Any]:
+    with _TAG_LOCK:
+        return {n: f for items in _APP_FILTERS.values() for n, f in items.items()}
+
+
+def bind_app_function(fn: Any, ctx: Any) -> Any:
+    """把 ctx 绑到 App 模板函数的第一个参数上，并打沙箱放行标记。"""
+
+    def _bound(*args: Any, **kwargs: Any) -> Any:
+        return fn(ctx, *args, **kwargs)
+
+    _bound.__cms_api__ = True  # type: ignore[attr-defined]
+    _bound.__name__ = getattr(fn, "__name__", "app_template_function")
+    _bound.__doc__ = getattr(fn, "__doc__", None)
+    return _bound
+
+
+def _apply_app_filters(env: CmsSandbox) -> None:
+    with _TAG_LOCK:
+        for items in _APP_FILTERS.values():
+            for name, fn in items.items():
+                env.filters[name] = fn
 
 
 # ---------------------------------------------------------------- 环境与缓存
@@ -379,6 +544,7 @@ def get_env() -> CmsSandbox:
             auto_reload=False,
         )
         _register_filters(env)
+        _apply_app_filters(env)
         # 只留安全的内置助手，range 换限流版
         env.globals.clear()
         env.globals.update({

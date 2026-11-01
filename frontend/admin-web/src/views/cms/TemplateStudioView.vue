@@ -58,6 +58,106 @@ const diffText = ref('')
 const diffStat = ref({ added: 0, removed: 0 })
 
 const newTheme = ref('')
+
+// ---------------------------------------------------------------- 标签速查
+// 写模板最卡的是「不知道能调什么」——以前只能去翻 docs/template-guide.md。
+// 后端 /templates/context-api 一直有这份清单，前端没接，等于白写一份接口。
+interface TagItem {
+  name: string
+  desc: string
+  insert: string
+  sign?: string
+  usage?: string
+  group?: string
+  type?: string
+  aliases?: string[]
+}
+
+interface CtxApi {
+  apis: TagItem[]
+  filters: TagItem[]
+  variables: TagItem[]
+  sandbox: { autoescape: boolean; rules: string[] }
+  macro: { how: string; then: string; hint: string }
+  app_tags: { functions: string[]; filters: string[]; hint: string }
+}
+
+const showTags = ref(false)
+const tagQuery = ref('')
+const tagTab = ref<'api' | 'filter' | 'var'>('api')
+const TABS = [
+  { key: 'api' as const, label: '数据 API' },
+  { key: 'filter' as const, label: '过滤器' },
+  { key: 'var' as const, label: '变量' },
+]
+const ctxApi = ref<CtxApi | null>(null)
+const loadingTags = ref(false)
+
+async function loadCtxApi() {
+  if (ctxApi.value || loadingTags.value) return
+  loadingTags.value = true
+  try {
+    const { data } = await api.get(`${BASE}/context-api`)
+    ctxApi.value = data
+  } catch (e: any) {
+    flash('err', errText(e, '标签列表加载失败'))
+  } finally {
+    loadingTags.value = false
+  }
+}
+
+function toggleTags() {
+  showTags.value = !showTags.value
+  if (showTags.value) loadCtxApi()
+}
+
+const tagSource = computed<TagItem[]>(() => {
+  const d = ctxApi.value
+  if (!d) return []
+  return tagTab.value === 'api' ? d.apis : tagTab.value === 'filter' ? d.filters : d.variables
+})
+
+const filteredTags = computed<TagItem[]>(() => {
+  const q = tagQuery.value.trim().toLowerCase()
+  if (!q) return tagSource.value
+  return tagSource.value.filter((x) =>
+    `${x.name} ${x.desc || ''} ${x.sign || ''} ${x.usage || ''} ${(x.aliases || []).join(' ')}`
+      .toLowerCase()
+      .includes(q),
+  )
+})
+
+const tagGroups = computed<[string, TagItem[]][]>(() => {
+  const list = filteredTags.value
+  if (tagTab.value !== 'api') return [['', list]]
+  const order = ['内容', '结构', '站点', '其他']
+  const map = new Map<string, TagItem[]>()
+  for (const it of list) {
+    const k = it.group || '其他'
+    if (!map.has(k)) map.set(k, [])
+    map.get(k)!.push(it)
+  }
+  return order.filter((k) => map.has(k)).map((k) => [k, map.get(k)!])
+})
+
+// $0 是光标落点标记：for 骨架插进去后光标停在循环体，不用再手动跳
+function insertTag(item: TagItem) {
+  if (!view) {
+    flash('err', '先在左侧选一个模板文件')
+    return
+  }
+  const raw = item.insert || ''
+  const marker = raw.indexOf('$0')
+  const payload = marker >= 0 ? raw.replace('$0', '') : raw
+  const caret = marker >= 0 ? marker : payload.length
+  const { from, to } = view.state.selection.main
+  view.dispatch({
+    changes: { from, to, insert: payload },
+    selection: { anchor: from + caret },
+    scrollIntoView: true,
+  })
+  view.focus()
+}
 const importInput = ref<HTMLInputElement | null>(null)
 
 const dirty = computed(() => content.value !== originContent.value)
@@ -451,6 +551,14 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
       </div>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
+        <button
+          class="btn-ghost text-sm"
+          :class="showTags ? 'text-blue-600' : ''"
+          title="列出模板里能用的变量、数据 API 与过滤器，点一下插入"
+          @click="toggleTags"
+        >
+          标签速查
+        </button>
         <button class="btn-ghost text-sm" @click="showHelp = true">使用说明</button>
         <select :value="currentTheme" class="input w-44 text-sm" @change="onThemeChange">
           <option v-for="t in themes" :key="t.theme" :value="t.theme">
@@ -533,7 +641,66 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
             <button class="btn-ghost text-xs" :disabled="sourceKind !== 'db'" @click="revert">还原</button>
           </div>
         </div>
-        <div ref="host" class="min-h-0 flex-1 overflow-hidden" />
+        <div class="relative min-h-0 flex-1 overflow-hidden">
+          <div ref="host" class="h-full" :class="showTags ? 'mr-[17rem]' : ''" />
+
+          <!-- 标签速查：写模板时不用再切到文档去翻 -->
+          <aside
+            v-if="showTags"
+            class="absolute inset-y-0 right-0 flex w-[17rem] flex-col border-l border-ink-100 bg-white"
+          >
+            <div class="flex items-center gap-1 border-b border-ink-100 px-2 py-1.5">
+              <span class="text-xs font-medium">标签速查</span>
+              <button class="ml-auto text-[11px] text-ink-400 hover:text-ink-700" @click="showTags = false">关闭</button>
+            </div>
+
+            <div class="flex gap-1 border-b border-ink-100 px-2 py-1.5">
+              <button
+                v-for="t in TABS"
+                :key="t.key"
+                class="rounded px-1.5 py-0.5 text-[11px]"
+                :class="tagTab === t.key ? 'bg-blue-50 font-medium text-blue-700' : 'text-ink-500 hover:bg-ink-50'"
+                @click="tagTab = t.key"
+              >
+                {{ t.label }}
+              </button>
+            </div>
+
+            <div class="border-b border-ink-100 px-2 py-1.5">
+              <input v-model="tagQuery" class="input h-7 w-full text-xs" placeholder="搜名字或用途，如 分页 / date" />
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-auto p-1.5">
+              <p v-if="loadingTags" class="p-2 text-[11px] text-ink-400">加载中…</p>
+              <p v-else-if="!filteredTags.length" class="p-2 text-[11px] text-ink-400">没匹配的标签</p>
+              <div v-for="[g, list] in tagGroups" :key="g" class="mb-2">
+                <div v-if="g" class="px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-400">{{ g }}</div>
+                <button
+                  v-for="it in list"
+                  :key="it.name"
+                  class="block w-full rounded px-1.5 py-1 text-left hover:bg-ink-50"
+                  :title="it.insert"
+                  @click="insertTag(it)"
+                >
+                  <div class="flex items-baseline gap-1">
+                    <code class="text-[11px] font-medium text-blue-700">{{ it.name }}</code>
+                    <span v-if="it.aliases?.length" class="text-[10px] text-ink-400">/ {{ it.aliases.join(' ') }}</span>
+                    <span v-if="it.type" class="ml-auto shrink-0 text-[10px] text-ink-400">{{ it.type }}</span>
+                  </div>
+                  <p class="mt-0.5 truncate text-[11px] leading-4 text-ink-500">{{ it.desc }}</p>
+                </button>
+              </div>
+            </div>
+
+            <div v-if="ctxApi" class="border-t border-ink-100 px-2 py-1.5 text-[10px] leading-4 text-ink-400">
+              <p>自动转义开着，输出 HTML 要加 <code class="text-ink-600">|safe</code></p>
+              <p class="mt-0.5">不能调 Python 内置，只能调上面这些和 {% macro %}</p>
+              <p v-if="ctxApi.app_tags.functions.length || ctxApi.app_tags.filters.length" class="mt-1 text-ink-500">
+                来自 App：{{ [...ctxApi.app_tags.functions, ...ctxApi.app_tags.filters].join('、') }}
+              </p>
+            </div>
+          </aside>
+        </div>
       </section>
 
       <!-- 预览 / 差异 -->

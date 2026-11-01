@@ -311,14 +311,88 @@ def _auto_register_app_routers() -> None:
         _discover_and_register(external_dir)
 
 
+def register_app_template_tags(
+    app_key: str, *, path: Path | None = None
+) -> bool:
+    """发现并注册 App 的模板标签：``apps/<key>/template_tags.py``。
+
+    文件里声明两个 dict 即可，其余交给框架：
+
+        FUNCTIONS = {"my_widget": fn}   # fn(ctx, *args, **kwargs)
+        FILTERS   = {"my_price": fn}    # fn(value, *args)
+
+    与路由的差别：模板标签没有「一次请求」可以挂依赖守卫，所以注册进来就全局可用。
+    停用 App **不会**自动摘掉标签，卸载时由调用方显式
+    ``unregister_template_api(app_key)``。模块不存在 / 加载失败一律返回 False，
+    不抛异常 —— 闭源 App 在核心包里缺失属于正常情况，不该拖垮启动。
+    """
+    from cenkor_admin.core.jinja_env import register_template_api
+
+    if path is None:
+        found = _resolve_app_file(app_key, "template_tags.py")
+        if found is None:
+            return False
+        path = found
+    if not path.exists():
+        return False
+
+    name = f"app_template_tags.{app_key}"
+    sys.modules.pop(name, None)
+    try:
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            log.warning("app.template_tags_no_spec", key=app_key)
+            return False
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        try:
+            spec.loader.exec_module(module)
+        except BaseException:
+            sys.modules.pop(name, None)  # 半个模块留在 sys.modules 更糟
+            raise
+    except Exception as exc:
+        log.warning("app.template_tags_failed", key=app_key, error=str(exc))
+        return False
+
+    functions = getattr(module, "FUNCTIONS", None) or {}
+    filters = getattr(module, "FILTERS", None) or {}
+    if not isinstance(functions, dict) or not isinstance(filters, dict):
+        log.warning(
+            "app.template_tags_bad_shape",
+            key=app_key,
+            hint="FUNCTIONS / FILTERS 必须是 dict（name -> callable）",
+        )
+        return False
+
+    result = register_template_api(app_key, functions=functions, filters=filters)
+    return bool(result["functions"] or result["filters"])
+
+
+def _resolve_app_file(app_key: str, filename: str) -> Path | None:
+    """在核心 apps/ 与外置 src/apps/ 里找 App 内的文件。"""
+    from cenkor_admin import apps as apps_pkg
+
+    apps_dir = Path(apps_pkg.__path__[0])
+    for base in (apps_dir, apps_dir.parent.parent / "apps"):
+        candidate = base / app_key / filename
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _discover_and_register(apps_dir: Path) -> None:
-    """扫描单个 App 目录并注册路由。"""
+    """扫描单个 App 目录，注册路由与模板标签。"""
     for item in sorted(apps_dir.iterdir()):
         if item.name.startswith("_") or not item.is_dir():
             continue
-        if not (item / "router.py").exists():
+        has_router = (item / "router.py").exists()
+        has_tags = (item / "template_tags.py").exists()
+        if not (has_router or has_tags):
             continue
-        register_app_router(item.name)
+        if has_router:
+            register_app_router(item.name)
+        if has_tags:
+            register_app_template_tags(item.name, path=item / "template_tags.py")
 
 
 _auto_register_app_routers()

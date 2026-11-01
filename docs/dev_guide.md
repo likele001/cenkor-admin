@@ -660,6 +660,156 @@ cp -r dist/* ../../../static/apps/my_app/     # 注意是三级：frontend → m
 
 ---
 
+## 站点模板标签：给主题加自定义标签
+
+先明确一件事：**这套系统的「标签」不是短代码**。没有 `{dede:arclist}`、没有
+`[gallery]`、没有 `<?php ?>`。所谓标签就是 Jinja2 里的**函数调用 + 过滤器**：
+
+```jinja
+{% for r in content_list('article', limit=6) %}
+  <a href="{{ r.url }}">{{ r.title }}</a>
+{% endfor %}
+
+{{ content.text|markdown }}
+```
+
+内置的是 **16 个数据 API + 16 个过滤器（19 个名字）**，主体在
+`apps/cms/template_context.py`（API，方法上打 `@cms_api`）与 `core/jinja_env.py`
+（过滤器，`_register_filters`）。完整清单看
+[template-guide.md](template-guide.md) §五、§六，或直接在后台
+「CMS → 模板工作台 → 标签速查」里点选插入。
+
+### 内置标签不能覆盖，但 App 可以加自己的
+
+App 目录下放一个 `template_tags.py`，声明两个 dict 就行，**启动时自动发现**，
+不用改核心、不用在别处登记：
+
+```
+apps/my_app/
+├── __init__.py
+├── router.py
+├── template_tags.py     # ← 新增，有它就会被注册
+└── models.py
+```
+
+```python
+# apps/my_app/template_tags.py
+from sqlalchemy import select
+from cenkor_admin.apps.my_app import models
+
+
+def my_app_specials(ctx, limit: int = 6) -> list[dict]:
+    """App 自有的「精选」列表，供主题模板调用。
+
+    ctx 是 TemplateContext —— 顺手就能用 ctx.content_list() / ctx.nav()
+    / ctx.url() 拿到绑定当前站点的数据，不用自己拿 session、不用管多站点。
+    """
+    limit = max(1, min(int(limit or 6), 30))          # 一律夹上限
+    rows = ctx.session.execute(
+        select(models.Special).order_by(models.Special.sort).limit(limit)
+    ).scalars().all()
+    return [{"id": r.id, "title": r.title, "url": r.url} for r in rows]
+
+
+def my_app_domain(url) -> str:
+    """过滤器：从 URL 取主机名。"""
+    from urllib.parse import urlparse
+    return urlparse(str(url or "")).netloc
+
+
+FUNCTIONS = {
+    "my_app_specials": my_app_specials,   # 模板里 {{ my_app_specials(3) }}
+}
+
+FILTERS = {
+    "my_app_domain": my_app_domain,       # 模板里 {{ item.url|my_app_domain }}
+}
+```
+
+主题里直接用：
+
+```jinja
+{% for s in my_app_specials(limit=3) %}
+  <a href="{{ s.url }}">{{ s.title }}</a>
+{% endfor %}
+```
+
+### 两种标签的签名不一样
+
+| 类型 | 注册位置 | 签名 | 拿到 ctx |
+|---|---|---|---|
+| 函数 | `FUNCTIONS` | `fn(ctx, *args, **kwargs)` | ✅ 第一个参数固定是 ctx |
+| 过滤器 | `FILTERS` | `fn(value, *args)` | ❌ 标准 Jinja 过滤器，只有值 |
+
+> 为什么函数一定要收 `ctx`：App 的标签通常不是从零算起，而是**复用已有能力再加工**。
+> 有了 ctx 就能 `ctx.content_list(...)` 拿条目再补一个自有字段，
+> 而不必自己建 engine、自己拼站点过滤条件。
+
+### 注册规则（不满足就静默跳过，不炸站点）
+
+| 规则 | 说明 |
+|---|---|
+| 名字格式 | `^[a-z_][a-z0-9_]{0,39}$`，小写字母/数字/下划线，不以数字开头，≤40 字符 |
+| 撞内置 | 16 个数据 API、9 个预注入变量、Jinja 内置过滤器 —— 一律拒绝 |
+| 跨 App 重名 | 先注册的赢，后来的被拒。**建议统一加 App 前缀**：`my_app_xxx` |
+| 同 App 重复注册 | 覆盖自己的旧条目（热更新友好） |
+| 被拒表现 | 记一条 `template_api.rejected` warning，函数不可用，其余照常 |
+
+被拒不会抛异常 —— 一个写错的 App 不该拖垮全站模板。排查时 grep 日志：
+
+```bash
+grep 'template_api' /www/wwwlogs/python/cenkor/error.log | tail
+# template_api.registered    app=my_app functions=1 filters=1
+# template_api.rejected      app=my_app error='模板函数名 ... 撞上内置模板标签'
+```
+
+### 停用与卸载
+
+- **停用 App 不会摘掉它的模板标签。** 路由有 `app_enabled_dependency` 守卫，
+  模板标签没有「一次请求」可挂 —— 注册进来就全局可用。
+  所以标签里**只做只读查询**，别假设调用方一定是启用状态。
+- **卸载 App 要显式摘除**，否则同名标签会一直留在模块单例里：
+
+```python
+from cenkor_admin.core.jinja_env import unregister_template_api
+unregister_template_api("my_app")
+```
+
+### ⚠️ 安全边界：注册标签 = 交出执行能力
+
+模板由**所有能进「模板工作台」的人**编辑。你把函数注册进模板，
+等于把这份能力交给他们。所以：
+
+- 只注册**只读、结果可控的纯函数**（查库、格式化、算 URL）
+- **不要**在标签里做写操作、发外部 HTTP、读文件、执行命令
+- 返回值别超过 2MB（单页输出上限，超了直接 `SecurityError`）
+- 别返回 ORM 对象或带敏感字段的 dict —— 模板能读属性，`{{ x.__class__ }}` 这类
+  虽然被沙箱挡住了，但普通字段照样能读出来
+
+沙箱本身还会挡：`_` 开头属性、非白名单 callable、超大乘法、`..` 模板名穿越。
+
+### 主题侧的自定义标签：用 macro
+
+写主题的人不需要碰 Python。常用片段直接写 `{% macro %}`，就是模板内的自定义标签：
+
+```jinja
+{# macros/card.html #}
+{% macro card(r) %}
+  <article class="card">
+    <h3>{{ r.title }}</h3>
+    <time>{{ r.published_at|date }}</time>
+  </article>
+{% endmacro %}
+
+{# layout.html #}
+{% from 'macros/card.html' import card %}
+{% for r in content_list('article', limit=6) %}{{ card(r) }}{% endfor %}
+```
+
+沙箱明确放行 `Macro` 调用，这是唯一不需要改后端就能「造标签」的方式。
+
+---
+
 ## 数据库迁移
 
 > 完整规则见 [migrations.md](migrations.md)。这里只讲扩展 App 相关的部分。
@@ -889,8 +1039,20 @@ DELETE FROM cms_content_types WHERE key = 'myitem';
 
 ### Q6: 模板引擎能调用 Python 函数吗？
 
-- **写站点主题** → 用 Jinja2，见 [template-guide.md](template-guide.md)。
-  Jinja2 全局变量与过滤器在 `core/jinja_env.py` 注册，可用但**不要给模板暴露能执行任意代码的对象**。
+**能，但不是随便调。** 主题模板跑在沙箱里，只有两类可调用：
+
+1. **内置数据 API**（16 个）—— `apps/cms/template_context.py` 里打了 `@cms_api` 的方法，
+   由 `as_globals()` 注入。
+2. **App 注册的标签** —— App 目录下 `template_tags.py` 声明 `FUNCTIONS` / `FILTERS`，
+   启动时自动注册，见上文「站点模板标签」。
+
+除此之外的 Python 对象（包括 `env.globals` 里的内建）**一律不可调**：
+`core/jinja_env.py` 里 `env.globals.clear()` 只保留 `range` / `dict` / `namespace`，
+`is_safe_callable` 也只放行带 `__cms_api__` 标记的函数和 `{% macro %}`。
+
+⚠️ **不要去 `core/jinja_env.py` 里硬加全局变量。** 那是核心单例，改了所有站点共用，
+而且下次升级会把你覆盖掉。要加就写 `template_tags.py`。
+
 - **老的 Liquid 兼容链路** → `core/template_engine.py` 只允许白名单 filter，
   `POST /api/v1/public/templates/render` 仍在服务 portal-web 的历史页面。
   已注册的 filter 在 `_register_filters` 里，新增要重启后端。

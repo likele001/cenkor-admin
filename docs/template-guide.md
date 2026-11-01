@@ -7,6 +7,13 @@
 > **这是用户手册，不是框架文档。** 你只需要会 HTML + 一点 Jinja 语法。
 > 数据从哪来、能调什么、哪里会报错，下面全部写清。
 
+> **「标签」就是函数和过滤器。** 这套系统没有 `{dede:arclist}`、`[gallery]` 那种短代码，
+> 也没有 `<?php ?>`。所有数据都靠第五节那 16 个**函数**取、第六节那 16 个**过滤器**加工，
+> 写法就是普通的 Jinja 表达式。
+>
+> 记不住名字不用背：**后台「CMS → 模板工作台 → 标签速查」**里点一下就能插进模板，
+> 支持按名字或用途搜（搜「分页」「日期」都行）。
+
 ---
 
 ## 一、模板与页面的对应关系
@@ -783,6 +790,85 @@ fields: [{name:'name',label:'称呼',type:'text',required:true}, ...]}`。
 | `json_safe` | `{{ data\|json_safe }}` | 序列化并转义 `< > &`，塞进 `<script>` 里不会被提前闭合 |
 
 时间过滤器对 `None`、空串、坏格式都返回空串，不会抛错。
+
+---
+
+## 六·补、找不到你要的标签怎么办
+
+按顺序试，通常第一步就解决了。
+
+### 1. 先看有没有
+
+「模板工作台 → 标签速查」有搜索框，按**用途**搜比按名字搜更快：搜「分页」「日期」「图片」「搜索」都能命中。
+
+### 2. 只是形式不同 → 换写法
+
+很多「缺标签」其实是同一个东西换个姿势：
+
+| 你想要 | 实际怎么写 |
+|---|---|
+| 首页最新 6 条 | `content_list('article', limit=6)` |
+| 某个栏目的 8 条 | `content_list('article', limit=8, category='news')` |
+| 带某个标签的条目 | `content_list('article', tag='智能制造')` |
+| 按阅读数排序 | `content_list('article', sort='-view_count')` |
+| 排除当前这篇 | `related(item, limit=4)` |
+| 全站搜关键词 | `search('关键词')` |
+| 面包屑 | `{{ item.category.name }}`（再往上一层没有现成字段） |
+| 上一篇 / 下一篇 | ❌ 没有现成标签，用 `related(item, limit=4)` 代替 |
+| 站点名 / 域名 | `{{ site.name }}` / `{{ site.domain }}` |
+| 当前年份 | `{{ now\|date('%Y') }}` |
+| 正文纯文字摘要 | `{{ item.body_html\|excerpt(120) }}` |
+
+`content_list` 的完整参数（`type` / `limit` / `offset` / `category` / `tag` / `sort` / `exclude`）
+在第 5 节第 1 条，绝大多数列表需求都在它里面。
+
+### 3. 只是重复片段 → 用 `macro` 自己造
+
+页面里反复出现的结构（卡片、标签云、价格块），写成 `macro` 就是你的自定义标签：
+
+```jinja
+{# 放在 macros/card.html #}
+{% macro card(r, show_date=true) %}
+  <article class="card">
+    {% if r.cover %}<img src="{{ r.cover }}" alt="{{ r.title }}" loading="lazy">{% endif %}
+    <h3><a href="{{ r.url }}">{{ r.title }}</a></h3>
+    {% if show_date %}<time>{{ r.published_at|date }}</time>{% endif %}
+    <p>{{ r.excerpt }}</p>
+  </article>
+{% endmacro %}
+```
+
+```jinja
+{# 在 layout.html 或其他模板里 #}
+{% from 'macros/card.html' import card %}
+
+{% for r in content_list('article', limit=6) %}{{ card(r) }}{% endfor %}
+{% for r in related(item, limit=3) %}{{ card(r, show_date=false) }}{% endfor %}
+```
+
+要点：
+
+- 放在 `macros/` 目录，用 `{% from 'xxx' import 名字 %}` 引入
+- 参数默认值、`if` 判断都能用，跟普通 Jinja 一样
+- 沙箱**放行 macro 调用**，这是不改后端就能造标签的唯一方式
+- macro 里同样能调 16 个数据 API 和过滤器
+
+### 4. 需要新数据源 → 找开发写 `template_tags.py`
+
+如果是「App 里有、模板拿不到」的数据（比如 App 自己的表），让开发者在该 App 目录下加
+`template_tags.py`，声明 `FUNCTIONS` / `FILTERS`，重启后端自动生效。
+写法见开发文档 [dev_guide.md](dev_guide.md) 的「站点模板标签」一节。
+
+注册好后，这些标签会**自动出现在「标签速查」面板里**，不用记名字。
+
+### 5. 还是不行 → 别硬凑
+
+模板只能读、不能写，也不能发外部请求。下面这些**做不了**，不用试：
+
+- 提交表单、写库、改内容（放进模板也不会执行）
+- 调第三方 API 拿数据（沙箱不给你网络）
+- 读文件、执行命令
+- 遍历超过上限的数据（`limit` 会被夹住）
 
 ---
 

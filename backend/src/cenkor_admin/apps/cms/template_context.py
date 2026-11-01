@@ -17,6 +17,7 @@ from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from cenkor_admin.apps.cms import models, url_resolver
+from cenkor_admin.core.jinja_env import app_template_functions, bind_app_function
 
 __all__ = ["TemplateContext", "build_pagination", "cms_api", "get_session_factory"]
 
@@ -831,8 +832,12 @@ class TemplateContext:
     # ------------------------------------------------------------ 上下文打包
 
     def as_globals(self) -> dict[str, Any]:
-        """16 个 API + 预注入的 site dict（模板里 {{ site.name }} 直接可用）。"""
-        return {
+        """16 个 API + 预注入的 site dict + App 注册进来的模板函数。
+
+        ``{{ site.name }}`` 走的是这里预注入的同名 dict，不是 ``site_meta()``。
+        App 标签每次都重新 bind 当前 ctx —— 缓存住会把上一个站点的数据串过来。
+        """
+        data: dict[str, Any] = {
             "content_list": self.content_list,
             "content": self.content,
             "related": self.related,
@@ -851,3 +856,6 @@ class TemplateContext:
             "media_list": self.media_list,
             "trans": self.trans,
         }
+        for name, fn in app_template_functions().items():
+            data[name] = bind_app_function(fn, self)
+        return data
