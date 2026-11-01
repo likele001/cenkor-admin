@@ -85,7 +85,7 @@ docker compose up -d
 
 - 管理后台：http://localhost:5173
 - 用户中心：http://localhost:5175（`npm run dev:portal`）
-- API：http://localhost:8000/api/docs
+- API：http://localhost:8002/api/docs
 - 管理员账号：`admin@cenkor.cn`（**初始口令随机生成，不写死在源码与文档里**）
 
 > 后端启动时 lifespan 会自动执行 `alembic upgrade heads` 建表，**无需手动跑迁移**（迁移图含公开链与商业应用闭源链，统一用 `heads` 升级）。

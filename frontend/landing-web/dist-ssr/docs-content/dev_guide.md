@@ -473,7 +473,7 @@ from cenkor_admin.core.db import get_db
 curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"field_key":"score","label":"评分","field_type":"number","required":false,
        "validation":{"min":0,"max":100}}' \
-  http://localhost:8000/api/v1/cms/content-types/1/field-definitions
+  http://localhost:8002/api/v1/cms/content-types/1/field-definitions
 ```
 
 ### 查询自定义字段值（⚠️ 别信 `custom.xxx=`）
@@ -884,11 +884,11 @@ bash scripts/package-app.sh my_app 1.0.0
 # 1. 登录
 curl -X POST -H "Content-Type: application/json" \
   -d '{"username":"admin@cenkor.cn","password":"<你的初始口令>","captcha_token":"任意16+hex"}' \
-  http://localhost:8000/api/v1/auth/login
+  http://localhost:8002/api/v1/auth/login
 
 # 2. 带 token
 curl -H "Authorization: Bearer <access_token>" \
-  http://localhost:8000/api/v1/cms/content-types
+  http://localhost:8002/api/v1/cms/content-types
 ```
 
 ### 前台 API（portal JWT）
@@ -898,14 +898,14 @@ curl -H "Authorization: Bearer <access_token>" \
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"username":"user1","email":"u@example.com","password":"test123456","captcha_token":"任意16+hex"}' \
-  http://localhost:8000/api/v1/public/portal/auth/register
+  http://localhost:8002/api/v1/public/portal/auth/register
 ```
 
 ### 公共 API（免鉴权）
 
 ```bash
-curl http://localhost:8000/api/v1/public/site/product
-curl http://localhost:8000/api/v1/public/categories?content_type_key=product
+curl http://localhost:8002/api/v1/public/site/product
+curl http://localhost:8002/api/v1/public/categories?content_type_key=product
 ```
 
 站点 HTML 直出接口是另一套前缀：`/api/v1/page/*`（详见 [template-guide.md](template-guide.md)）。
@@ -914,7 +914,7 @@ curl http://localhost:8000/api/v1/public/categories?content_type_key=product
 
 ```bash
 # 开发
-CORS_ORIGINS=http://localhost:5173,http://localhost:5175,http://localhost:8000
+CORS_ORIGINS=http://localhost:5173,http://localhost:5175,http://localhost:8002
 # 生产
 CORS_ORIGINS=https://admin.example.com,https://portal.example.com
 ```
@@ -1125,9 +1125,9 @@ FIELD_TYPES = [
 
 仅在 `DEBUG=True` 时可用：
 
-- Swagger UI：`http://localhost:8000/api/docs`
-- ReDoc：`http://localhost:8000/api/redoc`
-- OpenAPI JSON：`http://localhost:8000/api/openapi.json`
+- Swagger UI：`http://localhost:8002/api/docs`
+- ReDoc：`http://localhost:8002/api/redoc`
+- OpenAPI JSON：`http://localhost:8002/api/openapi.json`
 
 生产环境默认关闭。
 

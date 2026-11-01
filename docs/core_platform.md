@@ -86,7 +86,7 @@ docker compose exec backend python -m cenkor_admin.scripts.seed
 
 - 管理后台：<http://localhost:5173>
 - 用户中心：`npm run dev:portal` → <http://localhost:5175>
-- API 文档：<http://localhost:8000/api/docs>
+- API 文档：<http://localhost:8002/api/docs>
 - 管理员：`admin@cenkor.cn`（**无默认口令**，初始口令随机生成、只打印一次）
 
 > 后端 lifespan 会自动执行 `alembic upgrade heads`（迁移图含公开链与商业应用闭源链），通常无需手动跑迁移。
