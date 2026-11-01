@@ -212,6 +212,45 @@
 </article>
 ```
 
+## 列表页怎么整
+
+列表页（`list.html`）渲染时**路由已经把当前页数据注入好了**，不用自己调 `content_list`：
+
+| 变量 | 列表页里的值 |
+|---|---|
+| `items` | 当前页的卡片数组（和 `content_list` 卡片同构） |
+| `pagination` | 真实分页对象，路由已填好 `base_path`，链接直接能用 |
+| `page.kind` | 当前内容类型 |
+
+标准骨架：
+
+```jinja
+{% extends "layout.html" %}
+
+{% block main %}
+  <h1>{{ page.title }}</h1>
+
+  {% for r in items %}
+    <div class="card">
+      <a href="{{ r.url }}">{{ r.title }}</a>
+      <p>{{ r.excerpt|excerpt(80) }}</p>
+      <time>{{ r.published_at|date('%Y-%m-%d') }}</time>
+    </div>
+  {% endfor %}
+
+  {% for p in pagination.pages %}
+    <a href="{{ p.url }}" {% if p.current %}class="on"{% endif %}>{{ p.n }}</a>
+  {% endfor %}
+{% endblock %}
+```
+
+分工记牢：
+
+- **列表页主列表** → 认准 `items`。别自己调 `content_list` 当主列表，自己调会绕过分页（永远第一页）。
+- **首页区块 / 侧栏等额外数据** → `content_list()`，取完自己排。
+
+调试：`<pre>{{ items|json_safe }}</pre>` 看当前页全部卡片的字段。
+
 ## 打印与调试
 
 ### 两种花括号
