@@ -36,6 +36,17 @@ export const routes = [
     path: '/docs/guide',
     name: 'Guide',
     component: () => import('@/views/docs/Guide.vue')
+  },
+  {
+    path: '/docs',
+    name: 'Docs',
+    component: () => import('@/views/docs/DocsCenter.vue')
+  },
+  {
+    // /docs/<相对路径>：文档阅读页，客户端 fetch docs-content 下的 md 渲染
+    path: '/docs/:pathMatch(.*)*',
+    name: 'DocsRead',
+    component: () => import('@/views/docs/DocsCenter.vue')
   }
 ]
 

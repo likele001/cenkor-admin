@@ -37,6 +37,7 @@
           <div class="link-group">
             <h4>文档</h4>
             <ul>
+              <li><router-link to="/docs">文档中心</router-link></li>
               <li><router-link to="/docs/guide">使用指南</router-link></li>
               <li><router-link to="/deploy">部署教程</router-link></li>
               <li><a :href="urls.github" target="_blank" rel="noopener">GitHub 仓库</a></li>

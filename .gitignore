@@ -180,3 +180,9 @@ backend/restart_8002.py
 backend/bind_video_capability.py
 backend/fix_vision_capability.py
 backend/migrate_media_urls.py
+
+# 文档中心 manifest（copy-docs.mjs 生成）
+frontend/landing-web/src/config/docs-manifest.generated.ts
+
+# 文档中心构建产物（copy-docs.mjs 生成）
+frontend/landing-web/public/docs-content/

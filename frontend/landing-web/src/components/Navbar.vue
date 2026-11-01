@@ -32,6 +32,7 @@
           <div class="dropdown">
             <span class="dropdown-trigger">文档</span>
             <div class="dropdown-menu">
+              <a @click.prevent="navigate('/docs')">文档中心</a>
               <a @click.prevent="navigate('/docs/guide')">使用指南</a>
               <a @click.prevent="navigate('/deploy')">部署教程</a>
             </div>

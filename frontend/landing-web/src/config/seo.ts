@@ -82,6 +82,12 @@ export const SEO: Record<string, SeoEntry> = {
     description:
       '辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal；含 AI 模型接入与在线升级说明。',
   },
+  '/docs': {
+    title: '辰科Cenkor Admin - 文档中心 | 使用教程与二次开发',
+    description:
+      '辰科Cenkor Admin 文档中心：13 本用户手册、模板标签参考（数据 API / 过滤器 / App 注册标签）、'
+        + '应用开发规范与二次开发指南，全部在线可查。',
+  },
   '/docs/guide': {
     title: '辰科Cenkor Admin - 使用指南 | 企业级平台',
     description:
