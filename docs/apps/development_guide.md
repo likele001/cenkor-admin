@@ -1,21 +1,24 @@
 # Cenkor Admin 应用开发规范
 
-> 版本：1.1.0  
-> 更新日期：2026-10-12
+> 版本：1.2.0  
+> 更新日期：2026-11-01
 >
 > **本文覆盖两类交付形态**（真相源：后端 `store_router.DEV_METHODS`）：
-> - **第壹部分 · 平台内置应用**（`dev_method=platform`）：装进 cenkor-admin 自身，用 `manifest.py` + SQLAlchemy 模型 + alembic 迁移 → 第二～十节。
+> - **第壹部分 · 平台内置应用**（`dev_method=platform`）：装进 cenkor-admin 自身，用 `manifest.py` + SQLAlchemy 模型 + alembic 迁移 + `frontend/dist/plugin.js` → 第二～十节。
 > - **第贰部分 · 产品扩展包**（`dev_method=extension`）：热挂载到 MES 实例（cenkormes / cenkor-process），用 `manifest.json` + `router.py` + `migrations.sql` + `frontend/plugin.js` → 第十二～十八节。
 >
 > 若你开发的是**卖给 MES 客户的付费扩展**，直接跳到【第贰部分】。第十一节（product / dev_method）是两类共用的取值口径，先看它。
+>
+> 想跳过手写、直接起一个带 CRUD 的应用：`scripts/gen-app.py`，见
+> [../dev_guide.md](../dev_guide.md) 的「五分钟起一个 App」。
 
 ## 一、概述
 
 Cenkor Admin 支持通过应用（App）扩展平台功能。每个应用是一个独立的模块，可以：
 
 - 注册新的内容类型和字段
-- 添加后台管理页面
-- 注册 API 路由
+- 添加后台管理页面（前端以 `plugin.js` 运行时挂载，**不改主程序**）
+- 注册 API 路由（`router.py` 自动挂载到 `/api/v1/{key}`）
 - 添加菜单和权限
 - 提供公共 API
 
@@ -27,17 +30,33 @@ Cenkor Admin 支持通过应用（App）扩展平台功能。每个应用是一�
 
 ### 2.1 目录结构
 
+手写一个最小应用只需两个文件；用生成器（`scripts/gen-app.py`）产出的是完整形态：
+
 ```
-my-app/
-├── manifest.py          # 必需：应用清单
-├── __init__.py          # 必需：Python 包标识
-├── models.py            # 可选：数据库模型
-├── router.py            # 可选：API 路由
-├── schemas.py           # 可选：Pydantic 模型
-├── service.py           # 可选：业务逻辑
-└── static/              # 可选：前端资源
-    └── index.html       # 可选：应用管理页面
+my_app/                          # key 用下划线，目录名同时是 Python 包名
+├── manifest.py                  # 必需：应用清单
+├── __init__.py                  # 必需：Python 包标识
+├── models.py                    # 可选：数据库模型
+├── router.py                    # 可选：后台 API（自动挂载到 /api/v1/{key}）
+├── public_router.py             # 可选：免鉴权 API（⚠️ 不会自动挂载，见 §4.3）
+├── schemas.py                   # 可选：Pydantic 模型
+├── service.py                   # 可选：业务逻辑
+├── hooks.py                     # 可选：插件钩子处理器
+├── alembic/versions/            # 可选：本应用的迁移（package 模式）
+├── frontend/                    # 可选：前端插件源码
+│   ├── package.json
+│   ├── vite.config.js           # 打包为 iife 单文件，vue 走 external
+│   ├── dist/plugin.js           # ← 构建产物，平台运行时加载
+│   └── src/main.js              # 入口：window.__registerPlugin({...})
+└── release/                     # 打包产物（package-app.sh 生成，不进版本库）
 ```
+
+> 应用内**不放** `static/`：前端产物统一落在平台级的
+> `backend/src/cenkor_admin/static/apps/{key}/`，由 `/.app-assets` 暴露。
+
+> ⚠️ **`key` 不要用连字符**：目录名即 Python 包名，且 `api/v1/__init__.py` 拿目录名
+> 直接做路由前缀。全平台既有 App（`cloud_storage` / `my_todo` / `quick_notes`）
+> 一律下划线小写。
 
 > ⚠️ **商业闭源应用的存放位置有专门要求**（公开仓库不收录其源码），
 > 见「九、安全规范 → 9.3 仓库边界与商业源码保护」。
@@ -52,57 +71,69 @@ from cenkor_admin.apps.base import AppManifest
 
 MANIFEST = AppManifest(
     # ---- 基础信息 ----
-    key="my-app",                    # 唯一标识（小写英文+连字符）
+    key="my_app",                    # 唯一标识（小写英文 + 下划线；目录名即包名）
     name="我的应用",                  # 显示名称
     version="1.0.0",                 # 语义化版本号
     author="开发者名称",              # 作者
     description="应用描述",           # 简短描述
     icon="📦",                       # Emoji 图标
-    category="productivity",         # 分类：content / productivity / system / ai
+    category="productivity",         # 分类：business / productivity / content / system / ai
 
     # ---- 依赖 ----
     min_platform_version="0.1.0",    # 最低平台版本
     dependencies=[],                 # 依赖的其他 App key
 
     # ---- 权限 ----
+    # 三段式 {app}:{resource}:{action}，管理级用两段 {app}:admin
     permissions_required=[
-        "my-app:read",               # 读取权限
-        "my-app:write",              # 写入权限
+        "my_app:item:read",          # 读取权限
+        "my_app:item:write",         # 写入权限
+        "my_app:admin",              # 应用级管理权限
     ],
 
     # ---- 菜单 ----
     menus=[
         {
-            "key": "my-app",
+            "key": "my_app",
             "title": "我的应用",
             "icon": "box",           # 图标名称
             "sort": 70,              # 排序（数字越小越靠前）
             "children": [
-                {"key": "my-app:list", "title": "数据列表", "path": "/my-app"},
+                {"key": "my_app:item", "title": "数据列表", "path": "/my_app/items"},
             ],
         },
     ],
 
     # ---- 内容引擎（可选）----
     content_types=[
-        {"key": "my-item", "name": "我的项目", "icon": "📋",
+        {"key": "my_item", "name": "我的项目", "icon": "📋",
          "supports_category": True, "supports_tags": True},
     ],
     field_groups=[
-        {"content_type": "my-item", "key": "basic", "label": "基础信息", "sort": 0},
+        {"content_type": "my_item", "key": "basic", "label": "基础信息", "sort": 0},
     ],
     field_definitions=[
-        {"content_type": "my-item", "key": "name", "label": "名称",
+        {"content_type": "my_item", "key": "name", "label": "名称",
          "type": "text", "group": "basic", "required": True},
-        {"content_type": "my-item", "key": "description", "label": "描述",
+        {"content_type": "my_item", "key": "description", "label": "描述",
          "type": "richtext", "group": "basic"},
     ],
     categories_seed=[
-        {"content_type": "my-item", "slug": "general", "name": "通用"},
+        # 支持 children 嵌套，最多 3+ 级
+        {"content_type": "my_item", "slug": "general", "name": "通用"},
     ],
 
-    # ---- 公共 API ----
-    public_routes_prefix="/api/v1/public/my-app",
+    # ---- 公共 API 前缀 ----
+    # ⚠️ 仅是元数据（写进 App 注册信息供商店展示），不参与路由挂载。
+    public_routes_prefix="/api/v1/my_app",
+
+    # ---- 高级（可选）----
+    license_required=False,          # True：未授权一律 402（商店收费应用）
+    price_model="free",              # free / one_time / seat
+    price_cents=0,
+    period_days=365,                 # 仅 seat 生效
+    schema_managed=False,            # True：本应用的表由 apps/<key>/schema.sql 管理
+    hooks=[],                        # 钩子模块 dotted path，缺省试 apps.<key>.hooks
 )
 ```
 
@@ -145,16 +176,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.my_app import models  # 推荐相对导入：from . import models
 from cenkor_admin.core.db import get_db
+from . import models          # 推荐相对导入
 
 router = APIRouter()
 
 
-@router.get("", response_model=dict)
+@router.get("/items", response_model=dict)
 async def list_items(
     db: AsyncSession = Depends(get_db),
-    _: auth_models.User = Depends(require_permission("my-app:read")),
+    _: auth_models.User = Depends(require_permission("my_app:item:read")),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -163,25 +194,126 @@ async def list_items(
     return {"items": [], "total": 0}
 
 
-@router.post("", status_code=201)
+@router.post("/items", status_code=201)
 async def create_item(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current: auth_models.User = Depends(require_permission("my-app:write")),
+    current: auth_models.User = Depends(require_permission("my_app:item:write")),
 ):
     """创建"""
     # 你的业务逻辑
     return {"id": 1}
 ```
 
-### 4.2 权限命名规范
+### 4.2 自动挂载规则（必读）
+
+平台在启动时扫描 `apps/` 自动挂载路由，规则不直观：
+
+- 扫描**不以 `_` 开头**的目录
+- **只识别 `router.py`**，其余文件一律不管
+- 挂载前缀 `/api/v1/{目录名}`，并统一加三道守卫：
+  1. `get_current_user` —— **必须登录**（默认就不允许匿名）
+  2. `app_enabled_dependency(key)` —— 应用被停用则拒绝
+  3. 你在路由里自己写的 `require_permission(...)`
+
+所以 `router.py` 里的路径**不要**再带一次前缀：
+
+```python
+@router.get("/items")      # ✅ 实际地址 /api/v1/my_app/items
+@router.get("/my_app/items")  # ❌ 变成 /api/v1/my_app/my_app/items
+```
+
+### 4.3 `public_router.py` 不会自动挂载
+
+**这是最容易误判的一条。** 放在 `apps/{key}/public_router.py` 里的路由**不会出现**
+在 API 上 —— 自动发现只找 `router.py`。
+
+要提供免鉴权接口，只能由主程序手工 include（平台内置 App 的做法，属形态 B）：
+
+```python
+# backend/src/cenkor_admin/api/v1/__init__.py
+from cenkor_admin.apps.my_app.public_router import router as my_app_public
+api_v1_router.include_router(my_app_public, prefix="/public", tags=["my_app"])
+```
+
+> `manifest.public_routes_prefix` **只是元数据**（写进 App 注册信息供商店展示），
+> **不参与任何路由挂载**。填了它，接口不会自动暴露。
+
+### 4.4 权限命名规范
+
+平台实际使用**三段式** `{app}:{resource}:{action}`，应用级管理用两段式：
 
 ```
-{app-key}:read     # 读取权限
-{app-key}:write    # 写入权限
-{app-key}:delete   # 删除权限（可选）
-{app-key}:admin    # 管理权限（可选）
+{app}:{resource}:read      # 读取      my_app:item:read
+{app}:{resource}:write     # 写入      my_app:item:write
+{app}:{resource}:delete    # 删除      my_app:item:delete
+{app}:{resource}:export    # 导出      my_app:item:export
+{app}:admin                # 应用级管理 my_app:admin
 ```
+
+参照线上既有取值：`crm:customer:read` / `crm:customer:export` / `crm:admin`。
+
+两段式写法（`my_app:read`）功能上能跑，但与全平台既有权限码风格不一致，
+RBAC 授权页会显得混乱。**跟着三段式走。**
+
+### 4.5 前端插件
+
+应用的前端**不是**往 `frontend/admin-web/src/views/` 里加页面（那是改主程序，
+会被平台升级覆盖），而是产出 `frontend/dist/plugin.js`，由平台运行时动态加载：
+
+```
+后台启动 → GET /api/v1/system/apps/plugins → 注入
+<script src="/.app-assets/{key}/plugin.js?v={mtime}">
+plugin.js 执行 → window.__registerPlugin({ id, routes, menus, locales })
+→ 合并进 admin-web 路由表 / 侧边栏 / i18n
+```
+
+最小入口：
+
+```js
+// frontend/src/main.js
+import 'vue'        // 共享宿主的 window.Vue，不要 inline 一份
+import ItemListView from './pages/ItemListView.vue'
+
+window.__registerPlugin({
+  id: 'my_app',                    // 必须等于 manifest 的 key
+  version: '1.0.0',
+  name: '我的应用',
+  routes: [
+    { path: 'my_app/items', name: 'my-app-items', component: ItemListView,
+      meta: { permission: 'my_app:item:read' } },   // 与后端权限码一致
+  ],
+  menus: [
+    { key: 'my_app:item', title: '数据列表', path: '/my_app/items', icon: 'menu', sort: 71 },
+  ],
+  locales: { 'zh-CN': { my_app: { title: '我的应用' } } },
+})
+```
+
+构建必须把 `vue` 设为 external，否则插件内会 inline 一份 Vue，响应式失效：
+
+```js
+// frontend/vite.config.js
+build: {
+  lib: { entry: 'src/main.js', formats: ['iife'], name: 'MyAppPlugin', fileName: () => 'plugin.js' },
+  rollupOptions: { external: ['vue'], output: { globals: { vue: 'Vue' }, inlineDynamicImports: true } },
+}
+```
+
+调接口用平台注入的 `window.__PLUGIN_API__(method, path, body)`（自带 401 自动刷新
+token），不要自己 `new fetch` 拼 token。
+
+产物部署到：
+
+```
+backend/src/cenkor_admin/static/apps/{key}/plugin.js
+```
+
+由后端 `app.mount("/.app-assets", StaticFiles(...))` 暴露。改完前端**不用重启后端**，
+浏览器强刷即可（脚本按 `?v=<mtime>` 拉取）。
+
+> 完整链路（含 `__PLUGIN_NAV__`、兜底 token、菜单/路由对齐三要素）见
+> [../dev_guide.md](../dev_guide.md) 的「前端：插件机制」。
 
 ## 五、数据模型
 
@@ -235,10 +367,21 @@ class MyItem(Base):
 
 ### 6.1 创建迁移文件
 
+迁移目录**按来源分层**（`alembic.ini` 的 `version_locations` 逐条列出：
+`core` / `erp` / `crm` / `mes` / `commerce` / `ext`），新建时用 `--version-path`
+显式指定落点，别放到扁平路径下：
+
 ```bash
 cd backend
-PYTHONPATH=src alembic revision --autogenerate -m "create my_app tables"
+PYTHONPATH=src alembic revision --autogenerate -m "create my_app tables" \
+  --version-path alembic/versions/ext
+
+alembic upgrade heads
+bash ../scripts/check-migration-graph.py     # 断链 / 重复 / 多 head 自检
 ```
+
+> 用代码生成器（`scripts/gen-app.py`）建应用时，迁移会自动生成并接好
+> `down_revision`，不需要手工走这一步。
 
 ### 6.2 迁移文件模板
 
@@ -273,16 +416,24 @@ def downgrade():
 
 ### 7.1 ZIP 包结构
 
+用 `bash scripts/package-app.sh <key> [version]` 打包，产物在
+`apps/<key>/release/<key>-<version>.zip`：
+
 ```
-my-app-1.0.0.zip
+my_app-1.0.0.zip
 ├── manifest.py
 ├── __init__.py
 ├── models.py
 ├── router.py
 ├── schemas.py
 ├── service.py
-└── requirements.txt    # 可选：额外依赖
+├── alembic/versions/          # 本应用的迁移（package 模式）
+├── frontend/dist/plugin.js    # 前端插件产物
+└── requirements.txt           # 可选：额外依赖
 ```
+
+打包时自动排除 `node_modules`、`release`、`__pycache__`、`.git`。
+前端若定义了 `build` 脚本，打包前会先构建，保证 `dist` 与源码一致。
 
 ### 7.2 打包要求
 
@@ -334,10 +485,13 @@ docs/05-用户手册/<应用 key>_操作手册.md
 3. 检查 `key` 唯一性
 4. 检查 `version` 格式
 5. 检查依赖是否满足
-6. 将应用代码放入 `apps/{key}/` 目录
-7. 执行数据库迁移（如有新表）
-8. 注册权限和菜单
-9. 应用状态变为 `installed`
+6. 将应用代码放入 `apps/{key}/`
+7. 前端产物放入 `static/apps/{key}/`（`plugin.js` 由 `/.app-assets` 暴露）
+8. 执行数据库迁移（如有新表）
+9. 注册权限和菜单（启动流程自动完成，无需手工 install）
+10. 应用状态变为 `installed`
+
+> 装完后前端插件会在下次打开后台时自动加载，**不需要重新构建 admin-web**。
 
 ## 九、安全规范
 
@@ -375,8 +529,13 @@ docs/05-用户手册/<应用 key>_操作手册.md
 ```bash
 backend/src/cenkor_admin/apps/<key>/           # 后端源码
 backend/src/cenkor_admin/static/apps/<key>/    # 前端产物（plugin.js 常有 MB 级）
-backend/alembic/versions/2026*_<key>*.py       # 数据库迁移
+backend/alembic/versions/<目录>/*_<key>*.py     # 数据库迁移
 ```
+
+> ⚠️ 迁移已**按来源分目录**（`core` / `erp` / `crm` / `mes` / `commerce` / `ext`），
+> 登记时写具体目录（如 `backend/alembic/versions/ext/*_<key>*.py`），
+> **不要沿用老的扁平路径 `backend/alembic/versions/2026*_<key>*.py`** ——
+> 升到分层布局后那条 glob 匹配不到任何文件，等于没登记（源码会被推到公开仓库）。
 
 #### ⚠️ 新增 ignore 规则后，必须回头查历史
 
@@ -415,11 +574,22 @@ git config core.hooksPath .githooks     # ⚠️ 新 clone 后必须执行一次
 
 ## 十、示例应用
 
-参考内置应用：
-- `apps/cms/` — 内容管理系统
-- `apps/announcements/` — 公告管理
-- `apps/tickets/` — 工单系统
-- `apps/links/` — 链接收藏
+带 `manifest.py` 的完整参考实现（从简单到复杂）：
+
+| 应用 | 适合看什么 |
+|---|---|
+| `apps/links/` | 最简单的 CRUD 起步 |
+| `apps/announcements/` | 公告：内容 + 发布状态 |
+| `apps/tickets/` | 工单：状态流转、分派 |
+| `apps/quick_notes/` / `apps/my_todo/` | 轻量工具类、前端插件写法 |
+| `apps/cloud_storage/` | 文件上传 + 外部存储对接 |
+| `apps/crm/` | 多实体 + 权限细分 + 前端插件（`plugin.js` 在产线跑） |
+| `apps/erp/` / `apps/mes/` | 大型业务模块，迁移分目录的样板 |
+| `apps/cms/` | 内容引擎与模板工作台本体，扩展字段前先读它 |
+
+> 想快速起一个带 CRUD 的新应用，直接用 `scripts/gen-app.py`，
+> 产出的代码即是按上述规范生成的（见 [../dev_guide.md](../dev_guide.md)
+> 的「五分钟起一个 App」）。
 
 ## 十一、产品类型与开发方式（product / dev_method）
 

@@ -88,6 +88,7 @@ Cenkor Admin 文档目录。按用途选择。
 | `scripts/migrate-and-seed-host.sh` | 宿主机模式迁移 + 播种 | [deploy.md](deploy.md) |
 | `scripts/sync-docs-to-knowledge.sh` | 文档同步到知识库站点 | 本文档 |
 | `scripts/build-frontends.sh` | 构建全部前端 dist | [deploy.md](deploy.md) |
+| `scripts/gen-app.py` | **CRUD 代码生成器**（spec YAML → App：后端 + 前端插件 + 迁移） | [dev_guide.md](dev_guide.md) |
 | `scripts/package-core.sh` | 打核心平台包 | [packaging.md](packaging.md) |
 | `scripts/package-app.sh` | 打单个应用包 | [apps/development_guide.md](apps/development_guide.md) |
 | `scripts/gen-secrets.sh` | 生成 `.env.prod` | [packaging.md](packaging.md) |

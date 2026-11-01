@@ -149,9 +149,18 @@ def _compute_head(files: list[Path], scope: str) -> str:
 
 
 def all_migration_files(versions_dir: Path) -> list[Path]:
+    """收集迁移文件。
+
+    迁移按 App 分目录存放（alembic.ini 的 version_locations 列了 core / erp /
+    crm / mes / commerce / ext），顶层已不再有 .py。只 glob("*.py") 会得到空列表，
+    进而报「迁移图没有 head」—— 所以必须递归。
+    """
     if not versions_dir.is_dir():
         raise SystemExit(f"✗ 迁移目录不存在：{versions_dir}")
-    return sorted(f for f in versions_dir.glob("*.py"))
+    return sorted(
+        f for f in versions_dir.rglob("*.py")
+        if "__pycache__" not in f.parts and not f.name.startswith("__")
+    )
 
 
 def git_tracked_names(versions_dir: Path) -> set[str] | None:

@@ -49,6 +49,10 @@ SKIP_STEMS = {
 
 # 代码标识符、MCP 工具名、列名等，不是表名
 NOT_TABLES = {"portal_payload", "portal_token", "cms_page_router"}
+
+# 文档示例里虚构的 App key / 占位符：它们的存在意义就是「教你怎么写」，
+# 代码里当然找不到对应前缀，不算硬错误。
+EXAMPLE_SEGMENTS = {"my_app", "myapp", "my-app", "{key}", "{app_key}", "example", "your_app"}
 NOT_TABLE_PREFIX = re.compile(r"^cms_(create|update|get|list|search|publish|translate|describe|ai_draft)_")
 NOT_TABLE_SUFFIX = ("_models", "_tables", "_page", "_model", "_id", "_bp")
 
@@ -128,6 +132,8 @@ def main() -> int:
         if src:
             for p in set(re.findall(r"[`'\"](/api/v1/[A-Za-z0-9_\-/{}*]{2,})[`'\"]", text)):
                 seg = p.replace("/api/v1", "").strip("/").split("/")[0]
+                if seg in EXAMPLE_SEGMENTS:
+                    continue
                 if seg and seg not in src:
                     problems.append((rel, "API 前缀在代码里找不到", p))
 
