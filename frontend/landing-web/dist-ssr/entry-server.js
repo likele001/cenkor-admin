@@ -442,13 +442,13 @@ const routes = [
   {
     path: "/docs",
     name: "Docs",
-    component: () => import("./assets/DocsCenter-DoUnXM7Y.js")
+    component: () => import("./assets/DocsCenter-FGFWj0IM.js")
   },
   {
     // /docs/<相对路径>：文档阅读页，客户端 fetch docs-content 下的 md 渲染
     path: "/docs/:pathMatch(.*)*",
     name: "DocsRead",
-    component: () => import("./assets/DocsCenter-DoUnXM7Y.js")
+    component: () => import("./assets/DocsCenter-FGFWj0IM.js")
   }
 ];
 const scrollBehavior = () => ({ top: 0 });

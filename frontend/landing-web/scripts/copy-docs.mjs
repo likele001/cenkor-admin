@@ -33,6 +33,8 @@ const DIR_LABELS = {
 }
 const ROOT_LABEL = '总览与指南'
 const EXCLUDE_DIRS = new Set(['archive', '_bak'])
+// 对外不放的内部文档（打包发版流程，纯内部用）
+const EXCLUDE_FILES = new Set(['packaging.md'])
 
 function walk(dir, base) {
   const out = []
@@ -45,6 +47,7 @@ function walk(dir, base) {
       if (EXCLUDE_DIRS.has(name)) continue
       out.push(...walk(full, rel))
     } else if (name.endsWith('.md')) {
+      if (EXCLUDE_FILES.has(path.join(base, name).split(path.sep).join('/'))) continue
       out.push(rel)
     }
   }

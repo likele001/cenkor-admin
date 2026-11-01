@@ -90,12 +90,6 @@ const DOCS_GROUPS = [
         "dir": ""
       },
       {
-        "path": "packaging.md",
-        "title": "打包与交付",
-        "desc": "本文档描述如何将 Cenkor Admin 核心平台打成可交付压缩包，以及接收方如何解压部署。",
-        "dir": ""
-      },
-      {
         "path": "relaunch-ai-cms.md",
         "title": "Cenkor Mosaic · 重定位方案",
         "desc": "AI 原生内容平台 ｜ 2026-10-27 ｜ 从 cenkor-admin monorepo 孵化的独立产品线",
@@ -487,12 +481,6 @@ const DOCS_FLAT = [
     "path": "native_deploy.md",
     "title": "Cenkor Admin · 裸机部署（systemd + 宝塔反代）",
     "desc": "ℹ️ 本机生产未采用本文方案。",
-    "dir": ""
-  },
-  {
-    "path": "packaging.md",
-    "title": "打包与交付",
-    "desc": "本文档描述如何将 Cenkor Admin 核心平台打成可交付压缩包，以及接收方如何解压部署。",
     "dir": ""
   },
   {
