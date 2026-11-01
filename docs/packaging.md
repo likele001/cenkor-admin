@@ -73,101 +73,77 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 | `deploy/systemd/` | 裸机 systemd 单元 |
 | `scripts/` | 构建、部署、备份、打包脚本 |
 | `docs/` | 全部文档（`addons/` 与 `domain_setup.md` 除外） |
+| `docs/05-用户手册/` | 9 本使用手册（闭源模块的 crm/erp/mes/payment/workflow 5 本除外） |
 | `docker-compose*.yml` | 开发 / 生产 / 宝塔各模式 |
 | `.env.example` | 开发环境变量模板 |
+| `deploy/baota/cenkor-backend.host.env.example` | 生产环境变量模板（真实 `host.env` 不进包） |
 | `PACKAGE.md` | 包内安装速查（打包时生成） |
 
-### 3.2 不包含（需目标环境自行准备）
+### 3.2 不包含 —— 由 `.gitignore` 决定
 
-| 项 | 原因 |
-|----|------|
-| `node_modules/` | 体积大；生产只需 `dist` |
-| `.env` **及所有 `.env.*`**（`.env.prod` / `.env.bak-*` / `.env.local`） | 含密钥；只保留 `.env.example` 模板 |
-| `*.bak` / `*.bak-*` / `*.bak.*` / `_bak-*` / `_rollback_bak_*` | 本地备份目录与旧产物 |
-| `*.log` / `logs/`（含 `backend/logs/`） | 生产日志，单份可达 5 MB+，且含访问 IP |
-| `.stale-apps/`（`backend/.stale-apps/`） | 已卸载应用的残留，含闭源 payment 产物 |
-| `_rollback_bak_*/cenkor_db.sql` 等库备份 | 全量业务数据，单份 1.7 MB+ |
-| `.mimocode/`、`./www`（嵌套误建目录） | 工具元数据、历史误操作残留 |
-| `.git/` | 非必需 |
-| `deploy/addons/` / `docs/addons/` / `deploy/examples/` | 官网等可选扩展，与核心解耦 |
+**打包不再维护一份长长的 `--exclude` 名单，而是以 `git ls-files` 为文件源。**
+凡 `.gitignore` 里登记的东西，`git ls-files` 天然不会输出，也就不会进包：
+
+| 自动排除的内容 | 依据 |
+|----------------|------|
+| 闭源应用 `apps/{erp,crm,mes,workflow,payment}/`、外置 `backend/src/apps/` | `.gitignore` 应用目录规则 |
+| 闭源迁移（`versions/{erp,crm,mes}/` 整目录 + commerce 6 个 + ext 4 个混合目录文件） | `.gitignore` §155-172 逐个登记 |
+| `frontend/developer-web/`（开发者门户） | `.gitignore` |
+| `deploy/baota/cenkor-backend.host.env`（**真实 SECRET_KEY + 数据库口令**） | `.gitignore:47` |
+| `.env` / `.env.*` / `*.env`（只保留 `.env.example` 模板） | `.gitignore` |
+| `*.log`、`backend/logs/`、`.stale-apps/`、`node_modules/`、`__pycache__/` | `.gitignore` |
+| `*.bak*`、`_bak-*`、`_rollback_bak_*`、`*.orig`、`*.rej` | `.gitignore` |
+
+脚本里只保留**少量「已进 git 但不该交付」的例外**（在 `grep -zvE` 那一行）：
+
+| 例外 | 原因 |
+|------|------|
+| `frontend/developer-web/` | 防御性：即使有人误提交也不出门 |
 | `docs/domain_setup.md` | Cenkor 实例专用域名文档 |
-| **`backend/src/cenkor_admin/apps/{erp,crm,mes,workflow,payment}/`** | **闭源商业应用**，见下方 ⚠️ |
-| **`backend/src/apps/`**（外置应用：payment / commerce） | **闭源商业源码** |
-| **`backend/src/cenkor_admin/static/apps/{erp,crm,mes,workflow,payment}/`** | 上述应用的前端插件产物 |
-| **`backend/alembic/versions/{erp,crm,mes}/`** | 上述应用的迁移 |
-| **`frontend/developer-web/`** | 开发者门户，闭源商业资产 |
+| `deploy/{addons,website,examples,nginx/snippets}/`、`docs/addons/`、`docker-compose.addon-website.yml` | 官网等可选扩展 |
 | `verify_v11.py` | MES 端到端验证脚本，属闭源模块 |
+| `docs/05-用户手册/{crm,erp,mes,payment,workflow}_操作手册.md` | 闭源模块的使用说明 |
+| `www/wwwroot/`、`.mimocode/` | 历史误操作残留、IDE 计划文件 |
+| `*.bak*`（正则 `\.bak[^/]*$`） | 误提交进 git 的备份文件 |
 
-> ⚠️ **闭源资产排除是硬要求，不是可选项。**
+> ⚠️ **为什么放弃 `--exclude` 黑名单**
 >
-> 闭源应用在这台服务器上是**物理存在**的（erp 64 个 .py、crm 21、mes 24、workflow 8），
-> 它们只靠 `.gitignore` 阻止进 git。而 `package-core.sh` 用的是 **`tar`**——
-> **tar 读文件系统，不读 `.gitignore`**。漏一条 `--exclude`，整份 ERP/CRM/MES 源码
-> 就会跟着核心包发到客户手里。
+> 2026-10 到 11 月，同一类事故发生了四次，每次都是「`.gitignore` 里有、`tar` 不知道」：
 >
-> 同样的机制还会带走**从来没进过 git 的东西**：`.env.bak-20261007`（带真实密钥）、
-> `backend/logs/hub.log`（5 MB 生产日志）、`_rollback_bak_20261014/cenkor_db.sql`
-> （1.7 MB 全库备份）、`backend/.stale-apps/`（含闭源 payment 残留）。
-> 这些在 2026-11-01 的一次打包里全部出现过，包体积从 3.8 MB 虚涨到 13 MB。
+> 1. 闭源应用目录整份 ERP/CRM/MES 源码；
+> 2. `.env.bak-20261007`（真实密钥）、`backend/logs/hub.log`（5.2 MB 生产日志含访问 IP）、
+>    `_rollback_bak_20261014/cenkor_db.sql`（1.7 MB 全库备份）、`.stale-apps/`（闭源 payment 残留）；
+> 3. `commerce` / `ext` 混合目录里 10 个闭源迁移（定价/订单/授权/支付/市场/分成表结构）；
+> 4. `deploy/baota/cenkor-backend.host.env`（`SECRET_KEY` + `DATABASE_URL` 口令 + S3 密钥）。
 >
-> 因此脚本现在有**五道防线**，任何一道不通过都**删掉产物并 `exit 1`**：
->
-> | 自检 | 拦什么 | 输出 |
-> |------|--------|------|
-> | 闭源资产 | erp / crm / mes / workflow / payment / src-apps / developer-web / verify_v11.py | `自检通过：包内无闭源资产…` |
-> | 凭据文件 | 任何 `.env` 变体（example 除外）、`*.pem`、`*.key`、`id_rsa*`、`*.bak*` | `自检通过：包内无凭据 / 备份文件…` |
-> | 运行时垃圾 | `logs/`、`*.log`、`_bak-*`、`_rollback_bak_*`、`.bak.`、`.stale-apps/`、`www/wwwroot/` | `自检通过：包内无运行时垃圾…` |
-> | 关键文件在不在 | 后端入口、`alembic.ini`、三套前端 `index.html`、`.env.example`、`PACKAGE.md` | `自检通过：关键文件齐全…` |
-> | 迁移链自洽 | 每个 `down_revision` 都能在包内找到 | `自检通过：包内迁移链自洽…` |
->
-> 最后一道是**正向**检查——防止 `--exclude` 写过头把包打空（包能打出来但缺 dist，
-> 用户部署完是个白屏）。前四道是**反向**检查，防止脏东西出去。
->
-> 新增一个商业应用时，**必须同时**更新 `--exclude`、`FORBIDDEN_PATTERNS`，
-> 以及上面「不包含」表，否则自检会拦下你——这正是它存在的意义。
+> 黑名单的致命缺陷是**只覆盖已知项**：新增一个商业应用、加一个环境文件、多一份备份，
+> 就漏一次。改用 git 清单后，`gitignore` 是唯一真相，脚本不必跟着改。
 
-### 3.3 迁移链为什么要重接
+### 3.3 五道交付自检
 
-核心包排除了 `alembic/versions/{erp,crm,mes}/`，但迁移是**一条串行链**：
+压缩后逐项检查，任何一道不通过都**删掉产物并 `exit 1`**（fail-closed）：
 
-```
-crm_0006 → mes_0001 → … → mes_0009 → 20260922_0020_commerce → …
-```
+| 自检 | 拦什么 | 通过输出 |
+|------|--------|----------|
+| 闭源资产 | erp / crm / mes / workflow / payment / src-apps / developer-web / 闭源迁移 / verify_v11 | `自检通过：包内无闭源资产…` |
+| 凭据文件 | 任何 `.env` 变体（example 除外）、`*.pem`、`*.key`、`id_rsa*`、`*.bak*` | `自检通过：包内无凭据 / 备份文件…` |
+| 运行时垃圾 | `logs/`、`*.log`、`_bak-*`、`_rollback_bak_*`、`.bak.`、`.stale-apps/`、`www/wwwroot/` | `自检通过：包内无运行时垃圾…` |
+| 关键文件在不在 | 后端入口、`alembic.ini`、三套前端 `index.html`、`.env.example`、`PACKAGE.md` | `自检通过：关键文件齐全…` |
+| 迁移链自洽 | 每个 `down_revision` 都能在包内找到 | `自检通过：包内迁移链自洽…` |
 
-`commerce/20260922_0020_commerce.py` 原本 `down_revision = "20260904_mes_0009"`。
-闭源段被整段排除后，这个父节点在包内不存在，`alembic upgrade head` 直接报
-`KeyError: '20260904_mes_0009'`——包能正常解压，但**迁移跑不起来**。
-
-该迁移只新建 `app_pricing` / `app_orders` / `app_licenses` / `app_license_bindings`
-四张自建表，**不引用 MES/ERP/CRM 的任何表或 schema**，所以脚本在打包时把这个父节点
-置空（只改包内副本，不动仓库源码）：
-
-```
-▸ 已重接 commerce 迁移父节点（原 20260904_mes_0009 属闭源段，无表依赖）
-```
-
-交付包实测：
-
-```bash
-cd backend && alembic heads
-# 20261020_0035_app_publish (head)
-# 20261027_0100_app_schema (head)
-```
-
-> **升级路径注意**：核心包与完整仓库的迁移历史在这一处不同。以后接入商业模块时，
-> 用完整仓库的迁移目录，不要把两套迁移目录混用。
+加一道**正向**对账：包内迁移数必须等于 `git ls-files` 的迁移数，多一个就中止
+（`已核对迁移数：包内 44 个 = git 跟踪 44 个`）；其余未跟踪文件以 `⚠` 形式列出来供人工确认。
 
 > **交付前自检**（对已有的包也适用）：
 >
 > ```bash
 > P=release/cenkor-admin-core-<version>-<date>.tar.gz
-> # ① 闭源资产 / 凭据 / 垃圾，输出应为空
-> tar -tzf "$P" | grep -E 'backend/src/apps/|apps/(erp|crm|mes|workflow|payment)/|frontend/developer-web/|\.env\.|\.log$|\.stale-apps/|_bak' | head
+> # ① 闭源 / 凭据 / 垃圾，输出应为空
+> tar -tzf "$P" | grep -E 'apps/(erp|crm|mes|workflow|payment)/|developer-web|versions/(erp|crm|mes)/|\.env$|\.env\.|\.log$|\.sql$|_bak|\ .bak' | head
 > # ② 迁移链能不能跑
 > tar -xzf "$P" -C /tmp && (cd /tmp/$(basename "$P" .tar.gz)/backend && alembic heads)
+> # 应为唯一 head：20261031_1600_cms_permalink
 > ```
-
----
 
 ## 四、接收方部署流程
 
@@ -270,9 +246,11 @@ bash scripts/package-core.sh --skip-build
 > （输出「跳过 developer-web（闭源商业资产，未随仓库分发）」），这是正常现象，
 > 不是构建失败。
 >
-> 重新打包后同样会跑 §3.2 里的五道自检。如果接收方后来自己加了商业应用，
-> 打包会被自检拦下——按提示更新 `--exclude` 与 `FORBIDDEN_PATTERNS` 即可。
-> 若自检报「迁移链不完整」，说明新加的迁移接在了不存在的父节点后面，参照 §3.3 补重接逻辑。
+> 重新打包后同样会跑 §3.3 里的五道自检。如果接收方后来自己加了商业应用，
+> **把它登记进 `.gitignore` 即可**（打包以 `git ls-files` 为源，不用再改脚本）；
+> 若已误提交，自检会拦下并在报错里列出命中的文件。
+> 若自检报「迁移链不完整」，说明你排除了某个迁移，但公开迁移仍指向它的 revision——
+> 先确认该父迁移是否属闭源（`.gitignore` §155-172），再决定是保留还是连同引用方一起核对。
 
 若只改后端：
 

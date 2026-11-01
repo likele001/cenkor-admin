@@ -46,84 +46,69 @@ else
 fi
 
 info "复制核心文件到临时目录..."
+# ── 以 git 跟踪清单为源，不再靠 --exclude 逐条追赶 ──────────────────────────
+# tar 读文件系统、不读 .gitignore。过去四轮泄漏全部是同一原因：
+#   ① 闭源应用目录（erp/crm/mes/workflow/payment）
+#   ② .env.bak-*、backend/logs/hub.log(5.2M)、_rollback_bak_*/cenkor_db.sql(1.7M)
+#   ③ commerce/ext 混合目录里的闭源迁移（定价/订单/授权/支付/市场/分成）
+#   ④ deploy/baota/cenkor-backend.host.env（真实 SECRET_KEY + 数据库口令）
+# 这些东西 .gitignore 里都登记了，但 tar 不认识。改成以 `git ls-files` 为源后，
+# gitignore 自动生效，新增闭源资产不必再改本脚本。
+# 下面只保留「已进 git 但不该交付」的少量例外。
+TRACKED_TAR="$STAGE/.payload-tracked.tar"
 (
   cd "$ROOT"
+  git ls-files -z \
+    | grep -zvE '^(frontend/developer-web/|docs/domain_setup\.md|deploy/(addons|website|examples|nginx/snippets)/|docs/addons/|docker-compose\.addon-website\.yml$|verify_v11\.py$|docs/05-用户手册/(crm|erp|mes|payment|workflow)_操作手册\.md$|www/wwwroot/|\.mimocode/)|\.bak[^/]*$' \
+    | tar --null -T - -cf "$TRACKED_TAR"
+)
+# 用中转文件而不是直接 `| tar -x`：多个 tar 流串进同一个 tar -x 时，tar -x 读完
+# 第一个归档的 EOF 就关 stdin，上游 tar -c 吃 SIGPIPE（141），在 set -o pipefail 下
+# 整个脚本静默退出——这是「复制核心文件」后没有任何报错就中断的原因。
+tar -xf "$TRACKED_TAR" -C "$DEST"
+rm -f "$TRACKED_TAR"
+
+# ── 构建产物被 gitignore，但必须交付 ──────────────────────────────────────
+# 三套前端 dist + 开源应用的前端插件产物（闭源应用的插件目录逐个排除）。
+ARTIFACT_TAR="$STAGE/.payload-artifacts.tar"
+(
+  cd "$ROOT"
+  paths=()
+  for p in frontend/admin-web/dist frontend/portal-web/dist frontend/landing-web/dist; do
+    [ -d "$p" ] && paths+=("$p")
+  done
+  [ -d backend/src/cenkor_admin/static/apps ] && paths+=("backend/src/cenkor_admin/static/apps")
+  if [ "${#paths[@]}" -eq 0 ]; then
+    echo "✗ 打包中止：找不到任何前端构建产物（先跑 scripts/build-frontends.sh）" >&2
+    exit 1
+  fi
   tar -c \
-    --exclude='.git' \
-    --exclude='node_modules' \
-    --exclude='.venv' \
-    --exclude='venv' \
-    --exclude='__pycache__' \
-    --exclude='.pytest_cache' \
-    --exclude='.mypy_cache' \
-    --exclude='.ruff_cache' \
-    --exclude='.vite' \
-    --exclude='.env' \
-    --exclude='.env.*' \
-    --exclude='*.bak' \
-    --exclude='*.bak-*' \
-    --exclude='*.bak.*' \
-    --exclude='_bak-*' \
-    --exclude='_rollback_bak_*' \
-    --exclude='.stale-apps' \
-    --exclude='.mimocode' \
-    --exclude='*.log' \
-    --exclude='*.log.[0-9]*' \
-    --exclude='logs' \
-    --exclude='*.orig' \
-    --exclude='*.rej' \
-    --exclude='./release' \
-    --exclude='./www' \
-    --exclude='verify_v11.py' \
-    --exclude='*.tar.gz' \
-    --exclude='*.zip' \
-    --exclude='.DS_Store' \
-    --exclude='.user.ini' \
-    --exclude='.well-known' \
-    --exclude='deploy/addons' \
-    --exclude='deploy/website' \
-    --exclude='docs/addons' \
-    --exclude='deploy/examples' \
-    --exclude='deploy/nginx/snippets' \
-    --exclude='docker-compose.addon-website.yml' \
-    --exclude='docs/domain_setup.md' \
-    --exclude='backend/src/apps' \
-    --exclude='frontend/developer-web' \
-    --exclude='backend/src/cenkor_admin/apps/erp' \
-    --exclude='backend/src/cenkor_admin/apps/crm' \
-    --exclude='backend/src/cenkor_admin/apps/mes' \
-    --exclude='backend/src/cenkor_admin/apps/workflow' \
-    --exclude='backend/src/cenkor_admin/apps/payment' \
     --exclude='backend/src/cenkor_admin/static/apps/erp' \
     --exclude='backend/src/cenkor_admin/static/apps/crm' \
     --exclude='backend/src/cenkor_admin/static/apps/mes' \
     --exclude='backend/src/cenkor_admin/static/apps/workflow' \
     --exclude='backend/src/cenkor_admin/static/apps/payment' \
-    --exclude='backend/src/cenkor_admin/apps/*/release' \
-    --exclude='backend/alembic/versions/erp' \
-    --exclude='backend/alembic/versions/crm' \
-    --exclude='backend/alembic/versions/mes' \
-    .
-) | tar -x -C "$DEST"
+    -f "$ARTIFACT_TAR" "${paths[@]}"
+)
+tar -xf "$ARTIFACT_TAR" -C "$DEST"
+rm -f "$ARTIFACT_TAR"
 
-# ---- 闭源迁移接力：erp/crm/mes 整段排除后，commerce 首个迁移的父节点会悬空 ----
-# alembic/versions/commerce/20260922_0020_commerce.py 原本 down_revision = 20260904_mes_0009。
-# 它只新建 app_pricing / app_orders / app_licenses / app_license_bindings 四张自建表，
-# 不引用 MES/ERP/CRM 的任何表或 schema，因此置空父节点、让它成为独立分支起点是安全的。
-# 不改仓库源码，只改包内副本：交付包必须能直接 `alembic upgrade head`。
-COMMERCE_SEED="$DEST/backend/alembic/versions/commerce/20260922_0020_commerce.py"
-if [ -f "$COMMERCE_SEED" ]; then
-  sed -i 's|^down_revision = "20260904_mes_0009"$|down_revision = None  # 核心包：原父 20260904_mes_0009 属闭源 MES 段，本迁移不依赖其表|' "$COMMERCE_SEED"
-  if ! grep -q '^down_revision = None' "$COMMERCE_SEED"; then
-    echo "" >&2
-    echo "✗ 打包中止：commerce 迁移父节点改接失败（20260922_0020_commerce.py 已变化）" >&2
-    echo "  闭源段被排除后该迁移会指向不存在的 revision，交付包将无法执行 alembic upgrade。" >&2
-    echo "  请检查 scripts/package-core.sh 里的 COMMERCE_SEED 处理逻辑。" >&2
-    rm -rf "$STAGE"
-    exit 1
-  fi
-  info "已重接 commerce 迁移父节点（原 20260904_mes_0009 属闭源段，无表依赖）"
+# ---- 闭源迁移必须一个不剩 ----
+# 早先只排除了 alembic/versions/{erp,crm,mes} 三个目录，commerce 与 ext 是「混合目录」：
+# 目录里既有平台级公开迁移，也有闭源商业迁移（.gitignore §155-172 逐个登记）。
+# 这里对包内迁移数与 git 跟踪数做精确对账，差一个就中止。
+PKG_MIG="$(cd "$DEST" && find backend/alembic/versions -name '*.py' -not -path '*/__pycache__/*' | wc -l)"
+GIT_MIG="$(cd "$ROOT" && git ls-files 'backend/alembic/versions' | grep -c '\.py$' || true)"
+if [ "$PKG_MIG" -ne "$GIT_MIG" ]; then
+  echo "" >&2
+  echo "✗ 打包中止：包内迁移 $PKG_MIG 个，git 跟踪 $GIT_MIG 个，数量不符" >&2
+  echo "  多出的通常是闭源商业迁移（commerce / ext 混合目录）。用这条命令定位：" >&2
+  echo "    comm -13 <(git ls-files backend/alembic/versions|sort) \\" >&2
+  echo "             <(cd 解压目录 && find backend/alembic/versions -name '*.py'|sort)" >&2
+  rm -rf "$STAGE"
+  exit 1
 fi
+info "已核对迁移数：包内 $PKG_MIG 个 = git 跟踪 $GIT_MIG 个（闭源迁移未混入）"
 
 # .env.* 被整体排除（含 .env.bak-* 这类带真实凭据的历史备份），只补回模板
 for tpl in .env.example backend/.env.example; do
@@ -154,15 +139,16 @@ cat > "$DEST/PACKAGE.md" <<EOF
 
 ## 迁移说明
 
-核心包**不含** ERP / CRM / MES 商业模块，对应迁移目录（\`alembic/versions/erp\`、\`crm\`、\`mes\`）
-已从包中排除。\`commerce\` 的首个迁移原本接在闭源 MES 迁移之后，包内已把它的父节点置空
-（该迁移只新建自身 4 张表，不依赖商业模块的任何表），因此可直接执行：
+核心包**不含** ERP / CRM / MES 商业模块，也不含 commerce / ext 两个混合目录里的
+闭源商业迁移（定价、订单、授权、支付、市场、分成、促销、云绑定、工作流、应用发布）。
+包内迁移与公开仓库完全一致，可直接执行：
 
 \`\`\`bash
 cd backend && alembic upgrade head
 \`\`\`
 
-若未来要接入商业模块，请使用完整仓库的迁移目录，不要沿用本包内的迁移链。
+迁移链唯一 head 为 \`20261031_1600_cms_permalink\`。若未来要接入商业模块，
+请使用完整仓库的迁移目录，不要把两套迁移混用。
 
 ## 快速部署（宝塔）
 
@@ -192,7 +178,7 @@ tar -czf "$ARCHIVE" -C "$STAGE" "$PKG_NAME"
 # tar 读的是文件系统，不看 .gitignore；闭源应用在本机物理存在，仅靠上面的
 # --exclude 列表容易漏（新增一个商业应用就会漏一次）。这里用「特征路径扫描」兜底，
 # 宁可让打包失败，也不能产出带着 ERP/CRM/MES 源码的交付包。
-FORBIDDEN_PATTERNS='backend/src/cenkor_admin/apps/(erp|crm|mes|workflow|payment)/|backend/src/apps/|frontend/developer-web/|backend/src/cenkor_admin/static/apps/(erp|crm|mes|workflow|payment)/|backend/alembic/versions/(erp|crm|mes)/|verify_v11\.py'
+FORBIDDEN_PATTERNS='backend/src/cenkor_admin/apps/(erp|crm|mes|workflow|payment)/|backend/src/apps/|frontend/developer-web/|backend/src/cenkor_admin/static/apps/(erp|crm|mes|workflow|payment)/|backend/alembic/versions/(erp|crm|mes)/|backend/alembic/versions/commerce/(20260922_002[01]|20260923_002[234]|20261007_0029)|backend/alembic/versions/ext/(20260924_0025|20260925_0027|20261020_0035|20261027_0100)|verify_v11\.py'
 LEAKED="$(tar -tzf "$ARCHIVE" 2>/dev/null | grep -E "$FORBIDDEN_PATTERNS" | head -20 || true)"
 if [ -n "$LEAKED" ]; then
   echo "" >&2
@@ -211,8 +197,8 @@ info "自检通过：包内无闭源资产（erp / crm / mes / workflow / paymen
 # .env.bak-20261007 这类历史备份带真实密钥，且从未进过 git（.gitignore 管不到它们的
 # 兄弟文件名），tar 会照单全收。凡 .env 变体（example 除外）、私钥、*.bak 一律拦截。
 SECRET_HITS="$(tar -tzf "$ARCHIVE" 2>/dev/null \
-  | grep -E '(^|/)\.env(\..*)?$|\.pem$|\.key$|(^|/)id_(rsa|ed25519)|\.bak(-[^/]*)?$' \
-  | grep -vE '(^|/)\.env\.example$' | head -20 || true)"
+  | grep -E '(^|/)\.env$|(^|/)\.env\.[^/]*$|\.env$|\.env\.[^/]*$|\.pem$|\.key$|(^|/)id_(rsa|ed25519)|\.bak([-_.][^/]*)?$' \
+  | grep -vE '\.env\.example$' | head -20 || true)"
 if [ -n "$SECRET_HITS" ]; then
   echo "" >&2
   echo "✗ 打包中止：检测到凭据 / 备份文件被打进核心包" >&2
@@ -332,14 +318,30 @@ PYCHECK
     echo "✗ 打包中止：核心包迁移链不完整（alembic upgrade head 会失败）" >&2
     printf '%s\n' "$MIG_BAD" | sed 's/^/    /' >&2
     echo "" >&2
-    echo "  多半是排除了某个迁移目录，但公开迁移仍指向它的 revision。" >&2
-    echo "  请在 scripts/package-core.sh 里为该迁移补「父节点重接」逻辑。" >&2
+    echo "  多半是排除了某个迁移，但公开迁移仍指向它的 revision。" >&2
+    echo "  先确认该父迁移是否属闭源（.gitignore §155-172）；属闭源则连同引用它的迁移一起核对。" >&2
     rm -rf "$STAGE" "$ARCHIVE"
     exit 1
   fi
   info "自检通过：包内迁移链自洽（父 revision 齐全，可直接 alembic upgrade head）"
 else
   warn "跳过迁移链自检（当前环境没有 python3）"
+fi
+
+# ---- 提示：包内仍有 git 未跟踪的文件 ----
+# 构建产物（dist / 插件产物）与 PACKAGE.md 本就未跟踪，属正常；
+# 其余未跟踪文件多为尚未提交的开发内容，会跟着 tar 一起交付出去，需要人工过一眼。
+BUILD_ARTIFACTS='^(PACKAGE.md|frontend/(admin-web|portal-web|landing-web)/dist/|frontend/landing/|backend/src/cenkor_admin/static/apps/)'
+UNTRACKED="$(comm -23 \
+  <(tar -tzf "$ARCHIVE" | sed "s|^$PKG_NAME/||" | grep -v '/$' | sort -u) \
+  <(cd "$ROOT" && git -c core.quotePath=false ls-files | sort -u) 2>/dev/null \
+  | grep -vE "$BUILD_ARTIFACTS" || true)"
+if [ -n "$UNTRACKED" ]; then
+  N="$(printf '%s\n' "$UNTRACKED" | wc -l | tr -d ' ')"
+  warn "包内有 $N 个文件不在 git 跟踪中，会随包交付，请确认是否合适："
+  printf '%s\n' "$UNTRACKED" | head -15 | sed 's/^/    /'
+  [ "$N" -gt 15 ] && echo "    …（共 $N 条，仅显示前 15 条）"
+  echo "    处理方式：该提交的 git add；不该交付的加 --exclude。"
 fi
 
 rm -rf "$STAGE"
