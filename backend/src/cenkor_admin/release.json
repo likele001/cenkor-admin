@@ -1,12 +1,12 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "channel": "stable",
-  "released_at": "2026-10-30",
+  "released_at": "2026-11-02",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
   "docker_registry": "ghcr.io/likele001",
   "docker_image": "cenkor-admin",
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "AI CMS 全套：内容工作流引擎 workflow、落地页工作室 landing、知识库、多渠道发布、统计分析、内容健康追踪；后端迁移守卫 drift/idempotent/runner；前端新增 WorkflowStudio/LandingStudio/KnowledgeBase/PublishChannels/Analytics 视图。"
+  "notes": "内链模块、URL 规则体系、标签聚合；修复新装 AI 菜单与 12 张 AI 表缺失"
 }
