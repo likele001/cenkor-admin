@@ -175,6 +175,51 @@ async def _ensure_menu_tree(
     return row
 
 
+async def _sync_core_menus(db, *, dry_run: bool) -> list[str]:
+    """兜底同步 seed.DEFAULT_MENUS 里的核心平台菜单（幂等，只补缺失的 key）。
+
+    manifest 只覆盖 App 自带菜单；system 这类核心分组没有 manifest.py，
+    菜单定义在 seed 的 DEFAULT_MENUS 里。老库升级后若缺这些行，侧边栏同样
+    看不到入口（在线升级 / 代码生成 / 事件推送等就是这么丢的）。
+    """
+    # 延迟导入：seed 顶层会建 async engine，启动早期导入它没必要
+    from cenkor_admin.scripts.seed import DEFAULT_MENUS
+
+    rows = (await db.execute(select(rbac_models.Menu.key, rbac_models.Menu.id))).all()
+    known: dict[str, int] = {r[0]: r[1] for r in rows}
+    created: list[str] = []
+
+    # 两遍：先建根分组，再建子项（父级可能就在本次新建）
+    for round_no in (0, 1):
+        for key, parent_key, title, icon, path, sort in DEFAULT_MENUS:
+            is_root = parent_key is None
+            if (round_no == 0) != is_root:
+                continue
+            if key in known:
+                continue
+            parent_id = None
+            if not is_root:
+                parent_id = known.get(parent_key)
+                if parent_id is None:
+                    continue  # 父级仍缺，留给下一轮
+            if dry_run:
+                known[key] = -1
+            else:
+                menu = rbac_models.Menu(
+                    key=key,
+                    parent_id=parent_id,
+                    title=title,
+                    icon=icon,
+                    path=path,
+                    sort=sort,
+                )
+                db.add(menu)
+                await db.flush()
+                known[key] = menu.id
+            created.append(key)
+    return created
+
+
 async def sync(
     dry_run: bool,
     bind_super: bool,
@@ -345,6 +390,13 @@ async def sync(
                         db.add(rbac_models.RoleMenu(role_id=role.id, menu_id=menu.id))
                 if added_m:
                     stats["role_menus_added"][role_code] = added_m
+
+        # ---- 核心平台菜单兜底（2026-11-02）----
+        # 上面按 manifest 补的是 App 菜单；核心分组的菜单在 seed.DEFAULT_MENUS，
+        # 不走 manifest。两者合起来才是完整的「代码有 → 库里就该有」。
+        core_created = await _sync_core_menus(db, dry_run=dry_run)
+        if core_created:
+            stats["menus_created"].extend(core_created)
 
         if dry_run:
             await db.rollback()

@@ -107,6 +107,26 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("ai.registry.warm_failed", error=str(e))
 
+    # RBAC 目录自动对齐（2026-11-02）
+    # 按各 App manifest 重放菜单与权限，幂等、只补不删、不改运营调过的顺序。
+    # 以前这步只有手工脚本 sync_rbac_catalog，于是「代码里加了新页面、线上侧栏却
+    # 看不到入口」反复发生：AI 内容中心的 14 项、在线升级等 8 项都是这么丢的。
+    # 升级流程是 git pull + alembic + 重启，把同步挂在启动上即形成闭环 ——
+    # 以后改 manifest，升级重启后自动生效，不必再记着手工敲命令。
+    try:
+        from cenkor_admin.scripts.sync_rbac_catalog import sync as _sync_rbac
+
+        _rbac_stats = await _sync_rbac(dry_run=False, bind_super=True, only=None)
+        if _rbac_stats["menus_created"] or _rbac_stats["permissions_created"]:
+            log.info(
+                "rbac.catalog.synced",
+                menus_created=len(_rbac_stats["menus_created"]),
+                permissions_created=len(_rbac_stats["permissions_created"]),
+            )
+    except Exception as e:
+        # 菜单缺了只是入口不可见，不影响既有功能，因此不阻断启动
+        log.warning("rbac.catalog.sync_failed", error=str(e))
+
     try:
         await redis_client.ping()
         log.info("redis.ok")
