@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+import UrlPatternInput from '@/components/UrlPatternInput.vue'
 
 const auth = useAuthStore()
 // 规则是全站生效的：只读角色可以看、可以预览，但不能保存。
@@ -24,6 +25,8 @@ interface OverrideItem {
   name: string
   slug: string
   url_pattern: string | null
+  article_pattern?: string | null
+  template?: string | null
 }
 
 interface HistoryItem { kind: string; pattern: string }
@@ -62,7 +65,9 @@ const previews = ref<Record<string, PreviewResult | null>>({})
 const previewing = ref<string | null>(null)
 const saving = ref<string | null>(null)
 
-const overriddenCategories = computed(() => categories.value.filter(c => !!c.url_pattern))
+const overriddenCategories = computed(() =>
+  categories.value.filter(c => !!c.url_pattern || !!c.article_pattern || !!c.template)
+)
 const overriddenTags = computed(() => tags.value.filter(t => !!t.url_pattern))
 
 const sourceLabel: Record<string, string> = {
@@ -193,21 +198,13 @@ onMounted(load)
             </div>
           </div>
 
-          <input
+          <UrlPatternInput
             v-model="drafts[rule.kind]"
-            class="input font-mono text-sm"
+            :vars="rule.vars"
+            :presets="[{ label: '内置默认', pattern: rule.builtin }]"
+            :show-example="false"
             :placeholder="rule.builtin"
           />
-
-          <!-- 可用变量提示：让用户知道能填什么，而不是靠猜 -->
-          <div class="mt-2 flex flex-wrap gap-1.5">
-            <span
-              v-for="v in rule.vars"
-              :key="v.name"
-              class="text-xs px-2 py-0.5 rounded bg-ink-100 text-ink-600 cursor-help"
-              :title="v.desc"
-            ><code>{{ '{' + v.name + '}' }}</code></span>
-          </div>
 
           <div class="mt-3 flex flex-wrap gap-2">
             <button class="btn-outline" :disabled="previewing === rule.kind" @click="preview(rule)">
@@ -265,17 +262,25 @@ onMounted(load)
       <h2 class="text-lg font-semibold mb-3">栏目覆盖（{{ overriddenCategories.length }}）</h2>
       <div class="card mb-8">
         <p class="text-sm text-ink-500 mb-3">
-          栏目级规则只管栏目页自己的地址。修改请到「分类管理」里编辑对应栏目。
+          栏目级规则分两种：栏目页地址 / 该栏目下文章的地址，互不干扰。修改请到「分类管理」里编辑对应栏目。
         </p>
-        <div v-if="!overriddenCategories.length" class="text-sm text-ink-400">暂无栏目自定义规则</div>
+        <div v-if="!overriddenCategories.length" class="text-sm text-ink-400">暂无栏目自定义规则或模板</div>
         <div
           v-for="c in overriddenCategories"
           :key="c.id"
-          class="flex items-center gap-3 py-2 border-b border-ink-100 last:border-0"
+          class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 border-b border-ink-100 last:border-0"
         >
           <span class="font-medium text-sm">{{ c.name }}</span>
           <code class="text-xs text-ink-400">{{ c.slug }}</code>
-          <code class="text-xs text-ink-700 ml-auto">{{ c.url_pattern }}</code>
+          <span v-if="c.url_pattern" class="text-xs text-ink-500">
+            栏目页：<code class="text-ink-700">{{ c.url_pattern }}</code>
+          </span>
+          <span v-if="c.article_pattern" class="text-xs text-ink-500">
+            文章：<code class="text-ink-700">{{ c.article_pattern }}</code>
+          </span>
+          <span v-if="c.template" class="text-xs text-ink-500">
+            模板：<code class="text-ink-700">{{ c.template }}</code>
+          </span>
         </div>
       </div>
 

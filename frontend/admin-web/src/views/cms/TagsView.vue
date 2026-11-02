@@ -3,6 +3,19 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
+import UrlPatternInput from '@/components/UrlPatternInput.vue'
+
+// 标签页规则可用变量（与后端 permalink.py 对齐）
+const TAG_RULE_VARS = [
+  { name: 'slug', desc: '标签别名' },
+  { name: 'id', desc: '标签 ID' },
+  { name: 'type', desc: '内容类型标识' },
+]
+const TAG_RULE_PRESETS = [
+  { label: '按别名', pattern: 'tag/{slug}/' },
+  { label: '短路径', pattern: 't/{slug}/' },
+  { label: '按 ID', pattern: 'tag/{id}/' },
+]
 
 interface Tag { id: number; content_type_id: number; slug: string; name: string; color: string | null; url_pattern?: string | null }
 interface ContentType { id: number; key: string; name: string; icon: string | null }
@@ -146,14 +159,14 @@ onMounted(async () => {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">标签页地址规则（可选）</label>
-            <input
+            <UrlPatternInput
               v-model="form.url_pattern"
-              class="input font-mono text-sm"
+              :vars="TAG_RULE_VARS"
+              :presets="TAG_RULE_PRESETS"
               placeholder="留空 = 用站点默认，例如 tag/{slug}/"
             />
             <p class="text-xs text-ink-500 mt-1">
-              决定这个「标签页」自己的地址。标签页对 SEO 最友好，建议用短 slug，
-              比如 <code>tag/{slug}/</code>。可用变量：<code>{slug}</code> 标签别名、<code>{id}</code> 标签 ID。
+              决定这个「标签页」自己的地址。标签页对 SEO 最友好，建议用短 slug。
             </p>
           </div>
           <div>

@@ -3,6 +3,43 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 import { ref, onMounted, computed } from 'vue'
 import { api } from '@/lib/api'
+import UrlPatternInput from '@/components/UrlPatternInput.vue'
+
+// 栏目页规则可用变量（与后端 permalink.py 对齐）
+const CAT_RULE_VARS = [
+  { name: 'catdir', desc: '栏目目录链，如 mes-system/flow' },
+  { name: 'cat', desc: '本级栏目目录名（slug）' },
+  { name: 'parent', desc: '父栏目目录链' },
+  { name: 'slug', desc: '栏目别名（同 cat）' },
+  { name: 'id', desc: '栏目 ID' },
+  { name: 'type', desc: '内容类型标识' },
+]
+const CAT_RULE_PRESETS = [
+  { label: '按别名', pattern: 'category/{slug}/' },
+  { label: '目录+别名', pattern: '{catdir}/{slug}/' },
+  { label: '仅目录', pattern: '{catdir}/' },
+  { label: '按 ID', pattern: 'c/{id}/' },
+]
+
+// 文章内容页规则变量（与后端 article kind 变量集对齐）
+const ART_RULE_VARS = [
+  { name: 'catdir', desc: '栏目目录链，如 mes-system/flow' },
+  { name: 'cat', desc: '本级栏目目录名（slug）' },
+  { name: 'slug', desc: '文章别名' },
+  { name: 'id', desc: '文章 ID' },
+  { name: 'year', desc: '发布年份，如 2026' },
+  { name: 'month', desc: '发布月份，两位 01-12' },
+  { name: 'day', desc: '发布日期，两位 01-31' },
+  { name: 'type', desc: '内容类型前缀（建议不用，产品/新闻会混）' },
+]
+const ART_RULE_PRESETS = [
+  { label: '目录+别名', pattern: '{catdir}/{slug}.html' },
+  { label: '目录+日期', pattern: '{catdir}/{year}/{month}/{id}.html' },
+  { label: '目录+ID', pattern: '{catdir}/{id}.html' },
+]
+
+// 栏目模板候选：主题内的页面级模板，也允许手填自定义文件名
+const TPL_OPTIONS = ['list.html', 'detail.html', 'page.html', 'layout.html', '404.html']
 
 interface Category {
   id: number; content_type_id: number; parent_id: number | null
@@ -20,7 +57,7 @@ const loading = ref(true)
 const saving = ref(false)
 const showModal = ref(false)
 const editing = ref<Category | null>(null)
-const form = ref({ name: '', slug: '', parent_id: null as number | null, icon: '', color: '', sort: 0, url_pattern: '' })
+const form = ref({ name: '', slug: '', parent_id: null as number | null, icon: '', color: '', sort: 0, url_pattern: '', article_pattern: '', template: '' })
 
 const selectedCtName = computed(() => contentTypes.value.find(c => c.key === selectedCtKey.value)?.name || selectedCtKey.value)
 
@@ -48,7 +85,7 @@ async function loadCategories() {
 
 function openCreate(parentId: number | null = null) {
   editing.value = null
-  form.value = { name: '', slug: '', parent_id: parentId, icon: '', color: '', sort: 0, url_pattern: '' }
+  form.value = { name: '', slug: '', parent_id: parentId, icon: '', color: '', sort: 0, url_pattern: '', article_pattern: '', template: '' }
   showModal.value = true
 }
 
@@ -58,6 +95,8 @@ function openEdit(cat: Category) {
     name: cat.name, slug: cat.slug, parent_id: cat.parent_id,
     icon: cat.icon || '', color: cat.color || '', sort: cat.sort,
     url_pattern: cat.url_pattern || '',
+    article_pattern: (cat as any).article_pattern || '',
+    template: (cat as any).template || '',
   }
   showModal.value = true
 }
@@ -71,6 +110,8 @@ async function save() {
         parent_id: form.value.parent_id, icon: form.value.icon || null,
         color: form.value.color || null, sort: form.value.sort,
         url_pattern: form.value.url_pattern.trim() || null,
+        article_pattern: form.value.article_pattern.trim() || null,
+        template: form.value.template.trim() || null,
       })
     } else {
       await api.post('/api/v1/cms/categories', {
@@ -79,6 +120,8 @@ async function save() {
         parent_id: form.value.parent_id, icon: form.value.icon || null,
         color: form.value.color || null, sort: form.value.sort,
         url_pattern: form.value.url_pattern.trim() || null,
+        article_pattern: form.value.article_pattern.trim() || null,
+        template: form.value.template.trim() || null,
       })
     }
     showModal.value = false
@@ -207,15 +250,41 @@ onMounted(async () => {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">栏目页地址规则（可选）</label>
-            <input
+            <UrlPatternInput
               v-model="form.url_pattern"
-              class="input font-mono text-sm"
+              :vars="CAT_RULE_VARS"
+              :presets="CAT_RULE_PRESETS"
               placeholder="留空 = 用站点默认，例如 category/{slug}/"
             />
             <p class="text-xs text-ink-500 mt-1">
               只决定这个「栏目页」自己的地址，不管栏目下文章的地址。
-              可用变量：<code>{catdir}</code> 栏目目录链、<code>{slug}</code> 栏目别名、
-              <code>{id}</code> 栏目 ID、<code>{parent}</code> 父栏目目录链。
+            </p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">该栏目下文章的地址规则（可选）</label>
+            <UrlPatternInput
+              v-model="form.article_pattern"
+              :vars="ART_RULE_VARS"
+              :presets="ART_RULE_PRESETS"
+              placeholder="留空 = 用站点默认，例如 {catdir}/{slug}.html"
+            />
+            <p class="text-xs text-ink-500 mt-1">
+              只对这个栏目下的文章详情页生效；改规则后老地址自动 301，不会 404。
+            </p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">栏目模板（可选）</label>
+            <input
+              v-model="form.template"
+              class="input font-mono text-sm"
+              list="tpl-options"
+              placeholder="留空 = 用默认模板"
+            />
+            <datalist id="tpl-options">
+              <option v-for="t in TPL_OPTIONS" :key="t" :value="t" />
+            </datalist>
+            <p class="text-xs text-ink-500 mt-1">
+              主题内的模板文件名（模板预览里可在线编辑）。填了不存在的文件名会自动回退默认模板。
             </p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

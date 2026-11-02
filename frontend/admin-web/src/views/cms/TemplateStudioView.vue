@@ -26,9 +26,10 @@ interface FileItem {
   kind: string
   templatable: boolean
   overridden: boolean
+  disk?: boolean
   builtin: boolean
   inherited: boolean
-  source: 'db' | 'builtin' | 'inherited'
+  source: 'db' | 'builtin' | 'inherited' | 'disk'
 }
 
 const themes = ref<ThemeItem[]>([])
@@ -38,7 +39,7 @@ const files = ref<FileItem[]>([])
 const currentPath = ref('')
 const content = ref('')
 const originContent = ref('')
-const sourceKind = ref<'db' | 'builtin' | 'inherited'>('builtin')
+const sourceKind = ref<'db' | 'builtin' | 'inherited' | 'disk'>('builtin')
 
 const loadingFiles = ref(false)
 const saving = ref(false)
@@ -351,10 +352,14 @@ async function save() {
       content: content.value,
     })
     originContent.value = content.value
-    sourceKind.value = 'db'
-    const f = files.value.find((x) => x.path === currentPath.value)
-    if (f) { f.overridden = true; f.inherited = false; f.source = 'db' }
-    flash('ok', `已保存 ${currentPath.value}（${data.checksum?.slice(0, 8)}）`)
+    // 磁盘同名文件优先于 DB：保存成功但前台仍用磁盘版，必须提醒
+    if (data.disk_shadowed) {
+      flash('ok', `已存入数据库，但磁盘目录里有同名文件正在生效，前台不会变。删除 var/themes/${currentTheme.value}/${currentPath.value} 后此版本才生效`)
+    } else {
+      const f = files.value.find((x) => x.path === currentPath.value)
+      if (f) { f.overridden = true; f.inherited = false; f.source = 'db' }
+      flash('ok', `已保存 ${currentPath.value}（${data.checksum?.slice(0, 8)}）`)
+    }
     schedulePreview(100)
   } catch (e: any) {
     const d = e?.response?.data?.detail
@@ -596,6 +601,7 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
       <aside class="col-span-2 flex min-h-0 flex-col overflow-hidden rounded-lg border border-ink-100">
         <div class="border-b border-ink-100 px-2 py-1.5 text-xs text-ink-500">
           {{ loadingFiles ? '加载中…' : `${files.length} 个文件` }}
+          <span v-if="files.some(f => f.disk)" class="ml-1 text-green-600" title="绿色 = 磁盘文件，优先于在线编辑">· 含磁盘文件</span>
         </div>
         <div class="min-h-0 flex-1 overflow-auto p-1.5">
           <div v-for="[dir, list] in groups" :key="dir" class="mb-2">
@@ -608,10 +614,11 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
               @click="switchFile(f.path)"
             >
               <span class="w-1.5 shrink-0 rounded-full"
-                    :class="f.source === 'db' ? 'h-1.5 bg-blue-500' : f.source === 'builtin' ? 'h-1.5 bg-ink-300' : 'h-1.5 bg-ink-200'"
-                    :title="f.source === 'db' ? '已覆盖（DB）' : f.source === 'builtin' ? '内置' : '继承自 default'" />
+                    :class="f.source === 'disk' ? 'h-1.5 bg-green-500' : f.source === 'db' ? 'h-1.5 bg-blue-500' : f.source === 'builtin' ? 'h-1.5 bg-ink-300' : 'h-1.5 bg-ink-200'"
+                    :title="f.source === 'disk' ? '磁盘文件（优先于一切）' : f.source === 'db' ? '已覆盖（DB）' : f.source === 'builtin' ? '内置' : '继承自 default'" />
               <span class="truncate">{{ f.path.includes('/') ? f.path.slice(f.path.lastIndexOf('/') + 1) : f.path }}</span>
-              <span v-if="f.overridden" class="ml-auto text-[10px] text-blue-600">改</span>
+              <span v-if="f.disk" class="ml-auto text-[10px] text-green-600">盘</span>
+              <span v-else-if="f.overridden" class="ml-auto text-[10px] text-blue-600">改</span>
             </button>
           </div>
         </div>
@@ -628,8 +635,8 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
         <div class="flex items-center gap-2 border-b border-ink-100 px-2 py-1.5">
           <code class="text-xs font-medium">{{ currentPath || '未选择文件' }}</code>
           <span class="rounded px-1 text-[10px]"
-                :class="sourceKind === 'db' ? 'bg-blue-50 text-blue-700' : 'bg-ink-50 text-ink-500'">
-            {{ sourceKind === 'db' ? '已覆盖' : sourceKind === 'builtin' ? '内置' : '继承' }}
+                :class="sourceKind === 'disk' ? 'bg-green-50 text-green-700' : sourceKind === 'db' ? 'bg-blue-50 text-blue-700' : 'bg-ink-50 text-ink-500'">
+            {{ sourceKind === 'disk' ? '磁盘文件 · 编辑器改动存库但不生效' : sourceKind === 'db' ? '已覆盖' : sourceKind === 'builtin' ? '内置' : '继承' }}
           </span>
           <span v-if="dirty" class="text-[10px] text-amber-600">未保存</span>
           <span v-if="syntaxError" class="text-[10px] text-red-600">第 {{ syntaxError.line }} 行：{{ syntaxError.message }}</span>

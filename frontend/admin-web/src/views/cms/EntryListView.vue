@@ -15,6 +15,8 @@ interface Entry {
   created_at: string; updated_at: string
   /** AI 来源标记：null=人工；draft/rewrite/translate=AI 产出 */
   ai_origin: string | null
+  /** SEO 元信息：keywords / description 等 */
+  seo?: Record<string, any> | null
 }
 interface ContentType { id: number; key: string; name: string; icon: string | null; supports_category: boolean; supports_tags: boolean }
 interface Category { id: number; name: string; slug: string; parent_id: number | null }
@@ -42,36 +44,42 @@ const selectedCt = computed(() => contentTypes.value.find(c => c.key === selecte
 async function loadContentTypes() {
   const { data } = await api.get('/api/v1/cms/content-types')
   contentTypes.value = data.items
-  if (data.items.length && !selectedCtKey.value) selectedCtKey.value = data.items[0].key
+  // 默认「全部类型」：仅当 URL 带 ct 参数时才预选
+  if (data.items.length && !selectedCtKey.value && route.query.ct) {
+    selectedCtKey.value = route.query.ct as string
+  }
 }
 
 async function loadCategories() {
-  if (!selectedCtKey.value || !selectedCt.value?.supports_category) {
+  // 全部类型时拉全量分类；选中类型时按类型过滤
+  if (selectedCtKey.value && !selectedCt.value?.supports_category) {
     categories.value = []
     return
   }
-  const { data } = await api.get(`/api/v1/cms/categories?content_type_key=${selectedCtKey.value}`)
+  const qs = selectedCtKey.value ? `?content_type_key=${selectedCtKey.value}` : ''
+  const { data } = await api.get(`/api/v1/cms/categories${qs}`)
   categories.value = data.items || []
 }
 
 async function loadTags() {
-  if (!selectedCtKey.value || !selectedCt.value?.supports_tags) {
+  if (selectedCtKey.value && !selectedCt.value?.supports_tags) {
     tags.value = []
     return
   }
-  const { data } = await api.get(`/api/v1/cms/tags?content_type_key=${selectedCtKey.value}`)
+  const qs = selectedCtKey.value ? `?content_type_key=${selectedCtKey.value}` : ''
+  const { data } = await api.get(`/api/v1/cms/tags${qs}`)
   tags.value = data.items || []
 }
 
 async function loadEntries() {
-  if (!selectedCtKey.value) return
   loading.value = true
   try {
     const params = new URLSearchParams({
-      content_type_key: selectedCtKey.value,
       page: String(page.value),
       page_size: String(pageSize),
     })
+    // 不选类型 = 跨类型列全部
+    if (selectedCtKey.value) params.set('content_type_key', selectedCtKey.value)
     if (search.value) params.set('search', search.value)
     if (statusFilter.value) params.set('status', statusFilter.value)
     if (categoryFilter.value) params.set('category_id', String(categoryFilter.value))
@@ -85,6 +93,7 @@ async function loadEntries() {
 
 async function onCtChange() {
   page.value = 1
+  categoryFilter.value = null
   await loadCategories()
   await loadTags()
   await loadEntries()
@@ -106,7 +115,7 @@ function onPageChange(p: number) {
 }
 
 function newEntry() {
-  router.push({ name: 'cms-entry-new', query: { ct: selectedCtKey.value } })
+  router.push({ name: 'cms-entry-new', query: { ct: selectedCtKey.value || contentTypes.value[0]?.key || '' } })
 }
 
 function editEntry(e: Entry) {
@@ -123,7 +132,7 @@ async function reviewEntry(e: Entry, action: 'approve' | 'reject') {
   await api.post(`/api/v1/cms/entries/${e.id}/review`, { action })
   await loadEntries()
 }
-/** AI 来源徽章：一眼看出哪些稿是 AI 写的，点徽章等同筛选 */
+/** AI 来源徽章 */
 const AI_META: Record<string, { label: string; cls: string }> = {
   draft: { label: 'AI 起草', cls: 'bg-violet-50 text-violet-700 border border-violet-200' },
   rewrite: { label: 'AI 改写', cls: 'bg-sky-50 text-sky-700 border border-sky-200' },
@@ -137,6 +146,68 @@ function fmtSchedule(iso?: string | null): string {
   if (Number.isNaN(d.getTime())) return ''
   const p = (n: number) => String(n).padStart(2, '0')
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/** 通用时间展示：本地时区 MM-DD HH:mm */
+function fmtTime(iso?: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/** 类型名：跨类型列表时按 content_type_id 反查 */
+function ctName(id: number): string {
+  const ct = contentTypes.value.find(c => c.id === id)
+  return ct ? `${ct.icon || ''} ${ct.name}`.trim() : `#${id}`
+}
+
+/** 来源列：采集来源 > AI 产出 > 人工 */
+function sourceMeta(e: Entry): { text: string; cls: string; title: string } {
+  const cf: any = e.custom_fields || {}
+  const collect = cf.collect || {}
+  if (collect.source_name) {
+    return { text: `采集 · ${collect.source_name}`, cls: 'bg-amber-50 text-amber-700 border border-amber-200', title: collect.source_url || '采集来源' }
+  }
+  if (e.ai_origin && AI_META[e.ai_origin]) {
+    return { text: AI_META[e.ai_origin].label, cls: AI_META[e.ai_origin].cls, title: 'AI 生成，点击筛选同类' }
+  }
+  if (e.ai_origin) {
+    return { text: `AI · ${e.ai_origin}`, cls: 'bg-violet-50 text-violet-700 border border-violet-200', title: 'AI 生成' }
+  }
+  return { text: '人工', cls: 'bg-ink-100 text-ink-500', title: e.author_id ? `作者 ID ${e.author_id}` : '人工创建' }
+}
+
+function clickSource(e: Entry) {
+  const sm = sourceMeta(e)
+  if (sm.title.includes('筛选')) {
+    aiFilter.value = aiFilter.value === 'ai' ? '' : 'ai'
+    onStatusChange()
+  }
+}
+
+/** 关键词：seo.keywords 数组或逗号分隔字符串 */
+function kwList(e: Entry): string[] {
+  const seo: any = e.seo || {}
+  const kw = seo.keywords ?? seo.keyword
+  if (Array.isArray(kw)) return kw.filter(Boolean).map(String)
+  if (typeof kw === 'string' && kw.trim()) return kw.split(/[,，\s]+/).filter(Boolean)
+  return []
+}
+
+/** 权重内联编辑：change 即保存，失败回滚显示 */
+async function saveSort(e: Entry, ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const v = Number(input.value) || 0
+  if (v === e.sort) return
+  try {
+    await api.put(`/api/v1/cms/entries/${e.id}`, { sort: v })
+    e.sort = v
+  } catch (err: any) {
+    alert(err?.response?.data?.detail || '权重保存失败')
+    input.value = String(e.sort)
+  }
 }
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
@@ -176,7 +247,7 @@ function toggleSelectAll() {
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
 onMounted(async () => {
-  // 从 URL 参数读取 content_type_key
+  // 从 URL 参数读取 content_type_key；不带则默认「全部类型」
   if (route.query.ct) {
     selectedCtKey.value = route.query.ct as string
   }
@@ -196,6 +267,7 @@ onMounted(async () => {
       </div>
       <div class="flex gap-2">
         <select v-model="selectedCtKey" class="input w-full sm:w-40" @change="onCtChange">
+          <option value="">全部类型</option>
           <option v-for="ct in contentTypes" :key="ct.key" :value="ct.key">{{ ct.icon }} {{ ct.name }}</option>
         </select>
         <button class="btn-primary" @click="newEntry">{{ t('entryList.text_y2oa4s') }}</button>
@@ -205,7 +277,7 @@ onMounted(async () => {
     <!-- Filters -->
     <div class="card mb-4 flex flex-wrap gap-3 items-center">
       <input v-model="search" type="text" class="input w-full sm:w-60" :placeholder="t('entryList.按标题搜_1z0o89')" @keyup.enter="onSearch" />
-      <select v-if="selectedCt?.supports_category" v-model.number="categoryFilter" class="input w-full sm:w-40" @change="onStatusChange">
+      <select v-if="(!selectedCtKey || selectedCt?.supports_category) && categories.length" v-model.number="categoryFilter" class="input w-full sm:w-40" @change="onStatusChange">
         <option :value="null">{{ t('entryList.全部分类_av9kmt') }}</option>
         <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
@@ -241,60 +313,88 @@ onMounted(async () => {
     <div v-else-if="entries.length === 0" class="card text-center text-ink-400 py-12">
       {{ t('entryList.暂无内容点击新建条目创建第一个') }}
     </div>
-    <table v-else class="w-full text-sm">
-      <thead class="text-left text-ink-500 border-b">
-        <tr>
-          <th class="py-2 px-2 w-8">
-            <input type="checkbox" :checked="selected.length === entries.length" @change="toggleSelectAll" />
-          </th>
-          <th class="py-2 px-2">{{ t('newsList.标题_ij5d') }}</th>
-          <th class="py-2 px-2">{{ t('entryList.分类_emut') }}</th>
-          <th class="py-2 px-2">{{ t('usersList.状态_k1e3') }}</th>
-          <th class="py-2 px-2">{{ t('entryList.浏览_jck9') }}</th>
-          <th class="py-2 px-2">{{ t('entryList.更新时间_devbay') }}</th>
-          <th class="py-2 px-2 w-20">{{ t('usersList.操作_hkxb') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="e in entries" :key="e.id" class="border-b hover:bg-ink-50">
-          <td class="py-2 px-2">
-            <input type="checkbox" :checked="selected.includes(e.id)" @change="toggleSelect(e.id)" />
-          </td>
-          <td class="py-2 px-2">
-            <a href="#" class="text-blue-600 hover:underline" @click.prevent="editEntry(e)">{{ e.title }}</a>
-            <span
-              v-if="e.ai_origin"
-              class="text-[10px] px-1.5 py-0.5 rounded ml-1.5 align-middle cursor-pointer"
-              :class="AI_META[e.ai_origin]?.cls || 'bg-ink-100 text-ink-500'"
-              :title="`此条由 AI ${AI_META[e.ai_origin]?.label?.slice(3) || e.ai_origin} 生成，点击筛选同类`"
-              @click="aiFilter = aiFilter === 'ai' ? '' : 'ai'; onStatusChange()"
-            >{{ AI_META[e.ai_origin]?.label || 'AI' }}</span>
-            <code v-if="e.slug" class="text-xs text-ink-400 ml-2">{{ e.slug }}</code>
-          </td>
-          <td class="py-2 px-2 text-ink-500">
-            {{ e.category_id ? categories.find(c => c.id === e.category_id)?.name : '—' }}
-          </td>
-          <td class="py-2 px-2">
-            <span
-              class="text-xs px-1.5 py-0.5 rounded"
-              :class="STATUS_META[e.status]?.cls || 'bg-ink-100 text-ink-500'"
-            >{{ STATUS_META[e.status]?.label || e.status }}</span>
-            <!-- 审核通过但排期在未来：让审核的人一眼看到「不是没生效，是等到点才发」 -->
-            <div v-if="e.status === 'approved' && e.scheduled_at" class="mt-0.5 text-[11px] text-ink-400">
-              ⏰ {{ fmtSchedule(e.scheduled_at) }} 自动发布
-            </div>
-          </td>
-          <td class="py-2 px-2 text-ink-500">{{ e.view_count }}</td>
-          <td class="py-2 px-2 text-ink-500 text-xs">{{ e.updated_at?.slice(0, 16) }}</td>
-          <td class="py-2 px-2 whitespace-nowrap">
-            <button class="text-blue-600 text-xs" @click="editEntry(e)">{{ t('usersList.编辑_mekb') }}</button>
-            <button v-if="e.status === 'draft' || e.status === 'approved'" class="text-purple-600 text-xs ml-2" @click="submitReview(e)">提交审核</button>
-            <button v-if="e.status === 'pending_review'" class="text-green-600 text-xs ml-2" @click="reviewEntry(e, 'approve')">通过</button>
-            <button v-if="e.status === 'pending_review'" class="text-red-500 text-xs ml-2" @click="reviewEntry(e, 'reject')">驳回</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-else class="card overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-ink-500 border-b">
+          <tr>
+            <th class="py-2 px-2 w-8">
+              <input type="checkbox" :checked="selected.length === entries.length" @change="toggleSelectAll" />
+            </th>
+            <th class="py-2 px-2 w-12">ID</th>
+            <th class="py-2 px-2">{{ t('newsList.标题_ij5d') }}</th>
+            <th class="py-2 px-2">类型</th>
+            <th class="py-2 px-2">{{ t('entryList.分类_emut') }}</th>
+            <th class="py-2 px-2">{{ t('usersList.状态_k1e3') }}</th>
+            <th class="py-2 px-2" title="数值越小越靠前">权重</th>
+            <th class="py-2 px-2">{{ t('entryList.浏览_jck9') }}</th>
+            <th class="py-2 px-2">来源</th>
+            <th class="py-2 px-2">关键词</th>
+            <th class="py-2 px-2">发布时间</th>
+            <th class="py-2 px-2">{{ t('entryList.更新时间_devbay') }}</th>
+            <th class="py-2 px-2 w-20">{{ t('usersList.操作_hkxb') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="e in entries" :key="e.id" class="border-b hover:bg-ink-50">
+            <td class="py-2 px-2">
+              <input type="checkbox" :checked="selected.includes(e.id)" @change="toggleSelect(e.id)" />
+            </td>
+            <td class="py-2 px-2 text-ink-400 text-xs">{{ e.id }}</td>
+            <td class="py-2 px-2 max-w-[260px]">
+              <a href="#" class="text-blue-600 hover:underline" @click.prevent="editEntry(e)">{{ e.title }}</a>
+              <code v-if="e.slug" class="text-xs text-ink-400 ml-2">{{ e.slug }}</code>
+            </td>
+            <td class="py-2 px-2 text-ink-500 whitespace-nowrap">{{ ctName(e.content_type_id) }}</td>
+            <td class="py-2 px-2 text-ink-500">
+              {{ e.category_id ? categories.find(c => c.id === e.category_id)?.name || `#${e.category_id}` : '—' }}
+            </td>
+            <td class="py-2 px-2">
+              <span
+                class="text-xs px-1.5 py-0.5 rounded whitespace-nowrap"
+                :class="STATUS_META[e.status]?.cls || 'bg-ink-100 text-ink-500'"
+              >{{ STATUS_META[e.status]?.label || e.status }}</span>
+              <!-- 审核通过但排期在未来：让审核的人一眼看到「不是没生效，是等到点才发」 -->
+              <div v-if="e.status === 'approved' && e.scheduled_at" class="mt-0.5 text-[11px] text-ink-400 whitespace-nowrap">
+                ⏰ {{ fmtSchedule(e.scheduled_at) }} 自动发布
+              </div>
+            </td>
+            <td class="py-2 px-2">
+              <input
+                type="number"
+                class="input w-16 px-1.5 py-0.5 text-xs"
+                :value="e.sort"
+                title="权重（越小越靠前），修改即保存"
+                @change="saveSort(e, $event)"
+              />
+            </td>
+            <td class="py-2 px-2 text-ink-500">{{ e.view_count }}</td>
+            <td class="py-2 px-2">
+              <span
+                class="text-xs px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer"
+                :class="sourceMeta(e).cls"
+                :title="sourceMeta(e).title"
+                @click="clickSource(e)"
+              >{{ sourceMeta(e).text }}</span>
+            </td>
+            <td class="py-2 px-2 max-w-[140px]">
+              <template v-if="kwList(e).length">
+                <span class="text-xs text-ink-500">{{ kwList(e).slice(0, 2).join('、') }}</span>
+                <span v-if="kwList(e).length > 2" class="text-xs text-ink-400" :title="kwList(e).join('、')">+{{ kwList(e).length - 2 }}</span>
+              </template>
+              <span v-else class="text-ink-300">—</span>
+            </td>
+            <td class="py-2 px-2 text-ink-500 text-xs whitespace-nowrap">{{ fmtTime(e.published_at) }}</td>
+            <td class="py-2 px-2 text-ink-500 text-xs whitespace-nowrap">{{ fmtTime(e.updated_at) }}</td>
+            <td class="py-2 px-2 whitespace-nowrap">
+              <button class="text-blue-600 text-xs" @click="editEntry(e)">{{ t('usersList.编辑_mekb') }}</button>
+              <button v-if="e.status === 'draft' || e.status === 'approved'" class="text-purple-600 text-xs ml-2" @click="submitReview(e)">提交审核</button>
+              <button v-if="e.status === 'pending_review'" class="text-green-600 text-xs ml-2" @click="reviewEntry(e, 'approve')">通过</button>
+              <button v-if="e.status === 'pending_review'" class="text-red-500 text-xs ml-2" @click="reviewEntry(e, 'reject')">驳回</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- Pagination -->
     <div v-if="totalPages > 1" class="mt-4 flex items-center gap-2 text-sm">
