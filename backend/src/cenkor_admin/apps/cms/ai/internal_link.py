@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.apps.cms.ai import prompt_registry as prompts
 from cenkor_admin.apps.cms.ai.embedding import entry_to_text
 from cenkor_admin.apps.cms.ai.search import similar_entries
-from cenkor_admin.apps.cms.models import Entry
+from cenkor_admin.apps.cms.models import Entry, EntryLink
 from cenkor_admin.core.llm import LLMNotConfiguredError, get_llm
 
 _INTERNAL_LINK_SYSTEM = """你是内容编辑助手。给你一篇正在编辑的文章，以及几篇候选相关文章。
@@ -166,7 +166,7 @@ async def suggest_links(
                 },
             ],
             temperature=0.3,
-            max_tokens=900,
+            max_tokens=4000,
         )
     except LLMNotConfiguredError:
         return {
@@ -233,4 +233,88 @@ async def suggest_links(
     }
 
 
-__all__ = ["suggest_links"]
+async def save_link(
+    session: AsyncSession,
+    *,
+    source_entry_id: int,
+    target_entry_id: int,
+    anchor_text: str,
+    insert_after: str | None = None,
+    created_by: int | None = None,
+    status: str = "pending",
+) -> EntryLink | None:
+    """保存一条内链建议为待审核；同源同目标同锚文本（非拒绝态）已存在则直接返回，避免重复。"""
+    existing = (
+        await session.execute(
+            select(EntryLink).where(
+                EntryLink.source_entry_id == source_entry_id,
+                EntryLink.target_entry_id == target_entry_id,
+                EntryLink.anchor_text == anchor_text,
+                EntryLink.status != "rejected",
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+    entry = await session.get(Entry, source_entry_id)
+    site_id = entry.site_id if entry else 1
+    link = EntryLink(
+        site_id=site_id,
+        source_entry_id=source_entry_id,
+        target_entry_id=target_entry_id,
+        anchor_text=anchor_text,
+        insert_after=insert_after,
+        status=status,
+        created_by=created_by,
+    )
+    session.add(link)
+    await session.flush()
+    return link
+
+
+async def list_links(
+    session: AsyncSession,
+    *,
+    source_entry_id: int | None = None,
+    target_entry_id: int | None = None,
+    status: str | None = None,
+) -> list[EntryLink]:
+    """列出内链：可按源文章 / 目标文章 / 状态过滤。"""
+    conds = []
+    if source_entry_id is not None:
+        conds.append(EntryLink.source_entry_id == source_entry_id)
+    if target_entry_id is not None:
+        conds.append(EntryLink.target_entry_id == target_entry_id)
+    if status is not None:
+        conds.append(EntryLink.status == status)
+    rows = (
+        await session.execute(
+            select(EntryLink).where(*conds).order_by(EntryLink.created_at.desc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def set_link_status(
+    session: AsyncSession, link_id: int, status: str
+) -> EntryLink | None:
+    """变更内链审核状态（pending/approved/inserted/rejected）。"""
+    link = await session.get(EntryLink, link_id)
+    if not link:
+        return None
+    link.status = status
+    await session.flush()
+    return link
+
+
+async def delete_link(session: AsyncSession, link_id: int) -> bool:
+    """删除一条内链。"""
+    link = await session.get(EntryLink, link_id)
+    if not link:
+        return False
+    await session.delete(link)
+    await session.flush()
+    return True
+
+
+__all__ = ["suggest_links", "save_link", "list_links", "set_link_status", "delete_link"]

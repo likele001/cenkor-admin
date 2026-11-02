@@ -36,7 +36,13 @@ from cenkor_admin.apps.cms.ai.content_health import entry_health, site_health
 from cenkor_admin.apps.cms.ai.dashboard import router as dashboard_router
 from cenkor_admin.apps.cms.ai.embedding import vectorize_entry, vectorize_pending
 from cenkor_admin.apps.cms.ai.health_report import render_html, render_markdown
-from cenkor_admin.apps.cms.ai.internal_link import suggest_links
+from cenkor_admin.apps.cms.ai.internal_link import (
+    suggest_links,
+    save_link,
+    list_links,
+    set_link_status,
+    delete_link,
+)
 from cenkor_admin.apps.cms.ai.landing_router import router as landing_router
 from cenkor_admin.apps.cms.ai.memory_router import router as memory_router
 from cenkor_admin.apps.cms.ai.models import CmsAiPrice
@@ -364,6 +370,102 @@ async def entry_link_suggestions(
         )
     except Exception as exc:
         raise _map_llm_error(exc) from exc
+
+
+@router.post(
+    "/entries/{entry_id}/internal-links",
+    summary="保存一条内链（待审核）",
+)
+async def create_internal_link(
+    entry_id: int,
+    body: dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """把一条内链建议落库为 pending（人工或批量建议后调用）。"""
+    entry = await _load_entry(db, entry_id)
+    try:
+        target_id = int(body.get("target_entry_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "target_entry_id 必须为整数")
+    anchor = str(body.get("anchor_text") or "").strip()
+    if not anchor:
+        raise HTTPException(400, "anchor_text 必填")
+    if target_id == entry_id:
+        raise HTTPException(400, "不能链接到自己")
+    link = await save_link(
+        db,
+        source_entry_id=entry_id,
+        target_entry_id=target_id,
+        anchor_text=anchor,
+        insert_after=body.get("insert_after"),
+        created_by=user.id,
+    )
+    await db.commit()
+    return {"id": link.id, "status": link.status}
+
+
+@router.get(
+    "/entries/{entry_id}/internal-links",
+    summary="列出某文章的全部内链（含状态）",
+)
+async def list_internal_links(
+    entry_id: int,
+    status: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> dict[str, Any]:
+    await _load_entry(db, entry_id)
+    rows = await list_links(db, source_entry_id=entry_id, status=status)
+    items = [
+        {
+            "id": r.id,
+            "source_entry_id": r.source_entry_id,
+            "target_entry_id": r.target_entry_id,
+            "anchor_text": r.anchor_text,
+            "insert_after": r.insert_after,
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+    return {"items": items, "total": len(items)}
+
+
+@router.patch(
+    "/internal-links/{link_id}",
+    summary="审核内链：approved / rejected / inserted",
+)
+async def review_internal_link(
+    link_id: int,
+    body: dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> dict[str, Any]:
+    new_status = str(body.get("status") or "").strip()
+    if new_status not in ("pending", "approved", "inserted", "rejected"):
+        raise HTTPException(400, "status 必须是 pending/approved/inserted/rejected")
+    link = await set_link_status(db, link_id, new_status)
+    if not link:
+        raise HTTPException(404, "内链不存在")
+    await db.commit()
+    return {"id": link.id, "status": link.status}
+
+
+@router.delete(
+    "/internal-links/{link_id}",
+    summary="删除一条内链",
+)
+async def delete_internal_link(
+    link_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> dict[str, Any]:
+    ok = await delete_link(db, link_id)
+    if not ok:
+        raise HTTPException(404, "内链不存在")
+    await db.commit()
+    return {"deleted": True}
 
 
 @router.get(

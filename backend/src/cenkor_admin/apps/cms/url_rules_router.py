@@ -123,7 +123,14 @@ async def list_url_rules(
 
     cats = (
         await db.execute(
-            select(models.Category.id, models.Category.name, models.Category.slug, models.Category.url_pattern)
+            select(
+                models.Category.id,
+                models.Category.name,
+                models.Category.slug,
+                models.Category.url_pattern,
+                models.Category.article_pattern,
+                models.Category.template,
+            )
             .where(models.Category.site_id == site_id, models.Category.deleted_at.is_(None))
             .order_by(models.Category.sort)
         )
@@ -169,7 +176,15 @@ async def list_url_rules(
     return {
         "defaults": defaults,
         "categories": [
-            {"id": c[0], "name": c[1], "slug": c[2], "url_pattern": c[3]} for c in cats
+            {
+                "id": c[0],
+                "name": c[1],
+                "slug": c[2],
+                "url_pattern": c[3],
+                "article_pattern": c[4],
+                "template": c[5],
+            }
+            for c in cats
         ],
         "tags": [{"id": t[0], "name": t[1], "slug": t[2], "url_pattern": t[3]} for t in tags],
         "history": history,

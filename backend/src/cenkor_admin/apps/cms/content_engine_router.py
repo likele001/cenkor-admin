@@ -139,6 +139,20 @@ def _validate_url_pattern(raw: Any, kind: str) -> str | None:
         raise HTTPException(400, f"URL 规则不合法：{exc}") from exc
 
 
+def _validate_url_template_file(raw: Any) -> str | None:
+    """校验栏目模板文件名：只允许主题内安全路径，防路径穿越。"""
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise HTTPException(400, "模板文件名必须是字符串")
+    text = raw.strip()
+    if not text:
+        return None
+    if text.startswith("/") or ".." in text or "\\" in text or len(text) > 120:
+        raise HTTPException(400, "模板文件名不合法（只能填主题内的相对路径，如 list.html）")
+    return text
+
+
 def _validate_user_path(raw: Any, site_id: int | None) -> str | None:
     """校验用户手填的固定路径（``cms_entries.url_path``）。
 
@@ -660,6 +674,9 @@ async def create_category(
         raise HTTPException(400, "slug and name required")
     # 栏目级 URL 规则：覆盖站点默认的栏目规则，只对这个栏目生效
     url_pattern = _validate_url_pattern(body.get("url_pattern"), "category")
+    # 栏目级文章规则：该栏目下条目的详情页地址（与 url_pattern 正交），
+    # 按 article 变量集校验；空 = 用站点默认 article 规则
+    article_pattern = _validate_url_pattern(body.get("article_pattern"), "article")
     obj = models.Category(
         content_type_id=ct_id,
         parent_id=body.get("parent_id"),
@@ -669,6 +686,8 @@ async def create_category(
         color=body.get("color"),
         sort=body.get("sort", 0),
         url_pattern=url_pattern,
+        article_pattern=article_pattern,
+        template=_validate_url_template_file(body.get("template")),
     )
     db.add(obj)
     await db.commit()
@@ -692,6 +711,11 @@ async def update_category(
     # 栏目 URL 规则：显式传 None / 空串 = 取消覆盖，回到站点默认
     if "url_pattern" in body:
         obj.url_pattern = _validate_url_pattern(body.get("url_pattern"), "category")
+    # 栏目级文章规则：同上，只管该栏目下条目的详情页地址
+    if "article_pattern" in body:
+        obj.article_pattern = _validate_url_pattern(body.get("article_pattern"), "article")
+    if "template" in body:
+        obj.template = _validate_url_template_file(body.get("template"))
     await db.commit()
     await db.refresh(obj)
     # [P2] 分类名会出现在该分类下每条详情页的面包屑里，整站静态页撤掉重建
@@ -1689,6 +1713,8 @@ def _category_to_dict(c: models.Category) -> dict:
         "sort": c.sort,
         "status": c.status,
         "url_pattern": c.url_pattern,
+        "article_pattern": getattr(c, "article_pattern", None),
+        "template": getattr(c, "template", None),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
@@ -1764,6 +1790,7 @@ def _entry_to_dict(e: models.Entry) -> dict:
         "sort": e.sort,
         "view_count": e.view_count,
         "url_path": e.url_path,
+        "seo": e.seo or {},
         "ai_origin": getattr(e, "ai_origin", None),
         "ai_generation_id": getattr(e, "ai_generation_id", None),
         "created_at": e.created_at.isoformat() if e.created_at else None,

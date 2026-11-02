@@ -103,6 +103,9 @@ class RuleSet:
     defaults: dict[str, str] = field(default_factory=lambda: dict(permalink.DEFAULT_PATTERNS))
     category_patterns: dict[int, str] = field(default_factory=dict)
     tag_patterns: dict[int, str] = field(default_factory=dict)
+    # 栏目级「文章内容页」规则：cms_categories.article_pattern，只管该栏目下
+    # 条目的详情页地址，与 category_patterns（栏目页自己的地址）正交。
+    category_article_patterns: dict[int, str] = field(default_factory=dict)
     # 历史规则：只用于「旧地址 → 301 到新地址」，不参与正向生成
     history: tuple[permalink.Rule, ...] = ()
 
@@ -147,6 +150,7 @@ def _build(
     cfg: dict[str, Any],
     categories: list[tuple[int, str]],
     tags: list[tuple[int, str]],
+    category_articles: list[tuple[int, str]] | None = None,
 ) -> RuleSet:
     defaults = dict(permalink.DEFAULT_PATTERNS)
     for kind, key in URL_KEYS.items():
@@ -166,6 +170,9 @@ def _build(
         defaults=defaults,
         category_patterns={cid: p for cid, p in categories if p and p.strip()},
         tag_patterns={tid: p for tid, p in tags if p and p.strip()},
+        category_article_patterns={
+            cid: p for cid, p in (category_articles or []) if p and p.strip()
+        },
         history=_parse_history(cfg.get(HISTORY_KEY)),
     )
 
@@ -299,6 +306,14 @@ async def load_rules(db, site_id: int = 1) -> RuleSet:
                 )
             )
         ).all()
+        cat_articles = (
+            await db.execute(
+                select(models.Category.id, models.Category.article_pattern).where(
+                    models.Category.site_id == site_id,
+                    models.Category.article_pattern.is_not(None),
+                )
+            )
+        ).all()
         tags = (
             await db.execute(
                 select(models.Tag.id, models.Tag.url_pattern).where(
@@ -307,7 +322,7 @@ async def load_rules(db, site_id: int = 1) -> RuleSet:
                 )
             )
         ).all()
-        rules = _build(_cfg_dict(list(cfg_rows)), list(cats), list(tags))
+        rules = _build(_cfg_dict(list(cfg_rows)), list(cats), list(tags), list(cat_articles))
     except Exception:
         logger.warning("加载 URL 规则失败，退回内置默认规则 site_id=%s", site_id, exc_info=True)
         rules = RuleSet()
@@ -330,13 +345,19 @@ def load_rules_sync(session, site_id: int = 1) -> RuleSet:
                 models.Category.url_pattern.is_not(None),
             )
         ).all()
+        cat_articles = session.execute(
+            select(models.Category.id, models.Category.article_pattern).where(
+                models.Category.site_id == site_id,
+                models.Category.article_pattern.is_not(None),
+            )
+        ).all()
         tags = session.execute(
             select(models.Tag.id, models.Tag.url_pattern).where(
                 models.Tag.site_id == site_id,
                 models.Tag.url_pattern.is_not(None),
             )
         ).all()
-        rules = _build(_cfg_dict(list(cfg_rows)), list(cats), list(tags))
+        rules = _build(_cfg_dict(list(cfg_rows)), list(cats), list(tags), list(cat_articles))
     except Exception:
         logger.warning("加载 URL 规则失败，退回内置默认规则 site_id=%s", site_id, exc_info=True)
         rules = RuleSet()
@@ -510,17 +531,24 @@ def detail_url(
 
     手填路径优先于一切规则 —— 用户在编辑页明确钉死的地址，后台改规则不该动它。
 
-    栏目级 / 标签级规则**不参与**详情页地址：它们只管栏目页 / 标签页自己的地址。
-    「这条内容要不要带栏目目录」由站点默认规则决定（用不用 ``{catdir}``）。
+    栏目级规则分两个字段，互不越界：
 
-    ``category_id`` 保留是为了让调用方一处传参，但这里不再拿它查栏目覆盖 ——
-    早期版本拿栏目覆盖当详情页模板，正反两个方向解释成两种东西，
-    配了规则的栏目下所有条目反解时拿内容 slug 查栏目表 → 全批 404。
+    - ``cms_categories.url_pattern``  只管栏目页自己的地址（category_base 用）
+    - ``cms_categories.article_pattern`` 只管**该栏目下条目**的详情页地址。
+      只认条目直接所属栏目（``category_id``），与反解侧的归属核对严格对称：
+      正向用哪条规则生成，反向就只用同一条规则认领，认领后回库核对归属，
+      对不上换下一条 —— 不会重演早期版本「正反两向各说各话 → 整批 404」。
+
+    ``{catdir}`` 要不要带，由这里传入的 ``catdir`` 决定（调用方已按栏目链算好）。
     """
     if url_path and str(url_path).strip():
         return normalize_user_path(str(url_path))
 
     values = _values(kind, slug, entry_id, catdir, cat, published)
+    if category_id is not None:
+        cat_pattern = rules.category_article_patterns.get(int(category_id))
+        if cat_pattern:
+            return _try_patterns([cat_pattern], values, kind)
     return _try_patterns([rules.pattern_for(kind)], values, kind)
 
 

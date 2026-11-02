@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -266,6 +267,16 @@ class Category(Base):
     # {type} {catdir} {cat} {parent} {slug} {id}
     url_pattern: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # 该栏目下「文章内容页」的地址规则，留空 = 用站点默认 article 规则。
+    # 与 url_pattern 分工：url_pattern 只管栏目页自己的地址，本字段只管
+    # 该栏目下条目的详情页地址。变量集同 article：{type} {catdir} {cat}
+    # {slug} {id} {year} {month} {day}。
+    article_pattern: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # 栏目页面用的主题内模板文件名（如 list.html），留空 = 按 kind 走默认。
+    # 文件不存在时渲染层自动回退默认模板，不会 500。
+    template: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
     name: Mapped[str] = mapped_column(String(80), nullable=False)
 
     icon: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -472,6 +483,48 @@ class Entry(Base):
 
         Index("ix_cms_entries_custom_fields", "custom_fields", postgresql_using="gin"),
 
+    )
+
+
+class EntryLink(Base):
+    """内链关系（文章 → 文章，带锚文本与状态机）。
+
+    与 cms_content_tags（主题标签）互补：标签是「文章↔主题词」的多对多，
+    内链是「文章↔文章」的有向关联，用于正文互相推荐、沉淀内容关系网。
+    status: pending(待审核) / approved(已通过) / inserted(已插入正文) / rejected(已拒绝)
+    """
+
+    __tablename__ = "cms_entry_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_sites.id", ondelete="RESTRICT"),
+        nullable=False, default=1, index=True,
+    )
+    source_entry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_entries.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    target_entry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cms_entries.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    anchor_text: Mapped[str] = mapped_column(String(120), nullable=False)
+    insert_after: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        # 部分唯一索引：排除 rejected —— 拒绝后允许对同一条重新建议
+        Index(
+            "uq_entry_link_src_tgt_anchor",
+            "source_entry_id", "target_entry_id", "anchor_text",
+            unique=True, postgresql_where=text("status <> 'rejected'"),
+        ),
+        Index("ix_cms_entry_links_site_src", "site_id", "source_entry_id"),
+        Index("ix_cms_entry_links_site_tgt", "site_id", "target_entry_id"),
     )
 
 

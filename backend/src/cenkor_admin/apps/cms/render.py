@@ -4,14 +4,20 @@
 1. 解析站点当前主题（DB 覆盖内置）
 2. 在 executor 线程里同步渲染（同步 DB session，不碰主事件循环）
 3. 渲染失败逐级回退：用户主题 → 内置主题 → 极简 HTML，保证页面永远不白屏
+
+模板来源优先级：磁盘主题目录 → 数据库 → 内置主题。
+磁盘目录（var/themes/<主题>/）面向习惯「建文件改文件」的开发者：
+文件即事实源，删掉文件自动落回 DB/内置版本，不会 404。
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -24,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "KIND_TEMPLATE",
+    "disk_theme_paths",
     "invalidate_theme_cache",
     "make_preview_resolver",
     "render_page",
@@ -49,6 +56,58 @@ KIND_TEMPLATE = {
 _TPL_CACHE: dict[tuple[int, str, str], tuple[float, str | None]] = {}
 _TPL_TTL = 30.0
 _TPL_LOCK = threading.Lock()
+
+# 磁盘主题目录：backend/var/themes/<主题>/<模板路径>
+_THEMES_ROOT = Path(__file__).resolve().parents[4] / "var" / "themes"
+# 主题名白名单：只允许字母数字下划线连字符，杜绝路径穿越
+_THEME_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+# 磁盘层独立缓存：key=(theme, path) -> (expire_ts, content|None, mtime|None)
+# 与 DB 层分开，因为磁盘文件是开发者手改的 —— mtime 一变就要立刻生效，
+# 还得连带清 Jinja 编译缓存（编译缓存按模板名缓存、不含源码指纹，
+# 源码变了它不会自愈，不清前台就永远拿旧编译版）。
+_DISK_CACHE: dict[tuple[str, str], tuple[float, str | None, float | None]] = {}
+
+
+def _load_disk_template(theme: str, path: str) -> str | None:
+    """读磁盘主题文件；不存在/主题名/路径不安全返回 None，渲染层自然落到下一级。
+
+    每次调用都 stat 一次（微秒级）比对新 mtime：TTL 内命中缓存省掉 read_text，
+    但文件一被手改立刻重新读取并清编译缓存，改动下一次渲染即生效。
+    """
+    if not _THEME_NAME_RE.match(theme or "") or not jinja_env.is_safe_template_name(path):
+        return None
+    key = (theme, path)
+    fp = _THEMES_ROOT / theme / path
+    now = time.time()
+    try:
+        st = fp.stat()
+        mtime = st.st_mtime if st.st_size > 0 else None
+    except OSError:
+        mtime = None
+    with _TPL_LOCK:
+        hit = _DISK_CACHE.get(key)
+        if hit and hit[0] > now and hit[2] == mtime:
+            return hit[1]
+    content: str | None = None
+    if mtime is not None:
+        try:
+            resolved = fp.resolve()
+            # resolve 后再校验一次前缀，双保险防符号链接/相对路径逃逸
+            if resolved.is_relative_to(_THEMES_ROOT.resolve()) and resolved.is_file():
+                text = fp.read_text(encoding="utf-8")
+                if text.strip():
+                    content = text
+        except Exception:
+            logger.debug("磁盘主题文件读取失败：%s/%s", theme, path, exc_info=True)
+            content = None
+    changed = hit is not None and hit[1] != content
+    with _TPL_LOCK:
+        _DISK_CACHE[key] = (now + _TPL_TTL, content, mtime)
+    if changed:
+        jinja_env.clear_template_cache()
+        logger.info("磁盘主题文件变更，已清除模板编译缓存：%s/%s", theme, path)
+    return content
 
 
 # ---------------------------------------------------------------- 主题解析
@@ -102,8 +161,26 @@ def invalidate_theme_cache(site_id: int | None = None, theme: str | None = None)
     jinja_env.clear_template_cache()
 
 
+def disk_theme_paths(theme: str) -> set[str]:
+    """磁盘主题目录下已有的模板文件集合（递归，含 assets/ 等）。"""
+    if not _THEME_NAME_RE.match(theme or ""):
+        return set()
+    root = _THEMES_ROOT / theme
+    if not root.is_dir():
+        return set()
+    try:
+        return {
+            str(p.relative_to(root)).replace("\\", "/")
+            for p in root.rglob("*")
+            if p.is_file()
+        }
+    except Exception:
+        logger.debug("枚举磁盘主题文件失败：%s", theme, exc_info=True)
+        return set()
+
+
 def theme_documents(session, site_id: int, theme: str) -> dict[str, str]:
-    """合并内置 + DB 后的完整主题文件表，用于导出主题包。"""
+    """合并磁盘 + DB + 内置的完整主题文件表（磁盘优先），用于导出主题包。"""
     merged: dict[str, str] = dict(builtin_theme.BUILTIN_THEMES.get(builtin_theme.DEFAULT_THEME, {}))
     try:
         rows = session.execute(
@@ -116,12 +193,21 @@ def theme_documents(session, site_id: int, theme: str) -> dict[str, str]:
             merged[row.path] = row.content
     except Exception:
         logger.debug("导出主题时读取 cms_templates 失败", exc_info=True)
+    for path in disk_theme_paths(theme):
+        content = _load_disk_template(theme, path)
+        if content is not None:
+            merged[path] = content
     return merged
 
 
 def _make_resolver(session, site_id: int, theme: str, *, builtin_only: bool = False):
     def resolve(name: str) -> str | None:
         if not builtin_only:
+            # 磁盘优先：开发者建了文件就以文件为准（builtin_only 回退渲染时
+            # 刻意跳过磁盘层 —— 磁盘文件写坏了才触发回退，回退不能再被它污染）
+            src = _load_disk_template(theme, name)
+            if src is not None:
+                return src
             src = _load_db_template(session, site_id, theme, name)
             if src is not None:
                 return src
@@ -190,6 +276,11 @@ def _render_sync(
         css = resolver("assets/style.css") or ""
         context = _build_context(model, ctx, base, css, active_theme)
         tpl_name = KIND_TEMPLATE.get(model.get("kind") or "article", "detail.html")
+        # 栏目级模板覆盖：栏目配了 template 且主题里真有这个文件才启用，
+        # 否则回退按 kind 的默认模板 —— 不会因为填错文件名整页 500。
+        custom = (model.get("tpl") or "").strip() if isinstance(model.get("tpl"), str) else None
+        if custom and custom != tpl_name and resolver(custom):
+            tpl_name = custom
         return jinja_env.render_template_file(tpl_name, context)
     finally:
         if token is not None:

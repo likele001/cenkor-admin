@@ -1074,6 +1074,7 @@ async def _render_page_html(
     site_name: str = "Cenkor",
     site_desc: str = "",
     site_id: int | None = None,
+    tpl: str | None = None,
 ) -> str:
     """把一条公开内容渲染成完整 HTML（含 JSON-LD / OG / 正文）。
 
@@ -1122,6 +1123,8 @@ async def _render_page_html(
 
     model = {
         "kind": kind,
+        # 栏目级模板覆盖：空 = 按 kind 走 KIND_TEMPLATE 默认（render.py 里回退）
+        "tpl": tpl or None,
         "title": raw_title,
         "full_title": full_title,
         "description": desc,
@@ -1678,10 +1681,13 @@ def _list_model(
     canonical: str,
     items: list[dict[str, Any]],
     pagination: dict[str, Any],
+    tpl: str | None = None,
 ) -> dict[str, Any]:
     """列表页的 page 对象。字段与详情页保持同构，模板不用为列表页写第二套。"""
     return {
         "kind": "list",
+        # 栏目级模板覆盖：render.py 里空值回退 KIND_TEMPLATE 默认
+        "tpl": tpl or None,
         "title": title,
         "full_title": f"{title} · {site_name}",
         "description": description or site_desc,
@@ -1832,6 +1838,22 @@ async def _serve_product_list(
     )
 
 
+async def _category_template(db: AsyncSession, category_id: Any) -> str | None:
+    """栏目配置的主题内模板文件名（如 list.html），未配或栏目不存在返回 None。"""
+    if not category_id:
+        return None
+    try:
+        return (
+            await db.execute(
+                select(models.Category.template).where(
+                    models.Category.id == int(category_id)
+                )
+            )
+        ).scalar_one_or_none()
+    except Exception:
+        return None
+
+
 async def _serve_list_page(
     request: Request,
     db: AsyncSession,
@@ -1880,6 +1902,8 @@ async def _serve_list_page(
     type_id = ct.id
     extra: list[Any] = []
     title, description = _LIST_META.get(kind, (kind, ""))
+    # 栏目级模板：这个栏目页用栏目自己配的模板渲染（无栏目/未配则回退默认）
+    cat_tpl: str | None = None
 
     if category_slug:
         cat = (
@@ -1898,6 +1922,7 @@ async def _serve_list_page(
             return await not_found()
         type_id = cat.content_type_id or ct.id
         extra.append(models.Entry.category_id == cat.id)
+        cat_tpl = cat.template or None
         title = cat.name
         description = f"{cat.name} 分类下的全部内容"
     elif tag_slug:
@@ -2015,6 +2040,7 @@ async def _serve_list_page(
         canonical=canonical,
         items=items,
         pagination=pg,
+        tpl=cat_tpl,
     )
     headers = {"Cache-Control": "public, max-age=120"}
     if kw:
@@ -2226,6 +2252,8 @@ async def _serve_public_page(
     )
     canonical = f"{base}{page_path}"
     kind = item.get("content_type") or kind
+    # 栏目级模板：该条目所属栏目配了 template 就用它渲染详情页
+    cat_tpl = await _category_template(db, item.get("category_id"))
 
     # 规范地址自愈：page_path 就是这条内容在**当前规则**下的规范地址。
     # 请求路径跟它不一致就 301 —— 规则改过之后老地址（/article/x.html）
@@ -2245,6 +2273,7 @@ async def _serve_public_page(
         site_name=site_name,
         site_desc=site_desc,
         site_id=item.get("site_id"),
+        tpl=cat_tpl,
     )
     # P2：渲染成功就地落盘，nginx 下次直接出文件，不再进 Python。
     # 只在「请求 Host == 站点规范域名」时写，否则会把错误 canonical 写进静态文件。
@@ -2882,6 +2911,16 @@ def _expand_rules(rules: url_resolver.RuleSet) -> list[permalink.Rule]:
             out.append(permalink.Rule("category", pattern, source=f"category:{cid}", priority=1))
         except permalink.RuleError:
             continue
+    # 栏目级「文章内容页」规则：与栏目页规则同一个优先级层，但语义是详情页。
+    # 认领后在 _resolve_by_match 里按 entry.category_id 核对归属，
+    # 不属于该栏目的条目让给下一条规则 —— 不重演早期的全批 404。
+    for cid, pattern in rules.category_article_patterns.items():
+        try:
+            out.append(
+                permalink.Rule("article", pattern, source=f"category-article:{cid}", priority=1)
+            )
+        except permalink.RuleError:
+            continue
     for tid, pattern in rules.tag_patterns.items():
         try:
             out.append(permalink.Rule("tag", pattern, source=f"tag:{tid}", priority=1))
@@ -3138,6 +3177,17 @@ async def _resolve_by_match(
         return None
 
     real_kind = type_keys.get(entry.content_type_id) or kind
+
+    # 栏目级文章规则的归属核对：这条规则配给栏目 N，条目必须**直接属于** N，
+    # 否则让给下一条规则（就算漏网，规范地址自愈也会把地址纠正回来）。
+    src = match.rule.source or ""
+    if src.startswith("category-article:"):
+        try:
+            rule_cid = int(src.split(":", 1)[1])
+        except ValueError:
+            rule_cid = -1
+        if entry.category_id != rule_cid:
+            return None
 
     # 规范地址自愈：回算这条内容在**当前规则**下的规范地址，跟请求路径比对。
     # 不一致就 301。这一个动作同时解决三件事：

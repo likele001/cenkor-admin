@@ -30,6 +30,8 @@ from cenkor_admin.apps.cms import builtin_theme, models, static_cache
 from cenkor_admin.apps.cms.render import (
     KIND_TEMPLATE,
     RENDER_TIMEOUT,
+    _load_disk_template,
+    disk_theme_paths,
     invalidate_theme_cache,
     make_preview_resolver,
     resolve_theme,
@@ -404,7 +406,12 @@ async def templates_files(
     site_id: int = DEFAULT_SITE_ID,
     db: AsyncSession = Depends(get_db),
 ):
-    """主题文件树：内置文件 + DB 覆盖标记。自定义主题未覆盖的文件标 inherited。"""
+    """主题文件树：磁盘文件 + 内置文件 + DB 覆盖标记。
+
+    磁盘主题目录 var/themes/<theme>/ 里的文件优先于一切（渲染层同序），
+    工作台里标 source=disk；在线编辑保存写的是 DB，会被同名磁盘文件盖住，
+    响应里用 disk_shadowed 提醒。
+    """
     if not _THEME_RE.match(theme or ""):
         raise HTTPException(400, "非法主题名")
     base_paths = set(builtin_theme.BUILTIN_THEMES.get(builtin_theme.DEFAULT_THEME, {}))
@@ -416,9 +423,11 @@ async def templates_files(
         )
     )).scalars().all()
     custom = set(rows)
-    paths = sorted(base_paths | theme_paths | custom)
+    disk = disk_theme_paths(theme)
+    paths = sorted(base_paths | theme_paths | custom | disk)
     return {
         "theme": theme,
+        "disk_dir": f"var/themes/{theme}/",
         "items": [
             {
                 "path": p,
@@ -427,7 +436,13 @@ async def templates_files(
                 "overridden": p in custom,
                 "builtin": p in theme_paths,
                 "inherited": p not in custom and p not in theme_paths and p in base_paths,
-                "source": "db" if p in custom else ("builtin" if p in theme_paths else "inherited"),
+                "disk": p in disk,
+                "source": (
+                    "disk" if p in disk
+                    else "db" if p in custom
+                    else "builtin" if p in theme_paths
+                    else "inherited"
+                ),
             }
             for p in paths
         ],
@@ -445,6 +460,11 @@ async def templates_file_get(
         raise HTTPException(400, "非法模板路径")
     if not _THEME_RE.match(theme or ""):
         raise HTTPException(400, "非法主题名")
+    # 磁盘优先：同名文件以磁盘为准返回，前端标 source=disk 提示编辑无效
+    disk_src = _load_disk_template(theme, path)
+    if disk_src is not None:
+        return {"path": path, "content": disk_src, "source": "disk",
+                "checksum": None, "updated_at": None}
     row = (await db.execute(
         select(models.CmsTemplate).where(
             models.CmsTemplate.site_id == site_id,
@@ -492,7 +512,9 @@ async def templates_file_save(body: TemplateSaveRequest, db: AsyncSession = Depe
             row.kind = body.kind
     await db.commit()
     await _invalidate_all(db, body.site_id, body.theme)
-    return {"ok": True, "path": body.path, "checksum": checksum}
+    # 磁盘同名文件会盖住 DB 版：保存成功了但前台不生效，明确告诉前端
+    shadowed = _load_disk_template(body.theme, body.path) is not None
+    return {"ok": True, "path": body.path, "checksum": checksum, "disk_shadowed": shadowed}
 
 
 @router.delete("/templates/file")

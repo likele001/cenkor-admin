@@ -21,6 +21,16 @@ def _start_of_day_utc(days_ago: int = 0) -> datetime:
     return start
 
 
+# 首页统计去噪：只统计「人在后台的真实操作」
+# - HOOK：钩子事件（entry.saved 等），不是 API 调用，混在方法分布里是噪音
+# - /api/v1/public/*：门户/匿名流量（portal 登录、表单提交、公开模板渲染），
+#   量级随站点访客波动，不该进「后台 API 调用」图
+_NOISE = (
+    AuditLog.method != "HOOK",
+    ~AuditLog.path.like("/api/v1/public/%"),
+)
+
+
 @router.get("/stats")
 async def dashboard_stats(db: AsyncSession = Depends(get_db)) -> dict:
     """返回 Dashboard 所需的全部数据：
@@ -56,16 +66,16 @@ async def dashboard_stats(db: AsyncSession = Depends(get_db)) -> dict:
         .where(cms_models.Media.deleted_at.is_(None))
     )).scalar() or 0
 
-    # 7 天趋势起点
-    seven_days_ago = _start_of_day_utc(7)
+    # 7 天趋势起点（真 7 天：今天 + 往前 6 天，共 7 个点）
+    seven_days_ago = _start_of_day_utc(6)
 
-    # 7 天 API 调用趋势（按天）
+    # 7 天 API 调用趋势（按天，去噪）
     daily_rows = (await db.execute(
         select(
             func.date(AuditLog.created_at).label("day"),
             func.count().label("count"),
         )
-        .where(AuditLog.created_at >= seven_days_ago)
+        .where(AuditLog.created_at >= seven_days_ago, *_NOISE)
         .group_by(func.date(AuditLog.created_at))
         .order_by("day")
     )).all()
@@ -73,25 +83,25 @@ async def dashboard_stats(db: AsyncSession = Depends(get_db)) -> dict:
 
     # 补齐缺失的日期（0 计数）
     trend = []
-    for i in range(7, -1, -1):
+    for i in range(6, -1, -1):
         day = (_start_of_day_utc(i)).date()
         trend.append({
             "date": day.isoformat(),
             "count": daily_map.get(day.isoformat(), 0),
         })
 
-    # 7 天方法分布
+    # 7 天方法分布（去噪）
     method_rows = (await db.execute(
         select(AuditLog.method, func.count().label("count"))
-        .where(AuditLog.created_at >= seven_days_ago)
+        .where(AuditLog.created_at >= seven_days_ago, *_NOISE)
         .group_by(AuditLog.method)
     )).all()
     by_method = {row.method: int(row.count) for row in method_rows}
 
-    # 7 天状态码分布（粗粒度：2xx / 3xx / 4xx / 5xx）
+    # 7 天状态码分布（粗粒度：2xx / 3xx / 4xx / 5xx，去噪）
     status_rows = (await db.execute(
         select(AuditLog.status_code, func.count().label("count"))
-        .where(AuditLog.created_at >= seven_days_ago)
+        .where(AuditLog.created_at >= seven_days_ago, *_NOISE)
         .group_by(AuditLog.status_code)
     )).all()
     by_status_bucket = {"2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0}
