@@ -124,5 +124,30 @@ MANIFEST = AppManifest(
                 {"key": "cms:media",    "title": "媒体库", "path": "/cms/media", "sort": 58},
             ],
         },
+        # AI 内容中心：低频但必备的 AI 能力集中在此，避免散落各处点不到。
+        # 高频三项（建模向导 / 内容工作台 / 能力配置）仍挂在「内容管理」组首，
+        # 菜单 key 全局唯一，因此不会重复出现。
+        {
+            "key": "cms-ai-center",
+            "title": "AI 内容中心",
+            "icon": "🧠",
+            "sort": 40,
+            "children": [
+                {"key": "cms:ai-home", "title": "AI 驾驶舱", "path": "/cms/ai", "sort": 40},
+                {"key": "cms:ai-batch", "title": "批量生产", "path": "/cms/ai-batch", "sort": 41},
+                {"key": "cms:ai-knowledge", "title": "知识库", "path": "/cms/ai-knowledge", "sort": 42},
+                {"key": "cms:ai-landing", "title": "落地页工坊", "path": "/cms/ai-landing", "sort": 43},
+                {"key": "cms:ai-workflow", "title": "工作流编排", "path": "/cms/ai-workflow", "sort": 44},
+                {"key": "cms:ai-prompts", "title": "提示词管理", "path": "/cms/ai-prompts", "sort": 45},
+                {"key": "cms:ai-health", "title": "内容体检", "path": "/cms/ai-health", "sort": 46},
+                {"key": "cms:ai-quality", "title": "AI 质量台", "path": "/cms/ai-quality", "sort": 47},
+                {"key": "cms:ai-ask", "title": "问答自测", "path": "/cms/ai-ask", "sort": 48},
+                {"key": "cms:ai-gaps", "title": "选题缺口", "path": "/cms/ai-gaps", "sort": 49},
+                {"key": "cms:content-analytics", "title": "内容效果", "path": "/cms/analytics", "sort": 50},
+                {"key": "cms:publish-channels", "title": "分发渠道", "path": "/cms/publish-channels", "sort": 51},
+                {"key": "cms:ai-usage", "title": "AI 用量", "path": "/cms/ai-usage", "sort": 52},
+                {"key": "cms:ai-memory", "title": "AI 记忆", "path": "/cms/ai-memory", "sort": 53},
+            ],
+        },
     ],
 )
