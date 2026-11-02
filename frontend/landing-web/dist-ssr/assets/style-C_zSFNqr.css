@@ -3001,16 +3001,16 @@ code.hljs {
   /* purposely ignored */
   
 }
-.docs-page[data-v-eb81c0ae] {
+.docs-page[data-v-5f1276fd] {
   min-height: 60vh;
 }
-.docs-layout[data-v-eb81c0ae] {
+.docs-layout[data-v-5f1276fd] {
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 40px;
   align-items: start;
 }
-.docs-sidebar[data-v-eb81c0ae] {
+.docs-sidebar[data-v-5f1276fd] {
   position: sticky;
   top: 90px;
   max-height: calc(100vh - 120px);
@@ -3018,7 +3018,7 @@ code.hljs {
   border-right: 1px solid rgba(15, 23, 42, 0.08);
   padding-right: 20px;
 }
-.docs-search[data-v-eb81c0ae] {
+.docs-search[data-v-5f1276fd] {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid rgba(15, 23, 42, 0.15);
@@ -3027,10 +3027,10 @@ code.hljs {
   margin-bottom: 16px;
   outline: none;
 }
-.docs-search[data-v-eb81c0ae]:focus {
+.docs-search[data-v-5f1276fd]:focus {
   border-color: #10b981;
 }
-.docs-group-title[data-v-eb81c0ae] {
+.docs-group-title[data-v-5f1276fd] {
   font-size: 13px;
   font-weight: 700;
   color: #64748b;
@@ -3038,7 +3038,7 @@ code.hljs {
   letter-spacing: 0.04em;
   margin: 18px 0 8px;
 }
-.docs-item[data-v-eb81c0ae] {
+.docs-item[data-v-5f1276fd] {
   display: block;
   padding: 7px 12px;
   border-radius: 8px;
@@ -3047,44 +3047,44 @@ code.hljs {
   text-decoration: none;
   line-height: 1.4;
 }
-.docs-item[data-v-eb81c0ae]:hover {
+.docs-item[data-v-5f1276fd]:hover {
   background: rgba(16, 185, 129, 0.08);
   color: #059669;
 }
-.docs-item.active[data-v-eb81c0ae] {
+.docs-item.active[data-v-5f1276fd] {
   background: #10b981;
   color: #fff;
   font-weight: 600;
 }
-.docs-empty[data-v-eb81c0ae] {
+.docs-empty[data-v-5f1276fd] {
   color: #94a3b8;
   font-size: 14px;
 }
-.docs-article[data-v-eb81c0ae] {
+.docs-article[data-v-5f1276fd] {
   min-height: 400px;
   max-width: 860px;
 }
-.docs-state[data-v-eb81c0ae] {
+.docs-state[data-v-5f1276fd] {
   color: #64748b;
   padding: 40px 0;
 }
-.docs-error .btn[data-v-eb81c0ae] {
+.docs-error .btn[data-v-5f1276fd] {
   margin-top: 12px;
   display: inline-block;
 }
-.docs-card-group-title[data-v-eb81c0ae] {
+.docs-card-group-title[data-v-5f1276fd] {
   font-size: 20px;
   margin: 28px 0 14px;
 }
-.docs-card-group-title[data-v-eb81c0ae]:first-child {
+.docs-card-group-title[data-v-5f1276fd]:first-child {
   margin-top: 0;
 }
-.docs-cards[data-v-eb81c0ae] {
+.docs-cards[data-v-5f1276fd] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 14px;
 }
-.doc-card[data-v-eb81c0ae] {
+.doc-card[data-v-5f1276fd] {
   display: block;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 12px;
@@ -3092,12 +3092,12 @@ code.hljs {
   text-decoration: none;
   transition: all 0.2s ease;
 }
-.doc-card h3[data-v-eb81c0ae] {
+.doc-card h3[data-v-5f1276fd] {
   font-size: 15px;
   color: #0f172a;
   margin: 0 0 6px;
 }
-.doc-card p[data-v-eb81c0ae] {
+.doc-card p[data-v-5f1276fd] {
   font-size: 13px;
   color: #64748b;
   margin: 0;
@@ -3107,12 +3107,12 @@ code.hljs {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.doc-card[data-v-eb81c0ae]:hover {
+.doc-card[data-v-5f1276fd]:hover {
   border-color: #10b981;
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.12);
   transform: translateY(-1px);
 }
-.docs-pager[data-v-eb81c0ae] {
+.docs-pager[data-v-5f1276fd] {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -3120,68 +3120,68 @@ code.hljs {
   padding-top: 20px;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
-.docs-pager-link[data-v-eb81c0ae] {
+.docs-pager-link[data-v-5f1276fd] {
   max-width: 48%;
   text-decoration: none;
   color: #059669;
   font-size: 14px;
   font-weight: 600;
 }
-.docs-pager-link span[data-v-eb81c0ae] {
+.docs-pager-link span[data-v-5f1276fd] {
   display: block;
   font-size: 12px;
   color: #94a3b8;
   font-weight: 400;
 }
-.docs-pager-link.next[data-v-eb81c0ae] {
+.docs-pager-link.next[data-v-5f1276fd] {
   text-align: right;
 }
 
 /* ---------------------------------------------------------------- 正文排版 */
-.markdown-body[data-v-eb81c0ae] {
+.markdown-body[data-v-5f1276fd] {
   font-size: 15px;
   line-height: 1.75;
   color: #1e293b;
   word-break: break-word;
 }
-.markdown-body[data-v-eb81c0ae] h1 {
+.markdown-body[data-v-5f1276fd] h1 {
   font-size: 26px;
   margin: 0 0 20px;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
-.markdown-body[data-v-eb81c0ae] h2 {
+.markdown-body[data-v-5f1276fd] h2 {
   font-size: 21px;
   margin: 32px 0 14px;
 }
-.markdown-body[data-v-eb81c0ae] h3 {
+.markdown-body[data-v-5f1276fd] h3 {
   font-size: 17px;
   margin: 24px 0 10px;
 }
-.markdown-body[data-v-eb81c0ae] p {
+.markdown-body[data-v-5f1276fd] p {
   margin: 10px 0;
 }
-.markdown-body[data-v-eb81c0ae] a {
+.markdown-body[data-v-5f1276fd] a {
   color: #059669;
   text-decoration: none;
 }
-.markdown-body[data-v-eb81c0ae] a:hover {
+.markdown-body[data-v-5f1276fd] a:hover {
   text-decoration: underline;
 }
-.markdown-body[data-v-eb81c0ae] a.docs-dead {
+.markdown-body[data-v-5f1276fd] a.docs-dead {
   color: #94a3b8;
   cursor: help;
   text-decoration: underline dotted;
 }
-.markdown-body[data-v-eb81c0ae] ul,
-.markdown-body[data-v-eb81c0ae] ol {
+.markdown-body[data-v-5f1276fd] ul,
+.markdown-body[data-v-5f1276fd] ol {
   padding-left: 24px;
   margin: 10px 0;
 }
-.markdown-body[data-v-eb81c0ae] li {
+.markdown-body[data-v-5f1276fd] li {
   margin: 4px 0;
 }
-.markdown-body[data-v-eb81c0ae] blockquote {
+.markdown-body[data-v-5f1276fd] blockquote {
   margin: 14px 0;
   padding: 10px 16px;
   border-left: 3px solid #10b981;
@@ -3189,14 +3189,14 @@ code.hljs {
   border-radius: 0 8px 8px 0;
   color: #475569;
 }
-.markdown-body[data-v-eb81c0ae] code {
+.markdown-body[data-v-5f1276fd] code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 0.88em;
   background: rgba(15, 23, 42, 0.06);
   padding: 2px 6px;
   border-radius: 5px;
 }
-.markdown-body[data-v-eb81c0ae] pre.hljs {
+.markdown-body[data-v-5f1276fd] pre.hljs {
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 10px;
@@ -3205,12 +3205,12 @@ code.hljs {
   font-size: 13px;
   line-height: 1.6;
 }
-.markdown-body[data-v-eb81c0ae] pre.hljs code {
+.markdown-body[data-v-5f1276fd] pre.hljs code {
   background: none;
   padding: 0;
   font-size: inherit;
 }
-.markdown-body[data-v-eb81c0ae] table {
+.markdown-body[data-v-5f1276fd] table {
   width: 100%;
   border-collapse: collapse;
   margin: 14px 0;
@@ -3218,34 +3218,42 @@ code.hljs {
   display: block;
   overflow-x: auto;
 }
-.markdown-body[data-v-eb81c0ae] table th,
-.markdown-body[data-v-eb81c0ae] table td {
+.markdown-body[data-v-5f1276fd] table th,
+.markdown-body[data-v-5f1276fd] table td {
   border: 1px solid rgba(15, 23, 42, 0.1);
   padding: 8px 12px;
   text-align: left;
 }
-.markdown-body[data-v-eb81c0ae] table th {
+.markdown-body[data-v-5f1276fd] table th {
   background: rgba(15, 23, 42, 0.04);
   font-weight: 600;
 }
-.markdown-body[data-v-eb81c0ae] table tr:nth-child(2n) td {
+.markdown-body[data-v-5f1276fd] table tr:nth-child(2n) td {
   background: rgba(15, 23, 42, 0.015);
 }
-.markdown-body[data-v-eb81c0ae] hr {
+.markdown-body[data-v-5f1276fd] hr {
   border: none;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   margin: 28px 0;
 }
 @media (max-width: 900px) {
-.docs-layout[data-v-eb81c0ae] {
+.docs-layout[data-v-5f1276fd] {
     grid-template-columns: 1fr;
 }
-.docs-sidebar[data-v-eb81c0ae] {
+  /* 手机端文章区排到侧栏前面：单列布局下侧栏 45 条列表占两三屏，
+     路由切换后 scrollTo(top:0) 滚回页顶，文章在两屏之外 —— 看起来就是「点了没反应」。
+     文章优先后，滚回顶部正好是正文开头；/docs 目录页也变成卡片优先。 */
+.docs-article[data-v-5f1276fd] {
+    order: -1;
+}
+.docs-sidebar[data-v-5f1276fd] {
     position: static;
     max-height: none;
     border-right: none;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    border-bottom: none;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
     padding-bottom: 16px;
     padding-right: 0;
+    margin-top: 28px;
 }
 }

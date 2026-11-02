@@ -556,13 +556,22 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
+  /* 手机端文章区排到侧栏前面：单列布局下侧栏 45 条列表占两三屏，
+     路由切换后 scrollTo(top:0) 滚回页顶，文章在两屏之外 —— 看起来就是「点了没反应」。
+     文章优先后，滚回顶部正好是正文开头；/docs 目录页也变成卡片优先。 */
+  .docs-article {
+    order: -1;
+  }
+
   .docs-sidebar {
     position: static;
     max-height: none;
     border-right: none;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    border-bottom: none;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
     padding-bottom: 16px;
     padding-right: 0;
+    margin-top: 28px;
   }
 }
 </style>

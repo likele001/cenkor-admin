@@ -1059,7 +1059,9 @@ DELETE FROM cms_content_types WHERE key = 'myitem';
 
 ### Q7: 怎么调试模板？
 
-**站点主题（Jinja2）** —— 后台「CMS → 模板工作台」在线编辑 + 实时预览，也可直接调接口：
+**站点主题（Jinja2）** —— 后台「CMS → 模板工作台」在线编辑 + 实时预览；习惯本地写文件的
+也可以直接在服务器 `backend/var/themes/<主题名>/` 建模板（磁盘优先，改完约 2 秒生效，
+详见 `template-guide.md` 第十·补节）。也可直接调接口：
 
 | 接口 | 用途 |
 |---|---|

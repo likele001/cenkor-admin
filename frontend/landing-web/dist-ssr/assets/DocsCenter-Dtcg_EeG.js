@@ -24,6 +24,12 @@ const DOCS_GROUPS = [
         "dir": ""
       },
       {
+        "path": "CHANGELOG.md",
+        "title": "Cenkor Admin 系统更新日志",
+        "desc": "唯一事实源：本文件顶部为最新版本。发版时在标题行下方插入新版本段，后台首页「系统更新日志」公告约 30 秒内自动同步（无需重启服务、无需人工改公告）。",
+        "dir": ""
+      },
+      {
         "path": "cms-ai.md",
         "title": "CMS AI 能力",
         "desc": "Mosaic CMS 的 AI 层。四项能力：对话式建模 · AI 起草 · AI 翻译 · 语义检索。",
@@ -104,7 +110,7 @@ const DOCS_GROUPS = [
       {
         "path": "template-guide.md",
         "title": "主题模板开发",
-        "desc": "前台 HTML 由 Jinja2 主题渲染，模板存在数据库里，在后台「CMS → 模板工作台」直接改、实时预览、一键回滚。",
+        "desc": "前台 HTML 由 Jinja2 主题渲染。模板有两个存放位置，磁盘优先：",
         "dir": ""
       },
       {
@@ -234,6 +240,12 @@ const DOCS_GROUPS = [
         "dir": "05-用户手册"
       },
       {
+        "path": "05-用户手册/collect_操作手册.md",
+        "title": "内容采集 · 操作手册",
+        "desc": "把外部网站 / RSS 订阅源的内容按规则抓进系统，进入「采集箱」，人工确认后一键转成 CMS 草稿。纯系统实现，不消耗 AI 额度。",
+        "dir": "05-用户手册"
+      },
+      {
         "path": "05-用户手册/crm_操作手册.md",
         "title": "CRM 销售管理 · 操作手册",
         "desc": "给谁看：跑客户的销售、管销售的销售主管、维护客户资料的销售助理。",
@@ -322,6 +334,12 @@ const DOCS_FLAT = [
     "dir": "05-用户手册"
   },
   {
+    "path": "05-用户手册/collect_操作手册.md",
+    "title": "内容采集 · 操作手册",
+    "desc": "把外部网站 / RSS 订阅源的内容按规则抓进系统，进入「采集箱」，人工确认后一键转成 CMS 草稿。纯系统实现，不消耗 AI 额度。",
+    "dir": "05-用户手册"
+  },
+  {
     "path": "05-用户手册/crm_操作手册.md",
     "title": "CRM 销售管理 · 操作手册",
     "desc": "给谁看：跑客户的销售、管销售的销售主管、维护客户资料的销售助理。",
@@ -386,6 +404,12 @@ const DOCS_FLAT = [
     "title": "工作流审批 · 操作手册",
     "desc": "给谁看：日常发起单据的人、要审批的人、负责画流程的管理员。",
     "dir": "05-用户手册"
+  },
+  {
+    "path": "CHANGELOG.md",
+    "title": "Cenkor Admin 系统更新日志",
+    "desc": "唯一事实源：本文件顶部为最新版本。发版时在标题行下方插入新版本段，后台首页「系统更新日志」公告约 30 秒内自动同步（无需重启服务、无需人工改公告）。",
+    "dir": ""
   },
   {
     "path": "addons/website_cms.md",
@@ -552,7 +576,7 @@ const DOCS_FLAT = [
   {
     "path": "template-guide.md",
     "title": "主题模板开发",
-    "desc": "前台 HTML 由 Jinja2 主题渲染，模板存在数据库里，在后台「CMS → 模板工作台」直接改、实时预览、一键回滚。",
+    "desc": "前台 HTML 由 Jinja2 主题渲染。模板有两个存放位置，磁盘优先：",
     "dir": ""
   },
   {
@@ -696,9 +720,9 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     });
     return (_ctx, _push, _parent, _attrs) => {
       const _component_router_link = resolveComponent("router-link");
-      _push(`<div${ssrRenderAttrs(mergeProps({ class: "docs-page" }, _attrs))} data-v-eb81c0ae><section class="page-hero" data-v-eb81c0ae><div class="container" data-v-eb81c0ae><div class="page-hero-content" data-v-eb81c0ae><span class="hero-tag" data-v-eb81c0ae>文档中心</span><h1 data-v-eb81c0ae>${ssrInterpolate(currentDoc.value ? currentDoc.value.title : "Cenkor Admin 文档")}</h1><p data-v-eb81c0ae>用户教程 · 模板标签参考 · 二次开发指南</p></div></div></section><section class="section" data-v-eb81c0ae><div class="container" data-v-eb81c0ae><div class="docs-layout" data-v-eb81c0ae><aside class="docs-sidebar" data-v-eb81c0ae><input${ssrRenderAttr("value", query.value)} type="search" class="docs-search" placeholder="搜索文档…" data-v-eb81c0ae><nav class="docs-nav" data-v-eb81c0ae><!--[-->`);
+      _push(`<div${ssrRenderAttrs(mergeProps({ class: "docs-page" }, _attrs))} data-v-5f1276fd><section class="page-hero" data-v-5f1276fd><div class="container" data-v-5f1276fd><div class="page-hero-content" data-v-5f1276fd><span class="hero-tag" data-v-5f1276fd>文档中心</span><h1 data-v-5f1276fd>${ssrInterpolate(currentDoc.value ? currentDoc.value.title : "Cenkor Admin 文档")}</h1><p data-v-5f1276fd>用户教程 · 模板标签参考 · 二次开发指南</p></div></div></section><section class="section" data-v-5f1276fd><div class="container" data-v-5f1276fd><div class="docs-layout" data-v-5f1276fd><aside class="docs-sidebar" data-v-5f1276fd><input${ssrRenderAttr("value", query.value)} type="search" class="docs-search" placeholder="搜索文档…" data-v-5f1276fd><nav class="docs-nav" data-v-5f1276fd><!--[-->`);
       ssrRenderList(visibleGroups.value, (group) => {
-        _push(`<div class="docs-group" data-v-eb81c0ae><div class="docs-group-title" data-v-eb81c0ae>${ssrInterpolate(group.label)}</div><!--[-->`);
+        _push(`<div class="docs-group" data-v-5f1276fd><div class="docs-group-title" data-v-5f1276fd>${ssrInterpolate(group.label)}</div><!--[-->`);
         ssrRenderList(group.items, (doc) => {
           _push(ssrRenderComponent(_component_router_link, {
             key: doc.path,
@@ -721,15 +745,15 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       });
       _push(`<!--]-->`);
       if (!visibleGroups.value.length) {
-        _push(`<p class="docs-empty" data-v-eb81c0ae>没有匹配的文档</p>`);
+        _push(`<p class="docs-empty" data-v-5f1276fd>没有匹配的文档</p>`);
       } else {
         _push(`<!---->`);
       }
-      _push(`</nav></aside><article class="docs-article" data-v-eb81c0ae>`);
+      _push(`</nav></aside><article class="docs-article" data-v-5f1276fd>`);
       if (!currentDocPath.value) {
         _push(`<!--[-->`);
         ssrRenderList(visibleGroups.value, (group) => {
-          _push(`<div class="docs-card-group" data-v-eb81c0ae><h2 class="docs-card-group-title" data-v-eb81c0ae>${ssrInterpolate(group.label)}</h2><div class="docs-cards" data-v-eb81c0ae><!--[-->`);
+          _push(`<div class="docs-card-group" data-v-5f1276fd><h2 class="docs-card-group-title" data-v-5f1276fd>${ssrInterpolate(group.label)}</h2><div class="docs-cards" data-v-5f1276fd><!--[-->`);
           ssrRenderList(group.items, (doc) => {
             _push(ssrRenderComponent(_component_router_link, {
               key: doc.path,
@@ -738,9 +762,9 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
             }, {
               default: withCtx((_, _push2, _parent2, _scopeId) => {
                 if (_push2) {
-                  _push2(`<h3 data-v-eb81c0ae${_scopeId}>${ssrInterpolate(doc.title)}</h3>`);
+                  _push2(`<h3 data-v-5f1276fd${_scopeId}>${ssrInterpolate(doc.title)}</h3>`);
                   if (doc.desc) {
-                    _push2(`<p data-v-eb81c0ae${_scopeId}>${ssrInterpolate(doc.desc)}</p>`);
+                    _push2(`<p data-v-5f1276fd${_scopeId}>${ssrInterpolate(doc.desc)}</p>`);
                   } else {
                     _push2(`<!---->`);
                   }
@@ -760,9 +784,9 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       } else {
         _push(`<!--[-->`);
         if (loading.value) {
-          _push(`<p class="docs-state" data-v-eb81c0ae>加载中…</p>`);
+          _push(`<p class="docs-state" data-v-5f1276fd>加载中…</p>`);
         } else if (error.value) {
-          _push(`<div class="docs-state docs-error" data-v-eb81c0ae><p data-v-eb81c0ae>文档加载失败（${ssrInterpolate(error.value)}）。</p>`);
+          _push(`<div class="docs-state docs-error" data-v-5f1276fd><p data-v-5f1276fd>文档加载失败（${ssrInterpolate(error.value)}）。</p>`);
           _push(ssrRenderComponent(_component_router_link, {
             to: "/docs",
             class: "btn btn-secondary btn-small"
@@ -780,7 +804,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           }, _parent));
           _push(`</div>`);
         } else {
-          _push(`<!--[--><div class="markdown-body" data-v-eb81c0ae>${rendered.value ?? ""}</div><div class="docs-pager" data-v-eb81c0ae>`);
+          _push(`<!--[--><div class="markdown-body" data-v-5f1276fd>${rendered.value ?? ""}</div><div class="docs-pager" data-v-5f1276fd>`);
           if (prevDoc.value) {
             _push(ssrRenderComponent(_component_router_link, {
               to: docUrl(prevDoc.value),
@@ -788,7 +812,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
             }, {
               default: withCtx((_, _push2, _parent2, _scopeId) => {
                 if (_push2) {
-                  _push2(`<span data-v-eb81c0ae${_scopeId}>上一篇</span>${ssrInterpolate(prevDoc.value.title)}`);
+                  _push2(`<span data-v-5f1276fd${_scopeId}>上一篇</span>${ssrInterpolate(prevDoc.value.title)}`);
                 } else {
                   return [
                     createVNode("span", null, "上一篇"),
@@ -799,7 +823,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
               _: 1
             }, _parent));
           } else {
-            _push(`<span data-v-eb81c0ae></span>`);
+            _push(`<span data-v-5f1276fd></span>`);
           }
           if (nextDoc.value) {
             _push(ssrRenderComponent(_component_router_link, {
@@ -808,7 +832,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
             }, {
               default: withCtx((_, _push2, _parent2, _scopeId) => {
                 if (_push2) {
-                  _push2(`<span data-v-eb81c0ae${_scopeId}>下一篇</span>${ssrInterpolate(nextDoc.value.title)}`);
+                  _push2(`<span data-v-5f1276fd${_scopeId}>下一篇</span>${ssrInterpolate(nextDoc.value.title)}`);
                 } else {
                   return [
                     createVNode("span", null, "下一篇"),
@@ -835,7 +859,7 @@ _sfc_main.setup = (props, ctx) => {
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("src/views/docs/DocsCenter.vue");
   return _sfc_setup ? _sfc_setup(props, ctx) : void 0;
 };
-const DocsCenter = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-eb81c0ae"]]);
+const DocsCenter = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-5f1276fd"]]);
 export {
   DocsCenter as default
 };
