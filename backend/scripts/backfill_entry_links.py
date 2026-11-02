@@ -27,10 +27,10 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sqlalchemy import func, select  # noqa: E402
+from sqlalchemy import func, select
 
-from cenkor_admin.apps.cms.models import Entry, EntryLink  # noqa: E402
-from cenkor_admin.core.db import AsyncSessionLocal  # noqa: E402
+from cenkor_admin.apps.cms.models import Entry, EntryLink
+from cenkor_admin.core.db import AsyncSessionLocal
 
 A_TAG = re.compile(r'<a\b[^>]*?href\s*=\s*["\']([^"\']+)["\'][^>]*>(.*?)</a>', re.S | re.I)
 TAG_STRIP = re.compile(r"<[^>]+>")

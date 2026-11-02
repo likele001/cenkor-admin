@@ -317,4 +317,4 @@ async def delete_link(session: AsyncSession, link_id: int) -> bool:
     return True
 
 
-__all__ = ["suggest_links", "save_link", "list_links", "set_link_status", "delete_link"]
+__all__ = ["delete_link", "list_links", "save_link", "set_link_status", "suggest_links"]

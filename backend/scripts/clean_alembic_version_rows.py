@@ -11,7 +11,6 @@ check_alembic_drift.py 用 scalar_one() 就直接炸。
 
 from __future__ import annotations
 
-import os
 import pathlib
 import re
 import sys

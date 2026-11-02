@@ -8,6 +8,7 @@
 - 卸载后必须真的消失，不能留在 env.filters 里继续可用
 """
 import pytest
+from jinja2.exceptions import SecurityError, TemplateAssertionError
 
 from cenkor_admin.core import jinja_env
 
@@ -43,7 +44,8 @@ def test_bound_function_is_callable_in_sandbox():
 
 
 def test_unregistered_tag_is_not_callable():
-    with pytest.raises(Exception):
+    # sandbox 把未定义的函数调用拦成 SecurityError（实测：Undefined is not safely callable）
+    with pytest.raises(SecurityError):
         jinja_env.render_source("{{ nosuchtag() }}", {})
 
 
@@ -116,7 +118,8 @@ def test_filter_gone_after_unregister():
 
     assert "t_shout" not in jinja_env.app_template_filters()
     assert "t_shout" not in jinja_env.get_env().filters
-    with pytest.raises(Exception):
+    # 过滤器在编译期被判定不存在 -> TemplateAssertionError（TemplateSyntaxError 的子类）
+    with pytest.raises(TemplateAssertionError):
         jinja_env.render_source("{{ 'hi'|t_gone_filter }}", {})
 
 
@@ -125,5 +128,6 @@ def test_plain_callable_still_blocked():
         def danger(self):
             return "boom"
 
-    with pytest.raises(Exception):
+    # sandbox 不允许调用任意对象方法 -> SecurityError
+    with pytest.raises(SecurityError):
         jinja_env.render_source("{{ b.danger() }}", {"b": Box()})

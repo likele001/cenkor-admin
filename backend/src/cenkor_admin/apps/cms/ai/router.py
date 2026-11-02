@@ -37,11 +37,11 @@ from cenkor_admin.apps.cms.ai.dashboard import router as dashboard_router
 from cenkor_admin.apps.cms.ai.embedding import vectorize_entry, vectorize_pending
 from cenkor_admin.apps.cms.ai.health_report import render_html, render_markdown
 from cenkor_admin.apps.cms.ai.internal_link import (
-    suggest_links,
-    save_link,
-    list_links,
-    set_link_status,
     delete_link,
+    list_links,
+    save_link,
+    set_link_status,
+    suggest_links,
 )
 from cenkor_admin.apps.cms.ai.landing_router import router as landing_router
 from cenkor_admin.apps.cms.ai.memory_router import router as memory_router
@@ -383,7 +383,8 @@ async def create_internal_link(
     user: auth_models.User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """把一条内链建议落库为 pending（人工或批量建议后调用）。"""
-    entry = await _load_entry(db, entry_id)
+    # 只为校验 entry 存在且属于当前站点（不存在会抛 404），返回值本身用不上
+    await _load_entry(db, entry_id)
     try:
         target_id = int(body.get("target_entry_id"))
     except (TypeError, ValueError):
