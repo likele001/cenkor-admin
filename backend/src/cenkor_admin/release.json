@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "channel": "stable",
   "released_at": "2026-11-02",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "内链模块、URL 规则体系、标签聚合；修复新装 AI 菜单与 12 张 AI 表缺失"
+  "notes": "菜单入口全量补齐 8 项：在线升级/事件推送/URL重定向/评论管理/表单问卷/代码生成/URL规则/页面构建"
 }

@@ -105,6 +105,7 @@ DEFAULT_MENUS = [
     ("cms:cases", "cms", "案例", "briefcase", "/cms/cases", 55),
     ("cms:news", "cms", "新闻", "file-text", "/cms/news", 56),
     ("cms:site", "cms", "站点配置", "settings", "/cms/site", 57),
+    ("cms:url-rules", "cms", "URL 规则", "link", "/cms/url-rules", 57),
     # AI 内容中心：低频但必备的 AI 能力集中在此，避免散落各处点不到。
     # 高频三项（建模向导 / 内容工作台 / 能力配置）仍挂在「内容管理」组首。
     ("cms-ai-center", None, "AI 内容中心", "🧠", None, 40),
@@ -123,6 +124,7 @@ DEFAULT_MENUS = [
     ("cms:ai-usage", "cms-ai-center", "AI 用量", "✨", "/cms/ai-usage", 52),
     ("cms:ai-memory", "cms-ai-center", "AI 记忆", "✨", "/cms/ai-memory", 53),
     ("cms:media", "cms", "媒体库", "image", "/cms/media", 58),
+    ("builder", "cms", "页面构建", "🧩", "/builder/pages", 90),
     ("system", None, "系统", "settings-2", None, 90),
     ("system:users", "system", "用户", "users", "/system/users", 91),
     ("system:portal-users", "system", "前台会员", "users", "/system/portal-users", 94),
@@ -135,6 +137,15 @@ DEFAULT_MENUS = [
     ("system:audit", "system", "审计日志", "history", "/system/audit", 99),
     ("system:notifications", "system", "通知管理", "bell", "/system/notifications", 95),
     ("system:settings", "system", "系统设置", "settings-2", "/system/settings", 96),
+    # 平台工具：这些页面前端路由一直都在，但菜单定义长期只存在于数据库
+    # （早年在「菜单管理」里手工加的行），全新部署侧边栏看不到入口。
+    # 2026-11-02 用「前端路由 × 生产库菜单 × 种子清单」三方对账后补齐。
+    ("system:webhooks", "system", "事件推送", "⚡", "/system/webhooks", 90),
+    ("system:redirects", "system", "URL重定向", "↪️", "/system/redirects", 90),
+    ("system:comments", "system", "评论管理", "💬", "/system/comments", 90),
+    ("system:forms", "system", "表单问卷", "📋", "/system/forms", 90),
+    ("system:codegen", "system", "代码生成", "🪄", "/system/codegen", 97),
+    ("system:upgrade", "system", "在线升级", "🔧", "/system/upgrade", 99),
 ]
 
 DEFAULT_ROLES = [

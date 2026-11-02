@@ -122,6 +122,10 @@ MANIFEST = AppManifest(
                 {"key": "cms:news",     "title": "新闻", "path": "/cms/news", "sort": 56},
                 {"key": "cms:site",     "title": "站点配置", "path": "/cms/site", "sort": 57},
                 {"key": "cms:media",    "title": "媒体库", "path": "/cms/media", "sort": 58},
+                {"key": "cms:url-rules", "title": "URL 规则", "icon": "link",
+                 "path": "/cms/url-rules", "sort": 57},
+                {"key": "builder", "title": "页面构建", "icon": "🧩",
+                 "path": "/builder/pages", "sort": 90},
             ],
         },
         # AI 内容中心：低频但必备的 AI 能力集中在此，避免散落各处点不到。
