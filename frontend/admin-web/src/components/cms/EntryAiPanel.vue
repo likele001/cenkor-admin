@@ -13,6 +13,7 @@
  */
 import { computed, onUnmounted, ref } from 'vue'
 import { api } from '@/lib/api'
+import EntryLinkManager from '@/components/cms/EntryLinkManager.vue'
 
 interface Lang {
   code: string
@@ -73,16 +74,6 @@ interface VideoJob {
   og_image: string | null
 }
 
-interface LinkSuggestion {
-  entry_id: number
-  title: string
-  slug?: string | null
-  anchor_text: string
-  reason: string
-  insert_after: string
-  source_url: string
-}
-
 const props = withDefaults(
   defineProps<{
     entryId: number | null
@@ -115,8 +106,6 @@ const aiUnavailable = ref(false)
 const summary = ref('')
 const seo = ref<Record<string, any> | null>(null)
 const targetLangs = ref<string[]>([])
-const linkSuggestions = ref<LinkSuggestion[]>([])
-const appliedLinks = ref<Record<number, boolean>>({})
 
 const REDIST_CHANNELS: { key: RedistChannel; label: string; hint: string }[] = [
   { key: 'wechat', label: '公众号', hint: '长文 + 小标题' },
@@ -266,28 +255,6 @@ function toggleLang(code: string) {
   const i = targetLangs.value.indexOf(code)
   if (i >= 0) targetLangs.value.splice(i, 1)
   else targetLangs.value.push(code)
-}
-
-async function makeLinkSuggestions() {
-  if (!canEntryOp.value) return
-  reset()
-  busy.value = 'link'
-  linkSuggestions.value = []
-  try {
-    const { data } = await api.get(
-      `/api/v1/cms/ai/entries/${props.entryId}/link-suggestions`,
-      { params: { max_links: 3, candidates: 8 } },
-    )
-    linkSuggestions.value = (data.links || []) as LinkSuggestion[]
-    if (data.warning) notice.value = data.warning
-    if (!linkSuggestions.value.length) {
-      notice.value = data.warning || '没有值得互链的内容'
-    }
-  } catch (e: any) {
-    errorMsg.value = errText(e)
-  } finally {
-    busy.value = ''
-  }
 }
 
 async function makeRedist() {
@@ -459,16 +426,6 @@ async function copyRedist() {
   }
 }
 
-function applyLink(s: LinkSuggestion) {
-  emit('apply-link', {
-    anchorText: s.anchor_text,
-    url: s.source_url,
-    title: s.title,
-  })
-  appliedLinks.value = { ...appliedLinks.value, [s.entry_id]: true }
-  notice.value = `已在正文末尾追加「${s.anchor_text}」链接，可自行调整位置`
-}
-
 function applySummary() {
   if (!summary.value) return
   emit('apply-summary', summary.value)
@@ -614,50 +571,13 @@ function slugify(s: string): string {
       <p v-else class="mt-1 text-xs text-ink-400">译文写入草稿，不会覆盖已有译文</p>
     </div>
 
-    <!-- 内链建议 -->
+    <!-- 内链管理：建议、保存、审核交给独立组件 -->
     <div class="border-t border-ink-100 pt-3">
-      <div class="flex items-center justify-between">
-        <span class="text-xs font-medium text-ink-700">内链建议</span>
-        <button
-          class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
-          :disabled="!canEntryOp"
-          aria-label="生成内链建议"
-          title="生成内链建议"
-          @click="makeLinkSuggestions"
-        >
-          {{ busy === 'link' ? '分析中…' : '分析' }}
-        </button>
-      </div>
-      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">先保存一次，再分析内链</p>
-      <p v-else-if="!linkSuggestions.length" class="mt-1 text-xs text-ink-400">
-        找出该互相链接的内容，给出可直接插入的锚文本
-      </p>
-      <div v-if="linkSuggestions.length" class="mt-1.5 space-y-2">
-        <div
-          v-for="s in linkSuggestions"
-          :key="s.entry_id"
-          class="text-xs border border-ink-200 rounded-lg px-2.5 py-2 bg-ink-50"
-        >
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0">
-              <div class="text-ink-800 font-medium truncate">《{{ s.title }}》</div>
-              <div class="text-ink-500 mt-0.5">
-                锚文本：<span class="text-violet-700">{{ s.anchor_text }}</span>
-              </div>
-            </div>
-            <button
-              v-if="!appliedLinks[s.entry_id]"
-              class="btn-ghost text-xs px-2 py-0.5 shrink-0"
-              @click="applyLink(s)"
-            >
-              插入
-            </button>
-            <span v-else class="text-xs text-emerald-600 shrink-0">已插入</span>
-          </div>
-          <div v-if="s.reason" class="text-ink-500 mt-1 leading-relaxed">{{ s.reason }}</div>
-        </div>
-        <p class="text-ink-400">插入会追加到正文末尾的「相关阅读」段落，位置可自行调整</p>
-      </div>
+      <EntryLinkManager
+        :entry-id="entryId"
+        :disabled="!canEntryOp"
+        @apply-link="(v) => emit('apply-link', v)"
+      />
     </div>
 
     <!-- 多渠道再分发 -->

@@ -52,7 +52,7 @@ from cenkor_admin.apps.cms.ai.schema_impact import content_type_impact, field_im
 from cenkor_admin.apps.cms.ai.search import semantic_search, similar_entries
 from cenkor_admin.apps.cms.ai.workflow_router import router as workflow_router
 from cenkor_admin.apps.cms.knowledge_router import router as knowledge_router
-from cenkor_admin.apps.cms.models import Entry, SiteConfig
+from cenkor_admin.apps.cms.models import ContentType, Entry, SiteConfig
 from cenkor_admin.apps.cms.publish_router import router as publish_router
 from cenkor_admin.apps.cms.stats_router import router as stats_router
 from cenkor_admin.core.db import get_db
@@ -417,11 +417,54 @@ async def list_internal_links(
 ) -> dict[str, Any]:
     await _load_entry(db, entry_id)
     rows = await list_links(db, source_entry_id=entry_id, status=status)
+
+    # 列表要显示目标文章标题：一次批量查回来，避免 N+1
+    target_ids = {r.target_entry_id for r in rows}
+    meta: dict[int, dict[str, Any]] = {}
+    if target_ids:
+        trows = (
+            await db.execute(
+                select(
+                    Entry.id,
+                    Entry.title,
+                    Entry.slug,
+                    Entry.status,
+                    ContentType.key.label("ct_key"),
+                )
+                .join(ContentType, ContentType.id == Entry.content_type_id, isouter=True)
+                .where(Entry.id.in_(target_ids))
+            )
+        ).all()
+        meta = {
+            t.id: {
+                "title": t.title,
+                "slug": t.slug,
+                "status": t.status,
+                "ct_key": t.ct_key,
+            }
+            for t in trows
+        }
+
+    # 与 suggest_links 保持一致：已保存的链接也要能一键插进正文
+    target_urls: dict[int, str] = {}
+    for tid in target_ids:
+        m = meta.get(tid) or {}
+        if m.get("ct_key"):
+            target_urls[tid] = (
+                f"/api/v1/public/site/{m['ct_key']}/{m.get('slug') or tid}"
+            )
+        else:
+            target_urls[tid] = f"/api/v1/public/site/entry/{tid}"
+
     items = [
         {
             "id": r.id,
             "source_entry_id": r.source_entry_id,
             "target_entry_id": r.target_entry_id,
+            "target_title": (meta.get(r.target_entry_id) or {}).get("title"),
+            "target_slug": (meta.get(r.target_entry_id) or {}).get("slug"),
+            "target_status": (meta.get(r.target_entry_id) or {}).get("status"),
+            "target_url": target_urls.get(r.target_entry_id),
             "anchor_text": r.anchor_text,
             "insert_after": r.insert_after,
             "status": r.status,
@@ -429,7 +472,10 @@ async def list_internal_links(
         }
         for r in rows
     ]
-    return {"items": items, "total": len(items)}
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r.status] = counts.get(r.status, 0) + 1
+    return {"items": items, "total": len(items), "counts": counts}
 
 
 @router.patch(
