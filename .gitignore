@@ -142,7 +142,7 @@ dist.bak.*/
 backend/alembic/versions/crm/
 backend/alembic/versions/erp/
 backend/alembic/versions/mes/
-# commerce 目录已整体开源（v0.5.11）：9 个迁移全部公开，不再逐条白名单
+# commerce 目录已整体开源（v0.5.11）：10 个迁移全部公开，不再逐条白名单
 # 应用自带 schema（方案 D）同样属商业实现，双保险
 backend/src/cenkor_admin/apps/*/schema.sql
 

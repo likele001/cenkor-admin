@@ -59,9 +59,10 @@
 
 1. **新建迁移**，`down_revision` 填当前挂载点的父（现在 `0035`）。
    注意：`alembic revision --autogenerate` 默认把 `down_revision` 设成脚本目录的当前
-   head——闭源部署里那是闭源 head `0029`，必须手工改成公开 revision，否则公开迁移
-   就挂到闭源链上了。也不要挂到 `gen_inventory` 上——那会变成挂载点之后的第二个 head。
-   此时 `alembic heads` 会显示两个（`0036` 与 `0029`），属正常中间态。
+   head——闭源部署里那是某条闭源链的 head（`mes_0009` / `workflow_0027` /
+   `collect_1100` 之一），必须手工改成公开 revision，否则公开迁移就挂到闭源链上了。
+   也不要挂到 `gen_inventory` 上——那会变成挂载点之后的第二个 head。
+   此时 `alembic heads` 会多出一个（`0036` + 各条闭源链 head），属正常中间态。
 2. **先让线上库执行**：`alembic upgrade heads`（重启 hub 也会自动做）。
    此刻 `0036` 还不是闭源 head 的祖先，alembic 会真正执行它。
 3. **验证对象真的建出来了**（新表/新列/索引），再往下走。
@@ -78,9 +79,16 @@
 > 新迁移照样执行，不会整链卡死；`check-migration-graph.py` 会报错，补上顺延即可。
 > （历史版本用 `upgrade head`，遇到双 head 直接 MultipleHeads，一条都不执行。）
 
-> 闭源应用（erp / crm / commerce / mes 等）的新迁移方向相反：挂在**当前闭源 head**
-> （现在 `0029`）之后，不要碰公开链，也不要动挂载点。判断依据只有一个：
+> 闭源应用（erp / crm / mes / workflow / collect）的新迁移方向相反：挂在**自己应用
+> 所属那条闭源链的 head** 之后，不要碰公开链，也不要动挂载点。判断依据只有一个：
 > 这个迁移文件会不会进开源仓库——会，就插在挂载点之前；不会，就接在闭源 head 之后。
+>
+> ⚠️ 别跨应用串链：ERP/CRM 的迁移接 `mes_0009`，工作流接 `workflow_0027`，
+> 采集接 `collect_1100`。混着挂会把两条独立闭源链缝成一条，将来任一方要调整都会牵连另一方。
+>
+> **head 分布（v0.5.11 合流后，2026-11-03）**：公开链 1 个
+> `20261027_0100_app_schema`；闭源链 3 个 `mes_0009` / `workflow_0027` / `collect_1100`。
+> 公开视图（`--tracked-only`）必须恰好 1 个 head，闭源侧允许多个。
 
 ## 4. 校验清单
 
@@ -687,7 +695,7 @@ git add -A --dry-run | grep -E 'versions/(crm|erp|mes|commerce)/|schema\.sql'
 
 | 检查项 | 结果 |
 |---|---|
-| 46 个闭源文件中被忽略 | 43 个（另 3 个是公开的 commerce 迁移，符合预期） |
+| 40 个未跟踪迁移文件中被忽略 | 40 个（collect 5 / erp 19 / crm 6 / mes 9 / ext 里的 workflow 1），符合预期 |
 | HEAD 已跟踪文件误中忽略规则 | 0 |
 | `git add -A` 在迁移目录的产出 | 0 |
 | 从 GitHub clone 后 `apps/{crm,erp,mes}` 目录数 | 0 |

@@ -41,14 +41,16 @@ $PY ../scripts/check-migration-graph.py --tracked-only   # 公开仓库视图：
 > cd /www/wwwroot/cenkor-admin && git ls-files 'backend/alembic/versions/*.py' | grep -v __init__ | wc -l
 > ```
 
-| 目录 | 迁移数(10-30) | 入库(git) | 归属 |
+| 目录 | 迁移数(11-03) | 入库(git) | 归属 |
 |---|---|---|---|
-| `core/` | 31 | 全部 | 平台核心（cms/auth/rbac/portal/app store/i18n…） |
-| `ext/` | 13 | 多数 | 平台扩展（cloud_storage / codegen / upgrade / inventory / ai_video_jobs / cms_*…） |
-| `commerce/` | 9 | 少数（白名单） | 交易层（定价/订单/授权/结算），大部分闭源 |
+| `core/` | 36 | 全部 | 平台核心（cms/auth/rbac/portal/app store/i18n…） |
+| `ext/` | 14 | 13 | 平台扩展（cloud_storage / codegen / upgrade / inventory / ai_video_jobs / cms_*…）；仅 `0027_workflow` 闭源 |
+| `commerce/` | 10 | 全部 | 交易层（定价/订单/授权/结算）；**v0.5.11 起整体开源** |
 | `erp/` | 19 | 0 | ERP 应用（闭源） |
 | `crm/` | 6 | 0 | CRM 应用（闭源） |
 | `mes/` | 9 | 0 | MES 应用（闭源） |
+
+> 另有 `collect/` 5 个迁移，随内容采集应用一并闭源。全量 99 个迁移中公开 59 个。
 
 ```
 /web 版本目录不是「一个目录一棵树」，而是 6 个目录里的全部 revision
@@ -386,11 +388,8 @@ backend/alembic/versions/crm/
 backend/alembic/versions/erp/
 backend/alembic/versions/mes/
 
-# commerce 是混合目录：3 个平台级迁移公开，6 个商业模块闭源
-backend/alembic/versions/commerce/*
-!backend/alembic/versions/commerce/20261007_0028_product_axis.py
-!backend/alembic/versions/commerce/20261009_0030_app_intro.py
-!backend/alembic/versions/commerce/20261010_0031_dev_method.py
+# commerce 目录已整体开源（v0.5.11），不再有 commerce 专属忽略规则
+# 此前是「先全屏蔽再 ! 反选 3 个平台级迁移」的白名单写法，现已全部移除
 
 # 应用自带 schema（方案 D）同样属商业实现，双保险
 backend/src/cenkor_admin/apps/*/schema.sql
@@ -427,12 +426,14 @@ backend/src/apps/                    # 外置应用（payment / commerce …）�
 |---|---|
 | `alembic heads` | 1 个（= 最新公开 head，名字会随新增迁移变化，别写死在脚本里） |
 | `alembic upgrade heads` | 成功，但只建平台表；crm/erp/mes 表不存在 |
-| crm/erp/mes 应用 | 目录本身不在仓库里，不存在「装了但缺表」 |
+| crm/erp/mes/workflow/collect 应用 | 目录本身不在仓库里，不存在「装了但缺表」 |
 | CI | 只对公开链负责，绿了不代表闭源链 OK |
 
 ### 7.5 为什么不把它们放进仓库
 
-闭源迁移与 `apps/{crm,erp,mes}` 代码同源，属商业实现；一旦进公开仓库，等于把 ERP/CRM/MES 的完整表设计（含定价、结算、授权）开源出去。规则由 `scripts/check-migration-graph.py` 在 pre-commit / CI 双重把关。
+闭源迁移与 `apps/{crm,erp,mes,workflow}` 代码同源，属商业实现；一旦进公开仓库，等于把 ERP/CRM/MES 与工作流的完整表设计开源出去。规则由 `scripts/check-migration-graph.py` 在 pre-commit / CI 双重把关。
+
+> 定价、结算、授权这三块表原属 commerce，自 v0.5.11 起 commerce 整体开源，不再是闭源理由。
 
 ---
 

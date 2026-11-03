@@ -168,5 +168,5 @@ gunzip -c /www/backup/cenkor-admin/pg_<STAMP>.sql.gz | \
 - **迁移只前进**：核心发版的 alembic 迁移务必向后兼容或提供 downgrade；升级前一定先备份。
   迁移图的「公开链 / 闭源链 / 挂载点」规则与新增迁移顺序见 [migrations.md](migrations.md)。
 - **不要手改 VERSION / release.json 不一致**：统一用 `scripts/release.sh`。
-- **开源版无 commerce 模块**：`/store` 定价/授权/分成等闭源能力缺失时会自动静默跳过，不影响升级与启动。
+- **commerce / payment 随开源版交付**（v0.5.11 起）：`/store` 定价、订单、授权、分成均可用，无需额外授权码。
 - 生产环境 `RELEASE_CHECK_ENABLED` 可按需关闭横幅检查。
