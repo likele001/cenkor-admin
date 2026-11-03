@@ -55,7 +55,13 @@
     "password": "Password",
     "noAccount": "No account? Sign up",
     "forgotPassword": "Forgot password?",
-    "haveAccount": "Have an account? Sign in"
+    "haveAccount": "Have an account? Sign in",
+    "orThirdParty": "Or continue with",
+    "ssoProcessing": "Signing you in…",
+    "ssoFailed": "Third-party sign-in failed",
+    "ssoBound": "linked successfully",
+    "ssoNoTicket": "Missing login ticket, please try again",
+    "backToLogin": "Back to sign in"
   },
   "register": {
     "title": "Create an account",

@@ -42,6 +42,10 @@ api_v1_router = APIRouter()
 # ============================================================
 api_v1_router.include_router(cms_public_router, prefix="/public", tags=["public"])
 api_v1_router.include_router(portal_router, prefix="/public/portal", tags=["portal"])
+# SSO 授权跳转与回调必须匿名（理由见 apps/sso/router.py 顶部注释）
+from cenkor_admin.apps.sso.router import public_router as sso_public_router
+
+api_v1_router.include_router(sso_public_router, prefix="/public/sso", tags=["sso"])
 # M4·P3：评论 & 表单 公共接口
 from cenkor_admin.apps.comments.public_router import router as comments_public_router
 from cenkor_admin.apps.forms.public_router import router as forms_public_router

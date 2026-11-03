@@ -84,6 +84,9 @@ DEFAULT_PERMISSIONS = [
     # 系统设置
     ("settings:read", "API", "查看系统设置"),
     ("settings:write", "API", "编辑系统设置"),
+    # 第三方登录：read 看配置与回调地址，write 改凭证/开关/域名
+    ("sso:config:read", "API", "查看登录方式配置"),
+    ("sso:config:write", "API", "管理登录方式配置"),
 ]
 
 DEFAULT_MENUS = [
@@ -145,6 +148,9 @@ DEFAULT_MENUS = [
     ("system:comments", "system", "评论管理", "💬", "/system/comments", 90),
     ("system:forms", "system", "表单问卷", "📋", "/system/forms", 90),
     ("system:codegen", "system", "代码生成", "🪄", "/system/codegen", 97),
+    # 第三方登录配置。前台登录页的渠道按钮由 /api/v1/public/sso/login-config
+    # 动态下发，后台只负责填凭证与开关，所以入口放在「系统」组而不是内容组。
+    ("system:sso", "system", "登录方式", "🔐", "/system/sso", 98),
     ("system:upgrade", "system", "在线升级", "🔧", "/system/upgrade", 99),
 ]
 

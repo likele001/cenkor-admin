@@ -55,7 +55,13 @@
     "password": "密码",
     "noAccount": "没有账号？注册",
     "forgotPassword": "忘记密码？",
-    "haveAccount": "已有账号？登录"
+    "haveAccount": "已有账号？登录",
+    "orThirdParty": "或使用第三方账号登录",
+    "ssoProcessing": "正在完成登录…",
+    "ssoFailed": "第三方登录失败",
+    "ssoBound": "绑定成功",
+    "ssoNoTicket": "登录凭证缺失，请重新登录",
+    "backToLogin": "返回登录页"
   },
   "register": {
     "title": "注册账号",

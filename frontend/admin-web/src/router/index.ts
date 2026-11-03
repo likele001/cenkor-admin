@@ -116,6 +116,9 @@ const routes: RouteRecordRaw[] = [
       { path: 'system/apps', name: 'system-apps', component: AppsView, meta: { permission: 'rbac:role:read' } },
       { path: 'system/codegen', name: 'system-codegen', component: CodegenView, meta: { permission: 'system:codegen:read' } },
       { path: 'system/upgrade', name: 'system-upgrade', component: UpgradeView, meta: { permission: 'system:upgrade:read' } },
+      // 第三方登录配置。用懒加载而不是顶部 import：这个页面只在配凭证时才打开，
+      // 没必要进首屏包。
+      { path: 'system/sso', name: 'system-sso', component: () => import('@/views/system/SystemSsoView.vue'), meta: { permission: 'sso:config:read' } },
       { path: 'system/audit', name: 'system-audit', component: AuditView, meta: { permission: 'system:audit:read' } },
       { path: 'system/notifications', name: 'system-notifications', component: NotificationsView, meta: { permission: 'notification:read' } },
       { path: 'system/api-keys', name: 'system-api-keys', component: ApiKeysView, meta: { permission: 'apikey:read' } },

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,11 +63,16 @@ class UserOAuth(Base):
     access_token_enc: Mapped[str | None] = mapped_column(String(500), nullable=True)
     refresh_token_enc: Mapped[str | None] = mapped_column(String(500), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    raw_profile: Mapped[Any | None] = mapped_column("raw_profile", JSONB, nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        # 一个 provider 同一个 open_id 只能绑一个用户
-        # PG: UNIQUE(provider, open_id) - MySQL 也支持
+        # 一个 provider 同一个 open_id 只能绑一个用户。
+        # 原注释写了这条但约束从来没建过，SSO 迁移 20261103_0930 补上。
+        UniqueConstraint("provider", "open_id", name="uq_auth_oauth_provider_openid"),
     )
 
 

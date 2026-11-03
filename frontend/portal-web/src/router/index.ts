@@ -12,11 +12,15 @@ import AppCenterView from '@/views/AppCenterView.vue'
 import AppDetailView from '@/views/AppDetailView.vue'
 import ConnectView from '@/views/ConnectView.vue'
 import MyAppsView from '@/views/MyAppsView.vue'
+import SsoCallbackView from '@/views/SsoCallbackView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', component: LoginView, meta: { public: true } },
+    // 第三方登录回调。必须 public：此时用户还没登录，
+    // 拿到 ticket 换成 token 之后才进入已登录状态。
+    { path: '/auth/sso/callback', component: SsoCallbackView, meta: { public: true } },
     { path: '/register', component: RegisterView, meta: { public: true } },
     { path: '/forgot-password', component: ForgotPasswordView, meta: { public: true } },
     { path: '/reset-password', component: ResetPasswordView, meta: { public: true } },
