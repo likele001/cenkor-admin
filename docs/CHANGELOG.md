@@ -13,6 +13,36 @@
 > - 要点二
 > ```
 
+## 2026-11-03　交付文档修正：包内迁移 head 不再写死（⭐）
+
+**【修正：PACKAGE.md 声称的 head 已过期】**
+
+- v0.5.3 往公开链末尾补了 `20261103_1100_cms_orphan`，但 `scripts/package-core.sh`
+  里 PACKAGE.md 的文案仍写死「迁移链唯一 head 为 `20261031_1600_cms_permalink`」
+- 后果：每个 Release 包的说明都在告诉用户一个**过期 head**，照此核对会误以为包是旧的
+- 改为打包时实算：head 取自 `check-migration-graph.py --tracked-only`，
+  迁移数取自 `git ls-files`，两者一起写进 PACKAGE.md
+- `docs/packaging.md` 里同样的写死示例（「44 个迁移」/旧 head）改为占位表述，
+  并明确「不要在文档里写死 revision，迁移一加就会过期」
+
+**【验证：把 Release 包真装一遍】**
+
+- 下载 v0.5.4 的 Release 资产（`cenkor-admin-core-0.5.4-20261103.tar.gz`，4.1 MB），
+  在空库上走完整路径：`alembic upgrade heads` → `seed`
+- 结果：49 个迁移全部执行、head `20261103_1100_cms_orphan`、86 张基表、
+  v0.5.3 补的 6 张表与 18 个字段齐全、seed 全绿
+  （permissions 48 / menus 50 / roles 3 / users 1 / store listed=9 manifests=9）、
+  ORM 漂移 79 张全绿、幂等复跑 no-op
+- 包内无 erp / crm / mes / workflow / payment，也无 `src/apps`，闭源未泄漏
+
+**【已知噪音，不是缺陷】**
+
+- seed 首次创建管理员时会打印 `(trapped) error reading bcrypt version`：
+  passlib 1.7.4 读 `bcrypt.__about__.__version__`，而 bcrypt ≥ 4.1 已移除该属性。
+  功能正常（passlib 内部已捕获，seed 退出码 0）。
+  `requirements.txt` 已 pin `bcrypt>=3.2.0,<4.0`，按文档安装不会遇到；
+  当前服务器实装 4.3.0 属「环境与声明不一致」，需单独对齐。
+
 ## 2026-11-03　漂移检查修正：ERP 视图不再误报缺表（⭐）
 
 **【修正：20 个「缺表」其实是视图】**

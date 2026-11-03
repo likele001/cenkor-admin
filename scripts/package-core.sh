@@ -135,6 +135,12 @@ for tpl in .env.example backend/.env.example; do
 done
 
 info "写入安装说明 PACKAGE.md..."
+# 迁移 head 实算，不写死 —— v0.5.3 补迁移后这里的文案曾长期过期，
+# 导致每个 Release 包的说明都在告诉用户一个旧 head。
+PKG_HEAD="$(cd "$ROOT" && python3 scripts/check-migration-graph.py --tracked-only 2>/dev/null \
+  | sed -nE 's/^[[:space:]]*head[[:space:]]*:[[:space:]]*//p' | head -1)"
+PKG_HEAD="${PKG_HEAD:-unknown}"
+PKG_MIG_COUNT="$(cd "$ROOT" && git ls-files 'backend/alembic/versions' | grep -c '\.py$')"
 cat > "$DEST/PACKAGE.md" <<EOF
 # Cenkor Admin Core ${VERSION}
 
@@ -166,7 +172,7 @@ cat > "$DEST/PACKAGE.md" <<EOF
 cd backend && alembic upgrade head
 \`\`\`
 
-迁移链唯一 head 为 \`20261031_1600_cms_permalink\`。若未来要接入商业模块，
+迁移链唯一 head 为 \`${PKG_HEAD}\`，共 ${PKG_MIG_COUNT} 个迁移。若未来要接入商业模块，
 请使用完整仓库的迁移目录，不要把两套迁移混用。
 
 ## 快速部署（宝塔）

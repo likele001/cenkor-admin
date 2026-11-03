@@ -132,7 +132,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 | 迁移链自洽 | 每个 `down_revision` 都能在包内找到 | `自检通过：包内迁移链自洽…` |
 
 加一道**正向**对账：包内迁移数必须等于 `git ls-files` 的迁移数，多一个就中止
-（`已核对迁移数：包内 44 个 = git 跟踪 44 个`）；其余未跟踪文件以 `⚠` 形式列出来供人工确认。
+（`已核对迁移数：包内 N 个 = git 跟踪 N 个`）；其余未跟踪文件以 `⚠` 形式列出来供人工确认。
 
 > **交付前自检**（对已有的包也适用）：
 >
@@ -142,7 +142,8 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 > tar -tzf "$P" | grep -E 'apps/(erp|crm|mes|workflow|payment)/|developer-web|versions/(erp|crm|mes)/|\.env$|\.env\.|\.log$|\.sql$|_bak|\ .bak' | head
 > # ② 迁移链能不能跑
 > tar -xzf "$P" -C /tmp && (cd /tmp/$(basename "$P" .tar.gz)/backend && alembic heads)
-> # 应为唯一 head：20261031_1600_cms_permalink
+> # 必须只有一个 head，且与 scripts/check-migration-graph.py --tracked-only 输出一致
+> # （不要在文档里写死具体 revision，迁移一加就会过期）
 > ```
 
 ## 四、接收方部署流程
