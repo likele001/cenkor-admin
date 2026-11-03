@@ -191,4 +191,16 @@ bash scripts/backup.sh
 你可以自由地使用、复制、修改、合并、发布、分发、再许可及销售本软件，
 **包括用于商业目的**，唯一条件是保留上述版权声明与许可声明。
 
+### 适用范围
+
+本许可仅覆盖**本仓库内 git 跟踪的内容**（`backend/`、`frontend/`、`scripts/`、文档等）。
+
+以下模块**不在本仓库内，不适用本许可**，需单独授权：
+
+- 商业应用：ERP / CRM / MES / 支付（`apps/erp`、`apps/crm`、`apps/mes`、`apps/payment`）
+- 开发者门户（`frontend/developer-web`）
+
+如果你拿到的是「开源内核 + 商业应用」的混合部署，请不要把根目录的 `LICENSE`
+理解为对全部目录的授权。
+
 本软件按「原样」提供，不作任何明示或暗示的担保，详见 [LICENSE](LICENSE)。
