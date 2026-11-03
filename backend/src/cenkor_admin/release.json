@@ -1,5 +1,5 @@
 {
-  "version": "0.5.12",
+  "version": "0.5.13",
   "channel": "stable",
   "released_at": "2026-11-03",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "迁移图收尾：闭源链合流为单 head，检查规则改为公开严格、闭源放宽"
+  "notes": "迁移规范按真实拓扑重写；废弃 rebase_closed_chain，避免新迁移被静默跳过"
 }

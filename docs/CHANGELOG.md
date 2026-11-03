@@ -13,6 +13,40 @@
 > - 要点二
 > ```
 
+## 2026-11-03　迁移规范按真实拓扑重写，废弃会自动顺延的 rebase_closed_chain
+
+**【文档】两份迁移文档仍在教「两条链、一个挂载点」的旧模型**
+
+v0.5.11 开源 payment/commerce 时迁移图被重构过（公开链合流 + 闭源三条支线），
+但 `database-migrations.md`（权威版）和 `migrations.md`（历史记录）都没跟上。
+照旧文档操作会直接把图改坏，所以按实测拓扑整体重写。
+
+- 总 100 个迁移：公开 59、闭源 41；公开子图单根单 head（`20261027_0100_app_schema`）
+- 闭源侧是**三条锚点固定的支线**：erp/crm/mes → `0035_app_publish`、
+  workflow → `0025_cloud`、collect → `0100_app_schema`，
+  最后在 `20261103_1300_merge_closed` 汇合成单 head
+- 新增公开迁移**不再需要动任何闭源文件**，「顺延挂载点」这一步彻底删除
+- 顺手补上此前漏登记的 `collect`：目录表、忽略规则、闭源理由都补齐了
+
+**【代码】废弃 `rebase_closed_chain`：它会让新迁移被静默跳过**
+
+`codegen/builder.py` 里这个函数会在内置模式生成迁移后，把「`down_revision` 恰好
+等于公开 head 的闭源迁移」改挂到新迁移下面。
+
+v0.5.11 之后 collect 支线的锚点**就是**公开 head，一旦触发：collect 支线被拖到新迁移
+之下 → 新迁移进入闭源合流点 `merge_closed` 的祖先闭包 → 已部署库 `upgrade heads`
+判定它「已应用」，**不报错、不建表**，直到代码查那张表才 500。
+
+- 函数改为恒返回空列表并写明原因，`scripts/gen-app.py` 不再调用
+- 新增公开迁移只需把 `down_revision` 设成公开 head，别的都不用动
+
+**【实测】纯公开链建库**
+
+`git archive HEAD` 导出公开文件树 → 空库 → `alembic upgrade head`：
+59 个迁移建 **101 张表**、闭源表 **0 张**、退出码 0。
+（v0.5.11 之前是 39 迁移 / 59 表，涨上来是 payment/commerce 开源的结果，
+不是建库逻辑变了。）
+
 ## 2026-11-03　迁移图收尾：闭源链合流为单 head，检查规则改为「公开严格、闭源放宽」
 
 **【迁移图】v0.5.11 开源 payment/commerce 时留下的三个孤立 head**
