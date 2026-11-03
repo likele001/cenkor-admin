@@ -120,8 +120,25 @@ info "新版本：$NEW_VERSION"
 
 # ---------- 3. 安装 / 更新 Python 依赖 ----------
 info "pip install -r backend/requirements.txt …"
+# 升级前留一份依赖快照：出问题时能原样回滚，也便于对比漂移
+mkdir -p "$BACKUP_DIR"
+REQ_SNAPSHOT="$BACKUP_DIR/req-before-${STAMP}.txt"
+"$PYBIN" -m pip freeze > "$REQ_SNAPSHOT" 2>/dev/null && info "依赖快照 → $REQ_SNAPSHOT" || warn "依赖快照写入失败"
 ( cd backend && "$PYBIN" -m pip install --disable-pip-version-check -q -r requirements.txt ) \
   || warn "依赖安装报错，若为已满足依赖可忽略"
+
+# pip 遇到声明互相矛盾时不报错，只挑一个能装上的组合；装完对账才看得出来。
+# 2026-11-03 的教训：生产 aiobotocore 长期停在 2.5.0（钉死 botocore 1.29.x），
+# 与 boto3>=1.34 冲突已久，全程零告警，直到手工跑 pip check 才暴露。
+info "依赖一致性检查（pip check）…"
+PIP_CHECK_OUT="$("$PYBIN" -m pip check 2>&1 || true)"
+if printf '%s' "$PIP_CHECK_OUT" | grep -q "No broken requirements found"; then
+  echo "  ✓ 依赖自洽"
+else
+  warn "依赖存在冲突（不阻断升级，但这是版本漂移信号）："
+  printf '%s\n' "$PIP_CHECK_OUT" | sed 's/^/    /'
+  warn "回滚依赖：$PYBIN -m pip install -r \"$REQ_SNAPSHOT\""
+fi
 
 # ---------- 4. 数据库迁移（启动也会自动跑，这里提前跑以便暴露错误）----------
 info "alembic upgrade heads …"

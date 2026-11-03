@@ -74,6 +74,13 @@ jobs:
             "ruff>=0.3" \
             "mypy>=1.8"
 
+      # 依赖声明自洽性：requirements.txt 里两个包互相矛盾时，pip 不报错、只挑一个装上，
+      # 冲突要等运行时才炸。2026-11-03 就踩过：aiobotocore 2.5.0 钉死 botocore 1.29.x，
+      # 与 boto3>=1.34 对撞，连带 urllib3 被压到 1.26（trafilatura 要 2.8 装不上），全程无告警。
+      # 注意：闭源应用（apps/*/requirements.txt）不在此门禁内，只能覆盖主清单。
+      - name: 依赖一致性检查
+        run: pip check
+
       - name: Lint
         run: cd backend && ruff check .
 
