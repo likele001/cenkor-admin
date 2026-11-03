@@ -181,7 +181,7 @@ onMounted(() => {
 <template>
   <div>
     <h1 class="text-3xl font-semibold tracking-tight">{{ t('nav.dashboard', 'Dashboard') }}</h1>
-    <p class="mt-2 text-ink-500">{{ t('dashboard.welcome', '欢迎回来。这是 Cenkor Admin Platform 的起点。') }}</p>
+    <p class="mt-2 text-ink-500">{{ t('dashboard.welcome', '欢迎回来。AI CMS 已就绪，去创作或管理内容吧。') }}</p>
 
     <!-- 发现新版本升级横幅 -->
     <div v-if="release" class="mt-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
