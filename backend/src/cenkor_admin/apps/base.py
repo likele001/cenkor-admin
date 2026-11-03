@@ -58,3 +58,15 @@ class AppManifest:
     # 声明本 App 提供的钩子模块（dotted path），启动时自动 import 并注册其 @hook 处理器。
     # 缺省会尝试 cenkor_admin.apps.{key}.hooks。
     hooks: list[str] = field(default_factory=list)
+
+    # ---- 内置能力（2026-11-03）----
+    # True = 底座能力，不是可售卖、可装卸的应用。
+    # 由平台底座保证，App 自己不用实现：
+    #   - 启动时强制 installed + enabled，不从 platform_apps 的脏状态漂移
+    #   - 应用中心归入「内置功能」分组，不渲染卸载 / 停用入口
+    #   - API 层拒绝 uninstall / disable（403），防止绕过 UI 直接打接口
+    #
+    # 判断标准只有一条：**能被卸载的是应用，不能卸载的是底座。**
+    # 与目录位置无关 —— 放在 apps/ 只是复用 manifest 的自动注册能力
+    # （路由门禁 / 权限码 / 菜单 / hook），不代表它该被商业化装卸。
+    builtin: bool = False

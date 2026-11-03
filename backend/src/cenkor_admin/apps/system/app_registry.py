@@ -199,6 +199,8 @@ async def list_apps_with_status(db: AsyncSession) -> list[dict[str, Any]]:
             "permissions_grants": row.permissions_grants if row else {},
             "has_frontend": row.has_frontend if row else False,
             "enabled": bool(row.enabled) if row else True,
+            "builtin": bool(manifest.builtin),
+            "uninstallable": not bool(manifest.builtin),
             "registered_counts": counts,
         })
 
@@ -222,6 +224,8 @@ async def list_apps_with_status(db: AsyncSession) -> list[dict[str, Any]]:
                 "permissions_grants": row.permissions_grants or {},
                 "has_frontend": row.has_frontend or False,
                 "enabled": bool(row.enabled),
+                "builtin": False,
+                "uninstallable": True,
                 "registered_counts": {},
             })
 
@@ -356,6 +360,8 @@ async def _register_menu_tree(
 async def uninstall_app(db: AsyncSession, key: str) -> None:
     manifests = scan_app_manifests()
     manifest = manifests.get(key)
+    if manifest and manifest.builtin:
+        raise BuiltinAppError(f"内置应用不可卸载: {key}")
     result = await db.execute(select(InstalledApp).where(InstalledApp.key == key))
     row = result.scalar_one_or_none()
     if not row:
@@ -402,6 +408,55 @@ async def update_permissions_grants(
 # ============================================================
 # 应用启用 / 停用
 # ============================================================
+
+
+class BuiltinAppError(ValueError):
+    """内置应用（``manifest.builtin=True``）不允许卸载 / 停用。
+
+    继承 ValueError 是为了不破坏既有的 ``except ValueError`` 兜底；路由层
+    先捕获本异常并转成 403，落进通用 ValueError 分支说明是别的问题。
+    """
+
+
+async def ensure_builtin_apps(db: AsyncSession) -> list[str]:
+    """启动对齐：内置应用必须处于 installed + enabled。
+
+    内置应用是底座能力，任何「被卸载 / 被停用」的状态都是脏数据（手工改库、
+    老版本 API 未拦截、历史遗留），启动时单向修复回来。只处理
+    ``builtin=True`` 的 App，不影响其他应用，也不删除任何业务数据。
+
+    Returns:
+        实际修复项，形如 ``["sso:reinstalled", "sso:enabled"]``
+    """
+    fixed: list[str] = []
+    manifests = scan_app_manifests()
+    rows = (await db.execute(select(InstalledApp))).scalars().all()
+    by_key = {a.key: a for a in rows}
+
+    for key, manifest in manifests.items():
+        if not manifest.builtin:
+            continue
+        row = by_key.get(key)
+        if row is None or row.status != "installed":
+            try:
+                # install_app 内部会把 enabled 重置为 True
+                await install_app(db, key)
+                fixed.append(key + ":reinstalled")
+            except Exception as e:
+                # 多 worker 并发装同一个 App 属于幂等预期，回滚后无妨
+                await db.rollback()
+                log.warning("app.builtin.install_failed", key=key, error=str(e))
+            continue
+        if not row.enabled:
+            try:
+                await set_app_enabled(db, key, True)
+                fixed.append(key + ":enabled")
+            except Exception as e:
+                await db.rollback()
+                log.warning("app.builtin.enable_failed", key=key, error=str(e))
+
+    return fixed
+
 
 # 启用状态的进程内缓存：key -> (enabled, monotonic 读取时刻)
 # API 门禁每个请求都要判定，加 TTL 避免打爆 DB；多 worker 部署下最多延迟
@@ -500,6 +555,11 @@ async def set_app_enabled(db: AsyncSession, key: str, enabled: bool) -> Installe
     from sqlalchemy import update as sa_update
 
     from cenkor_admin.apps.rbac import models as rbac_models
+
+    if not enabled:
+        _mf = scan_app_manifests().get(key)
+        if _mf and _mf.builtin:
+            raise BuiltinAppError(f"内置应用不可停用: {key}")
 
     row = (await db.execute(
         select(InstalledApp).where(InstalledApp.key == key)

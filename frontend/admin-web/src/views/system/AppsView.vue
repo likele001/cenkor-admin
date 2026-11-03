@@ -24,6 +24,9 @@ interface AppItem {
   permissions_grants: Record<string, string[]>
   /** 启用状态：后端未返回时为 undefined（旧版本），此时不渲染启停入口 */
   enabled?: boolean
+  /** 内置能力（底座功能）：归入「内置功能」分组，不提供卸载 / 停用入口 */
+  builtin?: boolean
+  uninstallable?: boolean
   registered_counts: {
     content_types?: number
     field_definitions?: number
@@ -638,10 +641,17 @@ onMounted(() => {
 
 // 应用管理列表：含「未安装」（代码已存在但被卸载、或从未安装）——未安装项提供安装入口
 const installedApps = computed(() =>
-  apps.value.filter(
-    (a) => a.status === 'installed' || a.status === 'needs_upgrade' || a.status === 'not_installed',
-  ),
+  apps.value
+    .filter(
+      (a) => a.status === 'installed' || a.status === 'needs_upgrade' || a.status === 'not_installed',
+    )
+    // 内置能力排前面：它们是底座，不属于「我装了什么」
+    .sort((a, b) => Number(!!b.builtin) - Number(!!a.builtin)),
 )
+// 分组只为让「哪些是底座、哪些是业务应用」一眼可辨，
+// 两者的代码位置没有区别 —— 都靠 manifest 自动注册。
+const builtinApps = computed(() => installedApps.value.filter((a) => a.builtin))
+const businessApps = computed(() => installedApps.value.filter((a) => !a.builtin))
 // 本地已有代码的应用 key：安装时无需 ZIP 包，直接走 /system/apps/{key}/install
 const localAppKeys = computed(() => new Set(apps.value.map((a) => a.key)))
 const filteredSubmissions = computed(() => pendingApps.value.filter(s => s.status === subTab.value))
@@ -736,7 +746,16 @@ function categoryLabel(c: string): string {
       <div v-if="activeTab === 'installed' && installedApps.length === 0" class="card text-ink-500 text-center py-12">
         {{ t('apps.emptyInstalled') }}
       </div>
-      <div v-for="app in installedApps" v-if="activeTab === 'installed'" :key="app.key" class="card">
+      <template v-for="(app, idx) in installedApps" :key="app.key">
+      <h3
+        v-if="activeTab === 'installed' && idx === 0 && app.builtin"
+        class="text-[11px] font-semibold uppercase tracking-wider text-ink-400 pt-1"
+      >{{ t('apps.groupBuiltin') }}</h3>
+      <h3
+        v-if="activeTab === 'installed' && !app.builtin && app.key === businessApps[0]?.key"
+        class="text-[11px] font-semibold uppercase tracking-wider text-ink-400 pt-4"
+      >{{ t('apps.groupBusiness') }}</h3>
+      <div class="card">
         <div class="flex items-start gap-3">
           <span class="text-2xl">{{ app.icon }}</span>
           <div class="flex-1 min-w-0">
@@ -750,6 +769,11 @@ function categoryLabel(c: string): string {
                   'bg-yellow-50 text-yellow-700': app.status === 'needs_upgrade',
                 }"
               >{{ statusLabel[app.status] }}</span>
+              <span
+                v-if="app.builtin"
+                class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-600"
+                :title="t('apps.builtinHint')"
+              >{{ t('apps.builtin') }}</span>
               <span
                 v-if="app.enabled === false"
                 class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500"
@@ -786,19 +810,19 @@ function categoryLabel(c: string): string {
             @click="install(app.key)"
           >{{ t('apps.install') }}</button>
           <button
-            v-if="app.status === 'installed' && typeof app.enabled === 'boolean' && app.enabled"
+            v-if="!app.builtin && app.status === 'installed' && typeof app.enabled === 'boolean' && app.enabled"
             class="btn-ghost text-sm text-amber-600"
             :disabled="acting === app.key"
             @click="toggleEnable(app)"
           >{{ t('apps.disable') }}</button>
           <button
-            v-else-if="app.status === 'installed' && app.enabled === false"
+            v-else-if="!app.builtin && app.status === 'installed' && app.enabled === false"
             class="btn-primary text-sm"
             :disabled="acting === app.key"
             @click="toggleEnable(app)"
           >{{ t('apps.enable') }}</button>
           <button
-            v-if="app.status === 'installed'"
+            v-if="app.status === 'installed' && !app.builtin"
             class="btn-ghost text-sm text-red-600"
             :disabled="acting === app.key"
             @click="uninstall(app.key)"
@@ -837,6 +861,7 @@ function categoryLabel(c: string): string {
           </div>
         </div>
       </div>
+      </template>
 
       <div v-if="activeTab === 'store' && storeApps.length === 0" class="card text-ink-500 text-center py-12">
         {{ storeLoaded ? t('apps.emptyStoreCatalog') : t('apps.loading') }}

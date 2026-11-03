@@ -207,6 +207,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("app.auto_install.check_fail", error=str(e))
 
+    # 内置应用（manifest.builtin）状态对齐：底座能力不允许停留在
+    # uninstalled / disabled。单向修复 —— 被手工改库或老版本 API 停用过的，
+    # 启动时自动拉回 installed + enabled，避免「前台能登、后台配置页打不开」。
+    try:
+        from cenkor_admin.apps.system.app_registry import ensure_builtin_apps
+        from cenkor_admin.core.db import AsyncSessionLocal as _ASL
+
+        async with _ASL() as db:
+            _fixed = await ensure_builtin_apps(db)
+        if _fixed:
+            log.warning("app.builtin.reconciled", count=len(_fixed), detail=",".join(_fixed))
+    except Exception as e:
+        log.warning("app.builtin.check_fail", error=str(e))
+
     # 注册内置钩子处理器（插件框架 M1·P0）：导入模块即触发 @hook 装饰器注册
     try:
         from cenkor_admin.apps.system import hooks as _builtin_hooks

@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.system.app_registry import (
+    BuiltinAppError,
     install_app,
     list_apps_with_status,
     set_app_enabled,
@@ -171,6 +172,8 @@ async def uninstall_app_endpoint(
     try:
         await uninstall_app(db, app_key)
         return {"ok": True, "key": app_key, "status": "uninstalled"}
+    except BuiltinAppError as e:
+        raise HTTPException(403, str(e)) from e
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
@@ -203,6 +206,8 @@ async def disable_app_endpoint(
     try:
         row = await set_app_enabled(db, app_key, False)
         return {"ok": True, "key": row.key, "enabled": bool(row.enabled)}
+    except BuiltinAppError as e:
+        raise HTTPException(403, str(e)) from e
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
