@@ -13,6 +13,40 @@
 > - 要点二
 > ```
 
+## 2026-11-03　bcrypt 4.1+ 兼容：口令上下文收敛 + 垫片（⭐）
+
+**【修复：passlib 版本探测告警】**
+
+- 现象：seed 首次建管理员、或服务首次 hash/verify 口令时打印
+  `(trapped) error reading bcrypt version`
+- 根因：`passlib/handlers/bcrypt.py:620` 读 `bcrypt.__about__.__version__`，
+  bcrypt ≥ 4.1 已删除 `__about__`；passlib 捕获后走「版本未知」分支
+- 功能本就正常，但日志噪音会掩盖真实故障，且说明跑在**未声明**的版本上
+
+**【改动】**
+
+- 新增 `core/pwd.py`：全站唯一 `CryptContext`，导入时补回 `__about__` 垫片
+- `core/security.py`、`apps/portal/auth.py` 原先**各建一份** `CryptContext`，
+  改为复用同一实例——参数一旦分叉，典型症状就是「改完密码登录不了」
+- 依赖约束 `bcrypt>=3.2.0,<4.0` → `bcrypt>=4.1,<5`
+  （`<5` 是为规避 bcrypt 5.0 把超 72 字节口令由「静默截断」改为「抛 ValueError」）
+- 新增 `tests/test_password_context.py`：垫片在位 / 单实例 / 跨模块 `$2b$` 互通
+
+**【取 B 方案：放宽约束，而不是降级 bcrypt】**
+
+- 备选 A（重装 3.2.x）能让告警消失，但等于把环境钉回两年前的版本，
+  后续任何依赖 bcrypt 4.x 的包都会再撞一次
+- 选 B：放宽声明 + 兼容垫片，环境与声明一致，且前向兼容到 4.x 任意小版本
+- **哈希输出仍是 `$2b$12$`，历史口令零迁移**
+
+**【验证】**
+
+- 生产库实测：`auth_users` 29 条、`portal_users` 24 条，全部 `$2b$12$`，
+  `pwd_context.identify()` 均返回 `bcrypt`
+- 对照实验：裸 passlib 复现 `AttributeError: module 'bcrypt' has no attribute
+  '__about__'`；走 `core.pwd` 则静默、哈希与校验全部正常
+- ruff 全绿；`test_password_context.py` 3 条 + `test_security.py` 3 条全过
+
 ## 2026-11-03　交付文档修正：包内迁移 head 不再写死（⭐）
 
 **【修正：PACKAGE.md 声称的 head 已过期】**
@@ -36,6 +70,9 @@
 - 包内无 erp / crm / mes / workflow / payment，也无 `src/apps`，闭源未泄漏
 
 **【已知噪音，不是缺陷】**
+
+> **已由 v0.5.6 修复**：口令上下文收敛到 `core/pwd.py` 并补 `__about__` 垫片，
+> 依赖约束放宽为 `bcrypt>=4.1,<5`。以下为当时的分析，保留备查。
 
 - seed 首次创建管理员时会打印 `(trapped) error reading bcrypt version`：
   passlib 1.7.4 读 `bcrypt.__about__.__version__`，而 bcrypt ≥ 4.1 已移除该属性。
