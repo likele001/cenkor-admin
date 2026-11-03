@@ -1,5 +1,5 @@
 {
-  "version": "0.5.10",
+  "version": "0.5.11",
   "channel": "stable",
   "released_at": "2026-11-03",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "新增 CONTRIBUTING.md：贡献范围分层、七道提交门禁、提交规范与贡献授权；README 加参与贡献入口"
+  "notes": "支付中心与应用交易层开源（payment/commerce 随仓交付，不单独收费）；迁移图合流，公开链恢复单 head"
 }
