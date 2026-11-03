@@ -73,7 +73,7 @@ def decrypt_value(value: str) -> str:
     for f in fernets:
         try:
             return f.decrypt(payload).decode()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             last_exc = exc
             continue
     log.warning("payment.crypto.decrypt_failed", error=str(last_exc))

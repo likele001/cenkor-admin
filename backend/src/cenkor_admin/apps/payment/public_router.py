@@ -10,12 +10,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 from cenkor_admin.apps.payment import models, service
 from cenkor_admin.apps.payment.cashier import render_cashier
@@ -79,7 +78,7 @@ async def payment_return(
         try:
             form = await request.form()
             params.update({k: str(v) for k, v in form.items()})
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
     out_trade_no = (
@@ -105,7 +104,7 @@ async def payment_return(
         if order.status == "pending":
             await service.sync_order(db, order)
             await db.refresh(order)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("payment.return_sync_failed", out_trade_no=out_trade_no, error=str(exc))
 
     target = order.return_url or f"/api/v1/public/payment/cashier/{out_trade_no}"

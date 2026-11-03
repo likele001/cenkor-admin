@@ -22,8 +22,8 @@ downgrade 直接删表。
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 from cenkor_admin.core.compat import alembic_json
 
 revision = "20260922_0021_payment"

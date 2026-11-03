@@ -33,8 +33,8 @@ Create Date: 2026-10-20
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 
 revision = "20261020_0035_app_publish"
 # 闭源链根：顺延到公开链新 head（当前 cms_templates 挂在 ai_video_jobs 之后），

@@ -55,8 +55,8 @@ def _yuan(cents: int) -> str:
 
 def _to_cents(amount: Any) -> int:
     try:
-        return int(round(float(amount) * 100))
-    except Exception:  # noqa: BLE001
+        return round(float(amount) * 100)
+    except Exception:
         return 0
 
 
@@ -130,11 +130,11 @@ class XunhuDriver(PaymentDriver):
         try:
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.post(url, data=signed)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise PayError("无法连接虎皮椒网关", detail=str(exc), code="network") from exc
         try:
             node = resp.json()
-        except Exception:  # noqa: BLE001
+        except Exception:
             raise PayError("虎皮椒返回内容无法解析", detail=resp.text[:500], code="bad_response")
         return node if isinstance(node, dict) else {"errcode": -1, "errmsg": "返回格式异常"}
 
@@ -215,7 +215,7 @@ class XunhuDriver(PaymentDriver):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.get(qr_image_url)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("xunhupay.qrcode_resolve_failed", error=str(exc), url=qr_image_url[:120])
             return ""
         loc = resp.headers.get("location") or ""
@@ -225,7 +225,7 @@ class XunhuDriver(PaymentDriver):
             return ""
         try:
             return base64.b64decode(data + "=" * (-len(data) % 4)).decode("utf-8", "replace").strip()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("xunhupay.qrcode_decode_failed", error=str(exc))
             return ""
 

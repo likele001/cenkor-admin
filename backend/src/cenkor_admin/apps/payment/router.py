@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -41,14 +41,14 @@ async def _setting(db: AsyncSession, key: str) -> str:
         raw = (await db.execute(
             text("select value from system_settings where key = :k"), {"k": key}
         )).scalar()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return ""
     if raw is None:
         return ""
     if isinstance(raw, str):
         try:
             return str(json.loads(raw))
-        except Exception:  # noqa: BLE001
+        except Exception:
             return raw
     return str(raw)
 
@@ -161,7 +161,7 @@ _STATUS_CN = {
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _archived_at(o: models.PayOrder) -> str | None:
@@ -209,7 +209,7 @@ async def list_scenes(
         ))).all()
         for key, name in rows:
             scenes[key] = {"scene_key": key, "name": name or key, "source": "app"}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("payment.scene_query_failed", error=str(exc))
 
     keys = (await db.execute(
@@ -282,9 +282,12 @@ def _merge_config(
             merged[key] = raw
     if not is_update:
         for f in cls.config_fields:
-            if f.get("required") and not merged.get(f["key"]):
-                if f["label"] not in missing:
-                    missing.append(f["label"])
+            if (
+                f.get("required")
+                and not merged.get(f["key"])
+                and f["label"] not in missing
+            ):
+                missing.append(f["label"])
     return merged, missing
 
 
@@ -407,7 +410,7 @@ async def delete_channel(
     ch = await db.get(models.PayChannel, channel_id)
     if ch is None or ch.deleted_at is not None:
         raise HTTPException(404, "通道不存在")
-    ch.deleted_at = datetime.now(timezone.utc)
+    ch.deleted_at = datetime.now(UTC)
     ch.enabled = False
     await db.commit()
     log.info("payment.channel_deleted", channel_id=channel_id, by=current.id)
@@ -430,7 +433,7 @@ async def test_channel(
         info = await driver.query(probe)
     except PayError as exc:
         return {"ok": False, "message": exc.message, "detail": exc.detail}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"ok": False, "message": "自检失败", "detail": str(exc)}
 
     return {

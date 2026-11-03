@@ -74,17 +74,17 @@ class NotifyResult:
     error: str = ""
 
 
-_REGISTRY: dict[str, type["PaymentDriver"]] = {}
+_REGISTRY: dict[str, type[PaymentDriver]] = {}
 
 
-def register_driver(cls: type["PaymentDriver"]) -> type["PaymentDriver"]:
+def register_driver(cls: type[PaymentDriver]) -> type[PaymentDriver]:
     if not cls.provider:
         raise ValueError(f"{cls.__name__} 未声明 provider")
     _REGISTRY[cls.provider] = cls
     return cls
 
 
-def get_driver_class(provider: str) -> type["PaymentDriver"]:
+def get_driver_class(provider: str) -> type[PaymentDriver]:
     cls = _REGISTRY.get(provider)
     if cls is None:
         raise PayError(f"不支持的支付通道：{provider}", code="unknown_provider")

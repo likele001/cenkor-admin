@@ -14,8 +14,9 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
-from typing import Any, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import case, select
 
@@ -57,7 +58,7 @@ async def resolve_product(db: Any, app_key: str, body_product: Any = None) -> st
 
 
 def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _dt(v: Any) -> datetime | None:
@@ -70,7 +71,7 @@ def _dt(v: Any) -> datetime | None:
         except ValueError:
             return None
     if isinstance(v, datetime) and v.tzinfo is None:
-        return v.replace(tzinfo=timezone.utc)
+        return v.replace(tzinfo=UTC)
     return v
 
 
@@ -97,7 +98,7 @@ def _prop(base: int, num: int, den: int) -> int:
 # 促销状态机
 # ------------------------------------------------------------
 
-def promo_state(p: "cm.AppPricing | None", now: datetime | None = None) -> str:
+def promo_state(p: cm.AppPricing | None, now: datetime | None = None) -> str:
     """返回 none / scheduled / active / expired。
 
     促销成立的前提：有促销价、且促销价低于售价。时间窗缺省视为「不限制」那一侧。
@@ -119,7 +120,7 @@ def promo_state(p: "cm.AppPricing | None", now: datetime | None = None) -> str:
     return _PROMO_ACTIVE
 
 
-def promo_active(p: "cm.AppPricing | None", now: datetime | None = None) -> bool:
+def promo_active(p: cm.AppPricing | None, now: datetime | None = None) -> bool:
     return promo_state(p, now) == _PROMO_ACTIVE
 
 
@@ -127,7 +128,7 @@ def promo_active(p: "cm.AppPricing | None", now: datetime | None = None) -> bool
 # 生效价
 # ------------------------------------------------------------
 
-def unit_price_cents(p: "cm.AppPricing | None", model: str | None = None) -> int:
+def unit_price_cents(p: cm.AppPricing | None, model: str | None = None) -> int:
     """**当前生效成交单价（分）** —— 下单金额必须用这个，不要直接读 price_cents。
 
     - 免费 / 无定价行 → 0
@@ -153,7 +154,7 @@ def unit_price_cents(p: "cm.AppPricing | None", model: str | None = None) -> int
     return promo if promo_active(p) else max(price, 0)
 
 
-def list_unit_price_cents(p: "cm.AppPricing | None", model: str | None = None) -> int:
+def list_unit_price_cents(p: cm.AppPricing | None, model: str | None = None) -> int:
     """展示用「原价」单价：座位制按同比例换算。无原价时返回 0。"""
     if p is None:
         return 0
@@ -172,8 +173,8 @@ def list_unit_price_cents(p: "cm.AppPricing | None", model: str | None = None) -
 # 写入
 # ------------------------------------------------------------
 
-def apply_price_fields(row: "cm.AppPricing", body: dict, *,
-                       touch_fee: bool = False) -> "cm.AppPricing":
+def apply_price_fields(row: cm.AppPricing, body: dict, *,
+                       touch_fee: bool = False) -> cm.AppPricing:
     """校验并写入价格字段。非法组合抛 ``PriceRuleError``（调用方转 400）。
 
     ``touch_fee=True`` 时才允许改 ``platform_fee_bp``（仅平台侧）；
@@ -235,7 +236,7 @@ def discount_label(percent: float | None) -> str | None:
     return f"{text}折"
 
 
-def price_view(p: "cm.AppPricing | None", app_key: str | None = None,
+def price_view(p: cm.AppPricing | None, app_key: str | None = None,
                now: datetime | None = None) -> dict[str, Any]:
     """定价的对外视图（落库字段 + 展示字段 + 生效价 + 促销状态）。"""
     if p is None:
@@ -312,7 +313,7 @@ PUBLIC_PRICE_FIELDS: tuple[str, ...] = (
 )
 
 
-def public_price_view(p: "cm.AppPricing | None", app_key: str) -> dict[str, Any]:
+def public_price_view(p: cm.AppPricing | None, app_key: str) -> dict[str, Any]:
     """买家可见的价格视图（按 PUBLIC_PRICE_FIELDS 白名单裁剪）。
 
     Args:

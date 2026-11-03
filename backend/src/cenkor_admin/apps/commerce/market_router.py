@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -21,9 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.commerce import ledger
+from cenkor_admin.apps.commerce import ledger, pricing
 from cenkor_admin.apps.commerce import models as cm
-from cenkor_admin.apps.commerce import pricing
 from cenkor_admin.apps.system import store_models
 from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.apps.system.store_router import require_portal_or_admin
@@ -34,7 +33,7 @@ router = APIRouter()
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _iso(v: datetime | None) -> str | None:
@@ -179,7 +178,6 @@ async def my_apps(
         latest.setdefault(s.app_key, s)
 
     keys = list(latest.keys())
-    pricing: dict[str, cm.AppPricing] = {}
     sales: dict[str, dict[str, int]] = {}
     installs: dict[str, str] = {}
     if keys:
@@ -199,11 +197,11 @@ async def my_apps(
         )).all():
             sales[k] = {"order_count": int(cnt), "gross_cents": int(gross), "income_cents": int(income)}
 
-        installs = {
-            k: v for k, v in (await db.execute(
+        installs = dict(
+            (await db.execute(
                 select(InstalledApp.key, InstalledApp.status).where(InstalledApp.key.in_(keys))
             )).all()
-        }
+        )
 
     items = []
     for key, sub in latest.items():
@@ -683,19 +681,19 @@ async def market_list_pricing(
             .group_by(cm.AppOrder.app_key)
         )).all():
             sales[k] = {"order_count": int(cnt), "paid_cents": int(amt), "income_cents": int(income)}
-        names = {
-            k: n for k, n in (await db.execute(
+        names = dict(
+            (await db.execute(
                 select(InstalledApp.key, InstalledApp.name).where(InstalledApp.key.in_(keys))
             )).all()
-        }
+        )
         dev_ids = {r.developer_id for r in rows if r.developer_id}
         if dev_ids:
-            dev_names = {
-                i: n for i, n in (await db.execute(
+            dev_names = dict(
+                (await db.execute(
                     select(store_models.Developer.id, store_models.Developer.display_name)
                     .where(store_models.Developer.id.in_(dev_ids))
                 )).all()
-            }
+            )
 
     default_bp = await ledger.get_setting_int(db, ledger.SETTING_FEE_BP, 2000)
     items = []
@@ -793,13 +791,13 @@ async def market_list_developers(
         try:
             from cenkor_admin.apps.portal import models as portal_models
 
-            emails = {
-                uid: mail for uid, mail in (await db.execute(
+            emails = dict(
+                (await db.execute(
                     select(portal_models.PortalUser.id, portal_models.PortalUser.email)
                     .where(portal_models.PortalUser.id.in_(user_ids))
                 )).all()
-            }
-        except Exception as e:  # noqa: BLE001 - 邮箱只是展示字段，取不到不影响主流程
+            )
+        except Exception as e:
             log.warning("commerce.dev_emails_failed", error=str(e))
 
     items = []
@@ -840,12 +838,12 @@ async def market_list_withdrawals(
     names = {}
     ids = {w.developer_id for w in rows}
     if ids:
-        names = {
-            i: n for i, n in (await db.execute(
+        names = dict(
+            (await db.execute(
                 select(store_models.Developer.id, store_models.Developer.display_name)
                 .where(store_models.Developer.id.in_(ids))
             )).all()
-        }
+        )
     return {
         "total": int(total),
         "items": [{**ledger.withdrawal_dict(w),

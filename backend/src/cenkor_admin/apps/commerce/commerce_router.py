@@ -18,7 +18,7 @@ import json
 import os
 import shutil
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -30,10 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.commerce import ledger
-from cenkor_admin.apps.commerce import license_authority
+from cenkor_admin.apps.commerce import ledger, license_authority, pricing
 from cenkor_admin.apps.commerce import models as cm
-from cenkor_admin.apps.commerce import pricing
 from cenkor_admin.apps.system import store_models
 from cenkor_admin.apps.system.models import InstalledApp
 from cenkor_admin.apps.system.store_router import require_portal_or_admin
@@ -47,7 +45,7 @@ router = APIRouter()
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def _resolve_product(db: AsyncSession, app_key: str, body_product: Any = None) -> str:
@@ -484,14 +482,14 @@ async def _commerce_setting(db: AsyncSession, key: str, default: Any = None) -> 
         raw = (await db.execute(
             text("select value from system_settings where key = :k"), {"k": key}
         )).scalar()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return default
     if raw is None:
         return default
     if isinstance(raw, str):
         try:
             return json.loads(raw)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return raw
     return raw
 
@@ -721,7 +719,7 @@ async def _live_pay_biz_ids(db: AsyncSession) -> set[str]:
             "where biz_type = 'app_order' and status = 'pending' "
             "  and (expire_at is null or expire_at > now())"
         )).scalars().all())
-    except Exception:  # noqa: BLE001  支付中心未装 / 非 PG 方言：当作没有活的支付单
+    except Exception:
         return set()
     return {str(x) for x in rows if x}
 
@@ -801,7 +799,7 @@ async def delete_order(
                 "  and status in ('pending', 'closed', 'failed')"
             ), {"no": order.order_no})
             removed_pay = int(res.rowcount or 0)
-        except Exception:  # noqa: BLE001  支付中心未装：无连带可清
+        except Exception:
             removed_pay = 0
 
     no = order.order_no
@@ -1397,7 +1395,7 @@ async def install_from_cloud(
                         "version": s.APP_VERSION,
                     },
                 )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise HTTPException(502, f"授权中心不可达：{e}") from e
         if resp.status_code != 200:
             raise HTTPException(resp.status_code, f"授权校验失败：{resp.text[:300]}")
@@ -1438,14 +1436,14 @@ async def install_from_cloud(
                 f.write(pkg.content)
         except HTTPException:
             raise
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise HTTPException(502, f"下载应用包异常：{e}") from e
     else:
         lic = await _get_license(db, license_key)
         _guard_license(lic)
         app_key = lic.app_key
         hub_product = lic.product or ""
-        sub, path = await _fetch_package(db, app_key)
+        _sub, path = await _fetch_package(db, app_key)
         fd, tmp_path = tempfile.mkstemp(suffix=".zip")
         shutil.copyfile(path, tmp_path)
         os.close(fd)
@@ -1505,7 +1503,7 @@ async def _build_settings(db: AsyncSession) -> dict[str, Any]:
 
     payment_installed = True
     try:
-        from cenkor_admin.apps.payment import models as pm  # noqa: F401
+        from cenkor_admin.apps.payment import models as pm
     except ImportError:
         payment_installed = False
 
@@ -1533,7 +1531,7 @@ async def _build_settings(db: AsyncSession) -> dict[str, Any]:
                 if sk == scene_key and enabled:
                     channels.append({"provider": provider, "sub_type": sub_type,
                                      "title": title or provider})
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("commerce.settings_channels_failed", error=str(exc))
 
     return {
@@ -1578,6 +1576,6 @@ async def update_store_settings(
 # ============================================================
 # 应用市场（开发者侧 / 平台侧）—— 共用本前缀的子路由
 # ============================================================
-from cenkor_admin.apps.commerce import market_router as _market_router  # noqa: E402
+from cenkor_admin.apps.commerce import market_router as _market_router
 
 router.include_router(_market_router.router)

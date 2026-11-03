@@ -31,7 +31,7 @@ from __future__ import annotations
 import hashlib
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -65,7 +65,7 @@ DEFAULT_PORTAL_URL = "https://portal.cenkor.cn"
 # ============================================================
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _iso(v: datetime | None) -> str | None:
@@ -159,7 +159,7 @@ async def _price_map_safe(db: AsyncSession, keys: list[str]) -> dict[str, dict[s
         return {}
     try:
         return await pricing.public_price_map(db, keys)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("cloud.price_map_failed", error=str(exc))
         return {}
 
@@ -195,7 +195,7 @@ async def _latest_version_map(db: AsyncSession, keys: list[str]) -> dict[tuple[s
                 store_models.AppSubmission.yanked_at.is_(None),
             )
         )).all()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("cloud.latest_version_failed", error=str(exc))
         return {}
     rows = sorted(rows, key=lambda r: (ver_tuple(r[2]), r[4] or 0), reverse=True)
@@ -634,7 +634,7 @@ async def spoke_bind_start(
             r = await client.post(
                 f"{cloud}/api/v1/store/public/cloud/device/start", json=payload
             )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"官方云不可达：{e}") from e
     if r.status_code != 200:
         raise HTTPException(502, f"申请绑定码失败（HTTP {r.status_code}）：{r.text[:200]}")
@@ -664,7 +664,7 @@ async def spoke_bind_poll(
             r = await client.post(
                 f"{cloud}/api/v1/store/public/cloud/device/poll", json={"device_code": device_code}
             )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"官方云不可达：{e}") from e
     if r.status_code != 200:
         raise HTTPException(502, f"轮询失败（HTTP {r.status_code}）：{r.text[:200]}")
@@ -718,7 +718,7 @@ async def spoke_unbind(
                     f"{cloud}/api/v1/store/cloud/instance/revoke-self",
                     headers={"Authorization": f"Bearer {row.token}"},
                 )
-        except Exception as exc:  # noqa: BLE001 - 云端不可达也要允许本地解绑
+        except Exception as exc:
             log.warning("cloud.unbind_notify_failed", error=str(exc))
 
     await db.execute(delete(cm.CloudClient))
@@ -764,7 +764,7 @@ async def spoke_catalog(
                     break
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"官方应用市场不可达：{e}") from e
 
     installed: dict[str, str] = {}
@@ -775,7 +775,7 @@ async def spoke_catalog(
             if getattr(row, "status", "installed") != "installed":
                 continue
             installed[str(row.key)] = str(row.version or "")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("cloud.installed_map_failed", error=str(exc))
 
     merged: list[dict[str, Any]] = []
@@ -823,7 +823,7 @@ async def spoke_purchases(
                 f"{cloud}/api/v1/store/cloud/my-purchases",
                 headers={"Authorization": f"Bearer {row.token}"},
             )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(502, f"官方云不可达：{e}") from e
 
     if r.status_code == 401:

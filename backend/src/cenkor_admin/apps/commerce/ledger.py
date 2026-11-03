@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -58,7 +58,7 @@ SETTING_DEFAULTS: dict[str, Any] = {
 
 
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def is_self_operated(developer_id: int | None) -> bool:
@@ -80,14 +80,14 @@ async def get_setting(db: AsyncSession, key: str, default: Any = None) -> Any:
         raw = (await db.execute(
             text("select value from system_settings where key = :k"), {"k": key}
         )).scalar()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return default
     if raw is None:
         return default
     if isinstance(raw, str):
         try:
             return json.loads(raw)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return raw
     return raw
 

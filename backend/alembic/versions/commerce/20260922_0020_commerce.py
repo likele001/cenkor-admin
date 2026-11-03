@@ -21,8 +21,9 @@ downgrade 直接删表 —— 本迁移只新增表，不触碰任何既有表�
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "20260922_0020_commerce"
 down_revision = "20261103_1200_merge_commerce"

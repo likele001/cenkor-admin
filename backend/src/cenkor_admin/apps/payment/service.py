@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -103,7 +103,7 @@ def terminal_rank(channel: models.PayChannel, terminal: str) -> int:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def gen_out_trade_no(prefix: str = "P") -> str:
@@ -256,7 +256,7 @@ async def create_order(
         log.warning("payment.create_failed", scene=scene_key, out_trade_no=out_trade_no,
                     error=exc.message, detail=exc.detail)
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         order.status = FAILED
         await db.commit()
         log.error("payment.create_error", scene=scene_key, out_trade_no=out_trade_no,
@@ -320,7 +320,7 @@ async def _dispatch_paid(order: models.PayOrder) -> None:
     }
     try:
         await dispatch("payment.paid", **payload)
-    except Exception as exc:  # noqa: BLE001 - 钩子异常不能影响支付主流程
+    except Exception as exc:
         log.warning("payment.hook_failed", out_trade_no=order.out_trade_no, error=str(exc))
 
 
@@ -342,7 +342,7 @@ async def _notify_biz(order: models.PayOrder) -> None:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             await client.post(url, json=body)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("payment.biz_notify_failed", out_trade_no=order.out_trade_no, error=str(exc))
 
 
@@ -358,7 +358,7 @@ async def handle_notify(
     driver = build_driver(channel)
     try:
         result = await driver.verify_notify(headers, body)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         result = NotifyResult(ok=False, error=f"回调处理异常：{exc}", reply="failure")
 
     db.add(models.PayNotifyLog(
@@ -493,7 +493,7 @@ async def refund_order(
         refund.error = exc.detail or exc.message
         await db.commit()
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         refund.status = FAILED
         refund.error = str(exc)
         await db.commit()
@@ -525,7 +525,7 @@ async def refund_order(
                 biz_type=order.biz_type or "",
                 biz_id=order.biz_id or "",
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("payment.refund_hook_failed", error=str(exc))
 
     return refund
@@ -564,7 +564,7 @@ async def stats(db: AsyncSession, scene_key: str | None = None) -> dict[str, Any
             paid_count += int(cnt)
             paid_amount += int(amount or 0)
 
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     today_stmt = select(
         func.count(), func.coalesce(func.sum(models.PayOrder.amount_cents), 0),
     ).where(

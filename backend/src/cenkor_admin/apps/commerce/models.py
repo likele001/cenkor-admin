@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -49,7 +49,7 @@ def generate_license_key() -> str:
 
 
 def generate_order_no() -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     return f"CK{ts}{''.join(secrets.choice('0123456789') for _ in range(4))}"
 
 

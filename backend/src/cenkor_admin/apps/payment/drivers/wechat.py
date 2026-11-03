@@ -48,7 +48,7 @@ def _load_private_key(raw: str):
     for label in ("PRIVATE KEY", "RSA PRIVATE KEY"):
         try:
             return serialization.load_pem_private_key(_ensure_pem(raw, label), password=None)
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
     raise PayError("微信商户私钥格式不正确（需 apiclient_key.pem）", code="bad_private_key")
 
@@ -61,7 +61,7 @@ def _load_public_key(raw: str):
                 cert = x509.load_pem_x509_certificate(_ensure_pem(raw, label))
                 return cert.public_key()
             return serialization.load_pem_public_key(_ensure_pem(raw, label))
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
     raise PayError("微信支付平台证书格式不正确", code="bad_public_key")
 
@@ -128,13 +128,13 @@ class WechatDriver(PaymentDriver):
                     resp = await client.get(url, headers=headers)
                 else:
                     resp = await client.post(url, content=body_str.encode("utf-8"), headers=headers)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise PayError("无法连接微信支付网关", detail=str(exc), code="network") from exc
 
         text = resp.text or ""
         try:
             data = json.loads(text) if text.strip() else {}
-        except Exception:  # noqa: BLE001
+        except Exception:
             data = {"_raw": text[:500]}
         return resp.status_code, data
 
@@ -274,7 +274,7 @@ class WechatDriver(PaymentDriver):
         text = body.decode("utf-8", errors="replace")
         try:
             envelope = json.loads(text)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return NotifyResult(ok=False, error=f"回调非 JSON：{exc}", reply="", raw={})
 
         resource = envelope.get("resource") or {}
@@ -285,10 +285,9 @@ class WechatDriver(PaymentDriver):
 
         # 可选：平台证书验签
         platform_cert = self.one("platform_cert")
-        if platform_cert:
-            if not self._verify_signature(headers, text, platform_cert):
-                return NotifyResult(ok=False, error="回调验签失败",
-                                    reply="", raw=envelope)
+        if platform_cert and not self._verify_signature(headers, text, platform_cert):
+            return NotifyResult(ok=False, error="回调验签失败",
+                                reply="", raw=envelope)
 
         try:
             plain = AESGCM(self.one("api_v3_key").encode("utf-8")).decrypt(
@@ -297,7 +296,7 @@ class WechatDriver(PaymentDriver):
                 (resource.get("associated_data") or "").encode("utf-8") or None,
             )
             data = json.loads(plain.decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("payment.wechat.notify_decrypt_failed", error=str(exc))
             return NotifyResult(ok=False, error=f"回调解密失败：{exc}", reply="", raw=envelope)
 
@@ -328,6 +327,6 @@ class WechatDriver(PaymentDriver):
                 padding.PKCS1v15(), hashes.SHA256(),
             )
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("payment.wechat.notify_verify_failed", error=str(exc))
             return False

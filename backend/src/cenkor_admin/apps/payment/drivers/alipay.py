@@ -49,7 +49,7 @@ def _load_private_key(raw: str):
     for label in ("PRIVATE KEY", "RSA PRIVATE KEY"):
         try:
             return serialization.load_pem_private_key(_ensure_pem(raw, label), password=None)
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
     raise PayError("支付宝应用私钥格式不正确", code="bad_private_key")
 
@@ -57,7 +57,7 @@ def _load_private_key(raw: str):
 def _load_public_key(raw: str):
     try:
         return serialization.load_pem_public_key(_ensure_pem(raw, "PUBLIC KEY"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise PayError("支付宝公钥格式不正确", detail=str(exc), code="bad_public_key")
 
 
@@ -67,8 +67,8 @@ def _yuan(cents: int) -> str:
 
 def _to_cents(amount: Any) -> int:
     try:
-        return int(round(float(amount) * 100))
-    except Exception:  # noqa: BLE001
+        return round(float(amount) * 100)
+    except Exception:
         return 0
 
 
@@ -92,7 +92,7 @@ def _extract_raw_json(text: str, key: str) -> str:
     sub = text[colon + 1:].lstrip()
     try:
         _, end = json.JSONDecoder().raw_decode(sub)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return ""
     return sub[:end]
 
@@ -172,7 +172,7 @@ class AlipayDriver(PaymentDriver):
                 base64.b64decode(sign), node_str.encode("utf-8"),
                 padding.PKCS1v15(), hashes.SHA256(),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise PayError("支付宝响应验签失败", detail=str(exc), code="bad_response_sign") from exc
 
     @staticmethod
@@ -187,13 +187,13 @@ class AlipayDriver(PaymentDriver):
         try:
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.post(self._gateway(), data=params)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise PayError("无法连接支付宝网关", detail=str(exc), code="network") from exc
 
         text = resp.text
         try:
             data = json.loads(text)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise PayError("支付宝返回内容无法解析", detail=text[:500], code="bad_response") from exc
         self._verify_response(text, data, method)
         return data
@@ -310,7 +310,7 @@ class AlipayDriver(PaymentDriver):
                 base64.b64decode(sign), content.encode("utf-8"),
                 padding.PKCS1v15(), hashes.SHA256(),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("payment.alipay.notify_verify_failed", error=str(exc),
                         out_trade_no=params.get("out_trade_no", ""))
             return NotifyResult(ok=False, error=f"验签失败：{exc}", reply="failure", raw=params)

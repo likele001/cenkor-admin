@@ -15,7 +15,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -28,7 +28,7 @@ BIZ_TYPE = "app_order"
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def _load_order(db, order_no: str):
@@ -162,7 +162,7 @@ async def issue_license_on_payment(
         try:
             lic = await _issue_license(db, order)
             lic_key = lic.license_key
-        except Exception as e:  # noqa: BLE001 - 授权失败不回滚"已付款"这个事实
+        except Exception as e:
             log.error("commerce.hook.license_failed", order_no=order_no, error=str(e))
 
         log.info("commerce.hook.paid", order_no=order_no, app=app_key, license=lic_key,
@@ -232,7 +232,7 @@ async def settle_on_tick(**kwargs) -> dict | None:
         try:
             settled = await ledger.settle_due(db)
             await db.commit()
-        except Exception as e:  # noqa: BLE001 - 周期任务必须自愈
+        except Exception as e:
             await db.rollback()
             log.warning("commerce.settle_tick_failed", error=str(e))
             return None
