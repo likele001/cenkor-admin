@@ -229,7 +229,7 @@ async def lifespan(app: FastAPI):
         from cenkor_admin.apps.system import webhooks as _webhook_hooks  # noqa: F401
 
         # 已退役 cenkormes-center 桥接：付款后发卡改由本仓 commerce 层自行签发，不再向外部仓库 auto-issue。
-        # 闭源商业模块（无 manifest，由 api/v1/__init__.py 直接挂载 /api/v1/store）
+        # 交易层（无 manifest，由 api/v1/__init__.py 直接挂载 /api/v1/store）
         try:
             from cenkor_admin.apps.commerce import hooks as _commerce_hooks  # noqa: F401
         except ImportError:

@@ -568,7 +568,8 @@ async def main() -> None:
         #   - 这些应用本地已有源码，前端 storeInstall() 检测到 app_key 在本地会直接走
         #     系统安装（/system/apps/{key}/install），**不解压 ZIP** → file_path 允许为空；
         #   - 幂等：按唯一约束 (app_key, version) 判重，源码 bump 版本后自动补新记录；
-        #   - 闭源商业应用（crm/erp/mes/payment/workflow）不在开源仓库里，自然不会被上架。
+        #   - 仍闭源的商业应用（crm/erp/mes/workflow）不在开源仓库里，自然不会被上架；
+        #     payment / commerce 自 v0.5.11 起随仓开源，会正常纳入上架记录。
         try:
             import dataclasses
             from datetime import datetime

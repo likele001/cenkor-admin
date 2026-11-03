@@ -196,9 +196,14 @@ bash scripts/backup.sh
 
 本许可仅覆盖**本仓库内 git 跟踪的内容**（`backend/`、`frontend/`、`scripts/`、文档等）。
 
+**支付中心与应用交易层已开源**（v0.5.11 起）：`apps/payment`（支付宝 / 微信 /
+虎皮椒三通道 + 收银台 + 订单）与 `apps/commerce`（定价 / 订单 / 授权 / 云端安装）
+随平台同 MIT 授权，可自由用于商业项目，**不单独收费、也不需要授权码**。
+
 以下模块**不在本仓库内，不适用本许可**，需单独授权：
 
-- 商业应用：ERP / CRM / MES / 支付（`apps/erp`、`apps/crm`、`apps/mes`、`apps/payment`）
+- 商业应用：ERP / CRM / MES / 工作流（`apps/erp`、`apps/crm`、`apps/mes`、`apps/workflow`）
+- 内容采集（`apps/collect`，源码在外置目录 `backend/src/apps/collect/`）
 - 开发者门户（`frontend/developer-web`）
 
 如果你拿到的是「开源内核 + 商业应用」的混合部署，请不要把根目录的 `LICENSE`

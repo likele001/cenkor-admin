@@ -1,4 +1,6 @@
 # 应用存放位置：内置 cenkor_admin/apps/<key>/（开源进库）；独立/商业应用放 src/apps/<key>/（本文件已整体排除）
+# 说明：支付中心（payment）与生态交易层（commerce）已于 v0.5.11 开源，随仓交付；
+#       src/apps/ 现仅存 collect（内容采集，商业闭源）。
 
 # ============ Python / Backend ============
 __pycache__/
@@ -97,17 +99,11 @@ backend/src/cenkor_admin/apps/workflow/
 backend/src/cenkor_admin/static/apps/workflow/
 backend/alembic/versions/2026*_workflow*.py
 
-# ============ 支付中心应用（独立应用，不公开源码） ============
-# 源码已迁至外置应用目录 backend/src/apps/payment/，由上面的 backend/src/apps/ 规则整体覆盖，
-# 无需为本应用单独登记。下面两条仅因前端产物与迁移仍落在被跟踪的目录里：
-backend/src/cenkor_admin/static/apps/payment/
-backend/alembic/versions/2026*_payment*.py
-
-# 生态交易层（定价 / 订单 / 授权 / 云端安装，闭源）—— 源码在 backend/src/apps/commerce/，
-# 同样被上面的 backend/src/apps/ 规则整体覆盖；这里只补迁移文件。
-backend/alembic/versions/2026*_commerce*.py
-# 兜底：防止误把应用放回内置目录
-backend/src/cenkor_admin/apps/payment/
+# ============ 支付中心 + 生态交易层：已开源，随仓交付 ============
+# v0.5.11 起 payment（支付中心）与 commerce（定价/订单/授权/云端安装）源码迁回内置目录
+# backend/src/cenkor_admin/apps/{payment,commerce}/，与平台同 MIT 授权。
+# 迁移脚本同步入库：支付/订单/授权表结构是开源版能跑通结算的必要条件。
+# 因此本文件不再为本两者登记任何忽略规则 —— 若你在此处加回忽略，等于把已开源的应用重新闭源。
 
 # ============ 应用 Release 包（构建产物） ============
 backend/src/cenkor_admin/apps/*/release/
@@ -121,19 +117,8 @@ backend/src/cenkor_admin/apps/*/release/
 *.orig
 *.rej
 
-# 双边结算（钱包 / 流水 / 提现，闭源）—— 源码头文件在 backend/src/apps/commerce/ 已整体忽略，这里补迁移文件。
-backend/alembic/versions/2026*_marketplace*.py
-backend/alembic/versions/2026*_payout*.py
-
 # cenkor 商城运营平台(开发者注册/发布/收入/提现)——商业资产,不随开源 CMS 发布
 frontend/developer-web/
-
-# 应用定价：原价（划线价）与限时促销（闭源 commerce 的迁移，源码同样在 backend/src/apps/ 被整体忽略）
-backend/alembic/versions/2026*_promo*.py
-
-# 应用市场云端绑定（实例凭证 / 一次性绑定码）——闭源 commerce 的迁移，
-# 源码同样在 backend/src/apps/ 被整体忽略。
-backend/alembic/versions/2026*_cloud*.py
 
 # 同名双份 App 的备份区（把陈旧副本挪出导入路径用，内容仍是闭源应用源码，绝不入库）
 backend/.stale-apps/
@@ -157,20 +142,15 @@ dist.bak.*/
 backend/alembic/versions/crm/
 backend/alembic/versions/erp/
 backend/alembic/versions/mes/
-# commerce 是混合目录：3 个平台级迁移公开，6 个商业模块闭源
-backend/alembic/versions/commerce/*
-!backend/alembic/versions/commerce/20261007_0028_product_axis.py
-!backend/alembic/versions/commerce/20261009_0030_app_intro.py
-!backend/alembic/versions/commerce/20261010_0031_dev_method.py
+# commerce 目录已整体开源（v0.5.11）：9 个迁移全部公开，不再逐条白名单
 # 应用自带 schema（方案 D）同样属商业实现，双保险
 backend/src/cenkor_admin/apps/*/schema.sql
 
-# ext 目录是混合的：7 个平台级迁移公开，以下 4 个属闭源模块，逐个登记。
+# ext 目录是混合的：以下 2 个属闭源模块，逐个登记。
+#   · 20260925_0027_workflow  —— workflow 应用仍闭源
+#   · 其余（0025_cloud / 0035_app_publish / 0100_app_schema）随 commerce 开源
 # 新增闭源 ext 迁移时，必须在此追加，否则 git add -A 会直接带入。
-backend/alembic/versions/ext/20260924_0025_cloud.py
 backend/alembic/versions/ext/20260925_0027_workflow.py
-backend/alembic/versions/ext/20261020_0035_app_publish.py
-backend/alembic/versions/ext/20261027_0100_app_schema.py
 
 # ===== 一次性运维与迁移补丁脚本（2026-10-30 新增）=====
 # 这些是「跑一次就完」的临时脚本：直接改线上数据库、手工改服务商配置、

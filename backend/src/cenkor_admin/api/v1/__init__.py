@@ -414,16 +414,16 @@ from cenkor_admin.apps.system.release_router import router as release_router
 
 api_v1_router.include_router(release_router, prefix="/release", tags=["release"])
 
-# 生态交易层（定价 / 订单 / 授权 / 云端安装）
-# 闭源商业模块，位于外置目录 src/apps/commerce/（不进公开仓库）。
-# 开源部署不含此模块，ImportError 时静默跳过，不影响平台启动。
+# 生态交易层（定价 / 订单 / 授权 / 云端安装）—— 随仓开源（MIT）。
+# 源码在 cenkor_admin/apps/commerce/。仍保留 ImportError 兜底：
+# 裁剪部署（只要平台、不要交易层）时照样能正常启动。
 try:
     from cenkor_admin.apps.commerce.commerce_router import router as commerce_router
     api_v1_router.include_router(commerce_router, prefix="/store", tags=["app-commerce"])
 except Exception as e:
     log.warning("commerce.mount_skipped", error=str(e))
 
-# 应用市场云端绑定（实例 ↔ 官方账号）：闭源，与 commerce 同目录。
+# 应用市场云端绑定（实例 ↔ 官方账号）：与 commerce 同目录，随仓开源。
 # 客户实例用它「连接 Cenkor 账号 / 浏览官方市场 / 拉取已购并安装」。
 try:
     from cenkor_admin.apps.commerce.cloud_router import router as cloud_router
@@ -432,8 +432,8 @@ except Exception as e:
     log.warning("cloud.mount_skipped", error=str(e))
 
 # 支付中心公开路由（第三方回调 / 收银台 / 状态轮询，免鉴权）
-# 闭源商业模块，位于外置目录 src/apps/payment/（不进公开仓库）。
-# 开源部署不含此模块，ImportError 时静默跳过，不影响平台启动。
+# 随仓开源（MIT），源码在 cenkor_admin/apps/payment/。
+# 保留 ImportError 兜底：裁剪部署（不要支付能力）时照样能正常启动。
 try:
     from cenkor_admin.apps.payment.public_router import router as payment_public_router
     api_v1_router.include_router(

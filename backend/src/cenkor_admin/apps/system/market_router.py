@@ -11,7 +11,7 @@
 * 安装分两类：本地已有代码的（免费 / 内置应用）直接走系统安装，不需要下载包；
   本地没有代码的（付费商业应用）凭授权码从官方下载授权包再解压安装；
 * **无状态**：授权码与实例令牌由前端保存、随请求携带，服务端不落库、不引入迁移。
-  商业版另有闭源的 ``commerce`` / ``cloud_router`` 链路，自带库表与授权体系。
+  交易层另有 ``commerce`` / ``cloud_router`` 链路（随仓开源），自带库表与授权体系。
 """
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def _hub_base() -> str:
 def _instance_fp() -> str:
     """实例指纹：绑定官方账号时上报，官方据此区分不同实例。
 
-    开源层不依赖闭源的 licensing 模块，用「主机名 + 对外地址」派生，同一实例稳定。
+    本模块不依赖 licensing 模块，用「主机名 + 对外地址」派生，同一实例稳定。
     """
     raw = f"{socket.gethostname()}|{get_settings().PUBLIC_BASE_URL or ''}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]

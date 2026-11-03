@@ -48,7 +48,7 @@ PUBLIC_KEY_OLD: str = ""
 
 
 # ============================================================
-# 验签（公钥侧；私钥签发逻辑已移至闭源 src/apps/commerce/license_authority.py）
+# 验签（公钥侧；私钥签发逻辑在 apps/commerce/license_authority.py，随仓开源但私钥不落代码）
 # ============================================================
 
 def _b64e(raw: bytes) -> str:

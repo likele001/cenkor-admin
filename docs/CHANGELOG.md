@@ -13,6 +13,77 @@
 > - 要点二
 > ```
 
+## 2026-11-03　支付中心与应用交易层开源：payment / commerce 随仓交付（⭐）
+
+**【开源范围变更】收款能力是底座，不该收在闭源里**
+
+支付中心 `apps/payment`（支付宝官方 / 微信支付官方 / 虎皮椒聚合三通道 +
+收银台 + 订单 + 通道配置，3398 行）与生态交易层 `apps/commerce`
+（定价 / 订单 / 授权签发 / 云端绑定，4994 行）此前源码放在外置目录、
+被 `.gitignore` 整体排除。本次一并迁回内置目录，与平台同 MIT 授权，
+**不单独收费、不需要授权码**。
+
+- 源码位置：`backend/src/apps/{payment,commerce}/`
+  → `backend/src/cenkor_admin/apps/{payment,commerce}/`
+- 顺带清掉 4 个历史 `.bak_*` 手工备份（本就不该跟着源码流浪）
+- `static/apps/payment/plugin.js`、`docs/05-用户手册/payment_操作手册.md`
+  一并入库随包交付
+
+> 为什么不给支付单独留个授权位：`payment/manifest.py` 里它自己标着
+> `builtin=True`（"删了商店/套餐/订单付不了账"）。底座不开源、却把下游应用
+> 标成商业闭源，买到商业应用的用户也跑不起一笔结算 —— 逻辑上是拧着的。
+
+**【安全】授权体系：开源 77 行签发逻辑，但私钥不入库**
+
+`commerce/license_authority.py` 是 Ed25519 私钥生成 + 签名签发，
+文件头原本写着「只部署在授权中心」。本次判断可以开源，理由记在这里：
+
+- 私钥**不在源码里**：`get_or_create_keypair` 首次调用时现场生成，
+  以密文存进 `system_settings.license.signing_key`，随部署环境走
+- 客户实例只内置**公钥**（`core/licensing.DEFAULT_PUBLIC_KEY_B64`）做验签
+- Ed25519 的安全性只依赖私钥保密，不依赖算法实现保密（Kerckhoffs 原则）——
+  拿到全部源码但没有私钥，依然伪造不出有效授权
+- 反过来，不开源会让自营部署签不出授权，商店功能是残的
+
+**【修复】迁移图合流：公开链恢复单 head**
+
+开源后这些迁移要进公开仓库，但它们挂在闭源链中间，父节点拿不到：
+
+| 迁移 | 原 `down_revision` | 问题 |
+|---|---|---|
+| `20260922_0020_commerce` | `20260904_mes_0009` | ERP→CRM→MES 闭源链尾 |
+| `20261007_0029_product_commerce` | `20260925_0027_workflow` | workflow 仍闭源 |
+
+直接改挂到公开链尾会切断 erp/crm/mes 与主链的连接，它们变成「未应用分支」，
+`upgrade heads` 会把 ERP 全部迁移重跑一遍（撞 `DuplicateTable`）。故新增
+合流迁移 `20261103_1200_merge_commerce`：把公开链并行的两条分支
+（`20261103_1100_cms_orphan` 与 `20261020_0035_app_publish`）并成一个点，
+commerce 段挂到合流点之后，`product_commerce_0029` 改挂它真正依赖的
+`20260924_0025_cloud`。
+
+- 公开视图：59 个迁移，**单 head** `20261027_0100_app_schema`，无断链
+- 完整视图：`mes_0009` / `workflow_0027` / `collect_1100` 三个 head，
+  `upgrade heads` 各自独立推进
+- `alembic_version` 由 `(collect, cms_orphan)` 迁移为
+  `(mes_0009, workflow_0027, collect)`；实测 `upgrade heads` 零 DDL
+
+**【校验】开工前对支付应用做了敏感信息扫描**
+
+- 无私钥 / 证书文件（`-----BEGIN PRIVATE KEY-----` 只是配置项的 placeholder 文案）
+- 无硬编码密钥、商户号（正则扫 `secret|apikey|appsecret|mch_id` 赋值，零命中）
+- 配置全部走 `settings` / 环境变量，敏感值用 Fernet（密钥由 `SECRET_KEY`
+  经 PBKDF2 派生）加密存储
+
+**【文档】口径同步**
+
+- `README.md`：许可适用范围里支付从「需单独授权」移入「已开源不收费」，
+  补上 workflow / collect 两个此前漏登记的闭源项
+- `CONTRIBUTING.md`：分层表格新增"改支付中心 / 应用交易层 ✅ 欢迎"一行
+- `docs/packaging.md`、`docs/apps/development_guide.md`：闭源清单去掉 payment
+- 代码注释 19 处 + `license_authority.py` 模块文档重写（原「闭源」定性已不成立）
+
+---
+
 ## 2026-11-03　新增 CONTRIBUTING.md：贡献入口与提交门禁（⭐）
 
 **【新增】根目录 `CONTRIBUTING.md`（193 行）**

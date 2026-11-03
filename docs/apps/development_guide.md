@@ -58,7 +58,8 @@ my_app/                          # key 用下划线，目录名同时是 Python 
 > 直接做路由前缀。全平台既有 App（`cloud_storage` / `my_todo` / `quick_notes`）
 > 一律下划线小写。
 
-> ⚠️ **商业闭源应用的存放位置有专门要求**（公开仓库不收录其源码），
+> ⚠️ **仍需闭源的商业应用（ERP/CRM/MES/工作流/采集）存放位置有专门要求**（公开仓库不收录其源码）。
+> 支付中心（payment）与应用交易层（commerce）自 v0.5.11 起已开源，放在内置目录，
 > 见「九、安全规范 → 9.3 仓库边界与商业源码保护」。
 
 ### 2.2 manifest.py（必需）
@@ -518,11 +519,11 @@ docs/05-用户手册/<应用 key>_操作手册.md
 
 | 落点 | 忽略机制 | 用途 |
 |---|---|---|
-| `backend/src/apps/<key>/`（**外置**） | `.gitignore` 目录级整体忽略 | **商业闭源应用一律放这里** |
-| `backend/src/cenkor_admin/apps/<key>/`（**内置**） | 默认进公开仓库，闭源须逐条登记 | 开源应用 |
+| `backend/src/apps/<key>/`（**外置**） | `.gitignore` 目录级整体忽略 | **仍闭源的商业应用放这里**（现仅 collect） |
+| `backend/src/cenkor_admin/apps/<key>/`（**内置**） | 默认进公开仓库，闭源须逐条登记 | 开源应用（含 payment / commerce） |
 
 放外置目录时，前端产物与数据库迁移仍落在被跟踪的目录里，故仍需单独登记 ——
-写法参照 `.gitignore` 中 `commerce` / `payment` 两段。
+写法参照 `.gitignore` 中 `erp` / `crm` / `mes` / `workflow` 几段（`commerce` / `payment` 两段已在 v0.5.11 移除，它们已开源）。
 
 #### 放内置目录时的登记清单（三条，缺一不可）
 

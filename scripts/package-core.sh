@@ -67,9 +67,9 @@ fi
 info "复制核心文件到临时目录..."
 # ── 以 git 跟踪清单为源，不再靠 --exclude 逐条追赶 ──────────────────────────
 # tar 读文件系统、不读 .gitignore。过去四轮泄漏全部是同一原因：
-#   ① 闭源应用目录（erp/crm/mes/workflow/payment）
+#   ① 闭源应用目录（erp/crm/mes/workflow）
 #   ② .env.bak-*、backend/logs/hub.log(5.2M)、_rollback_bak_*/cenkor_db.sql(1.7M)
-#   ③ commerce/ext 混合目录里的闭源迁移（定价/订单/授权/支付/市场/分成）
+#   ③ ext 混合目录里的闭源迁移（workflow 流程定义等）
 #   ④ deploy/baota/cenkor-backend.host.env（真实 SECRET_KEY + 数据库口令）
 # 这些东西 .gitignore 里都登记了，但 tar 不认识。改成以 `git ls-files` 为源后，
 # gitignore 自动生效，新增闭源资产不必再改本脚本。
@@ -78,7 +78,7 @@ TRACKED_TAR="$STAGE/.payload-tracked.tar"
 (
   cd "$ROOT"
   git ls-files -z \
-    | grep -zvE '^(frontend/developer-web/|docs/domain_setup\.md|deploy/(addons|website|examples|nginx/snippets)/|docs/addons/|docker-compose\.addon-website\.yml$|verify_v11\.py$|docs/05-用户手册/(crm|erp|mes|payment|workflow)_操作手册\.md$|www/wwwroot/|\.mimocode/)|\.bak[^/]*$' \
+    | grep -zvE '^(frontend/developer-web/|docs/domain_setup\.md|deploy/(addons|website|examples|nginx/snippets)/|docs/addons/|docker-compose\.addon-website\.yml$|verify_v11\.py$|docs/05-用户手册/(crm|erp|mes|workflow)_操作手册\.md$|www/wwwroot/|\.mimocode/)|\.bak[^/]*$' \
     | tar --null -T - -cf "$TRACKED_TAR"
 )
 # 用中转文件而不是直接 `| tar -x`：多个 tar 流串进同一个 tar -x 时，tar -x 读完
@@ -88,7 +88,8 @@ tar -xf "$TRACKED_TAR" -C "$DEST"
 rm -f "$TRACKED_TAR"
 
 # ── 构建产物被 gitignore，但必须交付 ──────────────────────────────────────
-# 三套前端 dist + 开源应用的前端插件产物（闭源应用的插件目录逐个排除）。
+# 三套前端 dist + 开源应用的前端插件产物（闭源应用的插件目录逐个排除，
+# payment 自 v0.5.11 起开源，其 plugin.js 随包交付）。
 ARTIFACT_TAR="$STAGE/.payload-artifacts.tar"
 (
   cd "$ROOT"
@@ -106,22 +107,22 @@ ARTIFACT_TAR="$STAGE/.payload-artifacts.tar"
     --exclude='backend/src/cenkor_admin/static/apps/crm' \
     --exclude='backend/src/cenkor_admin/static/apps/mes' \
     --exclude='backend/src/cenkor_admin/static/apps/workflow' \
-    --exclude='backend/src/cenkor_admin/static/apps/payment' \
     -f "$ARTIFACT_TAR" "${paths[@]}"
 )
 tar -xf "$ARTIFACT_TAR" -C "$DEST"
 rm -f "$ARTIFACT_TAR"
 
 # ---- 闭源迁移必须一个不剩 ----
-# 早先只排除了 alembic/versions/{erp,crm,mes} 三个目录，commerce 与 ext 是「混合目录」：
-# 目录里既有平台级公开迁移，也有闭源商业迁移（.gitignore §155-172 逐个登记）。
+# 早先只排除了 alembic/versions/{erp,crm,mes} 三个目录，ext 是「混合目录」：
+# 目录里既有平台级公开迁移，也有闭源商业迁移（.gitignore 逐个登记）。
+# commerce/ 自 v0.5.11 起整体开源，不再属于混合目录。
 # 这里对包内迁移数与 git 跟踪数做精确对账，差一个就中止。
 PKG_MIG="$(cd "$DEST" && find backend/alembic/versions -name '*.py' -not -path '*/__pycache__/*' | wc -l)"
 GIT_MIG="$(cd "$ROOT" && git ls-files 'backend/alembic/versions' | grep -c '\.py$' || true)"
 if [ "$PKG_MIG" -ne "$GIT_MIG" ]; then
   echo "" >&2
   echo "✗ 打包中止：包内迁移 $PKG_MIG 个，git 跟踪 $GIT_MIG 个，数量不符" >&2
-  echo "  多出的通常是闭源商业迁移（commerce / ext 混合目录）。用这条命令定位：" >&2
+  echo "  多出的通常是闭源商业迁移（ext 混合目录里的 workflow 等）。用这条命令定位：" >&2
   echo "    comm -13 <(git ls-files backend/alembic/versions|sort) \\" >&2
   echo "             <(cd 解压目录 && find backend/alembic/versions -name '*.py'|sort)" >&2
   rm -rf "$STAGE"
@@ -164,7 +165,7 @@ cat > "$DEST/PACKAGE.md" <<EOF
 
 ## 迁移说明
 
-核心包**不含** ERP / CRM / MES 商业模块，也不含 commerce / ext 两个混合目录里的
+核心包**不含** ERP / CRM / MES / workflow 商业模块，也不含 ext 混合目录里的
 闭源商业迁移（定价、订单、授权、支付、市场、分成、促销、云绑定、工作流、应用发布）。
 包内迁移与公开仓库完全一致，可直接执行：
 
@@ -203,7 +204,7 @@ tar -czf "$ARCHIVE" -C "$STAGE" "$PKG_NAME"
 # tar 读的是文件系统，不看 .gitignore；闭源应用在本机物理存在，仅靠上面的
 # --exclude 列表容易漏（新增一个商业应用就会漏一次）。这里用「特征路径扫描」兜底，
 # 宁可让打包失败，也不能产出带着 ERP/CRM/MES 源码的交付包。
-FORBIDDEN_PATTERNS='backend/src/cenkor_admin/apps/(erp|crm|mes|workflow|payment)/|backend/src/apps/|frontend/developer-web/|backend/src/cenkor_admin/static/apps/(erp|crm|mes|workflow|payment)/|backend/alembic/versions/(erp|crm|mes)/|backend/alembic/versions/commerce/(20260922_002[01]|20260923_002[234]|20261007_0029)|backend/alembic/versions/ext/(20260924_0025|20260925_0027|20261020_0035|20261027_0100)|verify_v11\.py'
+FORBIDDEN_PATTERNS='backend/src/cenkor_admin/apps/(erp|crm|mes|workflow)/|backend/src/apps/|frontend/developer-web/|backend/src/cenkor_admin/static/apps/(erp|crm|mes|workflow)/|backend/alembic/versions/(erp|crm|mes)/|backend/alembic/versions/ext/20260925_0027_workflow|verify_v11\.py'
 LEAKED="$(tar -tzf "$ARCHIVE" 2>/dev/null | grep -E "$FORBIDDEN_PATTERNS" | head -20 || true)"
 if [ -n "$LEAKED" ]; then
   echo "" >&2
@@ -216,7 +217,7 @@ if [ -n "$LEAKED" ]; then
   rm -rf "$STAGE" "$ARCHIVE"
   exit 1
 fi
-info "自检通过：包内无闭源资产（erp / crm / mes / workflow / payment / src-apps / developer-web）"
+info "自检通过：包内无闭源资产（erp / crm / mes / workflow / src-apps / developer-web）"
 
 # ---- 交付前自检之二：不许出现凭据文件 ----
 # .env.bak-20261007 这类历史备份带真实密钥，且从未进过 git（.gitignore 管不到它们的
@@ -239,7 +240,7 @@ info "自检通过：包内无凭据 / 备份文件（.env 变体仅保留 .env.
 
 # ---- 交付前自检之三：不许出现运行时垃圾（日志 / 数据库备份 / 旧产物） ----
 # backend/logs/hub.log（5M+ 生产日志）、_rollback_bak_*/cenkor_db.sql（全量库备份）、
-# backend/.stale-apps/（已卸载应用的残留，含闭源 payment 产物）都曾被打进包。
+# backend/.stale-apps/（已卸载应用的残留产物）都曾被打进包。
 # 这些都是 untracked 文件，.gitignore 管不到，只能靠这里拦。
 GARBAGE_PATTERNS='(^|/)logs?/|\.log$|\.log\.[0-9]+$|(^|/)_bak-|(^|/)_rollback_bak_|(^|/)_work/|\.bak\.|(^|/)\.stale-apps/|(^|/)\.mimocode/|(^|/)www/wwwroot/'
 GARBAGE="$(tar -tzf "$ARCHIVE" 2>/dev/null | grep -E "$GARBAGE_PATTERNS" | head -20 || true)"

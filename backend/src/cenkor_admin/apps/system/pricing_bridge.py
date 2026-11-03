@@ -3,19 +3,19 @@
 为什么需要它
 ------------
 应用商店的公开接口（``store_router.public_store_apps`` / ``public_store_app_detail``）
-属 **公开源码**，而定价数据与「生效价 / 促销状态」的计算属 **闭源 commerce 应用** ——
-公开侧不得 import 闭源，否则公开仓库无法独立运行。
+在平台包内，而定价数据与「生效价 / 促销状态」的计算属 **commerce 应用** ——
+公开侧不 import 具体实现，两边才可各自独立裁剪。
 
 做法
 ----
 公开侧只在这里声明**契约**（一个注册点）：
 
-- 装了 commerce：闭源在模块加载时把自己的实现注册进来，商店接口即可展示价格；
-- 纯开源部署：``price_map()`` 返回空 dict，接口**静默降级** —— 不报错、只是不显示价格。
+- 装了 commerce：它在模块加载时把自己的实现注册进来，商店接口即可展示价格；
+- 裁剪掉 commerce 的部署：``price_map()`` 返回空 dict，接口**静默降级** —— 不报错、只是不显示价格。
 
-这与 ``core/hooks.py`` 的事件钩子同一思路（公开侧定契约、实现留在闭源侧），
+这与 ``core/hooks.py`` 的事件钩子同一思路（公开侧定契约、实现随应用注入），
 也是本项目既有的跨边界解耦手法：``store_router.submit_app`` 派发 ``app.submitted``
-事件，由闭源 ``commerce/hooks.py`` 订阅落库定价。
+事件，由 ``commerce/hooks.py`` 订阅落库定价。
 
 安全约束（重要）
 ----------------
@@ -39,7 +39,7 @@ _provider: PriceMapProvider | None = None
 
 
 def register_price_map_provider(fn: PriceMapProvider) -> None:
-    """注册价格视图提供者（由闭源 commerce 在模块加载时调用）。
+    """注册价格视图提供者（由 commerce 在模块加载时调用）。
 
     Args:
         fn: 满足 ``PriceMapProvider`` 契约的异步函数。

@@ -2,7 +2,7 @@
 
 **本模块属公开源码**，是定价字段规则的唯一真相源：
 - 应用商店提交接口（`store_router.submit_app`）用它校验开发者提交的价格；
-- 闭源 commerce 应用的定价写入（`apps/commerce/pricing.py`）也 import 它。
+- commerce 应用的定价写入（`apps/commerce/pricing.py`）也 import 它。
 
 只做「规则」，不碰数据库、不认识任何表：给定一份 dict，返回规范化后的 dict；
 非法组合抛 ``PriceRuleError``，其 message 可直接回给前端。

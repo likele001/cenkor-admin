@@ -73,7 +73,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 | `deploy/systemd/` | 裸机 systemd 单元 |
 | `scripts/` | 构建、部署、备份、打包脚本 |
 | `docs/` | 全部文档（`addons/` 与 `domain_setup.md` 除外） |
-| `docs/05-用户手册/` | 9 本使用手册（闭源模块的 crm/erp/mes/payment/workflow 5 本除外） |
+| `docs/05-用户手册/` | 9 本使用手册（闭源模块的 crm/erp/mes/workflow 4 本除外；payment 手册自 v0.5.11 起随包交付） |
 | `docker-compose*.yml` | 开发 / 生产 / 宝塔各模式 |
 | `.env.example` | 开发环境变量模板 |
 | `deploy/baota/cenkor-backend.host.env.example` | 生产环境变量模板（真实 `host.env` 不进包） |
@@ -86,8 +86,8 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 | 自动排除的内容 | 依据 |
 |----------------|------|
-| 闭源应用 `apps/{erp,crm,mes,workflow,payment}/`、外置 `backend/src/apps/` | `.gitignore` 应用目录规则 |
-| 闭源迁移（`versions/{erp,crm,mes}/` 整目录 + commerce 6 个 + ext 4 个混合目录文件） | `.gitignore` §155-172 逐个登记 |
+| 闭源应用 `apps/{erp,crm,mes,workflow}/`、外置 `backend/src/apps/`（现仅 collect） | `.gitignore` 应用目录规则 |
+| 闭源迁移（`versions/{erp,crm,mes}/` 整目录 + ext 混合目录里的 workflow 迁移） | `.gitignore` 逐个登记。commerce 目录自 v0.5.11 起整体开源 |
 | `frontend/developer-web/`（开发者门户） | `.gitignore` |
 | `deploy/baota/cenkor-backend.host.env`（**真实 SECRET_KEY + 数据库口令**） | `.gitignore:47` |
 | `.env` / `.env.*` / `*.env`（只保留 `.env.example` 模板） | `.gitignore` |
@@ -102,7 +102,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 | `docs/domain_setup.md` | Cenkor 实例专用域名文档 |
 | `deploy/{addons,website,examples,nginx/snippets}/`、`docs/addons/`、`docker-compose.addon-website.yml` | 官网等可选扩展 |
 | `verify_v11.py` | MES 端到端验证脚本，属闭源模块 |
-| `docs/05-用户手册/{crm,erp,mes,payment,workflow}_操作手册.md` | 闭源模块的使用说明 |
+| `docs/05-用户手册/{crm,erp,mes,workflow}_操作手册.md` | 闭源模块的使用说明（payment 手册已随包交付） |
 | `www/wwwroot/`、`.mimocode/` | 历史误操作残留、IDE 计划文件 |
 | `*.bak*`（正则 `\.bak[^/]*$`） | 误提交进 git 的备份文件 |
 
@@ -112,8 +112,8 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 >
 > 1. 闭源应用目录整份 ERP/CRM/MES 源码；
 > 2. `.env.bak-20261007`（真实密钥）、`backend/logs/hub.log`（5.2 MB 生产日志含访问 IP）、
->    `_rollback_bak_20261014/cenkor_db.sql`（1.7 MB 全库备份）、`.stale-apps/`（闭源 payment 残留）；
-> 3. `commerce` / `ext` 混合目录里 10 个闭源迁移（定价/订单/授权/支付/市场/分成表结构）；
+>    `_rollback_bak_20261014/cenkor_db.sql`（1.7 MB 全库备份）、`.stale-apps/`（旧应用残留）；
+> 3. `ext` 混合目录里的闭源迁移（workflow 流程定义等）；
 > 4. `deploy/baota/cenkor-backend.host.env`（`SECRET_KEY` + `DATABASE_URL` 口令 + S3 密钥）。
 >
 > 黑名单的致命缺陷是**只覆盖已知项**：新增一个商业应用、加一个环境文件、多一份备份，
@@ -125,7 +125,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 | 自检 | 拦什么 | 通过输出 |
 |------|--------|----------|
-| 闭源资产 | erp / crm / mes / workflow / payment / src-apps / developer-web / 闭源迁移 / verify_v11 | `自检通过：包内无闭源资产…` |
+| 闭源资产 | erp / crm / mes / workflow / src-apps / developer-web / 闭源迁移 / verify_v11 | `自检通过：包内无闭源资产…` |
 | 凭据文件 | 任何 `.env` 变体（example 除外）、`*.pem`、`*.key`、`id_rsa*`、`*.bak*` | `自检通过：包内无凭据 / 备份文件…` |
 | 运行时垃圾 | `logs/`、`*.log`、`_bak-*`、`_rollback_bak_*`、`.bak.`、`.stale-apps/`、`www/wwwroot/` | `自检通过：包内无运行时垃圾…` |
 | 关键文件在不在 | 后端入口、`alembic.ini`、三套前端 `index.html`、`.env.example`、`PACKAGE.md` | `自检通过：关键文件齐全…` |

@@ -419,7 +419,7 @@ class BuiltinAppError(ValueError):
     """
 
 
-# 外部应用（backend/src/apps/，见 .gitignore 第 75 行）不进版本管理，
+# 外部应用（backend/src/apps/，见 .gitignore）不进版本管理，
 # 应用中心升级 / 重装会**覆盖其 manifest.py** —— 写在里面的 builtin=True 会丢。
 # 所以底座名单在这里再兜一层：manifest 声明 或 命中本名单，都算内置。
 # 新增底座时两处都改一下：manifest 是直观表达，这里是防覆盖的保险。
