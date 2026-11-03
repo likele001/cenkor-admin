@@ -23,8 +23,7 @@ bcrypt>=4.1,<5  # 4.1+ 删了 __about__，core/pwd.py 已垫片；<5 规避 72 �
 python-dotenv>=1.0.0
 
 httpx>=0.27.0
-boto3>=1.34.0
-aiobotocore>=2.5.0
+aiobotocore>=2.26.0,<3  # 2.x 每个版本钉死一个 botocore，上界防意外跳 3.x
 
 structlog>=24.1.0
 loguru>=0.7.2
