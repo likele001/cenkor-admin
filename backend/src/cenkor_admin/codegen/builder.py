@@ -12,7 +12,7 @@
     write_files(files, out_dir)        把文件映射写到磁盘（CLI 用）
     self_check(spec, files, ...)       静态自检，返回问题列表
     current_head / tracked_head        迁移链 head 探测
-    rebase_closed_chain                内置模式：顺延闭源链入口
+    rebase_closed_chain                【已废弃 v0.5.12】旧的内置模式顺延逻辑，恒返回 []
 
 设计原则：只依赖标准库 + PyYAML，不 import fastapi/sqlalchemy/后端任何模块，
 因此可脱离后端环境独立运行与单测。错误统一用 SystemExit（API 层捕获转 400）。
@@ -185,8 +185,7 @@ def tracked_head(versions_dir: Path) -> str:
 
     内置（平台自带、开源）App 的迁移绝不能挂在闭源迁移之下 —— 闭源迁移被 .gitignore
     排除后，该开源迁移在公开仓库里就成了孤儿/revision 缺失。「一键部署」会因此失败。
-    故内置模式的挂载点取「开源链 head」，原本挂在它下面的闭源链入口顺延（见
-    rebase_closed_chain）。
+    故内置模式直接取「开源链 head」当父节点，**不再顺延任何闭源文件**（v0.5.12 起）。
     """
     tracked = git_tracked_names(versions_dir)
     if tracked is None:
@@ -745,28 +744,28 @@ def _rewrite_down_revision(path: Path, new_head: str) -> bool:
 
 def rebase_closed_chain(versions_dir: Path, old_head: str, new_rev: str,
                         exclude: set[str] | None = None) -> list[tuple[str, str]]:
-    """内置模式：把「挂在开源链旧 head 下的闭源迁移」顺延挂到新迁移之下。
+    """【已废弃，v0.5.12】旧逻辑：把挂在开源链旧 head 下的闭源迁移顺延到新迁移之下。
 
-    为什么必须做：闭源商业应用（erp/crm/mes/commerce…）的迁移入口挂在最靠后的开源
-    迁移上。新增一条开源迁移后，若不把该入口顺延，它仍指向旧 head —— 全量视图就会出现
-    两个 head（新迁移 + 闭源链尾），alembic 直接拒绝 upgrade；而反过来把新开源迁移挂到
-    闭源迁移之下又违反「开源迁移绝不挂在闭源之下」的铁律。故：只把 down_revision 恰好
-    等于旧 head 的「非 git 跟踪」迁移重挂到新迁移。
+    为什么不用了——v0.5.11 之后闭源侧是三条独立支线，锚点固定在公开链中途：
 
-    返回 [(文件名, 新 down_revision), ...]。
+        erp/crm/mes  → 20261020_0035_app_publish
+        workflow     → 20260924_0025_cloud
+        collect      → 20261027_0100_app_schema   ← 恰好是公开 head
+
+    一旦有迁移的 down_revision 等于公开 head，自动顺延就会把它拖到新迁移之下，
+    连带产生两个后果：
+
+    1. **新迁移被静默跳过**：collect 支线被拖到新迁移之下后，新迁移进入闭源合流点
+       `20261103_1300_merge_closed` 的祖先闭包。已部署库 `upgrade heads` 会判定它
+       「已应用」，不报错、不建表，直到代码查那张表才 500。
+    2. **锚点被破坏**：公开链每加一条迁移就要重排闭源支线，退回旧模型的脆弱状态。
+
+    新做法见 scripts/gen-app.py：内置模式只把新迁移的 down_revision 设成公开 head，
+    不碰任何闭源文件。全量视图若因此出现 head 分裂，用 `alembic merge` 显式收口。
+
+    保留此函数仅为兼容历史调用，**恒返回空列表**。
     """
-    tracked = git_tracked_names(versions_dir)
-    if tracked is None:
-        raise SystemExit("✗ 内置模式需要 git 来识别闭源迁移，但未找到 git 命令")
-    exclude = exclude or set()
-    rebased = []
-    for f in all_migration_files(versions_dir):
-        if f.name.startswith("__") or f.name in tracked or f.name in exclude:
-            continue
-        _rev, down = parse_migration(f)
-        if down == old_head and _rewrite_down_revision(f, new_rev):
-            rebased.append((f.name, new_rev))
-    return rebased
+    return []
 
 
 # ---------------------------------------------------------------------------

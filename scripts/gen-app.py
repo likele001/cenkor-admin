@@ -100,11 +100,12 @@ def main() -> int:
     mig_rev, _down = B.parse_migration(mig_disk)
     print("▸ 迁移：%s（revision=%s, down_revision=%s）" % (mig_disk, mig_rev, head))
     if args.mode == "builtin":
-        # 把原本挂在开源链旧 head 下的闭源链入口顺延到新迁移之下，保证全量视图仍唯一 head
-        for fname, new_down in B.rebase_closed_chain(
-            versions_dir, old_head=head, new_rev=mig_rev, exclude={mig_name}
-        ):
-            print("▸ 闭源链顺延：%s 的 down_revision → %s" % (fname, new_down))
+        # v0.5.12 起不再顺延闭源链入口：闭源侧是三条锚点固定的独立支线
+        # （erp→0035_app_publish / workflow→0025_cloud / collect→0100_app_schema）。
+        # 旧逻辑 rebase_closed_chain 会把 collect 支线拖到本迁移之下，使本迁移进入
+        # 闭源合流点 merge_closed 的祖先闭包，已部署库 upgrade heads 会静默跳过它。
+        # 若生成后全量视图出现 head 分裂，用 `alembic merge` 显式收口，别改闭源文件。
+        pass
 
     print("▸ 生成完成：%s" % app_dir)
     if args.mode == "builtin":
