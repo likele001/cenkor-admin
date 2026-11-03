@@ -52,14 +52,14 @@ if not os.getenv("DATABASE_URL"):
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
+from sqlalchemy import select
+
 from cenkor_admin.apps.commerce import (
     ledger,
     pricing,
 )
 from cenkor_admin.apps.commerce import models as cm
 from cenkor_admin.apps.commerce.commerce_router import _issue_license
-from sqlalchemy import select
-
 from cenkor_admin.apps.system import store_models
 from cenkor_admin.core.db import AsyncSessionLocal
 

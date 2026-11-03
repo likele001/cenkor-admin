@@ -99,6 +99,14 @@ ignore = [
     "SIM117", # 嵌套 async with，语义正确，合并易出错
 ]
 
+[tool.ruff.lint.isort]
+# 显式声明本项目的一方差，不依赖 ruff 的 src/ 目录自动探测。
+# 2026-11-03 踩过：本地 src/ 下多了未跟踪的 apps/（闭源外置应用），
+# 探测结果与 CI（clean checkout）不同，导致同一份代码本地绿、CI 红。
+#   cenkor_admin — 平台主包
+#   apps         — 外置应用包（闭源，仅本机存在，声明后其内部 import 也能正确分组）
+known-first-party = ["cenkor_admin", "apps"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
