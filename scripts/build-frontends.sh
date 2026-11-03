@@ -45,7 +45,30 @@ VITE_API_BASE_URL="$API_BASE" npm run build
 # 注意：landing-web/vite.config.ts 的 base 必须为 /landing/，否则同步后资源 404
 info "同步 landing 产物到 frontend/landing/ ..."
 cd ..
-rsync -a --delete landing-web/dist/ landing/
+# frontend/landing/ 是线上目录，里面除了 dist 产物，还放着**不参与构建**的静态资产：
+#   · docs-content/  文档源（markdown，由站点运行时/知识库消费）
+#   · docs/          文档站旧静态页
+#   · advantages.html / ai-cms.html / deploy.html / docs.html / features.html
+#                    （旧静态落地页，仍在 git 里、可能被外部链接引用）
+#   · favicon.svg / og-image.png / robots.txt / sitemap.xml
+# 这些在 dist 里不存在。过去直接 `rsync -a --delete` 会把它们全删掉，
+# 后果是 package-core.sh 用 `git ls-files | tar` 打包时报
+# `tar: frontend/landing/advantages.html: Cannot stat`，Release 流水线必挂
+# （v0.5.0 / v0.5.1 / v0.5.2 三个版本都因此失败）。
+# 所以 --delete 要配排除清单：只清理构建产物，不动手写资产。
+rsync -a --delete \
+  --exclude='/docs-content/' \
+  --exclude='/docs/' \
+  --exclude='/advantages.html' \
+  --exclude='/ai-cms.html' \
+  --exclude='/deploy.html' \
+  --exclude='/docs.html' \
+  --exclude='/features.html' \
+  --exclude='/favicon.svg' \
+  --exclude='/og-image.png' \
+  --exclude='/robots.txt' \
+  --exclude='/sitemap.xml' \
+  landing-web/dist/ landing/
 
 cd ../..
 info "完成"

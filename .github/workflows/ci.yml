@@ -94,6 +94,17 @@ jobs:
           DATABASE_URL_SYNC="postgresql+psycopg2://cenkor:test_pwd@localhost:5432/cenkor_test" \
           alembic upgrade heads
 
+      # 迁移图自洽 ≠ 迁移完整。历史上出现过两次「ORM 有表/列、迁移没建」：
+      # 2026-11-02 的 12 张 AI 表、2026-11-03 的 6 张 CMS 表 + 18 个字段。
+      # 这类缺口 alembic 不会报错，单元测试也测不到，只有真连库比对才露出来。
+      # 上一行刚把库建好，正好在这里对账。
+      - name: ORM ↔ 迁移 漂移检查
+        env:
+          DATABASE_URL_SYNC: "postgresql+psycopg2://cenkor:test_pwd@localhost:5432/cenkor_test"
+        run: |
+          cd backend
+          PYTHONPATH=src python3 ../scripts/check-orm-drift.py --strict
+
       - name: Run tests
         env:
           DB_NAME: ${{ matrix.db.name }}

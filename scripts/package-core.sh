@@ -45,6 +45,25 @@ else
   warn "跳过前端构建（使用现有 dist）"
 fi
 
+# ---- 前置检查：git 跟踪但磁盘上不存在的文件 ----
+# `git ls-files | tar` 的前提是「跟踪的文件都在工作区」。一旦有文件被构建脚本
+# 误删（历史上就是 `rsync --delete` 删 landing/ 里的手写资产），tar 只会抛出
+# 一串 `Cannot stat`，真正的起因（谁删的）看不出来，排查成本极高。
+# 这里先查一遍 `git status` 的已删除项，直接指明原因与恢复方式。
+DELETED_TRACKED="$(git status --porcelain --untracked-files=no 2>/dev/null | grep '^ D' | sed 's/^ D //' | head -20 || true)"
+if [ -n "$DELETED_TRACKED" ]; then
+  echo "" >&2
+  echo "✗ 打包中止：有 git 跟踪的文件在工作区里被删除，无法进包" >&2
+  printf '%s\n' "$DELETED_TRACKED" | sed 's/^/    /' >&2
+  echo "" >&2
+  echo "  常见原因：scripts/build-frontends.sh 的 rsync --delete 清掉了 frontend/landing/" >&2
+  echo "  里不参与构建的资产（旧静态页 / docs-content / robots.txt 等）。" >&2
+  echo "" >&2
+  echo "  恢复：git checkout -- <上面列出的路径>" >&2
+  echo "  长期：确认 build-frontends.sh 的 rsync 排除清单已包含这些手写资产。" >&2
+  exit 1
+fi
+
 info "复制核心文件到临时目录..."
 # ── 以 git 跟踪清单为源，不再靠 --exclude 逐条追赶 ──────────────────────────
 # tar 读文件系统、不读 .gitignore。过去四轮泄漏全部是同一原因：

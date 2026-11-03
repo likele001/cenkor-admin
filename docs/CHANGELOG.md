@@ -13,6 +13,48 @@
 > - 要点二
 > ```
 
+## 2026-11-03　开源包结构完整性 + CI 门禁（⭐）
+
+**【迁移：补齐 6 张表与 18 个字段】**
+
+- 在「开源包全新安装」环境里做 ORM ↔ 库结构逐项比对，发现一批对象
+  **任何迁移都没建过**（公开链、闭源链都没有）——生产库是历史上靠手工 SQL
+  补出来的，仓库里只留 ORM 定义。这类缺口 alembic 不会报错、单元测试也测不到，
+  只有真连库比对才露出来
+- 补齐：`cms_kb_docs` / `cms_kb_chunks` / `cms_publish_channels` /
+  `cms_publish_jobs` / `cms_entry_stats_daily` / `cms_track_events` 共 **6 张表**；
+  `app_submissions`(5) / `cms_ai_generations`(4) / `cms_entries`(2) /
+  `cms_forms`(2) / `cms_pages`(5) 共 **18 个字段**，外加 2 个外键
+- 其中 `app_submissions` 的 5 列原先只由**闭源迁移**添加，而公开侧 seed
+  （内置应用自动上架）要用它们 —— 开源版每次 `seed` 都会报
+  `UndefinedColumn: schema_version`。现在公开链自备一份
+- 结构全部由生产库 `pg_dump --schema-only` 导出，不凭 ORM 反推；
+  重复主键会抛 `42P16 invalid_table_definition`（**不是** `duplicate_object`），
+  DO 块已把四类冲突异常全收
+- pgvector 缺失时 `cms_kb_chunks.vector` 降级为 `double precision[]`
+  （与既有方案一致），装扩展后用 `backend/scripts/enable_pgvector.py` 升级
+
+**【CI：迁移必须覆盖 ORM 全部定义】**
+
+- 新增 `scripts/check-orm-drift.py`：拿 SQLAlchemy metadata 与真实库逐表逐列
+  比对，`MISSING_TABLE` / `MISSING_COLUMN` 一律失败
+- 接入 CI 的 `ORM ↔ 迁移 漂移检查` 步骤（在迁移执行之后、跑测试之前）
+- 这才是这类问题的门禁：`alembic upgrade heads` 只要迁移图自洽就返回成功，
+  它并不知道 ORM 里还有别的表
+
+**【修复：Release 流水线已连续 3 个版本失败】**
+
+- 根因：`scripts/build-frontends.sh` 用 `rsync -a --delete` 同步 landing 产物，
+  把 `frontend/landing/` 里**不参与构建**的资产（5 个旧静态页、
+  `docs-content/` 文档源、`robots.txt` 等）全删了；随后 `package-core.sh`
+  用 `git ls-files | tar` 打包，撞上已不存在的文件，报
+  `tar: frontend/landing/advantages.html: Cannot stat` 而中止
+- 后果：v0.5.0 / v0.5.1 / v0.5.2 的 Docker 镜像都推送成功，
+  但 **GitHub Release 与核心包全部没有产出**
+- 修法：`rsync --delete` 配排除清单，只清理构建产物；`package-core.sh`
+  增加前置检查，发现「git 跟踪但磁盘已删除」的文件时直接指明原因与恢复命令，
+  不再让 tar 抛一堆 `Cannot stat`
+
 ## 2026-11-03　产品核心能力归入底座（⭐）
 
 **【内置清单：6 个】**
