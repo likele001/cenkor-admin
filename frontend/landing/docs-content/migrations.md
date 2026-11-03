@@ -1,17 +1,22 @@
-# 数据库迁移：两条链、一个挂载点
+# 数据库迁移：一条公开链、三条闭源支线、一个合流点
 
-> 🔴 **本文是 2026-10-27 的历史记录与事故复盘，不是操作手册。**
+> 🔴 **本文分两半：§1–§5 是 v0.5.12 的现状说明，§6 起是历史记录与事故复盘。**
 > 当前唯一权威规范是 [**database-migrations.md**](./database-migrations.md)，冲突时以它为准。
->
-> **哪些内容还能信、哪些已作废：**
 >
 > | 章节 | 状态 |
 > |---|---|
-> | §1 三条硬规则、§2 两张图、§3「顺延挂载点」的五步 | ⚠️ 描述的是 **10-26 事故后、10-27 校正前**的方案。核心思路仍成立，但**具体 revision 名与"公开 head 是 `gen_inventory`"已作废** |
-> | §4 校验清单 | ⚠️ 命令可用，但注释里的 `0035 → gen_inventory → erp_init` 顺序已过时 |
-> | §5 起（含 §6 事故复盘、§10 护栏、§11 分区、§12 方案 D、§13 .gitignore） | ✅ 仍准确，且比权威文档更详细（历史背景、为什么这么改） |
+> | §1 硬规则、§2 拓扑图、§3 新增迁移、§4 校验清单 | ✅ 2026-11-03（v0.5.12）按现状重写 |
+> | §5 开源仓库 / 闭源部署的差异 | ✅ 2026-11-03 重写，含纯公开链建库实测 |
+> | §6 事故复盘、§10 护栏、§11 分区、§12 方案 D、§13 .gitignore | 📜 历史记录。里面的 revision 名与数字都是**当时**的事实，不要当现状引用 |
 >
-> 本文里的数字（迁移条数、表数）都是**当时的快照**，不要当现状引用。查现状：
+> **以下旧说法已作废，别照着做：**
+> - ❌ 标题曾经是「两条链、一个挂载点」，规则里有「挂载点跟随公开 head 顺延」——
+>   v0.5.11 起闭源侧是三条独立支线，锚点固定在公开链中途，
+>   **新增公开迁移不再需要顺延任何东西**
+> - ❌ 「公开 head 是 `gen_inventory`」「完整部署 head 是 `0029_product_commerce`」
+> - ❌ 「闭源迁移排在公开链末端」——现在是锚在不同位置的三条支线，末端汇入合流点
+>
+> 查现状永远用这两条命令，别抄本文里的数字：
 >
 > ```bash
 > cd /www/wwwroot/cenkor-admin
@@ -19,185 +24,219 @@
 > PYTHONPATH=backend/src python3 scripts/check-migration-graph.py --tracked-only # 公开视图
 > ```
 
-
 > 适用：cenkor-admin（hub）后端。开源基础框架与商业应用共用同一套 Alembic 迁移目录，
-> 但两张迁移图必须**各自保持单 head，再通过挂载点串成一条**。
-> 违反这条规则曾导致 2026-10-26 门户应用中心整页 500，见 §6。
+> 但两边的图必须各自闭合：**公开子图单根单 head，闭源迁移只能锚在公开 revision 上，
+> 不能反向依赖**。违反这条曾导致 2026-10-26 门户应用中心整页 500，见 §6。
 
-## 1. 三条硬规则
+## 1. 四条硬规则
 
-1. **公开链不依赖闭源**：公开（git 跟踪）迁移的 `down_revision` 只能指向公开 revision。
-   否则开源仓库里会出现「找不到父迁移」的断链。
-2. **挂载点跟随公开 head**：闭源链的挂载迁移 `20261014_124126_create_inventory`
-   （revision `20261014_124126_gen_inventory`，下称 `gen_inventory`）的 `down_revision`
-   必须等于**最新的公开迁移**。公开链每加一条，就要把它顺延一次。
-3. **两种视图都只能有一个 head**：
-   - 完整工作区（公开 + 闭源）：head = 闭源链末端；
-   - `git` 跟踪视图（开源仓库的样子）：head = `gen_inventory`。
+1. **公开迁移只能依赖公开 revision。** 公开（git 跟踪）迁移的 `down_revision` 必须是
+   公开 revision。否则开源仓库里「找不到父迁移」，`git clone` 下来直接 `KeyError`，
+   一张表都建不出来——而且 `entrypoint.sh` 吞掉报错，服务照常启动，然后全站 500。
+2. **公开子图必须单根、单 head。** 开源版要能 `alembic upgrade head` 一把建库。
+   根唯一（现为 `20260107_0001_initial`），head 唯一（现为 `20261027_0100_app_schema`）。
+3. **闭源迁移可以锚在公开 revision 上，反向不行。** 挂载是单向的：闭源的 `erp_init`
+   认公开的 `0035_app_publish` 当父节点没问题；公开的迁移认闭源当父节点就是断链。
+   判定标准只有一条：**这个文件会不会进开源仓库**。别靠目录名判断，目录只是分类。
+4. **新增公开迁移直接接公开 head，不用碰闭源任何文件。** 这是 v0.5.11 之后最大的
+   简化——三条闭源支线各自锚在公开链中途，公开链往前长不影响它们。
+   （旧模型的「顺延挂载点」操作已作废，见 §3。）
 
-## 2. 两张图长什么样
+判定由 `scripts/check-migration-graph.py` 实现：
+
+- `--tracked-only`（挂在 pre-commit 上）：公开子图必须恰好 1 个 head，且无断链；
+- 全量模式：允许多个 head（闭源支线各有一条是一条），但每个 head 必须能沿
+  `down_revision` 回到公开链，且公开子图自身必须完整。
+
+## 2. 拓扑图（2026-11-03 实测）
+
+迁移总数 **100**：公开 59、闭源 41。
 
 ```
-公开/基础链（git 跟踪）
-  0001_initial → … → 0028_product_axis → 0030_app_intro → 0031_dev_method
-  → 0032_codegen_runs → 0033_upgrade_runs → 0034_upgrade_notes
-  → 0035_app_publish → gen_inventory          ← 公开视图 head（挂载点）
-                            │
-商业应用闭源链（.gitignore，不进开源仓库）
-                            └→ erp_init → … → mes_0009 → 0020_commerce
-                               → … → 0029_product_commerce   ← 完整部署 head
+公开链（59 个，git 跟踪，单根单 head）
+  20260107_0001_initial
+        → …（平台核心：auth / rbac / cms / portal / 云存储 / 商店）
+        → 20261031_1310_cms_ai_tables
+        → 20261031_1600_cms_permalink          ← 公开链在这里分叉
+                ├─→ 20261020_0035_app_publish ─────────────────────┐
+                └─→ 20261102_1210_cms_cat_url_tpl                  │
+                          → 20261102_1215_cms_entry_links           │
+                          → 20261102_2140_cms_ai_missing            │
+                          → 20261103_0930_sso_bindings              │
+                          → 20261103_1100_cms_orphan ───────────────┤
+                                                                    ↓
+                                        20261103_1200_merge_commerce  ← 公开合流点
+                                                                    ↓
+                                                        20260922_0020_commerce
+                                                                    ↓
+                            20260922_0021_payment → 0022_marketplace → 0023_payout
+                                                                    ↓
+                            20260923_0024_promo → 20260924_0025_cloud
+                                                                    ↓
+                                                  20261007_0029_product_commerce
+                                                                    ↓
+                                            20261027_0100_app_schema  ← 公开 head
+
+闭源支线（41 个，.gitignore，只在完整部署里）
+  锚 0035_app_publish → 20260831_0001_erp_init → …（erp 19 + crm 6 + mes 9）
+                                                      → 20260904_mes_0009 ───┐
+  锚 0025_cloud      → 20260925_0027_workflow（仅此一条）───────────────────┤
+  锚 0100_app_schema → 20261101_1430_collect → …（collect 5）
+                                                      → 20261102_1100_collect ┤
+                                                                             ↓
+                                          20261103_1300_merge_closed  ← 全量 head
 ```
 
-- 开源使用者只有上半段：单 head，`alembic upgrade heads` 即可，无需关心挂载点。
-- 闭源部署两段都有：`alembic_version` 里只有一行（闭源 head），迁移仍然是一条线。
-- 挂载点为什么要存在：闭源迁移不能出现在开源仓库，又必须排在公开迁移之后，
-  所以把闭源子链「挂」在公开链的末端，而不是让它成为第二个 head。
+读这张图要抓住三件事：
 
-## 3. 新增一条公开迁移（最容易踩的顺序陷阱）
+- **三个锚点**（`0035_app_publish` / `0025_cloud` / `0100_app_schema`）是闭源支线与
+  公开链的唯一接缝，位置固定。公开链在这些点之后继续往前长，不影响任何一条支线。
+- **公开合流点** `merge_commerce` 收拢的是公开链内部两条并行分支
+  （`0035_app_publish` 与 cms 分支），跟闭源无关。
+- **闭源合流点** `merge_closed` 收拢三条闭源支线，让全量图恢复单 head。
+  它是纯拓扑合并、零 DDL，且**不在公开仓库里**（已登记 `.gitignore`）。
 
-假设当前公开迁移是 `0035`、挂载点是 `gen_inventory → 0035`，要加 `0036`：
+> 两个合流点是两次不同处置的产物，别混：
+> `merge_commerce` 是 v0.5.11 开源 payment/commerce 时为避免公开链断链加的；
+> `merge_closed` 是那次改挂之后三条闭源支线被甩成孤立 head，v0.5.12 补的。
 
-1. **新建迁移**，`down_revision` 填当前挂载点的父（现在 `0035`）。
-   注意：`alembic revision --autogenerate` 默认把 `down_revision` 设成脚本目录的当前
-   head——闭源部署里那是闭源 head `0029`，必须手工改成公开 revision，否则公开迁移
-   就挂到闭源链上了。也不要挂到 `gen_inventory` 上——那会变成挂载点之后的第二个 head。
-   此时 `alembic heads` 会显示两个（`0036` 与 `0029`），属正常中间态。
-2. **先让线上库执行**：`alembic upgrade heads`（重启 hub 也会自动做）。
-   此刻 `0036` 还不是闭源 head 的祖先，alembic 会真正执行它。
-3. **验证对象真的建出来了**（新表/新列/索引），再往下走。
-4. **顺延挂载点**：把 `gen_inventory.down_revision` 从 `0035` 改成 `0036`，
-   图恢复单 head。
-5. `scripts/check-migration-graph.py` 两种模式都通过后，
-   把「新迁移 + 挂载点改动」**一起提交**。
+## 3. 新增迁移（两种，走法完全不同）
 
-> 反了会怎样：先顺延、后执行，`0036` 在拓扑上变成闭源 head 的祖先，
-> alembic 会认为它「已应用」，`upgrade` 静默跳过——不报错，直到代码查那张表/列才 500。
-> 2026-10-26 的 0035 就是这一步没做（当时连挂载点都没顺延）。
+### 3.1 公开迁移（会进开源仓库）
 
-> 忘了顺延会怎样：双 head，但 hub 启动与在线升级现在都用 `alembic upgrade heads`，
-> 新迁移照样执行，不会整链卡死；`check-migration-graph.py` 会报错，补上顺延即可。
-> （历史版本用 `upgrade head`，遇到双 head 直接 MultipleHeads，一条都不执行。）
+1. **新建**。生成到 `versions/` 下对应目录（`core` / `commerce` / `ext`），
+   **`down_revision` 必须手工改成当前公开 head**（现为 `20261027_0100_app_schema`）。
+   `--autogenerate` 默认拿脚本目录的当前 head 当父节点——在完整部署里那是闭源的
+   `20261103_1300_merge_closed`，不改就会造出「公开迁移依赖闭源」，开源版直接断链。
+2. **执行**：`alembic upgrade heads`（hub 重启也会自动做）。
+   此刻全量图会出现 2 个 head（新公开 head + `merge_closed`），属正常中间态。
+3. **验证对象真的建出来了**（新表 / 新列 / 索引），再提交。
+4. **不用碰闭源任何文件，也不用顺延锚点。** 提交前跑两种模式的图检查。
 
-> 闭源应用（erp / crm / commerce / mes 等）的新迁移方向相反：挂在**当前闭源 head**
-> （现在 `0029`）之后，不要碰公开链，也不要动挂载点。判断依据只有一个：
-> 这个迁移文件会不会进开源仓库——会，就插在挂载点之前；不会，就接在闭源 head 之后。
+> 新增公开迁移之后，全量图会长期保持 2 个 head，这是合流模型的正常状态，不是错误，
+> `upgrade heads` 两个都会升到位。想让全量图回到单 head 得再补一个闭源合流
+> （把新公开 head 也并进去），代价是要校正已部署库的 `alembic_version`——一般没必要。
+
+> **反例（2026-10-26 真踩过）**：公开迁移挂到了闭源 revision 上。开源版报
+> `KeyError: '20261020_0035_app_publish'`；而 `docker/fullstack/entrypoint.sh` 写的是
+> `alembic upgrade heads || echo "迁移未成功，交由应用内 lifespan 重试"`——错误被吞、
+> 服务照常启动，然后全站 500。**别人 clone 下来会以为装好了，实际一张表都没建。**
+
+### 3.2 闭源迁移（不进开源仓库）
+
+接在**自己那条支线的 head** 之后：
+
+| 支线 | 当前接在谁后面 |
+|---|---|
+| erp / crm / mes | `20260904_mes_0009` |
+| workflow | `20260925_0027_workflow` |
+| collect | `20261102_1100_collect` |
+
+不要跨支线挂——那会把两条独立线缝成一条，将来任何一方调整都牵连另一方。
+也不要挂到合流点 `merge_closed` 上：它已经收拢了三条支线，往上接会重新分裂出 head。
+
+> 命名陷阱：`merge_closed` 是闭源文件，公开仓库里看不到它。如果你 autogenerate 出
+> `down_revision = '20261103_1300_merge_closed'`，说明你在建公开迁移，必须改回公开 head。
 
 ## 4. 校验清单
 
-在仓库根目录（`backend/` 下执行 alembic 命令）：
+仓库根目录执行：
+
+```bash
+cd /www/wwwroot/cenkor-admin
+PYTHONPATH=backend/src python3 scripts/check-migration-graph.py                # 全量
+PYTHONPATH=backend/src python3 scripts/check-migration-graph.py --tracked-only # 公开
+```
+
+预期结果（2026-11-03 / v0.5.12 基线）：
+
+| 模式 | 迁移数 | head | 要求 |
+|---|---:|---|---|
+| `--tracked-only` | 59 | `20261027_0100_app_schema` | 必须恰好 1 个 head，无断链 |
+| 全量 | 100 | `20261103_1300_merge_closed` | 允许 1 个以上 head，但每个都须可达公开链 |
+
+alembic 侧：
 
 ```bash
 cd backend
-alembic heads            # 完整部署：1 个；新增迁移的中间态：2 个
-alembic current          # 线上库当前版本（应为闭源 head）
-alembic history | head   # 确认链尾串联顺序：最新公开 head → 0035_app_publish → erp_init
-                         #（10-27 时是 gen_inventory → 0035；公开链此后不断加迁移，
-                         #  所以「最新公开 head」这个名字会变，别当常量记）
-cd ..
-python3 scripts/check-migration-graph.py                # 完整工作区：必须 1 head
-python3 scripts/check-migration-graph.py --tracked-only # 开源视图：必须 1 head
+alembic heads     # 全量：当前 1 个；新增公开迁移后 2 个（正常）
+alembic current   # 线上库实际版本
 ```
 
 对象级体检（可选，只读）：`backend/scripts/check_hub_schema.py`
-——核对 `alembic_version` 与 0030–0035 实际创建的表/列/索引。
+——核对 `alembic_version` 与实际建出的表 / 列 / 索引是否一致。
 
 ## 5. 开源仓库 / 闭源部署的差异
 
-### 5.1 两条链的关系（2026-10-27 校正）
+### 5.1 同一份代码，两种图
 
-仓库被切成两半：**公开链**（进 git）和**闭源链**（不进 git，只在完整部署里有）。
-
-```
-公开链 39 个：0001_initial → … → 0034_upgrade_notes → gen_inventory
-                                                            ↓
-                                    20261014_124200_schema_versions（公开 head）
-                                                            ↓
-闭源链 44 个：                                      0035_app_publish
-                                                            ↓
-                                            erp_init → … → 0029_product_commerce
-                                                            ↓
-                                   20261027_0100_app_schema（全集 head，空实现）
-```
-
-**核心规则：公开迁移绝对不能依赖闭源 revision。**
-
-之前的错误做法是把挂载点「顺延」—— 让公开的 `gen_inventory` 挂到闭源的
-`0035_app_publish` 上。这样两条链确实串成一条，但**开源版单独拿出来就断链**：
-
-```
-KeyError: '20261020_0035_app_publish'
-```
-
-而且 `docker/fullstack/entrypoint.sh` 写的是
-`alembic upgrade heads || echo "[entrypoint] 迁移未成功，交由应用内 lifespan 重试"`
-—— 报错被吞、服务照常启动，然后所有接口 500。**别人 clone 下来会以为装好了，实际一张表都没建。**
-
-同一个坑当天踩了第二次：`20261027_0100_app_schema` 最初把父节点设成闭源的
-`0029_product_commerce`，又造出一次「公开迁移依赖闭源」。是
-`scripts/check-migration-graph.py --tracked-only` 当场把它拦下来的。
-**建在闭源链尾的公开迁移，等于没建 —— 开源仓库里看不到它。**
-
-### 5.2 正确做法：公开链自己闭合，闭源挂在公开 head 之后
-
-| 文件 | down_revision | 归属 |
+| | 开源版（`git clone`） | 完整部署 |
 |---|---|---|
-| `ext/20261014_124126_create_inventory.py` | `20261018_0034_upgrade_notes` | 公开 |
-| `core/20261014_124200_schema_versions.py` | `20261014_124126_gen_inventory` | **公开 head**，建 `app_schema_versions` |
-| `ext/20261020_0035_app_publish.py` | `20261014_124200_schema_versions` | 闭源挂载点，顺延到这里 |
-| `erp/20260831_0001_erp_init.py` | `20261020_0035_app_publish` | 闭源 |
+| 迁移文件 | 59（公开） | 100（公开 + 闭源） |
+| 根 | `20260107_0001_initial` | 同 |
+| head | `20261027_0100_app_schema` | `20261103_1300_merge_closed` |
+| 建表数 | 101 | 241 |
+| 闭源表 | 一张都不建 | 按应用建 |
+| 命令 | `alembic upgrade head` | `alembic upgrade heads` |
 
-`app_schema_versions` 为什么必须在公开链：它是 `core/app_schema.py`（方案 D）的记账表，
-属于平台核心，开源部署同样要用（`sync_builtin_apps()` 直接读写它）。
+公开仓库里 `alembic.ini` 的 `version_locations` 仍列着 `erp/` `crm/` `mes/` `collect/`
+四个目录，但那些目录**不存在**——alembic 对不存在的版本目录不报错（已实测），
+所以不需要为缺目录做特殊处理。
 
-`ext/20261027_0100_app_schema.py` 已改为**空实现** —— 它当初建的正是这张表，
-前移到公开链之后，这里只保留 revision 占位。已部署环境的 `alembic_version` 指向它，
-删掉会报「未知 revision」。空实现对任何环境都无副作用：
-新装时公开链已建好表，已部署的环境早已执行过、不会重跑。
+### 5.2 铁律是从事故里长出来的
 
-以后**新增公开迁移**：接在 `20261014_124200_schema_versions` 后面，然后把这个新 revision
-填进 `0035_app_publish.down_revision`（顺延的是**闭源的挂载点**，不是公开的）。
+**公开迁移绝不能依赖闭源 revision。** 2026-10-27 踩的：当时为了把两条链串成一条，
+让公开的 `gen_inventory` 挂到闭源的 `0035_app_publish` 上，结果开源版单独拿出来
+`KeyError`。同一天又踩第二次——`0100_app_schema` 最初把父节点设成
+`0029_product_commerce`，同样是公开依赖闭源，被 `--tracked-only` 当场拦下。
 
-以后**新增闭源迁移**：正常接在当前闭源 head 后面，不用动公开链。
+结论：**建在闭源链尾的公开迁移，等于没建——开源仓库里看不到它。**
 
-> 判断标准只有一条：**这个迁移要不要出现在开源仓库里？** 要 → 挂公开 head；
-> 不要 → 挂闭源 head。别靠目录名判断，目录只是分类，不决定归属。
+### 5.3 纯公开链建库实测（2026-11-03，v0.5.12）
 
-### 5.3 实测验证（2026-10-27，从 GitHub 公开地址 clone 后真装）
+`git archive HEAD` 导出纯公开文件树（906 个文件，只剩 `core` / `commerce` / `ext`
+三个版本目录）→ 空库 → `alembic upgrade head`：
 
-| 场景 | 迁移数 | head | 建表数 | 结果 |
-|---|---:|---|---:|---|
-| 只有公开链（`git clone` 公开仓库） | 39 | `20261014_124200_schema_versions` | **59** | ✅ 退出码 0，闭源表 **0 张** |
-| 公开 + 闭源（完整部署） | 83 | `0100_app_schema` | 81 核心 + 107 应用 + 20 视图 | ✅ 单 head |
+| 项 | 结果 |
+|---|---:|
+| 执行迁移数 | **59** |
+| 建表数 | **101** |
+| 视图数 | 0 |
+| 闭源表（erp / crm / mes / collect / workflow） | **0** |
+| 退出码 | **0** |
 
-公开链 39 个 = 原有 38 个 + `20261014_124200_schema_versions`。
+抽检核心表：`auth_users` / `app_pricing` / `app_orders` / `pay_channels` /
+`cms_entries` / `app_schema_versions` 全部建出。`inventory_items` 不建——它是
+ERP 应用自带的 schema，走运行时 `sync_builtin_apps()`，开源版没有这个应用。
 
-开源版建出的 59 张表全是平台核心：`auth_*` / `rbac_*` / `cms_*` / `portal_*` /
-`notifications` / `cloud_storage_*` / `app_*`（商店）/ `codegen_runs` / `inventory_*` /
-`links` / `my_todo_items` / `app_schema_versions`。
+> 数字对比：v0.5.11 之前公开链只有 39 个迁移、59 张表；payment / commerce 开源后
+> 涨到 59 / 101。这是**开源范围扩大**的结果，不是建库逻辑变了。
 
-复现命令：
+复现：
 
 ```bash
-git clone https://github.com/likele001/cenkor-admin /tmp/x && cd /tmp/x/backend
+mkdir -p /tmp/x && cd /www/wwwroot/cenkor-admin && git archive HEAD | tar -x -C /tmp/x
+cd /tmp/x/backend
 CENKOR_DATABASE_URL="postgresql+psycopg2://cenkor:PW@127.0.0.1:5432/testdb" \
-  PYTHONPATH=src python -m alembic upgrade head     # 39 步，59 张表
+  PYTHONPATH=src alembic upgrade head
 ```
 
-`alembic.ini` 的 `version_locations` 列了 6 个目录，公开仓库里只有
-`core` / `commerce` / `ext` 三个 —— **alembic 对不存在的版本目录不报错**（已实测），
-不需要为缺目录做特殊处理。
+> ⚠️ 连接串必须用 `postgresql+psycopg2://`（同步驱动）。`env.py` 读的是
+> `DATABASE_URL_SYNC`，把 `.env` 里的 `postgresql+asyncpg://` 直接塞进去会报
+> `MissingGreenlet`。
 
-### 5.4 命令
+### 5.4 命令对照
 
 | 场景 | 命令 | 说明 |
 |---|---|---|
-| 只用开源基础框架 | `alembic upgrade head` | 单 head，`heads` 也等价 |
-| 闭源完整部署 | `alembic upgrade head` | 挂载点正确时单 head |
-| 全新装库 | `alembic upgrade head` | 顺序由拓扑决定 |
+| 只用开源基础框架 | `alembic upgrade head` | 单 head，`heads` 等价 |
+| 闭源完整部署 | `alembic upgrade heads` | 多 head 时逐个升到位 |
+| 全新装库 | 同上 | 顺序由拓扑决定 |
 | 已有库补跑漏掉的公开迁移 | 手工幂等 DDL + 校验 | 见 §6；`upgrade` 是 no-op |
 
-> 用 `head` 而不是 `heads`：`heads` 会在多 head 时静默只跑一部分，
-> 而多 head 本身就该当成错误处理（见 §4 校验清单）。
+> `head` vs `heads`：`head` 在多 head 时直接 `MultipleHeads`，一条都不执行；
+> `heads` 会逐个升。hub 启动与在线升级统一用 `heads`。
+> 但「公开子图必须单 head」这条不放松——开源版只有一条线，多 head 就是出了 bug。
 
 ## 6. 事故复盘：2026-10-26 门户 500
 
@@ -220,19 +259,22 @@ CENKOR_DATABASE_URL="postgresql+psycopg2://cenkor:PW@127.0.0.1:5432/testdb" \
 
 | 症状 | 大概率原因 | 处理 |
 |---|---|---|
-| 接口 500 `column ... does not exist` | 迁移没执行 / 版本停在旧 head | `alembic current`、对象体检、按 §3 补跑 |
-| 启动日志无 `migration.ok`，或出现 MultipleHeads | 挂载点漏顺延 | 顺延挂载点；本次起 `heads` 已兜底 |
-| `alembic upgrade` 无任何 revision 输出，但代码报缺列 | 先顺延后执行，迁移被静默跳过 | 手工幂等 DDL + 校验（见 §6） |
-| `--tracked-only` 报断链 | 新公开迁移未加入 git / 公开迁移挂了闭源 revision | 与新迁移一起提交；改回公开父节点 |
+| 接口 500 `column ... does not exist` | 迁移没执行 / 版本停在旧 head | `alembic current`、对象体检、按 §3.1 补跑 |
+| `--tracked-only` 报「head 不唯一」 | 公开子图多出一条分支，通常是新公开迁移的父节点写错 | 公开链只允许一条线；查新迁移的 `down_revision` |
+| 全量视图 2 个 head（`merge_closed` + 某条公开 head） | 新增了公开迁移，闭源合流点还没收拢它 | **正常状态**，不必处理；`upgrade heads` 会都升到位 |
+| `--tracked-only` 报断链 | 新公开迁移未加入 git，或公开迁移挂了闭源 revision | 与新迁移一起提交；把父节点改回公开 revision |
+| `alembic upgrade` 无任何 revision 输出，但代码报缺列 | 迁移的父节点写成了闭源 revision，被拓扑判定「已应用」而静默跳过 | 手工幂等 DDL + 校验（见 §6） |
+| `MissingGreenlet` | 连接串用了 `asyncpg`，alembic 是同步上下文 | 用 `DATABASE_URL_SYNC` / `postgresql+psycopg2://`（见 §5.3） |
 
 ## 8. 回退与降级
 
 - 回退公开迁移在闭源部署上**不要用 `alembic downgrade -1`**：当前版本是闭源 head，
   `-1` 回退的是闭源迁移。
-- 正确顺序：先把挂载点退回该迁移的父修订 → 再针对该迁移执行其 `downgrade()`
-  中定义的 DDL（删列/删表前先备份；`downgrade <rev>` 会连带回退途经的闭源迁移，
-  生产上不要直接跑）。
-- 回退后同样跑一遍 §4 的校验清单，确保两种视图都恢复单 head。
+- 正确顺序：先把该迁移从图里摘出来——把原本以它为父节点的迁移的 `down_revision`
+  改指到它的父修订——再单独执行该迁移 `downgrade()` 里定义的 DDL
+  （删列/删表前先备份；`downgrade <rev>` 会连带回退途经的其他迁移，生产上不要直接跑）。
+- 回退后同样跑一遍 §4 的校验清单：公开视图必须恢复单 head；
+  全量视图允许 2 个 head（新公开 head + `merge_closed`），不是失败。
 
 ## 9. 相关脚本
 
@@ -298,7 +340,7 @@ ALEMBIC_SCOPE_TABLES=my_new_table alembic revision --autogenerate -m "feat: add 
 ALEMBIC_SCOPE_TABLES=orders,order_items alembic revision --autogenerate -m "feat: ..."
 ```
 
-生成的迁移只含这些表的变更，删掉无关行后按 §3 的顺序（先执行、再顺延挂载点、后提交）走。
+生成的迁移只含这些表的变更，删掉无关行后按 §3.1 的顺序（改父节点为公开 head → 执行 → 验证 → 提交）走。
 
 ### 10.4 体检命令
 
@@ -595,7 +637,7 @@ export CENKOR_DATABASE_URL="postgresql+psycopg2://cenkor:口令@127.0.0.1:5432/�
 
 ---
 
-## 13. 闭源隔离：.gitignore 规则（2026-10-27）
+## 13. 闭源隔离：.gitignore 规则（2026-10-27 初版 / 2026-11-03 更新）
 
 迁移按应用分入子目录后，原有的一条规则失效了：
 
@@ -606,31 +648,33 @@ backend/alembic/versions/2026*_mes_*.py   # 老的扁平布局，文件移进 me
 结果 40 个闭源迁移重新暴露在 `git add -A` 的扫描范围内 —— 这些文件含完整的
 ERP / MES / CRM 表结构，一次误提交就是商业实现外泄。
 
-### 13.1 当前规则
+### 13.1 当前规则（2026-11-03 / v0.5.12）
 
 ```gitignore
-# 整目录闭源
+# 整目录闭源：四个应用各一条支线
 backend/alembic/versions/crm/
 backend/alembic/versions/erp/
 backend/alembic/versions/mes/
+backend/alembic/versions/collect/
 
-# 混合目录：默认屏蔽，! 反选回平台级公开迁移
-backend/alembic/versions/commerce/*
-!backend/alembic/versions/commerce/20261007_0028_product_axis.py
-!backend/alembic/versions/commerce/20261009_0030_app_intro.py
-!backend/alembic/versions/commerce/20261010_0031_dev_method.py
-
-# ext/ 逐个登记（7 公开 : 4 闭源）
-backend/alembic/versions/ext/20260924_0025_cloud.py
+# ext/ 逐个登记（14 个里只有 2 个闭源）
 backend/alembic/versions/ext/20260925_0027_workflow.py
-backend/alembic/versions/ext/20261020_0035_app_publish.py
-backend/alembic/versions/ext/20261027_0100_app_schema.py
+backend/alembic/versions/ext/20261103_1300_merge_closed.py
 
 # 应用自带 schema，双保险
 backend/src/cenkor_admin/apps/*/schema.sql
 ```
 
-`apps/{crm,erp,mes}/` 整目录在更早的规则里已经屏蔽（第 67、68、83 行），无需重复。
+`apps/{crm,erp,mes}/`、`static/apps/{crm,erp,mes}/`、`src/apps/`（只剩 collect）
+在更早的规则里已经整体屏蔽，无需重复。
+
+> **v0.5.11 的变更**：`commerce/` 从「默认屏蔽 + `!` 反选平台级迁移」改成整目录放开。
+> payment / commerce 一并开源之后，那 3 条 `!` 反选规则就失去意义了——留着反而
+> 让后来人以为 commerce 还有部分是闭源的。现在 `versions/commerce/` 全公开。
+>
+> **新增闭源迁移时**：文件放对目录（`erp`/`crm`/`mes`/`collect` 天然被目录规则挡住），
+> 若放在 `ext/` 这类混合目录，**必须补一行逐个登记的忽略规则**并跟着一起提交，
+> 否则 `git add -A` 会把它带进公开仓库。
 
 ### 13.2 三个必须知道的细节
 
@@ -687,7 +731,7 @@ git add -A --dry-run | grep -E 'versions/(crm|erp|mes|commerce)/|schema\.sql'
 
 | 检查项 | 结果 |
 |---|---|
-| 46 个闭源文件中被忽略 | 43 个（另 3 个是公开的 commerce 迁移，符合预期） |
+| 40 个未跟踪迁移文件中被忽略 | 40 个（collect 5 / erp 19 / crm 6 / mes 9 / ext 里的 workflow 1），符合预期 |
 | HEAD 已跟踪文件误中忽略规则 | 0 |
 | `git add -A` 在迁移目录的产出 | 0 |
 | 从 GitHub clone 后 `apps/{crm,erp,mes}` 目录数 | 0 |
