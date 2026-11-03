@@ -1,6 +1,12 @@
-# Cenkor Admin Platform · Monorepo
+# Cenkor Admin · AI CMS
 
-**核心平台**：FastAPI 后端 + 管理后台 + 用户中心，可独立部署，**不依赖官网**。
+**开箱即用的 AI 内容管理系统**：AI 批量出稿 → 人工审校 → 多站点分发，
+内置选题缺口分析、内容体检、落地页工坊、知识库 RAG。
+
+底层是模块化企业后台底座（FastAPI + Vue 3 + 多租户 + RBAC），
+ERP / MES / CRM 等以可装卸应用形式按需安装；核心平台可独立部署，**不依赖官网**。
+
+> 一分钟部署：`bash scripts/bootstrap-fullstack.sh`
 
 | 项 | 值 |
 |----|---|
