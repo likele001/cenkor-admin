@@ -5,12 +5,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from cenkor_admin.core.config import get_settings
+from cenkor_admin.core.pwd import pwd_context
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 PORTAL_JWT_ISSUER = "cenkor-portal"
 _PORTAL_SUFFIX = ":portal"

@@ -29,7 +29,7 @@ dependencies = [
     # Auth
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
-    "bcrypt>=3.2.0,<4.0",  # passlib 1.7.4 不兼容 bcrypt 4.x
+    "bcrypt>=4.1,<5",  # 4.1+ 删了 __about__（core/pwd.py 已垫片）；<5 规避 72 字节抛错
     "python-dotenv>=1.0.0",
 
     # HTTP / 集成
