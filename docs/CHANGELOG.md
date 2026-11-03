@@ -13,6 +13,45 @@
 > - 要点二
 > ```
 
+## 2026-11-03　依赖清理：pip check 归零，S3 链路升到 aiobotocore 2.26（⭐）
+
+**【修复：4 条 pip check 冲突，根子只有一个】**
+
+- 起因：`pip check` 报 4 条 broken requirements，看似四个独立问题
+- 根因：`aiobotocore 2.5.0` 钉死 `botocore>=1.29.76,<1.29.77`（**精确到单个补丁版本**），
+  而 botocore 1.29.76 又钉死 `urllib3<1.27`，于是三面撞车：
+  `boto3` 要 botocore ≥1.34、`s3transfer` 要 ≥1.33.2、
+  `trafilatura` / `htmldate` 要 urllib3 ≥2.8.0
+- 删掉 `boto3` 声明：代码里**零引用**，唯一依赖者是 `kombu[sqs]` 的 extra，
+  项目用 `celery[redis]`，从未启用
+- `aiobotocore` `>=2.5.0` → `>=2.26.0,<3`，连带 `botocore 1.29.76 → 1.41.5`、
+  `urllib3 1.26.20 → 2.8.0`
+- 为什么 2.26 能解开 urllib3 死结：botocore 1.41 的 `urllib3<1.27` 带
+  `python_version < "3.10"` 条件，本项目跑 3.13，**条件不生效**
+- 上界 `<3` 是必须的：2.x 每个版本钉一个 botocore，不加上界时全新环境
+  会直接解到 3.10.0（botocore 1.43.x），与现存行为差一个大版本
+
+**【验证：先独立 venv 跑通，再动生产】**
+
+- 目标组合（aiobotocore 2.26.0 / botocore 1.41.5 / urllib3 2.8.0 /
+  trafilatura 2.3.1 / htmldate 1.11.0 / requests 2.34.2）`pip check` 无冲突
+- 用项目真实 `S3CompatDriver` 跑 10 项全过：health_check / ensure_bucket /
+  upload_fileobj / head_object / get_object 内容一致 / list_objects /
+  presigned_put_url / presigned_get_url / copy_object / delete
+- 生产真实链路（`QiniuKodoDriver` + 凭证解密）：上传、直连签名 URL 回读、
+  公有 URL 回读全部 200 且内容一致
+- `trafilatura` 在 urllib3 2.8.0 下 `extract` / `bare_extraction` 正常
+- 后端测试与升级前**完全一致**（185 passed / 36 skipped / 1 failed / 11 errors，
+  均为既有的 aiosqlite 缺失与 sqlite 方言环境问题）
+- 升级后 `pip check`：**No broken requirements found**
+
+**【顺带发现一个既有瑕疵（本轮未修）】**
+
+- `presigned_get_url` 生成后会经 `_apply_cdn_domain` 把 host 换成 CDN 域名，
+  而 CDN 不认识 S3 签名参数 → 该 URL 返回 404
+- 实测同一对象：直连签名 URL **200**、公有 URL **200**、CDN 变换 URL **404**
+- 私有对象的签名访问应走直连 endpoint，CDN 域名只适合公有读；单独排期修
+
 ## 2026-11-03　bcrypt 4.1+ 兼容：口令上下文收敛 + 垫片（⭐）
 
 **【修复：passlib 版本探测告警】**
