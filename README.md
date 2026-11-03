@@ -57,7 +57,7 @@ bash scripts/bootstrap-fullstack.sh
 
 > ℹ️ **「应用中心」在开源仓库内** —— 管理后台自带（侧边栏「系统 → 应用中心」，
 > `/system/apps`），可查看已装 App、安装 ZIP 包、启停应用，随 `bootstrap` 一起部署。
-> **闭源的是「开发者门户」**（`frontend/developer-web/`，供开发者上架 App），
+> **未开源的是「开发者门户」**（`frontend/developer-web/`，供开发者上架 App），
 > 被 `.gitignore` 排除，默认不部署；源码齐全的机器上加 `--profile developer` 启用（端口 `5175`）。
 
 管理员账号为 `admin@cenkor.cn`。**初始口令是随机生成的，只在首次启动时打印一次**
