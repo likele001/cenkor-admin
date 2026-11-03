@@ -13,6 +13,43 @@
 > - 要点二
 > ```
 
+## 2026-11-03　新增 CONTRIBUTING.md：贡献入口与提交门禁（⭐）
+
+**【新增】根目录 `CONTRIBUTING.md`（193 行）**
+
+把「提交前必须知道的硬约束」集中到一处，省得每个贡献者重新踩一遍：
+
+- **分层说明**：哪些目录可以直接提 PR（核心 / 前端 / 新增 App / 驱动插件），
+  哪些（ERP / CRM / MES / 支付 / 开发者门户）**不在仓库内**、提不了。
+  并点明改 `apps/base.py` 的 `AppManifest` 契约会波及仓库外的商业应用，
+  这类改动需在 PR 里说明兼容性影响
+- **七道门禁**：与 CI 逐条对应的可复制命令（`pip check` / `ruff check` /
+  `check-migration-graph.py` / `alembic upgrade heads` /
+  `check-orm-drift.py` / 单元测试 / 前端 `type-check` + `build`），
+  并说明 6 个集成测试需真 uvicorn + seed、本地 skip 或报错属正常
+- **迁移改动**：改了 models 就必须同时有迁移，否则 alembic 不报错、单测测不到，
+  只有 ORM 漂移检查会红（引用 `migrations.md` 与
+  `database-migrations.md` §12.1，不重复正文）
+- **提交信息**：Conventional Commits + 中文，附 6 条真实历史提交作示例；
+  特别提醒「别整文件改写行尾」—— 仓库有部分 CRLF 文件，
+  一个改 3 行的提交会变成 2000 行 diff
+- **贡献授权**：提交 PR 即视为按 MIT 授权（inbound = outbound），
+  当前**不要求签署 CLA**，将来若引入会事先在文件里说明
+- **禁止提交**：密钥 / 生产数据 / 构建产物 / 闭源代码；
+  并给出「密钥已误提交 → 先当它已泄漏、立刻轮换，再处理 git 历史」的处置顺序
+
+**【入口】**
+
+- README 顶部导航新增「🤝 参与贡献」一行，与「文档索引 / 迁移规则 / 打包交付」并列
+
+**【核对】**
+
+- 文档内 7 个相对链接 + 2 个代码路径**全部实测存在**，0 死链
+- `check-migration-graph.py --tracked-only`（49 迁移 / 单 head）、
+  `check-doc-facts.py`（33 份文档 / 260 表 / 69 路由）、
+  `check-app-tracking.sh` 全绿
+- README 保持 LF 行尾，diff 仅 **+1 行**；新文件为 LF
+
 ## 2026-11-03　许可证声明补齐：明确 MIT 的适用范围（⭐）
 
 **【核对结论：确实是 MIT，且分发合规】**

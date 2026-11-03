@@ -12,6 +12,7 @@
 📖 **文档索引**：[`docs/index.md`](docs/index.md)
 🧭 **数据库迁移规则（动迁移前必读）**：[`docs/migrations.md`](docs/migrations.md)
 📦 **打包交付**：[`docs/packaging.md`](docs/packaging.md)
+🤝 **参与贡献**：[`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## 一键部署（Docker，推荐）
 
