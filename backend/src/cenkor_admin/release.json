@@ -1,5 +1,5 @@
 {
-  "version": "0.5.9",
+  "version": "0.5.10",
   "channel": "stable",
   "released_at": "2026-11-03",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "许可证声明补齐：4 个前端包补 license=MIT，README 明确 MIT 仅覆盖仓库内容、商业应用需单独授权"
+  "notes": "新增 CONTRIBUTING.md：贡献范围分层、七道提交门禁、提交规范与贡献授权；README 加参与贡献入口"
 }
