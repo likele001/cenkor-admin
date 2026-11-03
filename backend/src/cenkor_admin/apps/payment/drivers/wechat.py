@@ -73,7 +73,8 @@ class WechatDriver(PaymentDriver):
     supports_refund = True
     config_fields = [
         {"key": "app_id", "label": "AppID", "type": "text", "required": True,
-         "placeholder": "wx1234567890abcdef", "hint": "公众号 / 小程序 / APP 的 appid"},
+         "placeholder": "wx1234567890abcd",
+         "hint": "公众号 / 小程序 / APP 的 AppID，wx 开头共 18 位"},
         {"key": "mch_id", "label": "商户号", "type": "text", "required": True,
          "placeholder": "1600000000"},
         {"key": "api_v3_key", "label": "APIv3 密钥", "type": "text", "required": True,
