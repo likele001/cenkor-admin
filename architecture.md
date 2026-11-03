@@ -481,8 +481,11 @@ app.add_middleware(
 
 ### 7.4 密码哈希
 
-- bcrypt（passlib）
-- bcrypt < 4.0 兼容性
+- bcrypt（passlib），全站唯一入口 `core/pwd.py`
+- 依赖约束 `bcrypt>=4.1,<5`：4.1 起删除 `__about__`，由 `core/pwd.py` 补兼容垫片；
+  `<5` 是为规避 5.0 把超 72 字节口令由静默截断改为抛 `ValueError`
+- 哈希输出 `$2b$12$`，与 bcrypt 3.x / 4.x 完全互通，历史口令零迁移
+- 不要在别处新建 `CryptContext`：参数分叉会导致「改完密码登录不了」
 
 ### 7.5 滑动验证
 
