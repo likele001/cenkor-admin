@@ -13,6 +13,31 @@
 > - 要点二
 > ```
 
+## 2026-11-03　产品核心能力归入底座（⭐）
+
+**【内置清单：6 个】**
+
+- 新标记 `builtin=True`：`cms`（辰科官网 CMS，AI 内容核心）、`collect`（内容采集）、
+  `cloud_storage`（云存储）、`notification`（站内通知）、`payment`（支付中心），
+  连同此前的 `sso`，共 **6 个底座能力不可卸载 / 不可停用**
+- 仍可装卸的 9 个：`crm` / `erp` / `mes`（商业化业务应用），
+  `workflow` / `announcements` / `tickets` / `links` / `quick_notes` / `my_todo`（可选工具）
+- 判定标准仍是那句：**能被卸载的是应用，不能卸载的是底座**。
+  自己是做 AI CMS 的，把 CMS / 采集这类立身之本做成可卸的商业应用没有意义
+
+**【加固：外部应用的 manifest 会被升级覆盖】**
+
+`collect` / `payment` 在 `backend/src/apps/`（`.gitignore` 第 75 行忽略），
+应用中心升级或重装会**覆盖其 `manifest.py`**，写在里面的 `builtin=True` 会丢。
+为此新增 `BUILTIN_APP_KEYS` 兜底名单，`is_builtin_app()` 判定 = manifest 声明
+**或** 名单命中 —— 两层保险，升级后保护不丢
+
+**【澄清：这 7 个不需要标】**
+
+`rbac` / `system` / `auth` / `portal` / `builder` / `comments` / `forms` 没有
+`manifest.py`，不进应用中心，本来就不可能被卸载 —— 不需要也不应该标 builtin。
+另 `commerce` 同理，由 `api/v1/__init__.py` 直接挂载
+
 ## 2026-11-03　统一登录归入底座能力
 
 **【应用中心 · 内置能力】**

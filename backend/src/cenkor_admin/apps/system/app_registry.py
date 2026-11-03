@@ -180,6 +180,7 @@ async def list_apps_with_status(db: AsyncSession) -> list[dict[str, Any]]:
             status = "installed"
 
         counts = await _get_counts(db, manifest) if status in ("installed", "needs_upgrade") else {}
+        _builtin = is_builtin_app(key, manifest)
 
         items.append({
             "key": key,
@@ -199,8 +200,8 @@ async def list_apps_with_status(db: AsyncSession) -> list[dict[str, Any]]:
             "permissions_grants": row.permissions_grants if row else {},
             "has_frontend": row.has_frontend if row else False,
             "enabled": bool(row.enabled) if row else True,
-            "builtin": bool(manifest.builtin),
-            "uninstallable": not bool(manifest.builtin),
+            "builtin": _builtin,
+            "uninstallable": not _builtin,
             "registered_counts": counts,
         })
 
@@ -360,7 +361,7 @@ async def _register_menu_tree(
 async def uninstall_app(db: AsyncSession, key: str) -> None:
     manifests = scan_app_manifests()
     manifest = manifests.get(key)
-    if manifest and manifest.builtin:
+    if is_builtin_app(key, manifest):
         raise BuiltinAppError(f"内置应用不可卸载: {key}")
     result = await db.execute(select(InstalledApp).where(InstalledApp.key == key))
     row = result.scalar_one_or_none()
@@ -418,6 +419,37 @@ class BuiltinAppError(ValueError):
     """
 
 
+# 外部应用（backend/src/apps/，见 .gitignore 第 75 行）不进版本管理，
+# 应用中心升级 / 重装会**覆盖其 manifest.py** —— 写在里面的 builtin=True 会丢。
+# 所以底座名单在这里再兜一层：manifest 声明 或 命中本名单，都算内置。
+# 新增底座时两处都改一下：manifest 是直观表达，这里是防覆盖的保险。
+BUILTIN_APP_KEYS: frozenset[str] = frozenset({
+    "sso",            # 统一登录
+    "cms",            # 内容管理（AI CMS 核心）
+    "collect",        # 内容采集（外部应用，manifest 会被升级覆盖）
+    "cloud_storage",  # 云存储
+    "notification",   # 站内通知
+    "payment",        # 支付中心（外部应用，同上）
+})
+
+
+def is_builtin_app(key: str, manifest: AppManifest | None = None) -> bool:
+    """该 App 是否属于底座（不可卸载 / 不可停用）。
+
+    Args:
+        key: App 唯一标识
+        manifest: 已知的 manifest，省一次全盘扫描；不传则现查
+
+    Returns:
+        True 底座 / False 应用
+    """
+    if key in BUILTIN_APP_KEYS:
+        return True
+    if manifest is None:
+        manifest = scan_app_manifests().get(key)
+    return bool(manifest and manifest.builtin)
+
+
 async def ensure_builtin_apps(db: AsyncSession) -> list[str]:
     """启动对齐：内置应用必须处于 installed + enabled。
 
@@ -434,7 +466,7 @@ async def ensure_builtin_apps(db: AsyncSession) -> list[str]:
     by_key = {a.key: a for a in rows}
 
     for key, manifest in manifests.items():
-        if not manifest.builtin:
+        if not is_builtin_app(key, manifest):
             continue
         row = by_key.get(key)
         if row is None or row.status != "installed":
@@ -556,10 +588,8 @@ async def set_app_enabled(db: AsyncSession, key: str, enabled: bool) -> Installe
 
     from cenkor_admin.apps.rbac import models as rbac_models
 
-    if not enabled:
-        _mf = scan_app_manifests().get(key)
-        if _mf and _mf.builtin:
-            raise BuiltinAppError(f"内置应用不可停用: {key}")
+    if not enabled and is_builtin_app(key):
+        raise BuiltinAppError(f"内置应用不可停用: {key}")
 
     row = (await db.execute(
         select(InstalledApp).where(InstalledApp.key == key)

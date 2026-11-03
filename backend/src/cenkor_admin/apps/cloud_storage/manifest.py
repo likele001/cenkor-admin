@@ -2,6 +2,7 @@ from cenkor_admin.apps.base import AppManifest
 
 MANIFEST = AppManifest(
     key="cloud_storage",
+    builtin=True,          # 底座：媒体存储底座，删了上传与素材全废
     name="云存储",
     version="1.0.1",
     description="替换 S3 后端。支持腾讯云 COS / 阿里云 OSS / 七牛云 Kodo / 又拍云。",
