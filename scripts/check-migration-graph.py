@@ -16,12 +16,21 @@
 
 本脚本只做四件事：无断链、无重复 revision、head 恰好一个、revision 不超长。
 
-两个迁移图靠「挂载点」接成单 head：
-  · 公开/基础链    ... → 0035_app_publish → gen_inventory（挂载迁移）
-  · 商业应用闭源链  gen_inventory → erp → crm → commerce → 0029（闭源 head）
-新增公开迁移时，必须把挂载迁移（如 gen_inventory）的 down_revision 顺延到新的
-公开 head —— 否则两链各留一个 head，hub 启动的 `alembic upgrade` 会抛
-MultipleHeads，新迁移永远不执行。
+判定规则（v0.5.11 开源 payment/commerce 后调整）
+--------------------------------------------------
+硬约束只有一条：**git 跟踪的迁移（公开子图）必须恰好 1 个 head、无断链**。
+公开仓库拉下来要能 `alembic upgrade head` 一把建库，这条破了就是事故。
+
+全量视图（含闭源迁移）**允许多个 head**：闭源应用（erp / crm / mes / workflow /
+collect）是并行开发线，各自一个 head 是正常形态，不必强迫合流。全量视图只额外
+校验一件事 —— 每个 head 都能沿 down_revision 回到公开 head，即没有任何一条
+闭源链是与公开链平行的孤链（那样公开仓库拿到它会断链）。
+
+历史背景：早期是「公开链 + 一条闭源链 + 挂载点顺延」的单 head 模型，
+新增公开迁移必须顺延挂载迁移的 down_revision。v0.5.11 把 payment/commerce
+开源时改成合流迁移（20261103_1200_merge_commerce），闭源侧随后拆成 3 条独立
+链并再次合流（20261103_1300_merge_closed，闭源文件、不进库）。
+这个「挂载点」概念仍未完全退场，见 docs/migrations.md。
 
 完整规则、新增迁移的执行顺序与事故复盘：docs/migrations.md
 
@@ -160,6 +169,18 @@ def analyse(revs, downs):
     return broken, heads
 
 
+def ancestors(rev, downs):
+    """沿 down_revision 回溯，返回祖先闭包（含自身）。"""
+    seen, stack = set(), [rev]
+    while stack:
+        r = stack.pop()
+        if r in seen:
+            continue
+        seen.add(r)
+        stack.extend(downs.get(r, ()))
+    return seen
+
+
 def main():
     ap = argparse.ArgumentParser(description="alembic 迁移图自检")
     ap.add_argument("--dir", default=DEFAULT_DIR, help="迁移目录（默认 %s）" % DEFAULT_DIR)
@@ -179,8 +200,45 @@ def main():
 
     broken, heads = analyse(revs, downs)
 
-    ok = not errors and not broken and len(heads) == 1
+    # 公开子图：任何模式下都要单独算一次。公开仓库一旦断链或多 head，
+    # 「一键部署」会直接失败 —— 这是唯一的硬约束。
+    if args.tracked_only:
+        pbroken, pheads, pcount = broken, heads, len(files)
+    else:
+        _pr, _pd, pfiles, _pe = collect(args.dir, tracked_only=True)
+        pbroken, pheads = analyse(_pr, _pd)
+        pcount = len(pfiles)
 
+    problems = []
+    if errors:
+        problems.append(("parse", errors))
+
+    # 公开子图断链比全量断链更致命：工作区里父节点在、git 里不在，
+    # 「本地跑得好好的」，clone 下来直接 KeyError。
+    pset = {(f, r, m) for f, r, m in pbroken}
+    bset = {(f, r, m) for f, r, m in broken}
+    if pset:
+        problems.append(("public_broken", pbroken))
+    if bset - pset:
+        problems.append(("broken", [x for x in broken if x in bset - pset]))
+
+    if not pheads:
+        problems.append(("no_public_head", []))
+    elif len(pheads) > 1:
+        problems.append(("multi_public_head", pheads))
+
+    # 每个 head 都必须能回到公开 head，否则是一条与公开链平行的孤链。
+    if not args.tracked_only and len(pheads) == 1:
+        pub = pheads[0]
+        orphan = [h for h in heads if pub not in ancestors(h, downs)]
+        if orphan:
+            problems.append(("orphan_head", orphan))
+
+    # 公开视图必须恰好 1 个 head；全量视图允许多个（闭源并行开发线）。
+    if args.tracked_only and len(heads) != 1:
+        problems.append(("multi_head", heads))
+
+    ok = not problems
     if args.quiet and ok:
         return 0
 
@@ -189,41 +247,72 @@ def main():
     print("  文件数        : %d" % len(files))
     print("  revision 数   : %d" % len(revs))
     print("  head          : %s" % (", ".join(heads) if heads else "（无）"))
+    if not args.tracked_only:
+        print("  公开子图      : %d 个文件，head %s"
+              % (pcount, ", ".join(pheads) if pheads else "（无）"))
     print()
 
-    if errors:
-        print("✗ 解析问题：")
-        for e in errors:
-            print("    - %s" % e)
-        print()
-
-    if broken:
-        print("✗ 断链（down_revision 指向仓库中不存在的迁移）：")
-        for fname, rev, missing in broken:
-            print("    - %s" % fname)
-            print("        revision      = %s" % rev)
-            print("        缺失的 down    = %s" % missing)
-        print()
-        print("  可能原因：该迁移被提交在了「闭源链」中间，而闭源迁移不进公开仓库。")
-        print("  修法：把它的 down_revision 改挂到公开链的 head 上，"
-              "并把原闭源子链的挂载点顺延。")
-        print()
-
-    if len(heads) == 0:
-        print("✗ 没有 head —— 迁移图全是环或全断。")
-        print()
-    elif len(heads) > 1:
-        print("✗ head 不唯一（alembic 要求恰好 1 个）：")
-        for h in heads:
-            print("    - %s  (%s)" % (h, revs.get(h, "?")))
-        print()
-        print("  可能原因：公开链新增了迁移，但没把闭源链的挂载点（如")
-        print("  gen_inventory.down_revision）顺延到新的公开 head。")
-        print("  修法：把挂载迁移改挂到最新公开迁移上；公开迁移不要依赖闭源 revision。")
-        print()
+    for kind, payload in problems:
+        if kind == "parse":
+            print("✗ 解析问题：")
+            for e in payload:
+                print("    - %s" % e)
+            print()
+        elif kind == "public_broken":
+            print("✗ 公开子图断链（公开迁移的 down_revision 不在 git 跟踪的文件里）：")
+            for fname, rev, missing in payload:
+                print("    - %s" % fname)
+                print("        revision      = %s" % rev)
+                print("        缺失的 down    = %s" % missing)
+            print()
+            print("  这是最危险的一种：工作区里父节点在、clone 下来不在，")
+            print("  本地一切正常，部署时 alembic 直接 KeyError。")
+            print()
+            print("  修法：公开迁移只能依赖公开 revision。要接闭源段，")
+            print("  用合流迁移挂到公开 head 上，别直接指向闭源 revision。")
+            print()
+        elif kind == "broken":
+            print("✗ 断链（down_revision 指向仓库中不存在的迁移）：")
+            for fname, rev, missing in payload:
+                print("    - %s" % fname)
+                print("        revision      = %s" % rev)
+                print("        缺失的 down    = %s" % missing)
+            print()
+            print("  可能原因：该迁移被提交在了「闭源链」中间，而闭源迁移不进公开仓库。")
+            print("  修法：把它的 down_revision 改挂到公开链的 head 上，"
+                  "并把原闭源子链的挂载点顺延。")
+            print()
+        elif kind == "no_public_head":
+            print("✗ 公开子图没有 head —— 全是环或全断。")
+            print()
+        elif kind == "multi_public_head":
+            print("✗ 公开仓库视图出现多个 head（alembic 要求恰好 1 个）：")
+            for h in payload:
+                print("    - %s  (%s)" % (h, revs.get(h, "?")))
+            print()
+            print("  可能原因：公开链新增了迁移，但没把闭源链的挂载点顺延到新 head，")
+            print("  或某条公开迁移被误改成依赖闭源 revision。")
+            print("  修法：git 跟踪的迁移必须串成单 head，闭源部分挂在它之下。")
+            print()
+        elif kind == "orphan_head":
+            print("✗ 有 head 回不到公开链（是一条与公开链平行的孤链）：")
+            for h in payload:
+                print("    - %s  (%s)" % (h, revs.get(h, "?")))
+            print()
+            print("  每条链最终都必须接在公开 head 之后，否则公开仓库拿到它会断链。")
+            print()
+        elif kind == "multi_head":
+            print("✗ head 不唯一（公开视图必须恰好 1 个）：")
+            for h in payload:
+                print("    - %s  (%s)" % (h, revs.get(h, "?")))
+            print()
 
     if ok:
-        print("✓ 迁移图完整：无断链、无重复、head 唯一（%s）" % heads[0])
+        if args.tracked_only:
+            print("✓ 迁移图完整：无断链、无重复、head 唯一（%s）" % heads[0])
+        else:
+            print("✓ 迁移图完整：公开子图单 head（%s），全量 %d 个 head 均可达公开链"
+                  % (pheads[0], len(heads)))
         return 0
 
     print("✗ 迁移图自检未通过。")

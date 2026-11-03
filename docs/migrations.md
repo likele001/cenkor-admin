@@ -31,9 +31,14 @@
 2. **挂载点跟随公开 head**：闭源链的挂载迁移 `20261014_124126_create_inventory`
    （revision `20261014_124126_gen_inventory`，下称 `gen_inventory`）的 `down_revision`
    必须等于**最新的公开迁移**。公开链每加一条，就要把它顺延一次。
-3. **两种视图都只能有一个 head**：
-   - 完整工作区（公开 + 闭源）：head = 闭源链末端；
-   - `git` 跟踪视图（开源仓库的样子）：head = `gen_inventory`。
+3. **公开视图必须恰好一个 head，闭源侧允许多个**（v0.5.11 起）：
+   - `git` 跟踪视图（开源仓库的样子）：**必须恰好 1 个 head** —— 这是硬约束，
+     公开仓库拉下来要能 `alembic upgrade head` 一把建库；
+   - 完整工作区（公开 + 闭源）：**允许多个 head**（闭源应用是并行开发线），
+     但每个 head 都必须能沿 `down_revision` 回到公开 head，不能有与公开链
+     平行的孤链。
+   - 判定由 `scripts/check-migration-graph.py` 实现：`--tracked-only` 走严格模式，
+     全量模式只额外查「闭源 head 可达公开 head」和「公开子图自身完整」。
 
 ## 2. 两张图长什么样
 
@@ -83,12 +88,19 @@
 > 所属那条闭源链的 head** 之后，不要碰公开链，也不要动挂载点。判断依据只有一个：
 > 这个迁移文件会不会进开源仓库——会，就插在挂载点之前；不会，就接在闭源 head 之后。
 >
-> ⚠️ 别跨应用串链：ERP/CRM 的迁移接 `mes_0009`，工作流接 `workflow_0027`，
-> 采集接 `collect_1100`。混着挂会把两条独立闭源链缝成一条，将来任一方要调整都会牵连另一方。
+> ⚠️ **历史提醒**：v0.5.11 开源 payment/commerce 时，`commerce_0020` 与
+> `product_commerce_0029` 各改挂了一次，导致 `mes_0009` / `workflow_0027` /
+> `collect_1100` 变成三条孤立 head。2026-11-03 用闭源合流迁移
+> `20261103_1300_merge_closed`（放在 `versions/ext/`，**不进公开仓库**）把三者
+> 并回一个点。这个文件已登记在 `.gitignore`，别误提交。
 >
-> **head 分布（v0.5.11 合流后，2026-11-03）**：公开链 1 个
-> `20261027_0100_app_schema`；闭源链 3 个 `mes_0009` / `workflow_0027` / `collect_1100`。
-> 公开视图（`--tracked-only`）必须恰好 1 个 head，闭源侧允许多个。
+> **head 分布（2026-11-03 合流后）**：
+> - 公开视图（`--tracked-only`）：1 个 head，`20261027_0100_app_schema`
+> - 全量视图（含闭源）：1 个 head，`20261103_1300_merge_closed`
+>
+> 新增闭源迁移：统一接在当前闭源 head（现为 `20261103_1300_merge_closed`）之后。
+> 不要在 `mes_0009` / `workflow_0027` / `collect_1100` 上再挂东西 —— 它们已经是
+> 合流点的祖先，往上接会重新分裂出 head。
 
 ## 4. 校验清单
 
@@ -102,8 +114,9 @@ alembic history | head   # 确认链尾串联顺序：最新公开 head → 0035
                          #（10-27 时是 gen_inventory → 0035；公开链此后不断加迁移，
                          #  所以「最新公开 head」这个名字会变，别当常量记）
 cd ..
-python3 scripts/check-migration-graph.py                # 完整工作区：必须 1 head
-python3 scripts/check-migration-graph.py --tracked-only # 开源视图：必须 1 head
+python3 scripts/check-migration-graph.py                # 完整工作区：公开子图单 head，
+                                                        # 闭源可多 head 但须可达公开链
+python3 scripts/check-migration-graph.py --tracked-only # 开源视图：必须恰好 1 head（硬约束）
 ```
 
 对象级体检（可选，只读）：`backend/scripts/check_hub_schema.py`
