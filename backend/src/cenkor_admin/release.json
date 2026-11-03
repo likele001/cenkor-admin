@@ -1,12 +1,12 @@
 {
-  "version": "0.4.2",
+  "version": "0.5.0",
   "channel": "stable",
-  "released_at": "2026-11-02",
+  "released_at": "2026-11-03",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
   "docker_registry": "ghcr.io/likele001",
   "docker_image": "cenkor-admin",
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "菜单启动自动对齐：升级重启即补齐缺失菜单与权限"
+  "notes": "可插拔第三方登录：微信/抖音/飞书/Google/GitHub；后台不开放第三方自助注册"
 }
