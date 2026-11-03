@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/lib/api'
+import RichTextContent from '@/components/RichTextContent.vue'
 import { useAuthStore } from '@/stores/auth'
 
 interface ContentType { id: number; key: string; name: string; translatable?: boolean }
@@ -673,7 +674,9 @@ onUnmounted(() => {
 
               <div v-if="draft.content?.body" class="mt-4">
                 <p class="text-xs font-medium text-ink-700">正文</p>
-                <pre class="mt-1 text-xs text-ink-700 bg-ink-50 border border-ink-200 rounded-lg p-3 whitespace-pre-wrap break-words max-h-72 overflow-auto">{{ draft.content.body }}</pre>
+                <div class="mt-1 bg-ink-50 border border-ink-200 rounded-lg p-3 max-h-72 overflow-auto">
+                  <RichTextContent :content="draft.content.body" format="markdown" />
+                </div>
               </div>
 
               <div v-if="Object.keys(draft.custom_fields || {}).length" class="mt-4">

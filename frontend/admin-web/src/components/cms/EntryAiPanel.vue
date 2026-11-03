@@ -14,6 +14,7 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { api } from '@/lib/api'
 import EntryLinkManager from '@/components/cms/EntryLinkManager.vue'
+import RichTextContent from '@/components/RichTextContent.vue'
 
 interface Lang {
   code: string
@@ -631,8 +632,8 @@ function slugify(s: string): string {
           超出字数上限，平台会截断，建议精简
         </p>
 
-        <div class="mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap break-words text-ink-700 leading-relaxed">
-          {{ redistResult.body }}
+        <div class="mt-1.5 max-h-56 overflow-auto text-ink-700 leading-relaxed">
+          <RichTextContent :content="redistResult.body" format="markdown" />
         </div>
 
         <div v-if="redistResult.tags.length" class="mt-1.5 flex flex-wrap gap-1">
