@@ -10,6 +10,40 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 ## 发版日志
 
+### 0.5.14 · 2026-11-03
+
+- CI 门禁恢复绿：payment 驱动的微信 AppID 占位符改为不撞 GitHub 密钥扫描规则的写法
+- 清理 payment / commerce 开源入仓后暴露的 108 处 ruff 告警（等价重写）
+- `pyproject.toml` 显式声明 `known-first-party`，消除本地绿 / CI 红的判定漂移
+- 纯后台改动，不涉及数据库迁移，不需要重启服务
+- 产物：`release/cenkor-admin-core-0.5.14-20261103.tar.gz`
+
+### 0.5.13 · 2026-11-03
+
+- `database-migrations.md` / `migrations.md` 按合流后的真实拓扑整体重写
+- 废弃 `codegen/builder.py` 的 `rebase_closed_chain`：它会让新迁移被静默跳过
+- 产物：`release/cenkor-admin-core-0.5.13-20261103.tar.gz`
+
+### 0.5.12 · 2026-11-03
+
+- 新增闭源合流迁移 `20261103_1300_merge_closed`，三条闭源支线收成一个 head
+- `check-migration-graph.py` 改为「公开子图严格单 head、全量允许多 head 但须能回到公开 head」
+- 删除 `backend/scripts/check-migration-graph.py`（自 v0.3.0 起分叉的孤立副本）
+- 产物：`release/cenkor-admin-core-0.5.12-20261103.tar.gz`
+
+### 0.5.11 · 2026-11-03
+
+- **支付交易层开源**：payment（13 py / 3398 行）+ commerce（9 py / 4994 行）移入主仓库，同 MIT
+- 收款能力是平台底座，不再作为商业闭源项单独收费
+- 迁移图重构：payment / commerce 的迁移改挂公开 head，不再依赖闭源 revision
+- 产物：`release/cenkor-admin-core-0.5.11-20261103.tar.gz`
+
+### 0.5.10 · 2026-11-03
+
+- 补齐 6 张表与 18 个字段（生产库手工补过、迁移里从没建过的那些）
+- 新增 `scripts/check-orm-drift.py`，CI 里卡「迁移必须覆盖 ORM 全部定义」
+- 产物：`release/cenkor-admin-core-0.5.10-20261103.tar.gz`
+
 ### 0.1.0 · 2026-06-07
 
 - 首次核心平台打包脚本 `scripts/package-core.sh`
@@ -36,3 +70,5 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 bash scripts/package-core.sh
 cp release/cenkor-admin-core-*.tar.gz /你的备份路径/
 ```
+
+> 完整变更说明见 [CHANGELOG.md](../CHANGELOG.md)；本文档只记「哪一版打了什么包」。
