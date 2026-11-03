@@ -13,6 +13,52 @@
 > - 要点二
 > ```
 
+## 2026-11-03　CI 门禁恢复绿：入仓代码的 lint 清理与密钥扫描误报
+
+**【修复：GitHub 密钥扫描误报，push 被反复告警】**
+
+`backend/src/cenkor_admin/apps/payment/drivers/wechat.py` 里有处微信 AppID
+占位符 `wx1234567890abcdef`——18 位、`wx` + 16 位十六进制，正好命中 GitHub
+的「腾讯微信 API 应用 ID」规则。它只是驱动里的示例，不含任何真实凭据，
+但告警会一直挂在仓库首页。
+
+- 占位符改成 `wx1234567890abcd`（共 18 位，`wx` + 14 位），换掉那个刚好
+  撞规则的“太工整”的 16 位十六进制，并补一句注释说明为什么不写满
+- 全仓复核已跟踪文件：仅此 1 处命中，无真实 AppID / AppSecret / 私钥
+- **已经产生的告警不会自动消失**，需在仓库 Security → Secret scanning 里
+  手动标记为误报（API 操作需要仓库权限 token，服务器上没有）
+
+**【修复：payment / commerce 入仓后 CI Lint 首次失败】**
+
+这两个应用此前被 `.gitignore` 排除，CI 在干净 checkout 里根本看不到它们。
+v0.5.11 开源入仓后第一次进入 lint 视野，一次性暴露 108 处历史告警。
+
+- `RUF100` 多余 `noqa` 59 处、`I001` 导入排序 12、`UP017` 12、`UP037` 12、
+  `C416` 5，其余 8 处 —— `ruff --fix` 自动修 116，手工处理 11
+- 其中 `F841` 是真问题：`pricing = {}` 声明后从未被使用，实际走的是
+  `price_map`，直接删掉
+- 全部是等价重写，不改任何运行时行为
+
+**【修复：本地跑绿、CI 跑红的判定漂移】**
+
+清完上面那批后本地 `ruff check` 干净，CI 仍报 2 处 `I001`。根因不在代码本身：
+
+- ruff 的 isort 会**自动探测**哪些是 first-party 包，依据是 `src/` 下的目录内容
+- 本地 `backend/src/` 多了未跟踪的 `apps/`，判定结果与干净 checkout 不一样
+- 在 `pyproject.toml` 显式声明 `known-first-party = ["cenkor_admin", "apps"]`，
+  不再让本地工作区内容影响判定
+
+排查手法值得记住：用 `git archive HEAD | tar -x` 还原一份与 CI 完全一致的
+文件树，在副本上跑门禁——只有这样才能复现「CI 独有」的失败，本地跑永远带着
+未跟踪目录，结论不可信。
+
+**【验证】**
+
+- 主仓库与干净副本，`ruff check` 均 `All checks passed`
+- pytest 1 failed / 185 passed / 36 skipped / 11 errors，与改动前基线一致
+- CI 四个 job（Backend(PG) / admin-web / portal-web / Integration）全绿
+- **纯后台等价重写：不需要重启服务，也不涉及任何数据库迁移**
+
 ## 2026-11-03　迁移规范按真实拓扑重写，废弃会自动顺延的 rebase_closed_chain
 
 **【文档】两份迁移文档仍在教「两条链、一个挂载点」的旧模型**

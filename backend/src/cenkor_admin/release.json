@@ -1,5 +1,5 @@
 {
-  "version": "0.5.13",
+  "version": "0.5.14",
   "channel": "stable",
   "released_at": "2026-11-03",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "迁移规范按真实拓扑重写；废弃 rebase_closed_chain，避免新迁移被静默跳过"
+  "notes": "CI 门禁恢复绿：修复微信 AppID 占位符的密钥扫描误报，清理 payment/commerce 入仓后的 108 处 lint 告警，显式声明 ruff first-party 消除本地/CI 判定漂移"
 }
