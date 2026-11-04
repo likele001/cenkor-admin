@@ -913,6 +913,11 @@ async def submit_app(
     auth: dict = Depends(require_portal_or_admin),
 ):
     """开发者上传应用 ZIP 包（可选同时提交定价：原价 / 售价 / 限时促销）"""
+    # 提交者必须是门户账号：Developer.user_id 指向 portal_users.id，
+    # admin token 的 user_id 是后台 users 表的主键——两个身份空间互不相干，
+    # 若放行会拿 admin id 去撞 portal_users，恰好命中同号开发者造成归属错乱。
+    if auth["user_type"] != "portal":
+        raise HTTPException(403, "请使用开发者门户账号提交应用（管理后台请走「应用市场」模块）")
     user_id = auth["user_id"]
 
     # 检查开发者身份
