@@ -1,12 +1,12 @@
 {
-  "version": "0.5.14",
+  "version": "0.5.15",
   "channel": "stable",
-  "released_at": "2026-11-03",
+  "released_at": "2026-11-04",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
   "docker_registry": "ghcr.io/likele001",
   "docker_image": "cenkor-admin",
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "CI 门禁恢复绿：修复微信 AppID 占位符的密钥扫描误报，清理 payment/commerce 入仓后的 108 处 lint 告警，显式声明 ruff first-party 消除本地/CI 判定漂移"
+  "notes": "依赖安全加固清零 critical：dompurify 3.4.17、axios 1.21、vite 6.4.5、vue-i18n 11，Dependabot 告警 100+ 降到 7；改写稿支持 Markdown 渲染；修内链建议 max_tokens 导致推理模型必然返回空正文"
 }

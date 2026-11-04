@@ -10,6 +10,17 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 ## 发版日志
 
+### 0.5.15 · 2026-11-04
+
+- 依赖安全加固：`dompurify` 3.4.13 → 3.4.17 修 critical 级 SAFE_FOR_TEMPLATES 绕过，`axios` 等 20+ 个包同步升级
+- `vite` 5.4.21 → 6.4.5（vite 5 已 EOL，安全回补只在 6.4.4+）、`@vitejs/plugin-vue` 5.2.4、`vue-i18n` 9.x → 11.x
+- 删除两份幽灵 lock（landing-web 的 package-lock、admin-web 的 pnpm-lock），Dependabot 告警由 100+ 降到 7（全 medium/low）
+- 新增改写稿 Markdown 渲染：`src/lib/markdown.ts` + `RichTextContent format="markdown"`
+- 修内链建议 `max_tokens` 4000 → 16000，推理模型下不再必然返回空正文
+- 后台欢迎语对齐 AI CMS 定位
+- 无数据库迁移；后端 `max_tokens` 改动需重启服务生效
+- 产物：`release/cenkor-admin-core-0.5.15-20261104.tar.gz`
+
 ### 0.5.14 · 2026-11-03
 
 - CI 门禁恢复绿：payment 驱动的微信 AppID 占位符改为不撞 GitHub 密钥扫描规则的写法

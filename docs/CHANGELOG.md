@@ -13,6 +13,42 @@
 > - 要点二
 > ```
 
+## 2026-11-04　依赖安全加固清零 critical + 改写稿 Markdown 渲染 + 内链建议修复 ⭐
+
+**【安全：Dependabot 告警 100+ → 7，critical 与 high 全部清零】**
+
+- `dompurify` 3.4.13 → 3.4.17（**critical**，SAFE_FOR_TEMPLATES 策略绕过）——这个库正是用来净化 AI 生成正文的，属于可直接被利用的 XSS 通道，优先修
+- `axios` 1.17.0 → 1.21.0（13 条告警）、`markdown-it`、`liquidjs`、`vue` / `@vue/server-renderer` 同步升到修复版本
+- `vite` 5.4.21 → 6.4.5：vite 5 已停止维护，安全公告只回补到 6.4.4+，留在 5.x 无论怎么升都清不掉。三个 web、脚手架模板、后端内嵌前端（cloud_storage / codegen）全部统一
+- `@vitejs/plugin-vue` 4.x → 5.2.4：4.x 不兼容 vite 6，脚手架模板与内嵌项目一并修正
+- `vue-i18n` 9.14.5 → 11.x：9.x 已 EOL，新公布的 advisory 没有修复版本。三个前端都是 `legacy: false` 的 Composition API，迁移无额外改动，`globalInjection`（模板里的 `$t`）在 v11 仍保留
+- 新增 9 条 `overrides`，把传递依赖钉在修复版本，避免下次安装又回退
+- 删除两份从不参与安装的遗留 lock：`frontend/landing-web/package-lock.json`（workspace 成员，构建实际用根 lock）与 `frontend/admin-web/pnpm-lock.yaml`（pnpm 时期残留且仍被跟踪）。Dependabot 一直在读它们，报出一批永远装不到机器上的版本
+
+**【新增：改写稿支持 Markdown 渲染】**
+
+- 新增 `src/lib/markdown.ts`：marked 解析 + DOMPurify 净化 + 结果缓存
+- `RichTextContent` 增加 `format="markdown"` 模式，原有 `auto` / `html` 行为不变
+- 接到改写稿再分发正文与 AI 工作台草稿正文：此前裸用 `whitespace-pre-wrap`，`**加粗**`、列表、标题都被原样显示成源码
+
+**【修复：内链建议在推理模型下必然失败】**
+
+- `ai/internal_link.py` 的 `max_tokens` 从 4000 提到 16000
+- 推理模型光思考就能吃掉 1.4 万字符，预算一满只返回 `reasoning_content`、没有正文，前端表现为「AI 调用失败」。这是 100% 复现的必然失败，不是偶发
+- 修复后内链建议立即恢复产出（清单一篇稿件补 2 条内链、3 个标签，线上验证通过）
+
+**【优化：后台首页欢迎语对齐 AI CMS 定位】**
+
+- 旧平台名文案换成「欢迎回来。AI CMS 已就绪，去创作或管理内容吧。」，中英文同步
+- 清理 `_extracted` 字典里 4 条携带旧品牌名的失效 key，构建产物中旧名 0 处残留
+
+**【验证】**
+
+- 三个前端 `vue-tsc` + build 全部通过；landing 的 SSR 预渲染正常产出 7 页
+- 线上 `admin.cenkor.cn` 登录页文案全部渲染，console 0 error 0 warning（重点核 i18n v11 的 `$t`）
+- Dependabot 剩余 7 条全是 medium / low，卡在 `echarts` 6、`@unhead/vue` 2、`@tiptap/*` 3、`minimatch` 11 这几个跨大版本升级，单独排期，不混进这类批量 PR
+- 后端 Python 改动只有一处 `max_tokens`，需重启服务生效，无数据库迁移
+
 ## 2026-11-03　CI 门禁恢复绿：入仓代码的 lint 清理与密钥扫描误报
 
 **【修复：GitHub 密钥扫描误报，push 被反复告警】**
