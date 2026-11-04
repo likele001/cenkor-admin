@@ -38,6 +38,18 @@
 理由：核验本身有误判空间（模型常识、行业公知、通篇无事实的纯观点文），
 拿它硬卡发布，编辑第一周就会把功能关掉。先让人看见，再谈卡不卡。
 真要卡，把 `block_publish` 打开即可，逻辑已经留好。
+
+## 「判断不了」不等于「有问题」
+
+三态里 uncertain 是独立的一态，不是 unsupported 的弱化版：
+
+- 支撑率的分母只算 supported + unsupported，**uncertain 不进分母**。
+  一篇文章引了几处站外事实（本来就无从核验），要是算进分母，
+  分数恒在 20% 附近，弹窗永远红色 —— 恒红指标没有信息量。
+- 证据源为空时全部判 uncertain，而不是 unsupported。
+  「查无依据」只有在**有证据源且证据里没有**时才等于可疑；
+  一个证据源都没有的时候我们什么都不知道，标红就是制造假警报。
+- 模型引用编号越界、或者判 supported 却没给出处，同样降级 uncertain。
 """
 
 from __future__ import annotations
@@ -77,19 +89,24 @@ _SENT_SPLIT_RE = re.compile(r"(?<=[。！？；!?;])\s*|\n{2,}")
 _FACT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # 百分比：37% / 3.5 %
     ("percent", re.compile(r"\d+(?:\.\d+)?\s*%")),
-    # 数字 + 计数单位：1200 万元 / 3 天 / 8 个
+    # 数量 + 数量级 + 单位，整段一起抽：`2万亿美元` 要抽成 `2万亿美元` 而不是 `2万`。
+    # 只抽前半截的话，证据里写「2 万亿美元」归一化后是 `2万亿美元`，
+    # 包含 `2万`（能命中），但展示给编辑看的是半截数字，反而看不懂在核什么。
     (
         "quantity",
         re.compile(
             r"\d+(?:\.\d+)?\s*"
-            r"(?:万|亿|千|百|元|美元|人|家|台|套|个|次|倍|天|小时|分钟|秒|年|月|日|"
+            r"(?:万亿|万|亿|千|百)?\s*"
+            r"(?:美元|元|人|家|台|套|个|次|倍|天|小时|分钟|秒|年|月|日|"
             r"GB|MB|TB|ms|kg|km|℃|度|条|项|种|款|门|间|亩|吨)"
         ),
     ),
     # 年月日：2026 年 3 月 / 2026-03-15
     ("date", re.compile(r"\d{4}\s*年(?:\s*\d{1,2}\s*月)?|\d{4}-\d{1,2}-\d{1,2}")),
-    # 版本号：v0.5.16 / 3.2
-    ("version", re.compile(r"[vV]?\d+\.\d+(?:\.\d+)?")),
+    # 版本号：必须带 v 前缀或三段点号。**不能写成 `\d+\.\d+`** ——
+    # 那样 `1.5万亿美元` 会抽出 `1.5`、`3.86亿` 抽出 `3.86`，
+    # 一篇文章里凭空多出十几个「版本号」，全是噪音。
+    ("version", re.compile(r"[vV]\d+\.\d+(?:\.\d+)?|\b\d+\.\d+\.\d+\b")),
     # 英文专名：OpenAI / GPT-4o / Kubernetes（连续大写起头的词，可含连字符数字）
     ("proper", re.compile(r"\b[A-Z][A-Za-z0-9]*(?:[-.][A-Za-z0-9]+)*(?:\s+[A-Z][A-Za-z0-9]*)*")),
     # 引号内短句：被当成原文引用，必须真有其话
@@ -337,13 +354,14 @@ JSON 之外不要输出任何文字。"""
 # ---------------------------------------------------------------------------
 
 
-def _level_of(rate: float, claims: int) -> str:
-    """阈值：无主张 / 支撑率 ≥0.85 视为 ok，≥0.6 warn，其余 risk。
+def _level_of(rate: float, judged: int) -> str:
+    """阈值：没有可判定句 / 支撑率 ≥0.85 视为 ok，≥0.6 warn，其余 risk。
 
-    没有事实主张的稿子（纯观点、公告）不该被判风险 —— 那会把误报率拉满，
-    编辑一旦习惯性忽略告警，这个功能就废了。
+    `judged` 是**能被判定**的句数（supported + unsupported），不含 uncertain ——
+    「我判断不了」不该把一篇文章推进红色区。没有事实主张的稿子（纯观点、公告）
+    也不该被判风险，那会把误报率拉满，编辑一旦习惯性忽略告警，这个功能就废了。
     """
-    if claims == 0:
+    if judged == 0:
         return "ok"
     if rate >= 0.85:
         return "ok"
@@ -418,10 +436,15 @@ async def check_text(
             pending.append(claim)
 
     # ---- 证据为空：不调模型，直接给出可解释的结论 ----
+    # 判 uncertain 而不是 unsupported —— 这是本条模块最重要的一条口径。
+    # 「查无依据」只有在**存在证据源且证据里没有**时才等于可疑；
+    # 连一个证据源都没有的时候，我们什么都不知道，标红只会制造假警报。
+    # 一篇新闻稿的事实本来就来自原报道，站内不可能有，硬判 unsupported
+    # 会让每一篇都变成「风险较高」，编辑第二天就把功能关了。
     if not evidence and claims:
         for claim in pending:
-            claim["verdict"] = "unsupported"
-            claim["note"] = "没有任何可用依据（素材 / 知识库 / 站内内容均为空）"
+            claim["verdict"] = "uncertain"
+            claim["note"] = "没有任何可用依据（素材 / 知识库 / 站内内容均为空），无法判断，需人工确认"
             claim["by"] = "rule"
         pending = []
         degraded_reason = "缺少证据源：知识库为空、站内无相关内容、起草时也未提供素材"
@@ -453,7 +476,10 @@ async def check_text(
                     {"role": "user", "content": prompt_text},
                 ],
                 temperature=0.0,
-                max_tokens=2000,
+                # 16000 不是拍脑袋：推理模型光思考就能吃掉一万多字符，
+                # 给 2000 会 100% 抛「输出被 max_tokens 截断」（已经实测踩过一次，
+                # 和内链建议那次是同一个坑）。真正的输出只有几条判定，很便宜。
+                max_tokens=16000,
             )
             raw = _as_object(raw, "事实核验")
             llm_meta = result.meta()
@@ -496,7 +522,11 @@ async def check_text(
     unsupported = sum(1 for c in claims if c["verdict"] == "unsupported")
     uncertain = sum(1 for c in claims if c["verdict"] == "uncertain")
     total = len(claims)
-    rate = round(supported / total, 3) if total else 1.0
+    # 分母只算「能被判定」的句子。把 uncertain 也算进去的话，
+    # 一篇文章只要引用了几处站外事实（本来就无从核验），分数就被拉到 20%，
+    # 弹窗永远显示「风险较高」—— 这种恒红指标没有信息量。
+    judged = supported + unsupported
+    rate = round(supported / judged, 3) if judged else 1.0
 
     items = [
         {
@@ -522,7 +552,8 @@ async def check_text(
             "unsupported": unsupported,
             "uncertain": uncertain,
             "support_rate": rate,
-            "level": _level_of(rate, total),
+            "judged": judged,
+            "level": _level_of(rate, judged),
             "evidence_count": len(evidence),
             "evidence_sources": _source_counts(evidence),
             "truncated": truncated,
@@ -607,6 +638,7 @@ def _empty(entry_id: int | None, reason: str) -> dict[str, Any]:
             "unsupported": 0,
             "uncertain": 0,
             "support_rate": 1.0,
+            "judged": 0,
             "level": "ok",
             "evidence_count": 0,
             "evidence_sources": {"material": 0, "kb": 0, "entry": 0},
@@ -627,8 +659,10 @@ async def check_entry(
     created_by: int | None = None,
 ) -> dict[str, Any]:
     """对一条已落库条目做事实核验。不写库、不改条目。"""
-    # 标题也参与核验：标题里塞一个「提升 300%」比正文里更危险
-    text = entry.title + "\n" + _entry_text(entry.content)
+    # 标题也参与核验：标题里塞一个「提升 300%」比正文里更危险。
+    # 用句号连起来而不是换行 —— 断句器只按句末标点切，换行会把标题和副标题
+    # 粘成一句，展示出来就是「标题。\n上市迈出关键一步」这种半截句子。
+    text = (entry.title or "") + "。" + _entry_text(entry.content)
     result = await check_text(
         session,
         text,

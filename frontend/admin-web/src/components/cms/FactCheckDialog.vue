@@ -43,6 +43,8 @@ interface FactSummary {
   unsupported: number
   uncertain: number
   support_rate: number
+  /** 能被判定的句数（supported + unsupported），不含 uncertain —— 支撑率的分母 */
+  judged: number
   level: 'ok' | 'warn' | 'risk' | string
   evidence_count: number
   evidence_sources: Record<string, number>
@@ -83,6 +85,17 @@ const ratePercent = computed(() => {
   const rate = data.value?.summary.support_rate
   return rate === undefined ? '—' : `${Math.round(rate * 100)}%`
 })
+
+/**
+ * 两类问题要分开看，混在一列里等于没分优先级：
+ * 「查无依据」是编辑必须处理的（要么补素材、要么改稿），
+ * 「无法确认」多数是站外事实（新闻原报道、行业公知），本来就核不了。
+ * 默认只看前者，后者折叠起来不占屏。
+ */
+const tab = ref<'bad' | 'unsure'>('bad')
+const badItems = computed(() => (data.value?.items || []).filter((i) => i.verdict === 'unsupported'))
+const unsureItems = computed(() => (data.value?.items || []).filter((i) => i.verdict !== 'unsupported'))
+const shownItems = computed(() => (tab.value === 'bad' ? badItems.value : unsureItems.value))
 
 const sourceLine = computed(() => {
   const src = data.value?.summary.evidence_sources || {}
@@ -180,8 +193,11 @@ watch(
       </div>
 
       <!-- 加载 / 错误 -->
-      <div v-if="loading" class="flex-1 flex items-center justify-center text-xs text-ink-400 p-12">
-        正在核验正文里的具体说法…
+      <div v-if="loading" class="flex-1 flex items-center justify-center text-xs text-ink-400 p-12 text-center">
+        <div>
+          正在核验正文里的具体说法…
+          <div class="text-[11px] mt-1 text-ink-300">逐句交给模型判定，通常需要 20~60 秒</div>
+        </div>
       </div>
       <div v-else-if="error" class="flex-1 flex items-center justify-center text-xs text-red-600 p-12">
         {{ error }}
@@ -197,7 +213,7 @@ watch(
                 'text-amber-600': data.summary.level === 'warn',
                 'text-red-600': data.summary.level === 'risk',
               }">{{ ratePercent }}</div>
-              <div class="text-[11px] text-ink-400 mt-1">有依据占比</div>
+              <div class="text-[11px] text-ink-400 mt-1">有依据占比（只算能判定的）</div>
             </div>
             <div class="flex gap-4 text-xs text-ink-600">
               <div><span class="font-semibold text-ink-800">{{ data.summary.claims }}</span> 处具体说法</div>
@@ -218,15 +234,36 @@ watch(
           </div>
         </div>
 
+        <!-- 分类 tab：查无依据要处理，无法确认多半是站外事实 -->
+        <div v-if="data.items.length" class="flex gap-1 px-5 pt-2 border-b text-xs">
+          <button
+            class="px-3 py-1.5 rounded-t"
+            :class="tab === 'bad' ? 'bg-white border border-b-white -mb-px text-ink-800 font-medium' : 'text-ink-400 hover:text-ink-600'"
+            @click="tab = 'bad'"
+          >
+            查无依据 {{ badItems.length }}
+          </button>
+          <button
+            class="px-3 py-1.5 rounded-t"
+            :class="tab === 'unsure' ? 'bg-white border border-b-white -mb-px text-ink-800 font-medium' : 'text-ink-400 hover:text-ink-600'"
+            @click="tab = 'unsure'"
+          >
+            无法确认 {{ unsureItems.length }}
+          </button>
+        </div>
+
         <!-- 明细 -->
         <div class="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-          <div v-if="!data.items.length" class="text-xs text-ink-400 py-8 text-center">
-            没发现缺少依据的具体说法。
-            <template v-if="!data.summary.claims">正文里没有可核验的数字、日期或专名，属于纯描述内容。</template>
+          <div v-if="!shownItems.length" class="text-xs text-ink-400 py-8 text-center">
+            <template v-if="!data.summary.claims">
+              正文里没有可核验的数字、日期或专名，属于纯描述内容，无需核验。
+            </template>
+            <template v-else-if="tab === 'bad'">没有「查无依据」的说法，这篇稿子的具体说法都站得住。</template>
+            <template v-else>没有「无法确认」的句子。</template>
           </div>
 
           <div
-            v-for="item in data.items"
+            v-for="item in shownItems"
             :key="item.index"
             class="border rounded p-3 space-y-1.5"
             :class="item.verdict === 'unsupported' ? 'border-red-200 bg-red-50/30' : 'border-amber-200 bg-amber-50/20'"
@@ -264,9 +301,9 @@ watch(
         </div>
 
         <!-- 底部提示 -->
-        <div class="px-5 py-2 border-t text-[11px] text-ink-400">
+        <div class="px-5 py-2 border-t text-[11px] text-ink-400 leading-relaxed">
           核验只做提示，不阻断发布。依据来自起草素材、企业知识库与站内已发布内容；
-          它们本身为空或不全时，判定偏严属正常。
+          站外事实（新闻原报道、行业公知）本来就核不了，判为「查无依据」属正常，请以人工核实为准。
         </div>
       </template>
     </div>
