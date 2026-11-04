@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import DynamicFieldRenderer from '@/components/cms/DynamicFieldRenderer.vue'
 import AiRewriteDialog from '@/components/cms/AiRewriteDialog.vue'
 import EntryAiPanel from '@/components/cms/EntryAiPanel.vue'
+import VersionDiffDialog from '@/components/cms/VersionDiffDialog.vue'
 
 interface FieldDef {
   id: number; field_key: string; label: string; field_type: string
@@ -82,6 +83,15 @@ const activeForm = computed(() => {
 const versions = ref<any[]>([])
 const previewVersion = ref<any>(null)
 const showVersionPreview = ref(false)
+
+// 版本对比：diffTo 为空则由弹层自己选「最新 vs 上一版」
+const diffOpen = ref(false)
+const diffTo = ref<number | null>(null)
+
+function openDiff(toVersion?: number) {
+  diffTo.value = toVersion ?? null
+  diffOpen.value = true
+}
 
 async function loadLanguages() {
   try {
@@ -720,7 +730,16 @@ onMounted(async () => {
 
         <!-- 版本历史（M1·P0） -->
         <div v-if="!isNew" class="card space-y-2">
-          <h3 class="font-medium text-sm">📜 版本历史</h3>
+          <div class="flex items-center justify-between">
+            <h3 class="font-medium text-sm">📜 版本历史</h3>
+            <button
+              v-if="versions.length >= 2"
+              class="btn-ghost px-2 py-0.5 text-xs"
+              @click="openDiff()"
+            >
+              对比最新两版
+            </button>
+          </div>
           <div v-if="!versions.length" class="text-xs text-ink-400">暂无版本快照</div>
           <div v-for="v in versions" :key="v.version" class="flex items-center justify-between gap-2 text-xs border-b pb-1.5 last:border-0">
             <div class="min-w-0">
@@ -730,6 +749,13 @@ onMounted(async () => {
             </div>
             <div class="flex gap-1 shrink-0">
               <button class="btn-ghost px-2 py-0.5 text-xs" @click="previewVersionFn(v)">查看</button>
+              <button
+                v-if="versions.length >= 2"
+                class="btn-ghost px-2 py-0.5 text-xs"
+                @click="openDiff(v.version)"
+              >
+                对比
+              </button>
               <button class="text-red-500 hover:underline px-1" @click="restoreVersion(v)">回滚</button>
             </div>
           </div>
@@ -852,6 +878,13 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    <VersionDiffDialog
+      v-if="!isNew"
+      v-model:open="diffOpen"
+      :entry-id="Number(route.params.id)"
+      :versions="versions"
+      :initial-to="diffTo"
+    />
     <!-- AI 改写弹层：标题用纯文本模式，正文用 HTML 分块模式 -->
     <AiRewriteDialog
       v-model:open="rewriteOpen"

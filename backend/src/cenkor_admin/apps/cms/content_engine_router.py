@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import models, permalink, schemas, static_cache, url_resolver
+from cenkor_admin.apps.cms import version_diff
 from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.core.db import get_db
@@ -1100,6 +1101,70 @@ async def list_entry_versions(entry_id: int, db: AsyncSession = Depends(get_db))
         "items": [_version_to_dict(v, include_data=False) for v in rows],
         "total": len(rows),
     }
+
+
+@router.get("/entries/{entry_id}/versions/diff", response_model=dict[str, Any])
+async def diff_entry_versions(
+    entry_id: int,
+    from_version: int | None = Query(None, alias="from"),
+    to_version: int | None = Query(None, alias="to"),
+    db: AsyncSession = Depends(get_db),
+):
+    """两个版本快照之间的差异（M1·P0 版本控制）。
+
+    审核人不必整篇重读：给出「改了几段、哪几段、哪些字段变了」。
+    默认取最新两个版本；只给 ``to`` 时自动向前找最近的一版。
+
+    注意：本端点必须注册在 ``/versions/{version}`` 之前 ——
+    后者把路径段当 int 解析，先注册会把 ``diff`` 抢走并回 422。
+    """
+    entry = await db.get(models.Entry, entry_id)
+    if not entry or entry.deleted_at:
+        raise HTTPException(404, "Entry not found")
+
+    rows = (
+        await db.execute(
+            select(models.EntryVersion)
+            .where(models.EntryVersion.entry_id == entry_id)
+            .order_by(models.EntryVersion.version.asc())
+        )
+    ).scalars().all()
+    if not rows:
+        raise HTTPException(404, "该条目还没有版本快照，无法比对")
+
+    by_version = {v.version: v for v in rows}
+    newest = rows[-1].version
+
+    if to_version is None:
+        to_version = newest
+    if to_version not in by_version:
+        raise HTTPException(404, f"Version {to_version} not found")
+
+    if from_version is None:
+        older = [v for v in by_version if v < to_version]
+        if not older:
+            raise HTTPException(409, f"v{to_version} 是最早的版本，没有可比对的上一版")
+        from_version = max(older)
+    if from_version not in by_version:
+        raise HTTPException(404, f"Version {from_version} not found")
+    if from_version == to_version:
+        raise HTTPException(400, "不能和同一个版本比对")
+
+    left = by_version[from_version]
+    right = by_version[to_version]
+
+    def _meta(v: models.EntryVersion) -> dict[str, Any]:
+        return {
+            "version": v.version,
+            "kind": "version",
+            "created_at": v.created_at.isoformat() if v.created_at else None,
+            "created_by": v.created_by,
+            "note": v.note,
+        }
+
+    return version_diff.build_payload(
+        _meta(left), left.data or {}, _meta(right), right.data or {}
+    )
 
 
 @router.get("/entries/{entry_id}/versions/{version}", response_model=dict[str, Any])
