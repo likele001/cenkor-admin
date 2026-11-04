@@ -10,6 +10,15 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 ## 发版日志
 
+### 0.5.16 · 2026-11-04
+
+- 新增稿件版本对比：`GET /cms/entries/{id}/versions/diff` + 后台双栏对照弹窗，审核人能看到「改了什么」
+- 新增站内搜索词日志：`cms_search_logs` 表、`/public/search` 旁路记录、`GET /cms/ai/search-terms`，选题缺口页接入真实搜索词
+- 官网构建产物移出 git（`frontend/landing/` 70 个文件），改由打包脚本从磁盘收集，仓库不再随每次构建变大
+- 数据库迁移：`20261104_1100_cms_search_logs`（down_revision 挂公开 head，开源版链路完整）
+- 后端改动 + 迁移，需重启服务并 `alembic upgrade head`
+- 产物：`release/cenkor-admin-core-0.5.16-20261104.tar.gz`
+
 ### 0.5.15 · 2026-11-04
 
 - 依赖安全加固：`dompurify` 3.4.13 → 3.4.17 修 critical 级 SAFE_FOR_TEMPLATES 绕过，`axios` 等 20+ 个包同步升级
