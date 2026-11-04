@@ -13,8 +13,14 @@ from sqlalchemy.orm import selectinload
 
 from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms import models, permalink, schemas, static_cache, url_resolver
-from cenkor_admin.apps.cms import version_diff
+from cenkor_admin.apps.cms import (
+    models,
+    permalink,
+    schemas,
+    static_cache,
+    url_resolver,
+    version_diff,
+)
 from cenkor_admin.apps.cms.field_types import FIELD_TYPES, NEEDS_OPTIONS
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.core.db import get_db
