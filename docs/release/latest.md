@@ -5,13 +5,13 @@
 | 项 | 值 |
 |----|-----|
 | 类型 | 核心平台（不含官网） |
-| 版本 | 0.5.15 |
+| 版本 | 0.5.16 |
 | 打包日期 | 2026-11-04 |
-| 文件名 | `cenkor-admin-core-0.5.15-20261104.tar.gz` |
+| 文件名 | `cenkor-admin-core-0.5.16-20261104.tar.gz` |
 | 路径 | `/www/wwwroot/cenkor-admin/release/` |
 | 打包命令 | `bash scripts/package-core.sh` |
-| 发布页 | `https://github.com/likele001/cenkor-admin/releases/tag/v0.5.15` |
-| 容器镜像 | `ghcr.io/likele001/cenkor-admin:0.5.15`（amd64 / arm64） |
+| 发布页 | `https://github.com/likele001/cenkor-admin/releases/tag/v0.5.16` |
+| 容器镜像 | `ghcr.io/likele001/cenkor-admin:0.5.16`（amd64 / arm64） |
 
 详细说明见 [../packaging.md](../packaging.md)。
 
@@ -19,6 +19,7 @@
 
 | 版本 | 日期 | 主要变化 |
 |------|------|----------|
+| 0.5.16 | 2026-11-04 | 稿件版本对比；站内搜索词日志（新表 + 选题真实信号）；AI 事实溯源（只告警不阻断）；官网产物移出 git、修打包漏文档中心 |
 | 0.5.15 | 2026-11-04 | 依赖安全加固：dompurify critical、axios 13 条、vite 6、vue-i18n 11；改写稿 Markdown 渲染；修内链建议 max_tokens |
 | 0.5.14 | 2026-11-03 | CI 门禁恢复绿：AppID 占位符不再撞密钥扫描、清理 108 处 lint、isort 显式声明 |
 | 0.5.13 | 2026-11-03 | 迁移规范按真实拓扑重写，废弃会自动顺延的 `rebase_closed_chain` |

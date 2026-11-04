@@ -45,29 +45,29 @@ VITE_API_BASE_URL="$API_BASE" npm run build
 # 注意：landing-web/vite.config.ts 的 base 必须为 /landing/，否则同步后资源 404
 info "同步 landing 产物到 frontend/landing/ ..."
 cd ..
-# frontend/landing/ 是线上目录，里面除了 dist 产物，还放着**不参与构建**的静态资产：
-#   · docs-content/  文档源（markdown，由站点运行时/知识库消费）
-#   · docs/          文档站旧静态页
+# frontend/landing/ 是 nginx 线上目录。除了下面这 6 个**手写页**，其余全是 dist 产物：
+#   · docs/guide.html
 #   · advantages.html / ai-cms.html / deploy.html / docs.html / features.html
-#                    （旧静态落地页，仍在 git 里、可能被外部链接引用）
-#   · favicon.svg / og-image.png / robots.txt / sitemap.xml
-# 这些在 dist 里不存在。过去直接 `rsync -a --delete` 会把它们全删掉，
+#     （旧静态落地页，仍在 git 里、可能被外部链接引用）
+# 它们在 dist 里不存在，直接 `rsync -a --delete` 会被删掉，
 # 后果是 package-core.sh 用 `git ls-files | tar` 打包时报
 # `tar: frontend/landing/advantages.html: Cannot stat`，Release 流水线必挂
 # （v0.5.0 / v0.5.1 / v0.5.2 三个版本都因此失败）。
-# 所以 --delete 要配排除清单：只清理构建产物，不动手写资产。
+# 所以 --delete 要配排除清单：只清理构建产物，不动这 6 个手写页。
+#
+# 清单只留这 6 个 —— 另外两类曾被误当「静态资产」排除，实际都是构建源：
+#   · docs-content/ ：landing-web 的 build 会先跑 docs:sync（scripts/copy-docs.mjs）
+#                     把 docs/ 生成到 public/docs-content，vite 再带进 dist；排除它
+#                     会让包内文档中心整个消失（v0.5.16 首包少 45 个文件、docs 404）
+#   · favicon.svg / og-image.png / robots.txt / sitemap.xml ：都在 landing-web/public/
+#                     里，排除它们等于线上用旧文件，改 robots/sitemap 发版不生效
 rsync -a --delete \
-  --exclude='/docs-content/' \
   --exclude='/docs/' \
   --exclude='/advantages.html' \
   --exclude='/ai-cms.html' \
   --exclude='/deploy.html' \
   --exclude='/docs.html' \
   --exclude='/features.html' \
-  --exclude='/favicon.svg' \
-  --exclude='/og-image.png' \
-  --exclude='/robots.txt' \
-  --exclude='/sitemap.xml' \
   landing-web/dist/ landing/
 
 cd ../..

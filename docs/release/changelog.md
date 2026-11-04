@@ -17,6 +17,9 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 - 官网构建产物移出 git（`frontend/landing/` 70 个文件），改由打包脚本从磁盘收集，仓库不再随每次构建变大
 - 数据库迁移：`20261104_1100_cms_search_logs`（down_revision 挂公开 head，开源版链路完整）
 - 后端改动 + 迁移，需重启服务并 `alembic upgrade head`
+- 新增 AI 事实溯源：`POST /cms/ai/entries/{id}/fact-check`，规则层比对 + 模型逐句判定，只告警不阻断
+- 修打包漏文件：`build-frontends.sh` 的 rsync 曾把 `docs-content/` 与 `public/` 下的 favicon / robots / sitemap 误当静态资产排除，产物移出 git 后官网文档中心整目录缺席
+- 新增打包自检：landing 文件数不达标直接中止，避免「包能打出来、装上缺内容」
 - 产物：`release/cenkor-admin-core-0.5.16-20261104.tar.gz`
 
 ### 0.5.15 · 2026-11-04

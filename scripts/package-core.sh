@@ -300,6 +300,22 @@ if [ -n "$MISSING" ]; then
 fi
 info "自检通过：关键文件齐全（后端入口 / 迁移 / 三套前端产物 / 环境模板）"
 
+# ---- 交付前自检之四点半：landing 产物完整性 ----
+# 只查 index.html 不够。docs-content 是 landing-web 的 docs:sync 从 docs/ 生成的产物，
+# 曾被 build-frontends.sh 的 rsync 排除项整目录挡在包外：包打得出来、自检也过，
+# 装上后官网文档中心却 404（v0.5.16 首包就少 45 个文件）。按文件数卡一道。
+LANDING_FILES="$(find "$DEST/frontend/landing" -type f 2>/dev/null | wc -l)"
+LANDING_DOCS="$(find "$DEST/frontend/landing/docs-content" -type f 2>/dev/null | wc -l)"
+if [ "$LANDING_DOCS" -lt 10 ] || [ "$LANDING_FILES" -lt 30 ]; then
+  echo "" >&2
+  echo "✗ 打包中止：landing 产物不完整（总 $LANDING_FILES 个文件，docs-content $LANDING_DOCS 个）" >&2
+  echo "  装上后官网文档中心会 404。检查 scripts/build-frontends.sh 的 rsync 排除清单：" >&2
+  echo "  docs-content 已由 landing-web 的 docs:sync 生成，不该被排除。" >&2
+  rm -rf "$STAGE" "$ARCHIVE"
+  exit 1
+fi
+info "自检通过：landing 产物完整（$LANDING_FILES 个文件，其中 docs-content $LANDING_DOCS 个）"
+
 # ---- 交付前自检之五：包内迁移链必须自洽（每个 down_revision 都要在包内） ----
 # 排除闭源迁移目录最容易留下的坑：公开迁移指向被删掉的父节点，包能打出来，
 # 但用户一跑 alembic upgrade head 就 KeyError。这里静态解析一遍再放行。
