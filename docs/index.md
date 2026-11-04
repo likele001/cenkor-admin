@@ -7,6 +7,7 @@ Cenkor Admin 文档目录。按用途选择。
 | 文档 | 用途 |
 |------|------|
 | [**deploy.md**](deploy.md) | **部署方案（权威）** —— 架构拓扑 · 端口台账 · 配置五落点与优先级 · 依赖服务 · 发布 · 验证 · 备份回滚 · 排障手册 |
+| [**nginx_proxy_rewrite.md**](nginx_proxy_rewrite.md) | **宝塔 Nginx 反代与伪静态配置说明** —— 什么时候反代 · 各站反代代码 · 伪静态 SPA 回退代码 · 排除清单同步 · 变更 SOP · 验证与故障速查 |
 | [**dev_guide.md**](dev_guide.md) | **开发者指南** —— 创建 App、字段定义、模板开发 |
 | [**migrations.md**](migrations.md) | **数据库迁移规则（必读）** —— 公开链 / 闭源链、挂载点、新增迁移顺序、事故与排查 |
 | [**template/**](template/index.md) | **模板标签参考** —— 总览 · 全量速查 · 内容 / 结构 / 站点配置 / 评论表单 / 自定义开发（仿 iCMS 参考手册式分页） |
