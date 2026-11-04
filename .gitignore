@@ -146,15 +146,18 @@ backend/alembic/versions/mes/
 # 应用自带 schema（方案 D）同样属商业实现，双保险
 backend/src/cenkor_admin/apps/*/schema.sql
 
-# ext 目录是混合的：以下 2 个属闭源模块，逐个登记。
-#   · 20260925_0027_workflow      —— workflow 应用仍闭源
-#   · 20261103_1300_merge_closed  —— 闭源链合流，down_revision 指向 3 个未跟踪
-#                                    revision（mes_0009 / workflow_0027 /
-#                                    collect_1100），进库会让公开视图断链
+# ext 目录是混合的：以下 3 个属闭源模块，逐个登记。
+#   · 20260925_0027_workflow          —— workflow 应用仍闭源
+#   · 20261103_1300_merge_closed      —— 闭源链合流，down_revision 指向 3 个未跟踪
+#                                        revision（mes_0009 / workflow_0027 /
+#                                        collect_1100），进库会让公开视图断链
+#   · 20261104_1200_merge_closed_cms  —— 再合流，down_revision 含闭源的
+#                                        merge_closed，同理不可入库
 #   · 其余（0025_cloud / 0035_app_publish / 0100_app_schema）随 commerce 开源
 # 新增闭源 ext 迁移时，必须在此追加，否则 git add -A 会直接带入。
 backend/alembic/versions/ext/20260925_0027_workflow.py
 backend/alembic/versions/ext/20261103_1300_merge_closed.py
+backend/alembic/versions/ext/20261104_1200_merge_closed_cms.py
 
 # ===== 一次性运维与迁移补丁脚本（2026-10-30 新增）=====
 # 这些是「跑一次就完」的临时脚本：直接改线上数据库、手工改服务商配置、
