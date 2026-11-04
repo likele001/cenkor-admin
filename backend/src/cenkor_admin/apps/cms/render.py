@@ -32,6 +32,7 @@ __all__ = [
     "KIND_TEMPLATE",
     "disk_theme_paths",
     "invalidate_theme_cache",
+    "load_disk_template",
     "make_preview_resolver",
     "render_page",
     "render_source",
@@ -200,6 +201,11 @@ def theme_documents(session, site_id: int, theme: str) -> dict[str, str]:
     return merged
 
 
+# 对外名字：theme_asset_router 取资源时用「磁盘 → DB → 内置」同一套顺序，
+# 复用这份实现，避免两处逻辑漂移（尤其缓存与安全检查那部分）。
+load_disk_template = _load_disk_template
+
+
 def _make_resolver(session, site_id: int, theme: str, *, builtin_only: bool = False):
     def resolve(name: str) -> str | None:
         if not builtin_only:
@@ -272,7 +278,7 @@ def _render_sync(
         active_theme = theme or (builtin_theme.DEFAULT_THEME if builtin_only else resolve_theme(session, site_id))
         resolver = _make_resolver(session, site_id, active_theme, builtin_only=builtin_only)
         token = jinja_env.set_resolver(resolver)
-        ctx = TemplateContext(session, site_id=site_id, base=base)
+        ctx = TemplateContext(session, site_id=site_id, base=base, theme=active_theme)
         css = resolver("assets/style.css") or ""
         context = _build_context(model, ctx, base, css, active_theme)
         tpl_name = KIND_TEMPLATE.get(model.get("kind") or "article", "detail.html")

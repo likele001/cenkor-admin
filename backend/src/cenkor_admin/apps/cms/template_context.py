@@ -13,10 +13,12 @@ import threading
 from datetime import UTC, datetime
 from typing import Any
 
+from markupsafe import Markup
 from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from cenkor_admin.apps.cms import models, url_resolver
+from cenkor_admin.apps.cms.csp import THEME_ASSET_PREFIX
 from cenkor_admin.core.jinja_env import app_template_functions, bind_app_function
 
 __all__ = ["TemplateContext", "build_pagination", "cms_api", "get_session_factory"]
@@ -166,10 +168,14 @@ _SORT_FIELDS = {
 class TemplateContext:
     """一次渲染一个实例，绑定站点 + 同步 session。"""
 
-    def __init__(self, session: Session, *, site_id: int = 1, base: str = "") -> None:
+    def __init__(
+        self, session: Session, *, site_id: int = 1, base: str = "", theme: str = ""
+    ) -> None:
         self.session = session
         self.site_id = int(site_id or 1)
         self.base = (base or "").rstrip("/")
+        # 当前渲染用的主题名：script() 要拼主题资源地址，不知道主题就拼不出来
+        self.theme = (theme or "").strip()
         # content_type_id → key 的懒加载缓存，一次渲染里最多查一次
         self._ct_keys: dict[int, str] | None = None
         # URL 规则集，同样一次渲染只取一次
@@ -691,6 +697,45 @@ class TemplateContext:
             return p
         return f"{self.base}/{p.lstrip('/')}"
 
+    # ------------------------------------------------------------ 11b. script
+
+    @cms_api
+    def script(self, path: str = "") -> Markup:
+        """生成外链 ``<script src>`` 标签。模板里禁止内联脚本，一律走这里。
+
+        ``{{ script('assets/app.js') }}``（或简写 ``{{ script('app.js') }}``）→
+        ``<script src="<base>/api/v1/public/theme-assets/<主题>/assets/app.js" defer></script>``
+
+        三个刻意的取舍：
+
+        * **不提供 attrs 参数** —— 让作者传任意属性等于把 sandbox / integrity
+          这些关键属性交给模板，白名单反而更好守。
+        * **defer 写死** —— 主题脚本不该阻塞首屏解析；defer 还保证按出现顺序执行，
+          省掉一堆 DOMContentLoaded 包裹。
+        * **不给 nonce** —— 内联脚本已在校验阶段被拦死（``lint_inline_script``），
+          nonce 没有服务对象；而且详情页会落盘静态缓存，nonce 写进文件就固化了，
+          反而制造"看着有防护"的假象。详见 ``apps/cms/csp.py`` 顶部说明。
+
+        路径为空或主题未知时返回空串，不生成指向 404 的坏标签。
+        """
+        src = self.theme_asset(path)
+        if not src:
+            return Markup("")
+        return Markup('<script src="{}" defer></script>').format(src)
+
+    def theme_asset(self, path: str = "") -> str:
+        """主题资源 URL。只认 ``assets/`` 下的 css / js（服务端也只放行这两种）。
+
+        不写成 @cms_api：资源地址本身不是数据接口，模板里不需要直接拼；
+        需要引脚本就用 ``script()``。
+        """
+        p = str(path or "").strip().replace("\\", "/").lstrip("/")
+        if not p or not self.theme:
+            return ""
+        if not p.startswith("assets/"):
+            p = f"assets/{p}"
+        return f"{self.base}{THEME_ASSET_PREFIX}/{self.theme}/{p}"
+
     # ------------------------------------------------------------ 12. url
 
     @cms_api
@@ -850,6 +895,7 @@ class TemplateContext:
             "site_meta": self.site_meta,
             "pagination": self.pagination,
             "asset": self.asset,
+            "script": self.script,
             "url": self.url,
             "comments": self.comments,
             "form": self.form,

@@ -87,6 +87,8 @@ class TemplateRenderRequest(BaseModel):
 class TemplateValidateRequest(BaseModel):
     template: str = ""
     source: str | None = None
+    # 当前编辑的是哪个文件：css / js 不跑 CSP 检查（里面出现 <script> 字样是正常的）
+    path: str | None = None
 
     def text(self) -> str:
         return self.template or self.source or ""
@@ -130,10 +132,20 @@ class ThemeActiveRequest(BaseModel):
 
 @router.post("/templates/validate")
 async def templates_validate(body: TemplateValidateRequest):
-    """校验语法。失败时带 line/col，编辑器直接标红。"""
+    """校验语法 + 会不会被 CSP 拦掉。失败时带 line/col，编辑器直接标红。
+
+    两类问题都走同一个 `error` 结构：`type="syntax"` 是跑不起来，
+    `type="csp"` 是跑得起来但脚本／事件不执行。后者更坑 —— 作者看代码没毛病。
+    """
     source = body.text()
-    ok, error = jinja_env.validate_source(source)
-    return {"valid": ok, "ok": ok, "error": error, "message": (error or {}).get("message")}
+    ok, error = jinja_env.validate_theme_source(source, path=body.path)
+    return {
+        "valid": ok,
+        "ok": ok,
+        "error": error,
+        "message": (error or {}).get("message"),
+        "kind": (error or {}).get("type"),
+    }
 
 
 @router.post("/templates/render")
@@ -197,7 +209,7 @@ def _preview_page_sync(body: PreviewRequest) -> str:
     try:
         theme = (body.theme or "").strip() or resolve_theme(session, body.site_id)
         resolver = make_preview_resolver(session, body.site_id, theme, overrides)
-        ctx = TemplateContext(session, site_id=body.site_id, base="")
+        ctx = TemplateContext(session, site_id=body.site_id, base="", theme=theme)
 
         item = ctx.content(body.kind, body.slug) if body.slug else None
         if item is None:
@@ -483,14 +495,18 @@ async def templates_file_get(
 
 @router.put("/templates/file")
 async def templates_file_save(body: TemplateSaveRequest, db: AsyncSession = Depends(get_db)):
-    """保存模板。语法错误直接拒，不留半成品在库里。"""
+    """保存模板。语法错误与「会被 CSP 拦掉的写法」都直接拒，不留半成品在库里。
+
+    保存端和导入端用同一把尺子（``validate_theme_source``）：只要有一处入口放宽，
+    就会有人从这里把死代码塞进库，然后在前台看到白屏。
+    """
     if not jinja_env.is_safe_template_name(body.path):
         raise HTTPException(400, "非法模板路径")
     if not _THEME_RE.match(body.theme or ""):
         raise HTTPException(400, "非法主题名")
-    ok, error = jinja_env.validate_source(body.content)
+    ok, error = jinja_env.validate_theme_source(body.content, path=body.path)
     if not ok:
-        raise HTTPException(400, {"message": "模板语法错误", "error": error})
+        raise HTTPException(400, {"message": (error or {}).get("message") or "模板语法错误", "error": error})
     checksum = _md5(body.content)
     row = (await db.execute(
         select(models.CmsTemplate).where(
@@ -666,7 +682,9 @@ async def templates_import(
             errors.append({"path": name, "message": "不是 UTF-8 文本"})
             continue
         if name.endswith((".html", ".xml")):
-            ok, err = jinja_env.validate_source(content, name=name)
+            # 语法 + CSP 双检：内联 <script>／内联事件属性在这个包里就是死的，
+            # 与其导入后线上空白，不如整包拒掉并指出是哪一行
+            ok, err = jinja_env.validate_theme_source(content, name=name, path=name)
             if not ok:
                 errors.append({"path": name, **(err or {"message": "语法错误"})})
                 continue

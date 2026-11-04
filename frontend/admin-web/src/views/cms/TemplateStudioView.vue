@@ -297,7 +297,11 @@ function scheduleValidate(delay = 450) {
 
 async function validateNow() {
   try {
-    const { data } = await api.post(`${BASE}/validate`, { source: content.value })
+    // path 决定要不要跑 CSP 检查：css / js 里出现 <script> 字样是正常的，不能误报
+    const { data } = await api.post(`${BASE}/validate`, {
+      source: content.value,
+      path: currentPath.value,
+    })
     if (data.valid) {
       syntaxError.value = null
       clearMarks()

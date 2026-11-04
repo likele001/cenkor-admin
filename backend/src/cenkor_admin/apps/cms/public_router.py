@@ -14,6 +14,7 @@ from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import (
+    csp,
     models,
     permalink,
     search_logs,
@@ -1771,10 +1772,9 @@ async def _html_404(request: Request, db: AsyncSession) -> Response:
     """统一 404：走主题的 404.html，别让未知路径掉进静态兜底变成 200 首页。"""
     base = str(request.base_url).rstrip("/")
     site_id, site_name, _ = await _resolve_site(db, request)
-    return Response(
-        content=await _render_404_html(base, site_name, site_id=site_id),
+    return csp.html_response(
+        await _render_404_html(base, site_name, site_id=site_id),
         status_code=404,
-        media_type="text/html; charset=utf-8",
     )
 
 
@@ -1837,9 +1837,8 @@ async def _serve_product_list(
         items=await _product_cards(db, rows, base),
         pagination=pg,
     )
-    return Response(
-        content=await render_page(model, site_id=site_id, base=base),
-        media_type="text/html; charset=utf-8",
+    return csp.html_response(
+        await render_page(model, site_id=site_id, base=base),
         headers={"Cache-Control": "public, max-age=120"},
     )
 
@@ -2052,9 +2051,8 @@ async def _serve_list_page(
     if kw:
         # 搜索结果页是无限薄内容，被收录只会稀释站点权重
         headers["X-Robots-Tag"] = "noindex, follow"
-    return Response(
-        content=await render_page(model, site_id=site_id, base=base),
-        media_type="text/html; charset=utf-8",
+    return csp.html_response(
+        await render_page(model, site_id=site_id, base=base),
         headers=headers,
     )
 
@@ -2290,9 +2288,8 @@ async def _serve_public_page(
         url_path=page_path,
         html=html,
     )
-    return Response(
-        content=html,
-        media_type="text/html; charset=utf-8",
+    return csp.html_response(
+        html,
         # 内容更新要能反映到爬虫，5 分钟足够；再长会被 AI 索引成旧版
         headers={"Cache-Control": "public, max-age=300"},
     )
@@ -2336,10 +2333,12 @@ async def preview_entry_html(token: str, db: AsyncSession = Depends(get_db)):
     entry, err = await _resolve_preview_entry(db, token)
     if not entry:
         raise HTTPException(404 if "失效" not in (err or "") else 410, err or "预览不可用")
-    return Response(
-        content=_render_preview_html(entry),
-        media_type="text/html; charset=utf-8",
+    return csp.html_response(
+        _render_preview_html(entry),
         headers={"X-Robots-Tag": "noindex"},
+        # 后台预览要能被后台 iframe 嵌入（后台与站点可能不同域名），
+        # 单独放开嵌套限制；预览地址是一次性 token，有效期受 _resolve_preview_entry 控。
+        allow_frame=True,
     )
 
 

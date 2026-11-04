@@ -42,12 +42,14 @@ __all__ = [
     "get_env",
     "get_template_meta",
     "is_safe_template_name",
+    "lint_inline_script",
     "register_template_api",
     "render_source",
     "render_template_file",
     "set_resolver",
     "unregister_template_api",
     "validate_source",
+    "validate_theme_source",
 ]
 
 log = structlog.get_logger()
@@ -641,6 +643,91 @@ def render_template_file(name: str, context: dict[str, Any]) -> str:
     return render_source(source, context, name=name)
 
 
+# ---------------------------------------------------------------- 内联脚本检查
+
+# 会被严格 CSP（script-src 'self'）拦下的内联事件属性。
+# 不写成 `on[a-z]+=` 是因为那样会把 `content="..."` 里的 `ontent=` 也匹配上。
+_EVENT_NAMES = (
+    "click|dblclick|load|error|change|input|submit|reset|select|"
+    "focus|blur|mouse[a-z]+|key[a-z]+|touch[a-z]+|pointer[a-z]+|"
+    "drag[a-z]*|drop|contextmenu|wheel|scroll|animation[a-z]+|transition[a-z]+"
+)
+_RE_INLINE_EVENT = re.compile(rf"(?<![\w-])on(?:{_EVENT_NAMES})\s*=", re.IGNORECASE)
+_RE_SCRIPT_OPEN = re.compile(r"<script\b[^>]*>", re.IGNORECASE)
+_RE_SCRIPT_SRC = re.compile(r"\bsrc\s*=", re.IGNORECASE)
+# 不执行脚本的 type：结构化数据 / 模板片段
+_RE_SCRIPT_INERT = re.compile(
+    r"""type\s*=\s*["']?(?:application/ld\+json|application/json|text/template|text/x-template)""",
+    re.IGNORECASE,
+)
+_RE_JS_URL = re.compile(
+    r"""\b(?:href|src|action|formaction)\s*=\s*["']?\s*javascript:""", re.IGNORECASE
+)
+
+
+def _line_col(source: str, pos: int) -> tuple[int, int]:
+    line = source.count("\n", 0, pos) + 1
+    last_nl = source.rfind("\n", 0, pos)
+    return line, pos - last_nl
+
+
+def lint_inline_script(source: str) -> dict[str, Any] | None:
+    """挑出会被严格 CSP 拦掉的写法。返回第一条问题（带 line/col），没有则 None。
+
+    为什么要提前吵：这类写法是**必然失效**，不是风格问题。``script-src 'self'``
+    下内联脚本一律不执行，作者看代码找不出毛病、上线却是空白 —— 最难自查的
+    一类故障。所以放在保存前报，不放到线上等。
+
+    放行的三种情况：
+
+    * ``<script src="...">``         外链，'self' 允许
+    * ``type="application/ld+json"`` 结构化数据，浏览器不执行
+    * ``type="text/template"``       模板片段，同样不执行
+    """
+    if not source:
+        return None
+
+    for m in _RE_SCRIPT_OPEN.finditer(source):
+        tag = m.group(0)
+        if _RE_SCRIPT_SRC.search(tag) or _RE_SCRIPT_INERT.search(tag):
+            continue
+        line, col = _line_col(source, m.start())
+        return {
+            "message": (
+                "内联 <script> 会被 CSP 拦下，已不执行。"
+                "请把脚本放到 assets/ 下，用 {{ script('assets/xxx.js') }} 引入"
+            ),
+            "line": line,
+            "col": col,
+            "type": "csp",
+        }
+
+    m = _RE_INLINE_EVENT.search(source)
+    if m:
+        line, col = _line_col(source, m.start())
+        return {
+            "message": (
+                f"内联事件属性 {m.group(0).strip()} 会被 CSP 拦下，"
+                "请改用外链脚本里的 addEventListener"
+            ),
+            "line": line,
+            "col": col,
+            "type": "csp",
+        }
+
+    m = _RE_JS_URL.search(source)
+    if m:
+        line, col = _line_col(source, m.start())
+        return {
+            "message": "javascript: 伪协议会被 CSP 拦下，请用 <a> 配合外链脚本绑定事件",
+            "line": line,
+            "col": col,
+            "type": "csp",
+        }
+
+    return None
+
+
 def validate_source(source: str, *, name: str = "<template>") -> tuple[bool, dict[str, Any] | None]:
     """校验语法。返回 (ok, error)；error 含 line/col/message，供编辑器定位。"""
     if not source or not source.strip():
@@ -660,6 +747,31 @@ def validate_source(source: str, *, name: str = "<template>") -> tuple[bool, dic
         return False, {"message": str(exc), "line": 1, "col": 1, "type": "security"}
     except Exception as exc:
         return False, {"message": str(exc), "line": 1, "col": 1, "type": "unknown"}
+
+
+def validate_theme_source(
+    source: str, *, name: str = "<template>", path: str | None = None
+) -> tuple[bool, dict[str, Any] | None]:
+    """主题专用校验：语法 + 会被 CSP 拦掉的写法。
+
+    语法错误优先报 —— 那是根本跑不起来的问题，CSP 是跑起来但跑不对的问题。
+
+    ``path`` 决定要不要跑 CSP 检查：只有 html/xml 会被 CSP 管到。css / js 文件里
+    出现 ``<script>`` 字样是完全正常的（模板字符串、注释、文档示例），一律按
+    html 去查会天天误报。不给 path 时按 html 处理 —— 编辑器默认就在写模板。
+    """
+    ok, err = validate_source(source, name=name)
+    if not ok:
+        return ok, err
+
+    target = (path or "").strip().lower()
+    if target and not target.endswith((".html", ".xml")):
+        return True, None
+
+    lint = lint_inline_script(source)
+    if lint is not None:
+        return False, lint
+    return True, None
 
 
 def get_template_meta(source: str) -> dict[str, Any]:
