@@ -172,3 +172,49 @@ class CmsPublishJob(Base):
         Index("ix_publish_jobs_status", "status", "scheduled_at"),
         Index("ix_publish_jobs_channel", "channel_id"),
     )
+
+
+class CmsSearchLog(Base):
+    """站内搜索词日志。
+
+    ## 为什么值得单独一张表
+
+    选题缺口模块现在只能拿「已有内容」反推「缺什么」—— 那是模型的判断，会飘。
+    真正硬的需求信号在搜索框里：读者主动打了什么、我们没搜到、他接着走了。
+    「零结果词」是最便宜的选题清单，而且比任何关键词工具都准 —— 它来自本站读者，
+    不是全网热度。
+
+    ## 为什么存 query_norm
+
+    聚合时必须把「AI CMS」「ai cms」「AI  CMS 」算成同一件事。归一化在写入时做一次，
+    读的时候直接 group by，不用在 SQL 里反复 lower(replace(...))，
+    也才能给这一列建索引。
+
+    ## 隐私
+
+    不存 IP、不存 UA 原文，只留前台已有的匿名 visitor_id 与归一化后的词。
+    搜索词可能含人名、公司名，所以只在后台聚合视图出现，不对公开接口返回。
+    """
+
+    __tablename__ = "cms_search_logs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    query: Mapped[str] = mapped_column(String(200), nullable=False)
+    query_norm: Mapped[str] = mapped_column(String(200), nullable=False)
+    # 这条词当时命中几条 —— 零结果词是有价值的那一类
+    result_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    clicked_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    visitor_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    lang: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    stat_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_search_logs_norm_date", "query_norm", "stat_date"),
+        Index("ix_search_logs_stat_date", "stat_date"),
+        Index("ix_search_logs_site_date", "site_id", "stat_date"),
+        Index("ix_search_logs_result_date", "result_count", "stat_date"),
+    )

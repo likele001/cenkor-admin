@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
+from cenkor_admin.apps.cms import search_logs
 from cenkor_admin.apps.cms.ai import copilot, pricing
 from cenkor_admin.apps.cms.ai import ingest as ingest_mod
 from cenkor_admin.apps.cms.ai.admin_router import router as admin_router
@@ -143,6 +144,37 @@ def _explain_unsupported(raw: str) -> str:
 # ---------------------------------------------------------------------------
 # 对话式建模
 # ---------------------------------------------------------------------------
+@router.get("/search-terms", response_model=dict[str, Any])
+async def list_search_terms(
+    days: int = Query(30, ge=1, le=365, description="回看天数"),
+    limit: int = Query(30, ge=1, le=200),
+    order: str = Query("hits", pattern="^(hits|zero|gap)$", description="hits=搜得最多 / zero=零结果最多 / gap=零结果占比最高"),
+    site_id: int = Query(1),
+    only_zero: bool = Query(False, description="只看零结果的词"),
+    db: AsyncSession = Depends(get_db),
+):
+    """站内搜索词榜 —— 选题缺口最硬的数据源。
+
+    和 ``/topic-gaps`` 的分工：
+    - ``/topic-gaps`` 让模型看「库里已有什么」，判断「还缺什么主题」，是推断；
+    - 这里给的是读者**实际打的字**，零结果词就是现成的选题清单，是事实。
+
+    ``result_count`` 是当时命中的公开条目数；零结果词标注出来，
+    这些是最该补的内容。
+    """
+    return {
+        "summary": await search_logs.summary(db, days=days, site_id=site_id),
+        "items": await search_logs.top_terms(
+            db,
+            days=days,
+            site_id=site_id,
+            limit=limit,
+            only_zero=only_zero,
+            order=order,
+        ),
+    }
+
+
 @router.post("/content-types/propose", summary="自然语言生成内容类型草案")
 async def propose_content_type(
     body: dict[str, Any] = Body(...),

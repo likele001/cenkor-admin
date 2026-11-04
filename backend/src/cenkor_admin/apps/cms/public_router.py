@@ -13,7 +13,13 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.cms import models, permalink, static_cache, url_resolver
+from cenkor_admin.apps.cms import (
+    models,
+    permalink,
+    search_logs,
+    static_cache,
+    url_resolver,
+)
 from cenkor_admin.apps.cms.render import render_page
 from cenkor_admin.apps.cms.template_context import (
     absolutize_pagination,
@@ -2638,6 +2644,7 @@ async def llms_txt(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.get("/search", response_model=dict[str, Any])
 async def search_public_entries(
+    request: Request,
     q: str = Query(..., min_length=1, description="关键词"),
     db: AsyncSession = Depends(get_db),
     content_type_key: str | None = Query(None),
@@ -2694,6 +2701,16 @@ async def search_public_entries(
         items = [await _apply_entry_translation(db, it, lang) for it in items]
     for it in items:
         it["og"] = _build_og(it)
+    # 记录搜索词（旁路统计）。失败只记 warn，绝不让统计打挂搜索本身 ——
+    # 丢一条日志无所谓，搜索慢或报错才是真问题。
+    await search_logs.record(
+        db,
+        query=q,
+        result_count=total,
+        site_id=int(request.query_params.get("site_id") or 1),
+        visitor_id=request.headers.get("X-Visitor-Id", ""),
+        lang=lang,
+    )
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
