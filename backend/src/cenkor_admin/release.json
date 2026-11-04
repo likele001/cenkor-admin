@@ -1,5 +1,5 @@
 {
-  "version": "0.5.18",
+  "version": "0.5.19",
   "channel": "stable",
   "released_at": "2026-11-04",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "widget 组件沙箱：模板可带交互组件，跑在 opaque origin 的 iframe 里，不需要同源权限。三层防护、sha256 脚本白名单、参数注入转义；内置 corporate 加 stats 组件样板"
+  "notes": "修复分页字段名不一致：corporate 主题的 Hero 在真实页面上从未显示；build_pagination 增加 current 别名；后台预览补齐 theme / is_home / 组件声明"
 }

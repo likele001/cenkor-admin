@@ -5,13 +5,13 @@
 | 项 | 值 |
 |----|-----|
 | 类型 | 核心平台（不含官网） |
-| 版本 | 0.5.18 |
+| 版本 | 0.5.19 |
 | 打包日期 | 2026-11-04 |
-| 文件名 | `cenkor-admin-core-0.5.18-20261104.tar.gz` |
+| 文件名 | `cenkor-admin-core-0.5.19-20261104.tar.gz` |
 | 路径 | `/www/wwwroot/cenkor-admin/release/` |
 | 打包命令 | `bash scripts/package-core.sh` |
-| 发布页 | `https://github.com/likele001/cenkor-admin/releases/tag/v0.5.18` |
-| 容器镜像 | `ghcr.io/likele001/cenkor-admin:0.5.18`（amd64 / arm64） |
+| 发布页 | `https://github.com/likele001/cenkor-admin/releases/tag/v0.5.19` |
+| 容器镜像 | `ghcr.io/likele001/cenkor-admin:0.5.19`（amd64 / arm64） |
 
 详细说明见 [../packaging.md](../packaging.md)。
 
@@ -19,6 +19,7 @@
 
 | 版本 | 日期 | 主要变化 |
 |------|------|----------|
+| 0.5.19 | 2026-11-04 | 修 corporate 主题 Hero 在真实页面从未显示（分页字段名对不上）；`build_pagination` 增加 `current` 别名；后台预览补齐 theme / is_home / 组件声明 |
 | 0.5.18 | 2026-11-04 | widget 组件沙箱：模板可带交互组件，跑在 opaque origin 的 iframe 里，开放交互但不需要同源权限；内置 corporate 加 stats 组件样板 |
 | 0.5.17 | 2026-11-04 | 公开页严格 CSP + 主题资源路由 + 内联脚本拦截；`theme.json` 包规范、3 个官方样板主题、主题配置表单、打包 CLI |
 | 0.5.16 | 2026-11-04 | 稿件版本对比；站内搜索词日志（新表 + 选题真实信号）；AI 事实溯源（只告警不阻断）；官网产物移出 git、修打包漏文档中心 |

@@ -10,6 +10,13 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 ## 发版日志
 
+### 0.5.19 · 2026-11-04
+
+- 修 `corporate` 主题的 Hero 在**真实页面上从未显示**：`build_pagination` 返回的键是 `page`，模板条件写的是 `pagination.current`，取到 `Undefined` 后条件恒为假，整块不渲染且不报错（第二期引入）
+- `build_pagination` 增加 `current` 作为 `page` 的别名 —— 模板作者几乎都会先写 `pagination.current`，缺这个别名就是一个不报错的永远为假
+- 后台模板预览补齐 `theme` 变量、`is_home` 判定与组件声明：此前预览里 Hero 和 `widget()` 都是空的，与线上不一致
+- 无数据库迁移；需重启服务
+- 产物：`release/cenkor-admin-core-0.5.19-20261104.tar.gz`
 ### 0.5.18 · 2026-11-04
 
 - 新增 widget 组件沙箱（模板市场第四期）：模板可以把交互部分做成组件，跑在没有同源权限的 iframe 里 —— 开放交互但**不需要信任模板作者**
