@@ -746,6 +746,7 @@ function categoryLabel(c: string): string {
       <div v-if="activeTab === 'installed' && installedApps.length === 0" class="card text-ink-500 text-center py-12">
         {{ t('apps.emptyInstalled') }}
       </div>
+      <template v-if="activeTab === 'installed'">
       <template v-for="(app, idx) in installedApps" :key="app.key">
       <h3
         v-if="activeTab === 'installed' && idx === 0 && app.builtin"
@@ -861,6 +862,7 @@ function categoryLabel(c: string): string {
           </div>
         </div>
       </div>
+      </template>
       </template>
 
       <div v-if="activeTab === 'store' && storeApps.length === 0" class="card text-ink-500 text-center py-12">
