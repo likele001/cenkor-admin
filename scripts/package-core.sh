@@ -45,6 +45,14 @@ else
   warn "跳过前端构建（使用现有 dist）"
 fi
 
+# ---- 构建产物回填索引：frontend/landing（nginx 线上目录） ----
+# frontend/landing/ 是 git 跟踪的，构建用 rsync --delete 换掉 assets/ 里的哈希
+# 文件。依赖升级（v0.5.15 的 vite 5 → 6）会让哈希全变：旧文件被删、新文件未跟踪。
+# 不处理的话下面「跟踪文件被删除」会直接中止（v0.5.0/0.5.1/0.5.2 同因失败），
+# 而 `git ls-files | tar` 也拿不到新哈希资源，包里的落地页会 404。
+# 这里把构建结果同步进索引，让 ls-files 反映真实磁盘内容；打包结束再还原。
+git add -A -- frontend/landing >/dev/null 2>&1 || true
+
 # ---- 前置检查：git 跟踪但磁盘上不存在的文件 ----
 # `git ls-files | tar` 的前提是「跟踪的文件都在工作区」。一旦有文件被构建脚本
 # 误删（历史上就是 `rsync --delete` 删 landing/ 里的手写资产），tar 只会抛出
@@ -369,6 +377,9 @@ if [ -n "$UNTRACKED" ]; then
   [ "$N" -gt 15 ] && echo "    …（共 $N 条，仅显示前 15 条）"
   echo "    处理方式：该提交的 git add；不该交付的加 --exclude。"
 fi
+
+# 还原索引：产物已进 tar，暂存区不留构建垃圾（本地手工打包时尤其重要）
+git reset -q -- frontend/landing >/dev/null 2>&1 || true
 
 rm -rf "$STAGE"
 
