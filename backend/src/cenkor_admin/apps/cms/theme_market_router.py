@@ -137,7 +137,7 @@ async def theme_market_install(
         from cenkor_admin.apps.system.market_router import _download_free_package
 
         try:
-            tmp_path, hub_product, hub_dev_method = await _download_free_package(app_key)
+            tmp_path, _hub_product, _hub_dev_method = await _download_free_package(app_key)
         except HTTPException as e:
             if e.status_code == 403:
                 raise HTTPException(

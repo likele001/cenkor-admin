@@ -31,9 +31,9 @@ from cenkor_admin.apps.notification.router import router as notification_router
 from cenkor_admin.apps.portal.admin_router import router as portal_admin_router
 from cenkor_admin.apps.portal.router import router as portal_router
 from cenkor_admin.apps.rbac.router import router as rbac_router
+from cenkor_admin.apps.system.developer_docs_router import router as developer_docs_router
 from cenkor_admin.apps.system.router import public_router as system_public_router
 from cenkor_admin.apps.system.router import router as system_router
-from cenkor_admin.apps.system.developer_docs_router import router as developer_docs_router
 from cenkor_admin.apps.system.webhook_router import router as webhook_router
 from cenkor_admin.core.hooks_router import router as hooks_router
 
