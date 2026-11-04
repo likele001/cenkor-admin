@@ -120,6 +120,7 @@ const navKeyMap: Record<string, string> = {
   '/cms/url-rules': 'nav.urlRules',
   '/cms/media': 'nav.media',
   '/cms/templates': 'nav.templates',
+  '/cms/theme-market': 'nav.themeMarket',
   '/system/users': 'nav.users',
   '/system/portal-users': 'nav.portalUsers',
   '/system/roles': 'nav.roles',

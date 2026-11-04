@@ -104,6 +104,7 @@ DEFAULT_MENUS = [
     ("cms:tags", "cms", "标签管理", "tags", "/cms/tags", 51),
     ("cms:entries", "cms", "通用内容", "file-stack", "/cms/entries", 52),
     ("cms:templates", "cms", "模板预览", "layout-template", "/cms/templates", 53),
+    ("cms:theme-market", "cms", "模板市场", "store", "/cms/theme-market", 54),
     ("cms:products", "cms", "产品", "package", "/cms/products", 54),
     ("cms:cases", "cms", "案例", "briefcase", "/cms/cases", 55),
     ("cms:news", "cms", "新闻", "file-text", "/cms/news", 56),
@@ -173,7 +174,7 @@ DEFAULT_ROLES = [
          "cms:ai:read"],
         ["dashboard", "cms", "cms:ai-settings", "cms:search", "cms:content-types",
          "cms:languages", "cms:categories", "cms:tags", "cms:entries", "cms:templates",
-         "cms:products", "cms:cases", "cms:news", "cms:site", "cms:media"],
+         "cms:theme-market", "cms:products", "cms:cases", "cms:news", "cms:site", "cms:media"],
     ),
     (
         "viewer", "访客", "只读权限", False,

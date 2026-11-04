@@ -1344,6 +1344,8 @@ async def download_package(
         "X-App-Version": version,
         "X-App-Product": lic.product or "",
         "X-App-Schema-Version": str(sub.schema_version or ""),
+        # dev_method：实例侧据此区分 app 包与 theme 包（theme 装进 cms_templates）
+        "X-Dev-Method": sub.dev_method or "",
     }
     if sub.file_hash:
         # 实例侧装完之前比对包体指纹；不等说明 hub 落盘的包与发布时不是同一份。
@@ -1361,6 +1363,58 @@ async def download_package(
         filename=f"{app_key}-{version}.zip",
         # X-App-Product：把授权轴上的 product 随包下发，实例侧据此拒绝跨产品误装。
         # 走响应头而不是改写 zip：hub 从不重打包（全仓无 ZipFile 'w'）。
+        headers=headers,
+    )
+
+
+@router.get("/cloud/public/packages/{app_key}")
+async def download_free_package(
+    app_key: str,
+    product: str = Query("cenkor-admin"),
+    db: AsyncSession = Depends(get_db),
+):
+    """免费包公开下载（仅限定价行 model=free 的应用）。
+
+    为「一键安装免费主题」而生：没有定价行 ≠ 免费（缺行只说明运营还没配价），
+    所以这里只放行**明确建了 free 定价行**的包。付费包仍走授权码下载。
+    """
+    from cenkor_admin.apps.commerce import models as cm
+
+    pricing = (await db.execute(
+        select(cm.AppPricing).where(
+            cm.AppPricing.app_key == app_key,
+            cm.AppPricing.product == product,
+        )
+    )).scalar_one_or_none()
+
+    if pricing is None or pricing.model != "free":
+        raise HTTPException(403, "该应用不是免费应用，需要授权码下载")
+
+    sub, path = await _fetch_package(db, app_key, product=product)
+    version = sub.version
+    sub.download_count = (sub.download_count or 0) + 1
+    await db.commit()
+
+    headers = {
+        "X-App-Version": version,
+        "X-App-Product": product,
+        "X-App-Schema-Version": str(sub.schema_version or ""),
+        "X-Dev-Method": sub.dev_method or "",
+    }
+    if sub.file_hash:
+        headers["X-Package-Sha256"] = sub.file_hash
+
+    log.info(
+        "commerce.free_package_served",
+        app=app_key,
+        version=version,
+        product=product,
+        sha256=sub.file_hash or "",
+    )
+    return FileResponse(
+        path,
+        media_type="application/zip",
+        filename=f"{app_key}-{version}.zip",
         headers=headers,
     )
 

@@ -213,6 +213,8 @@ def _decorate(
             and latest_version
             and ver_gt(latest_version, installed_version)
         ),
+        # dev_method：前端据此过滤主题包（theme）与应用包（platform/extension/standalone）
+        "dev_method": item.get("dev_method") or "",
     }
 
 
@@ -250,6 +252,7 @@ async def market_catalog(
     category: str = Query(""),
     q: str = Query(""),
     filter: str = Query("", description="free | paid | installed | update"),
+    dev_method: str = Query("", description="theme | platform | extension | standalone；留空=全部"),
     refresh: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     _: Any = Depends(require_permission("rbac:role:write")),
@@ -272,6 +275,8 @@ async def market_catalog(
     items = all_items
     if category:
         items = [it for it in items if it["category"] == category]
+    if dev_method:
+        items = [it for it in items if it.get("dev_method") == dev_method]
     if filter == "free":
         items = [it for it in items if it["is_free"]]
     elif filter == "paid":
@@ -370,11 +375,12 @@ async def market_app_detail(
 # 安装 / 升级
 # ============================================================
 
-async def _download_package(app_key: str, license_key: str) -> tuple[Path, str]:
-    """从官方下载授权包到临时文件，返回 (路径, hub 权威产品轴)。
+async def _download_package(app_key: str, license_key: str) -> tuple[Path, str, str]:
+    """从官方下载授权包到临时文件，返回 (路径, hub 权威产品轴, dev_method)。
 
     产品轴取自响应头 ``X-App-Product``（hub 按 license.product 下发）；老 hub 无此头
-    → 空串 → 调用方按「缺值即放行」处理。返回头而不是改写包：本函数拿到的是已签名
+    → 空串 → 调用方按「缺值即放行」处理。dev_method 取自 ``X-Dev-Method``，
+    用于区分 app 包与 theme 包。返回头而不是改写包：本函数拿到的是已签名
     的原始字节，就地重打包会破坏 file_hash 且 hub 从不重打包。
     """
     hub = _hub_base()
@@ -424,7 +430,68 @@ async def _download_package(app_key: str, license_key: str) -> tuple[Path, str]:
     fd, path = tempfile.mkstemp(suffix=".zip")
     with os.fdopen(fd, "wb") as f:
         f.write(content)
-    return Path(path), (resp.headers.get("X-App-Product") or "").strip()
+    return (
+        Path(path),
+        (resp.headers.get("X-App-Product") or "").strip(),
+        (resp.headers.get("X-Dev-Method") or "").strip(),
+    )
+
+
+async def _download_free_package(app_key: str) -> tuple[Path, str, str]:
+    """从官方下载免费包（不需要授权码），返回 (路径, 产品轴, dev_method)。
+
+    仅限定价行 model=free 的应用；付费包仍走授权码下载。
+    """
+    hub = _hub_base()
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=PACKAGE_TIMEOUT, follow_redirects=True) as client:
+            resp = await client.get(
+                f"{hub}/api/v1/store/cloud/public/packages/{app_key}",
+                params={"product": SELF_PRODUCT},
+            )
+    except Exception as e:
+        raise HTTPException(502, f"下载应用包失败：{e}") from e
+
+    if resp.status_code == 404:
+        raise HTTPException(404, "该应用暂无可分发的安装包")
+    if resp.status_code == 403:
+        raise HTTPException(403, _hub_detail(resp, "该应用不是免费应用"))
+    if resp.status_code != 200:
+        code = resp.status_code if resp.status_code < 500 else 502
+        raise HTTPException(code, f"下载应用包失败：{_hub_detail(resp, resp.text[:200])}")
+
+    content = resp.content
+    if content[:2] != b"PK":
+        raise HTTPException(502, "官方返回的不是有效的 ZIP 应用包")
+
+    # 包体指纹校验（与授权码下载同口径）
+    expected = (resp.headers.get("X-Package-Sha256") or "").strip().lower()
+    if expected:
+        actual = hashlib.sha256(content).hexdigest()
+        if actual != expected:
+            log.error(
+                "market.package_sha256_mismatch",
+                app=app_key,
+                expected=expected,
+                actual=actual,
+                size=len(content),
+            )
+            raise HTTPException(
+                502,
+                f"应用包校验失败：SHA256 与发布记录不一致"
+                f"（期望 {expected[:12]}…，实得 {actual[:12]}…），已拒绝安装",
+            )
+
+    fd, path = tempfile.mkstemp(suffix=".zip")
+    with os.fdopen(fd, "wb") as f:
+        f.write(content)
+    return (
+        Path(path),
+        (resp.headers.get("X-App-Product") or "").strip(),
+        (resp.headers.get("X-Dev-Method") or "").strip(),
+    )
 
 
 @router.post("/install")
@@ -436,10 +503,12 @@ async def market_install(
     """安装 / 升级官方应用。
 
     * 本地已有代码（免费、内置应用）→ 系统安装，不需要授权码、不解压 ZIP；
-    * 本地没有代码（官方分发的商业应用）→ 凭授权码从官方拉包解压安装。
+    * 本地没有代码（官方分发的商业应用）→ 凭授权码从官方拉包解压安装；
+    * 主题模板包（dev_method=theme）→ 装进 cms_templates，不进 InstalledApp。
     """
     app_key = str(body.get("app_key") or body.get("key") or "").strip()
     license_key = str(body.get("license_key") or "").strip()
+    site_id = int(body.get("site_id") or 1)
     if not app_key:
         raise HTTPException(400, "app_key 必填")
 
@@ -463,12 +532,64 @@ async def market_install(
         }
 
     if not license_key:
+        # 免费主题：不需要授权码，走公开下载通道（仅限定价行 model=free 的包）
+        if body.get("dev_method") == "theme":
+            try:
+                tmp_path, hub_product, hub_dev_method = await _download_free_package(app_key)
+                # 主题包安装到 cms_templates
+                try:
+                    from cenkor_admin.apps.cms import theme_install as _ti
+                    from cenkor_admin.apps.cms import theme_package as _tp
+
+                    raw = Path(tmp_path).read_bytes()
+                    try:
+                        raw_files, too_big = _ti.unzip_theme_package(raw)
+                    except ValueError as exc:
+                        raise HTTPException(400, str(exc)) from exc
+
+                    check = _tp.validate_package(raw_files, expected_key=app_key, require_manifest=True)
+                    errors = too_big + check.errors
+                    if errors:
+                        raise HTTPException(
+                            400,
+                            {"message": f"{len(errors)} 个文件未通过校验，已整体拒绝",
+                             "errors": errors, "warnings": check.warnings},
+                        )
+
+                    result = await _ti.install_theme_files(
+                        db, site_id=site_id, theme=app_key, files=dict(check.files), overwrite=True
+                    )
+                    manifest = check.manifest
+                    return {
+                        "ok": True,
+                        "app_key": app_key,
+                        "mode": "theme",
+                        "site_id": site_id,
+                        "written": result["written"],
+                        "skipped": result["skipped"],
+                        "warnings": check.warnings,
+                        "manifest": {
+                            "name": manifest.name if manifest else app_key,
+                            "version": manifest.version if manifest else None,
+                            "settings_count": len(manifest.settings) if manifest else 0,
+                        },
+                    }
+                finally:
+                    with contextlib.suppress(OSError):
+                        os.unlink(tmp_path)
+            except HTTPException as e:
+                if e.status_code == 403:
+                    raise HTTPException(
+                        400,
+                        "该主题需要授权码：请先在官方门户购买，再把授权码填入此处",
+                    ) from e
+                raise
         raise HTTPException(
             400,
             "该应用由官方分发，需要授权码：请先在官方门户购买，再把授权码填入此处",
         )
 
-    tmp_path, hub_product = await _download_package(app_key, license_key)
+    tmp_path, hub_product, hub_dev_method = await _download_package(app_key, license_key)
     # 跨产品误装闸：目录默认按 product=cenkor-admin 过滤，但 /install 只认 app_key，
     # 手工传一个 process 侧的 key 就能走到这里。缺值（老 hub 无此头）即放行。
     if hub_product and hub_product != SELF_PRODUCT:
@@ -477,6 +598,50 @@ async def market_install(
             400,
             f"该应用包属于产品「{hub_product}」，与本实例「{SELF_PRODUCT}」不符",
         )
+
+    # theme 包：装进 cms_templates，不进 InstalledApp
+    if hub_dev_method == "theme" or body.get("dev_method") == "theme":
+        try:
+            from cenkor_admin.apps.cms import theme_install as _ti
+            from cenkor_admin.apps.cms import theme_package as _tp
+
+            raw = Path(tmp_path).read_bytes()
+            try:
+                raw_files, too_big = _ti.unzip_theme_package(raw)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc)) from exc
+
+            check = _tp.validate_package(raw_files, expected_key=app_key, require_manifest=True)
+            errors = too_big + check.errors
+            if errors:
+                raise HTTPException(
+                    400,
+                    {"message": f"{len(errors)} 个文件未通过校验，已整体拒绝",
+                     "errors": errors, "warnings": check.warnings},
+                )
+
+            result = await _ti.install_theme_files(
+                db, site_id=site_id, theme=app_key, files=dict(check.files), overwrite=True
+            )
+            manifest = check.manifest
+            return {
+                "ok": True,
+                "app_key": app_key,
+                "mode": "theme",
+                "site_id": site_id,
+                "written": result["written"],
+                "skipped": result["skipped"],
+                "warnings": check.warnings,
+                "manifest": {
+                    "name": manifest.name if manifest else app_key,
+                    "version": manifest.version if manifest else None,
+                    "settings_count": len(manifest.settings) if manifest else 0,
+                },
+            }
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
+
     try:
         from cenkor_admin.apps.system.store_router import install_app_from_zip
 

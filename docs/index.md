@@ -10,7 +10,8 @@ Cenkor Admin 文档目录。按用途选择。
 | [**dev_guide.md**](dev_guide.md) | **开发者指南** —— 创建 App、字段定义、模板开发 |
 | [**migrations.md**](migrations.md) | **数据库迁移规则（必读）** —— 公开链 / 闭源链、挂载点、新增迁移顺序、事故与排查 |
 | [**template/**](template/index.md) | **模板标签参考** —— 总览 · 全量速查 · 内容 / 结构 / 站点配置 / 评论表单 / 自定义开发（仿 iCMS 参考手册式分页） |
-| [**template-guide.md**](template-guide.md) | **站点主题模板开发（教程）** —— 目录约定 · 页面上下文 · 16 个数据 API · 过滤器 · 自定义标签（macro / App 注册）· 沙箱边界 · 导入导出 · 排错 |
+| [**template-guide.md**](template-guide.md) | **站点主题模板开发（教程）** —— 目录约定 · 页面上下文 · 16 个数据 API · 过滤器 · 自定义标签（macro / App 注册）· 沙箱边界 · 导入导出 · 排错 · 上架与商业化 |
+| [**theme-market.md**](theme-market.md) | **模板市场** —— 站长安装主题 · 开发者上架 · 定价抽成 · 授权码 · 开发者结算 |
 | [**apps/development_guide.md**](apps/development_guide.md) | 应用开发规范（结构 / 字段类型 / 路由 / 迁移 / 打包 / 安全） |
 | [**apps/market_ai_extensions.md**](apps/market_ai_extensions.md) | AI 体系扩展应用上架说明（cenkormes 首批三包：清单 / 发布链路 / 商店取数 / 边界） |
 | [**core_platform.md**](core_platform.md) | 核心平台组成 · 域名规划 · 宝塔建站 |

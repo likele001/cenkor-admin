@@ -1409,3 +1409,110 @@ backend/var/htmlcache/
 ```
 
 `backend/var/` 已进 `.gitignore` —— 这是机器本地状态，换台机器会自己重建。
+
+---
+
+## 十二、模板上架与商业化
+
+写好主题后，可以把它上架到模板市场，让其他站长一键安装。这一节讲完整的商业化链路。
+
+### 12.1 开发者身份
+
+1. 在后台「模板市场 → 我的模板」注册开发者
+2. 填写显示名称、简介、网站（可选）
+3. 注册后即可提交主题包
+
+### 12.2 打包规范（theme.json）
+
+每个主题包必须包含 `theme.json` 清单文件：
+
+```json
+{
+  "schema_version": 1,
+  "key": "clean-blog",
+  "name": "Clean Blog",
+  "version": "1.2.0",
+  "description": "极简博客主题，适配内容型站点",
+  "author": { "name": "张三", "url": "https://example.com" },
+  "license": "MIT",
+  "icon": "🎨",
+  "tags": ["blog", "minimal", "responsive"],
+  "requires": {
+    "core_version": ">=0.5.16",
+    "asset_kinds": ["css"]
+  },
+  "settings": [
+    { "key": "brand_color", "type": "color", "label": "主色", "default": "#185FA5" },
+    { "key": "show_sidebar", "type": "bool", "label": "显示侧栏", "default": true }
+  ],
+  "widgets": [
+    { "name": "carousel", "title": "轮播图", "height": 320 }
+  ],
+  "files": ["layout.html", "list.html", "assets/style.css"]
+}
+```
+
+**关键字段说明**：
+
+| 字段 | 作用 | 校验规则 |
+|---|---|---|
+| `key` | 主题唯一标识（即 app_key） | 小写字母/数字/连字符/下划线，2-50 位 |
+| `version` | 语义化版本 | 必须是 semver（如 1.2.0） |
+| `requires.asset_kinds` | 声明使用的资源类型 | 声明了 js 必须有 `assets/*.js` 文件 |
+| `settings` | 可配置项（后台自动出配置表单） | key 唯一，type 必须在白名单内 |
+| `widgets` | 声明的交互组件 | name 必须有对应的 `widgets/<name>.html` |
+
+### 12.3 提交与审核
+
+1. 在后台「模板市场 → 我的模板 → 提交新版本」上传 zip
+2. 系统自动校验：theme.json 结构、路径安全、Jinja 语法、CSP 合规
+3. 审核通过后上架到模板市场
+
+**审核要点**：
+- `asset_kinds` 声明与实际文件一致（声明只用 CSS 却带了 JS → 直接拒）
+- 不能包含内联 `<script>`（除 `type="application/ld+json"`）
+- 不能包含内联事件（`onclick` 等）
+- 不能包含 `javascript:` 伪协议
+
+### 12.4 定价与抽成
+
+| 定价模式 | 说明 |
+|---|---|
+| `free` | 免费，站长直接安装 |
+| `one_time` | 一次性买断 |
+| `seat` | 按站点数收费 |
+
+**平台抽成**：默认 20%（可在后台「市场设置」调整）。开发者收入 = 售价 × (1 - 抽成比例)。
+
+**定价设置**：在后台「市场 → 定价管理」为每个主题设置价格。
+
+### 12.5 授权码
+
+付费主题需要授权码才能安装：
+
+1. 站长在官方门户购买主题
+2. 获得授权码（如 `LIC-XXXX-XXXX-XXXX`）
+3. 在后台「模板市场」安装时填入授权码
+
+**免费主题不需要授权码**，直接点安装即可。
+
+### 12.6 开发者结算
+
+| 功能 | 入口 |
+|---|---|
+| 查看收入 | 后台「市场 → 开发者 → 我的收入」 |
+| 查看账单 | 后台「市场 → 开发者 → 账单明细」 |
+| 申请提现 | 后台「市场 → 开发者 → 提现」 |
+| 收款账户 | 后台「市场 → 开发者 → 收款账户」 |
+
+**结算周期**：每月 1 日结算上月收入，T+7 到账。
+
+### 12.7 常见问题
+
+| 问题 | 解决方案 |
+|---|---|
+| 提交被拒：「asset_kinds 声明不一致」 | 检查 `requires.asset_kinds` 是否包含包里实际有的资源类型 |
+| 提交被拒：「内联脚本」 | 把 `<script>` 改为 `{{ script('assets/app.js') }}` |
+| 安装后白屏 | 检查 theme.json 的 `key` 是否与提交的 `app_key` 一致 |
+| 授权码无效 | 确认授权码属于该主题，且未过期 |
+| 免费主题安装报「需要授权码」 | 该主题未设置 `model=free` 定价行，联系平台配置 |

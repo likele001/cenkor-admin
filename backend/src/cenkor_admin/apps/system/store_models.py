@@ -33,7 +33,7 @@ class AppSubmission(Base):
     # 目标产品/宿主：cenkor-admin（平台内置应用）/ cenkormes / lightmes / cenkor-process ...
     # 多产品目录隔离与 app_key 命名空间的维度，默认平台自营。
     product: Mapped[str] = mapped_column(String(32), default="cenkor-admin", nullable=False, index=True)
-    # 应用开发方式（交付安装目标）：platform=平台内置(manifest.py) / extension=产品扩展(manifest.json) / standalone=独立整包
+    # 应用开发方式（交付安装目标）：platform=平台内置(manifest.py) / extension=产品扩展(manifest.json) / standalone=独立整包 / theme=主题模板(theme.json)
     # 取代旧「product != cenkor-admin 即扩展」的隐式判定；校验/安装按钮/门户徽标一律由此驱动。
     dev_method: Mapped[str] = mapped_column(String(16), default="extension", nullable=False, index=True)
     app_key: Mapped[str] = mapped_column(String(50), nullable=False, index=True)

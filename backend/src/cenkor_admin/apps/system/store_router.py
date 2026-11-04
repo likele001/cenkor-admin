@@ -173,7 +173,8 @@ ALLOWED_PRODUCTS = {"cenkor-admin", "cenkormes", "lightmes", "cenkor-process"}
 #   platform   平台内置应用（装进 cenkor-admin 自身，包内含 manifest.py + __init__.py）
 #   extension  产品扩展插件（交付到对应 MES 实例热挂载，包内含 manifest.json）
 #   standalone 独立应用（私有化整包，仅门户展示/售卖，不由平台或实例热挂载）
-DEV_METHODS = {"platform", "extension", "standalone"}
+#   theme      主题模板包（装进 cms_templates，包内含 theme.json + Jinja2 文件）
+DEV_METHODS = {"platform", "extension", "standalone", "theme"}
 
 
 def _manifest_dict(value: Any) -> dict[str, Any]:
@@ -801,6 +802,40 @@ async def precheck_package(
     if len(content) > MAX_APP_UPLOAD_BYTES:
         raise HTTPException(413, "应用包过大")
     sha256 = hashlib.sha256(content).hexdigest()
+
+    # theme 包走 theme_package.validate_package，与后台导入 / 商店安装同一口径
+    if dev_method == "theme":
+        from cenkor_admin.apps.cms import theme_install as _ti
+        from cenkor_admin.apps.cms import theme_package as _tp
+
+        try:
+            raw_files, too_big = _ti.unzip_theme_package(content)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+        check = _tp.validate_package(raw_files, expected_key=app_key or None, require_manifest=True)
+        errors = [e["message"] for e in (too_big + check.errors)]
+        manifest = check.manifest
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "app_key": manifest.key if manifest else None,
+            "name": manifest.name if manifest else None,
+            "version": manifest.version if manifest else None,
+            "dev_method": "theme",
+            "sha256": sha256,
+            "size": len(content),
+            "theme": {
+                "settings_count": len(manifest.settings) if manifest else 0,
+                "widgets_count": len(manifest.widgets) if manifest else 0,
+                "asset_kinds": list(manifest.asset_kinds) if manifest else [],
+                "has_js": "js" in manifest.asset_kinds if manifest else False,
+                "files": sorted(check.files.keys()),
+            },
+            "warnings": check.warnings,
+        }
+
+    # 以下为 extension / platform / standalone 包的体检
     try:
         with zipfile.ZipFile(io.BytesIO(content), "r") as zf:
             names = zf.namelist()
@@ -970,6 +1005,7 @@ async def submit_app(
     # - platform   平台内置应用：manifest.py + __init__.py（装进 cenkor-admin 自身）
     # - extension  产品扩展插件：manifest.json（交付到对应 MES 实例热挂载）
     # - standalone 独立应用：私有化整包，仅门户展示/售卖，不做安装向强校验
+    # - theme      主题模板包：theme.json + Jinja2 文件（装进 cms_templates）
     manifest_data = None
     pkg_scan: dict[str, Any] = {}
     try:
@@ -1038,6 +1074,47 @@ async def submit_app(
                             "router.py 中使用了错误的 import 路径 `apps.*`，"
                             f"请改为 `from cenkor_admin.apps.{app_key} import models` 或 `from . import models`",
                         )
+            elif dev_method == "theme":
+                # 主题模板包：theme.json + Jinja2 文件，装进 cms_templates
+                from cenkor_admin.apps.cms import theme_install as _ti
+                from cenkor_admin.apps.cms import theme_package as _tp
+
+                try:
+                    raw_files, too_big = _ti.unzip_theme_package(content)
+                except ValueError as exc:
+                    raise HTTPException(400, str(exc)) from exc
+
+                check = _tp.validate_package(raw_files, expected_key=app_key, require_manifest=True)
+                errors = too_big + check.errors
+                if errors:
+                    raise HTTPException(
+                        400,
+                        {"message": f"{len(errors)} 个文件未通过校验，已整体拒绝",
+                         "errors": errors, "warnings": check.warnings},
+                    )
+
+                manifest = check.manifest
+                if manifest is None:
+                    raise HTTPException(400, "主题包解析失败：缺少 theme.json")
+
+                # key 一致性：清单 key 必须与提交的 app_key 相同
+                if manifest.key != app_key:
+                    raise HTTPException(400, f"theme.json 中的 key ({manifest.key}) 与提交的 app_key ({app_key}) 不一致")
+
+                # 版本一致性：清单 version 必须与提交的 version 相同
+                if manifest.version != version:
+                    raise HTTPException(400, f"theme.json 中的 version ({manifest.version}) 与提交的 version ({version}) 不一致")
+
+                # 把主题元数据存进 manifest_data，供审核与安装使用
+                manifest_data = manifest.as_dict()
+                manifest_data["_theme"] = {
+                    "key": manifest.key,
+                    "settings_count": len(manifest.settings),
+                    "widgets_count": len(manifest.widgets),
+                    "asset_kinds": list(manifest.asset_kinds),
+                    "has_js": "js" in manifest.asset_kinds,
+                    "files": sorted(check.files.keys()),
+                }
             else:
                 # 独立应用（standalone）：私有化整包，仅门户展示/售卖，不做安装向强校验。
                 # 宽松要求：包内含 manifest.json 或 README 即可；有 manifest.json 则解析留档。

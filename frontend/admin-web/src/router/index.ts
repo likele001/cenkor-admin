@@ -74,6 +74,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'cms/entries/new', name: 'cms-entry-new', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
       { path: 'cms/entries/:id', name: 'cms-entry-edit', component: EntryEditView, meta: { permission: 'cms:entries:write' } },
       { path: 'cms/templates', name: 'cms-templates', component: () => import('@/views/cms/TemplateStudioView.vue'), meta: { permission: 'cms:site:read' } },
+      { path: 'cms/theme-market', name: 'cms-theme-market', component: () => import('@/views/cms/ThemeMarketView.vue'), meta: { permission: 'cms:site:read' } },
       { path: 'cms/languages', name: 'cms-languages', component: LanguagesView, meta: { permission: 'cms:entries:read' } },
       { path: 'cms/search', name: 'cms-search', component: SearchResultsView, meta: { permission: 'cms:entries:read' } },
       { path: 'builder/pages', name: 'builder-pages', component: BuilderPagesView, meta: { permission: 'settings:read' } },

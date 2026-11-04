@@ -24,6 +24,7 @@ from cenkor_admin.apps.cms.router import router as cms_router
 from cenkor_admin.apps.cms.site_router import router as cms_site_router
 from cenkor_admin.apps.cms.template_router import router as template_router
 from cenkor_admin.apps.cms.theme_asset_router import router as cms_theme_asset_router
+from cenkor_admin.apps.cms.theme_market_router import router as theme_market_router
 from cenkor_admin.apps.cms.url_rules_router import router as cms_url_rules_router
 from cenkor_admin.apps.cms.widget_router import router as cms_widget_router
 from cenkor_admin.apps.notification.router import router as notification_router
@@ -32,6 +33,7 @@ from cenkor_admin.apps.portal.router import router as portal_router
 from cenkor_admin.apps.rbac.router import router as rbac_router
 from cenkor_admin.apps.system.router import public_router as system_public_router
 from cenkor_admin.apps.system.router import router as system_router
+from cenkor_admin.apps.system.developer_docs_router import router as developer_docs_router
 from cenkor_admin.apps.system.webhook_router import router as webhook_router
 from cenkor_admin.core.hooks_router import router as hooks_router
 
@@ -141,6 +143,10 @@ api_v1_router.include_router(
     system_router, prefix="/system", tags=["system"],
     dependencies=[Depends(get_current_user)],
 )
+api_v1_router.include_router(
+    developer_docs_router, prefix="", tags=["developer-docs"],
+    dependencies=[Depends(get_current_user)],
+)
 
 # 系统公开路由（无需鉴权）— 供前端 PluginManager 在未登录时也能加载插件列表
 api_v1_router.include_router(
@@ -188,6 +194,10 @@ except Exception as e:
     structlog.get_logger().warning("graphql.mount_failed", error=str(e))
 api_v1_router.include_router(
     template_router, prefix="/cms", tags=["templates"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+api_v1_router.include_router(
+    theme_market_router, prefix="/cms", tags=["theme-market"],
     dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
 )
 

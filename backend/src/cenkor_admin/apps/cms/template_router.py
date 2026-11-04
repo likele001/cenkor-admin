@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import difflib
-import hashlib
 import io
 import json
 import logging
@@ -26,14 +25,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.cms import builtin_theme, models, static_cache, theme_package
+from cenkor_admin.apps.cms import builtin_theme, models, theme_install, theme_package
 from cenkor_admin.apps.cms.render import (
     KIND_TEMPLATE,
     RENDER_TIMEOUT,
     _load_disk_template,
     apply_theme_capabilities,
     disk_theme_paths,
-    invalidate_theme_cache,
     load_disk_template,
     make_preview_resolver,
     resolve_theme,
@@ -63,22 +61,8 @@ _SKIP_PARTS = ("__MACOSX", ".DS_Store", "Thumbs.db", "manifest.json")
 
 
 async def _invalidate_all(db: AsyncSession, site_id: int | None, theme: str | None = None) -> None:
-    """模板/主题变更后统一失效：Jinja 模板缓存 + 已落盘的静态页。
-
-    版式一动，之前落盘的 HTML 全是旧版，不整站撤掉就会出现
-    「后台改了模板，线上还是老样子」——这正是静态化最容易被骂的坑。
-    site_id 为空表示影响全部站点。
-    """
-    invalidate_theme_cache(site_id, theme)
-    if not static_cache.cache_enabled():
-        return
-    try:
-        if site_id:
-            await static_cache.purge_site_by_id(db, site_id)
-        else:
-            static_cache.purge_all()
-    except Exception as exc:
-        logger.warning("模板变更后清理静态缓存失败 site_id=%s theme=%s: %s", site_id, theme, exc)
+    """模板/主题变更后统一失效（委托给 theme_install 避免两处漂移）。"""
+    await theme_install.invalidate_after_theme_change(db, site_id, theme)
 
 
 class TemplateRenderRequest(BaseModel):
@@ -854,31 +838,11 @@ async def templates_import(
     if len(raw) > theme_package.MAX_PACKAGE_BYTES:
         raise HTTPException(413, f"主题包不能超过 {theme_package.MAX_PACKAGE_BYTES // 1024 // 1024}MB")
 
+    # 解 zip + 去垃圾（共用安装器），校验走 theme_package.validate_package
     try:
-        zf = zipfile.ZipFile(io.BytesIO(raw))
-    except zipfile.BadZipFile as exc:
-        raise HTTPException(400, f"不是合法的 zip 文件：{exc}") from exc
-
-    infos = [i for i in zf.infolist() if not i.is_dir()]
-    if len(infos) > theme_package.MAX_PACKAGE_FILES:
-        raise HTTPException(413, f"主题包内文件数上限 {theme_package.MAX_PACKAGE_FILES}")
-
-    # 解 zip 只做「读出来 + 去垃圾」，路径安全 / 体积 / 语法 / CSP 全交给公共校验，
-    # 但单文件体积要在这里先拦 —— 免得把一个 800MB 的文件读进内存。
-    raw_files: dict[str, str] = {}
-    too_big: list[dict[str, str]] = []
-    for info in infos:
-        name = info.filename.replace("\\", "/")
-        if any(part in name for part in _SKIP_PARTS):
-            continue
-        if info.file_size > theme_package.MAX_FILE_BYTES:
-            too_big.append({"path": name,
-                            "message": f"单文件超过 {theme_package.MAX_FILE_BYTES // 1024}KB"})
-            continue
-        try:
-            raw_files[name] = zf.read(info).decode("utf-8")
-        except UnicodeDecodeError:
-            too_big.append({"path": name, "message": "不是 UTF-8 文本"})
+        raw_files, too_big = theme_install.unzip_theme_package(raw)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
     check = theme_package.validate_package(raw_files, expected_key=theme, require_manifest=False)
 
@@ -908,45 +872,17 @@ async def templates_import(
     if not accepted:
         raise HTTPException(400, "主题包里没有可导入的文件")
 
-    existing = set((await db.execute(
-        select(models.CmsTemplate.path).where(
-            models.CmsTemplate.site_id == site_id, models.CmsTemplate.theme == theme
-        )
-    )).scalars().all())
-
-    written, skipped = 0, 0
-    for path, content in accepted.items():
-        if path in existing:
-            if not overwrite:
-                skipped += 1
-                continue
-            row = (await db.execute(
-                select(models.CmsTemplate).where(
-                    models.CmsTemplate.site_id == site_id,
-                    models.CmsTemplate.theme == theme,
-                    models.CmsTemplate.path == path,
-                )
-            )).scalars().first()
-            row.content = content
-            row.checksum = _md5(content)
-            row.kind = _kind_of(path)
-        else:
-            db.add(models.CmsTemplate(
-                site_id=site_id, theme=theme, path=path,
-                kind=_kind_of(path), content=content, checksum=_md5(content),
-            ))
-        written += 1
-
-    await db.commit()
-    await _invalidate_all(db, site_id, theme)
+    result = await theme_install.install_theme_files(
+        db, site_id=site_id, theme=theme, files=accepted, overwrite=overwrite
+    )
 
     manifest = check.manifest
     return {
         "ok": True,
         "theme": theme,
         "actual_key": actual_key,
-        "written": written,
-        "skipped": skipped,
+        "written": result["written"],
+        "skipped": result["skipped"],
         "files": sorted(accepted),
         "warnings": check.warnings,
         "legacy": check.legacy,
@@ -1065,7 +1001,7 @@ async def templates_context_api():
 
 
 def _md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+    return theme_install._md5(text)
 
 
 def _baseline_source(theme: str, path: str) -> str | None:
@@ -1086,21 +1022,7 @@ def _theme_documents_sync(site_id: int, theme: str) -> dict[str, str]:
 
 
 def _kind_of(path: str) -> str:
-    name = path.rsplit("/", 1)[-1]
-    if path.startswith("assets/"):
-        return "asset"
-    if path.startswith("macros/"):
-        return "macro"
-    if path.startswith("partials/"):
-        return "partial"
-    if name.endswith((".json", ".txt")):
-        return "meta"
-    return {
-        "layout.html": "layout",
-        "list.html": "list",
-        "detail.html": "detail",
-        "page.html": "page",
-    }.get(name, "partial")
+    return theme_install.kind_of(path)
 
 
 async def _resolve_theme_async(db: AsyncSession, site_id: int) -> str:

@@ -118,6 +118,7 @@ MANIFEST = AppManifest(
                 {"key": "cms:tags", "title": "标签管理", "path": "/cms/tags", "sort": 51},
                 {"key": "cms:entries", "title": "通用内容", "path": "/cms/entries", "sort": 52},
                 {"key": "cms:templates", "title": "模板预览", "path": "/cms/templates", "sort": 53},
+                {"key": "cms:theme-market", "title": "模板市场", "path": "/cms/theme-market", "sort": 54},
                 {"key": "cms:products", "title": "产品", "path": "/cms/products", "sort": 54},
                 {"key": "cms:cases",    "title": "案例", "path": "/cms/cases", "sort": 55},
                 {"key": "cms:news",     "title": "新闻", "path": "/cms/news", "sort": 56},
