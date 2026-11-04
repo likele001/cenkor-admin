@@ -178,3 +178,20 @@ backend/alembic/versions/collect/
 
 # 内容采集 App（商业闭源，源码外置 backend/src/apps/collect/）
 backend/src/cenkor_admin/static/apps/collect/
+
+# 官网线上目录 frontend/landing（nginx 直接服务 admin.cenkor.cn/landing/）
+# 里面的 assets / docs-content / index.html / sitemap.xml / 图标都是
+# build-frontends.sh 从 landing-web/dist 同步过来的构建产物，文件名带内容哈希，
+# 依赖一升级就全变。入库的代价：每次发版提交一批新文件、旧文件永久留在历史里；
+# 而且 package-core.sh 的「跟踪文件被删除」检查会直接掐掉发版
+# （v0.5.0 / 0.5.1 / 0.5.2 和 v0.5.15 首次都是这个原因）。
+# 产物改由 package-core.sh 从磁盘收集，与另外三套前端的 dist 保持一致。
+# 只有下面这几个不参与构建的旧静态页继续入库（可能被外部链接引用）。
+frontend/landing/*
+!frontend/landing/advantages.html
+!frontend/landing/ai-cms.html
+!frontend/landing/deploy.html
+!frontend/landing/docs.html
+!frontend/landing/features.html
+!frontend/landing/docs/
+!frontend/landing/docs/guide.html

@@ -45,13 +45,11 @@ else
   warn "跳过前端构建（使用现有 dist）"
 fi
 
-# ---- 构建产物回填索引：frontend/landing（nginx 线上目录） ----
-# frontend/landing/ 是 git 跟踪的，构建用 rsync --delete 换掉 assets/ 里的哈希
-# 文件。依赖升级（v0.5.15 的 vite 5 → 6）会让哈希全变：旧文件被删、新文件未跟踪。
-# 不处理的话下面「跟踪文件被删除」会直接中止（v0.5.0/0.5.1/0.5.2 同因失败），
-# 而 `git ls-files | tar` 也拿不到新哈希资源，包里的落地页会 404。
-# 这里把构建结果同步进索引，让 ls-files 反映真实磁盘内容；打包结束再还原。
-git add -A -- frontend/landing >/dev/null 2>&1 || true
+# ---- 关于 frontend/landing（nginx 线上目录） ----
+# 这个目录的构建产物（assets/ docs-content/ index.html sitemap.xml 图标）不入 git，
+# 由下面「构建产物」一段从磁盘收集；只有 6 个不参与构建的旧静态页还在 git 里。
+# 因此 rsync --delete 换掉产物，不会再触发下面「跟踪文件被删除」的检查。
+# 历史：v0.5.0/0.5.1/0.5.2 和 v0.5.15 首次发版都因产物哈希换代卡在这里。
 
 # ---- 前置检查：git 跟踪但磁盘上不存在的文件 ----
 # `git ls-files | tar` 的前提是「跟踪的文件都在工作区」。一旦有文件被构建脚本
@@ -102,7 +100,9 @@ ARTIFACT_TAR="$STAGE/.payload-artifacts.tar"
 (
   cd "$ROOT"
   paths=()
-  for p in frontend/admin-web/dist frontend/portal-web/dist frontend/landing-web/dist; do
+  # frontend/landing 是 nginx 线上目录：产物不入 git，必须从磁盘带进包，
+  # 否则安装后官网引用不到 assets（6 个手写静态页由上面跟踪清单一并带上）
+  for p in frontend/admin-web/dist frontend/portal-web/dist frontend/landing-web/dist frontend/landing; do
     [ -d "$p" ] && paths+=("$p")
   done
   [ -d backend/src/cenkor_admin/static/apps ] && paths+=("backend/src/cenkor_admin/static/apps")
@@ -115,6 +115,12 @@ ARTIFACT_TAR="$STAGE/.payload-artifacts.tar"
     --exclude='backend/src/cenkor_admin/static/apps/crm' \
     --exclude='backend/src/cenkor_admin/static/apps/mes' \
     --exclude='backend/src/cenkor_admin/static/apps/workflow' \
+    --exclude='frontend/landing/advantages.html' \
+    --exclude='frontend/landing/ai-cms.html' \
+    --exclude='frontend/landing/deploy.html' \
+    --exclude='frontend/landing/features.html' \
+    --exclude='frontend/landing/docs.html' \
+    --exclude='frontend/landing/docs/guide.html' \
     -f "$ARTIFACT_TAR" "${paths[@]}"
 )
 tar -xf "$ARTIFACT_TAR" -C "$DEST"
@@ -377,9 +383,6 @@ if [ -n "$UNTRACKED" ]; then
   [ "$N" -gt 15 ] && echo "    …（共 $N 条，仅显示前 15 条）"
   echo "    处理方式：该提交的 git add；不该交付的加 --exclude。"
 fi
-
-# 还原索引：产物已进 tar，暂存区不留构建垃圾（本地手工打包时尤其重要）
-git reset -q -- frontend/landing >/dev/null 2>&1 || true
 
 rm -rf "$STAGE"
 

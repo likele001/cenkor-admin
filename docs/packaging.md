@@ -66,6 +66,7 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 | `frontend/portal-web/dist/` | 用户中心**已构建**静态文件 |
 | `frontend/portal-web/src/` | 用户中心源码 |
 | `frontend/landing-web/` | 品牌落地页（源码 + dist） |
+| `frontend/landing/` | 官网线上目录（nginx 直接服务 `admin.cenkor.cn/landing/`）。构建产物**不入 git**，打包时从磁盘收集；只有 6 个不参与构建的旧静态页来自跟踪清单 |
 | `frontend/design-tokens/` | 设计 token |
 | `backend/src/cenkor_admin/static/apps/` | **开源**应用的插件产物（`cloud_storage` / `my_todo` / `quick_notes`） |
 | `deploy/baota/` | 宝塔伪静态、API 反代片段 |
