@@ -10,6 +10,25 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 ## 发版日志
 
+### 0.5.17 · 2026-11-04
+
+- 新增公开页严格 CSP：`script-src 'self'`、`frame-ancestors 'self'`、`base-uri 'self'`、`form-action 'self'`；5 处 HTML 出口统一走 `csp.html_response()`
+- 补齐全仓此前完全缺失的 clickjacking 防护（`X-Frame-Options: SAMEORIGIN` + `X-Content-Type-Options: nosniff` + `Referrer-Policy`）
+- 新增主题资源路由 `GET /public/theme-assets/{theme}/assets/{file}`，只服务 css/js，HTML 与 SVG 一律 404
+- 模板校验拦截内联 `<script>`、内联事件属性、`javascript:` 伪协议，validate / 保存 / 导入三处统一口径
+- 新增 `theme.json` 包规范（schema_version=1）：版本 / 作者 / 许可 / 依赖 / `asset_kinds` / `settings` 声明；`validate_package()` 成为后台导入、商店提交、CLI lint 共用的唯一校验入口
+- 内置主题拆为 4 个模块：`default` / `blog` 墨读 / `corporate` 企业官网 / `landing` 落地页，只存差异文件，其余回落到 default
+- 新增主题配置：`GET/PUT /cms/templates/themes/{theme}/settings` + 后台「主题配置」弹窗，按 `settings` 声明自动渲染控件，值存 `Site.settings`（不建表、不迁移）
+- 新增打包 CLI `scripts/cenkor-theme.py`：`init` / `lint` / `pack` / `list`
+- 修 Jinja 模板缓存串主题：`auto_reload=False` 下缓存 key 不含主题，换肤后 `layout.html` 仍命中上一个主题的编译结果；改 `cache_size=0`，编译缓存交给 `_compile`（key = 名字 + 源码 sha1）
+- 修 `clear_template_cache()` 在 `cache_size=0` 时的 `AttributeError`（异常发生在「保存后清理」环节，表面看像保存失败）
+- 修 `theme_documents()` 合并漏本主题，导出非默认主题时 `layout.html` 是 default 的
+- 修用户主题（DB）的 `theme.json` 读不到，从 zip 导入的主题配置页永远空着
+- 模板上下文注入 `is_home`：列表页 `kind` 一律为 `"list"`，模板此前无法区分首页
+- 闭源链迁移 `20261104_1200_merge_closed_cms`：纯拓扑合流、无 DDL，`alembic_version` 由两行收敛为一行（开源包不含，公开子图仍是单 head）
+- 后端改动需重启服务；有迁移的部署执行 `alembic upgrade heads`
+- 产物：`release/cenkor-admin-core-0.5.17-20261104.tar.gz`
+
 ### 0.5.16 · 2026-11-04
 
 - 新增稿件版本对比：`GET /cms/entries/{id}/versions/diff` + 后台双栏对照弹窗，审核人能看到「改了什么」

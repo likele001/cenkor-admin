@@ -1,5 +1,5 @@
 {
-  "version": "0.5.16",
+  "version": "0.5.17",
   "channel": "stable",
   "released_at": "2026-11-04",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "依赖安全加固清零 critical：dompurify 3.4.17、axios 1.21、vite 6.4.5、vue-i18n 11，Dependabot 告警 100+ 降到 7；改写稿支持 Markdown 渲染；修内链建议 max_tokens 导致推理模型必然返回空正文"
+  "notes": "模板市场第一期与第二期：公开页严格 CSP + 主题资源路由 + 内联脚本拦截；theme.json 包规范、3 个官方样板主题、主题配置表单、打包 CLI"
 }
