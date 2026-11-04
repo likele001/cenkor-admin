@@ -138,7 +138,7 @@ CARD = """<a class="card" href="{{ r.url }}">
 
 LIST = """{% extends "layout.html" %}
 {% block hero %}
-{% if theme.show_hero and is_home and (not page.pagination or page.pagination.current in (none, 1)) %}
+{% if theme.show_hero and is_home and (not page.pagination or page.pagination.page in (none, 1)) %}
 <section class="hero">
   <div class="hero-inner">
     <h1>{{ theme.hero_title }}</h1>

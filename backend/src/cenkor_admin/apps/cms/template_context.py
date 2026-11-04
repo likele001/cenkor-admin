@@ -136,7 +136,10 @@ def build_pagination(
         return page_url(base_path, n) if base_path else None
 
     out = {
-        "page": page, "per_page": per_page, "total": total,
+        # current 是 page 的别名。模板作者十有八九会写 pagination.current
+        # （"page" 在第一眼看起来更像 URL 路径而不是页码），不给别名就会
+        # 得到一个 Undefined —— 条件永远为假，而且不报错，最难查。
+        "page": page, "current": page, "per_page": per_page, "total": total,
         "total_pages": total_pages, "window": list(range(start, end + 1)),
         "has_prev": page > 1, "has_next": page < total_pages,
         "prev_page": page - 1 if page > 1 else None,
