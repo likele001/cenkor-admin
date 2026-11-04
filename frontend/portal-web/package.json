@@ -16,7 +16,7 @@
     "liquidjs": "^10.27.2",
     "pinia": "^2.1.7",
     "vue": "^3.5.42",
-    "vue-i18n": "^9.14.5",
+    "vue-i18n": "^11.4.14",
     "vue-router": "^4.2.5"
   },
   "devDependencies": {
