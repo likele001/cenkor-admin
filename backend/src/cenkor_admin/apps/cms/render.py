@@ -22,7 +22,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from cenkor_admin.apps.cms import builtin_theme, models
+from cenkor_admin.apps.cms import builtin_theme, models, theme_package
 from cenkor_admin.apps.cms.template_context import TemplateContext, get_session_factory
 from cenkor_admin.core import jinja_env
 
@@ -182,7 +182,10 @@ def disk_theme_paths(theme: str) -> set[str]:
 
 def theme_documents(session, site_id: int, theme: str) -> dict[str, str]:
     """合并磁盘 + DB + 内置的完整主题文件表（磁盘优先），用于导出主题包。"""
+    # 先铺 default 基线，再盖本主题 —— 顺序反了的话 blog 导出时 layout.html
+    # 还是 default 那一份（它的自有文件永远盖不上去），包拿出来就是另一个主题。
     merged: dict[str, str] = dict(builtin_theme.BUILTIN_THEMES.get(builtin_theme.DEFAULT_THEME, {}))
+    merged.update(builtin_theme.BUILTIN_THEMES.get(theme, {}))
     try:
         rows = session.execute(
             select(models.CmsTemplate).where(
@@ -248,7 +251,62 @@ def make_preview_resolver(
 # ---------------------------------------------------------------- 上下文
 
 
-def _build_context(model: dict[str, Any], ctx: TemplateContext, base: str, css: str, theme: str) -> dict[str, Any]:
+def _theme_manifest_text(session, site_id: int, theme: str) -> str | None:
+    """取本主题的 theme.json 原文。
+
+    查找范围**严格限定在本主题**：磁盘 → DB → 本主题内置，到此为止。
+    不走 default 回落 —— 借来的清单会让站长的设置项变成另一个主题的 key。
+    """
+    raw = _load_disk_template(theme, theme_package.MANIFEST_NAME)
+    if raw is None:
+        raw = _load_db_template(session, site_id, theme, theme_package.MANIFEST_NAME)
+    if raw is None:
+        raw = builtin_theme.get_builtin_source(theme, theme_package.MANIFEST_NAME)
+    return raw
+
+
+def _theme_settings(session, site_id: int, theme: str, site_settings: dict[str, Any] | None) -> dict[str, Any]:
+    """主题设置 = 清单默认值 + 站点覆盖。没有清单就是空 dict。
+
+    清单解析失败不让渲染挂掉 —— 配置是元数据，坏了顶多设置项不生效，页面照出。
+    """
+    raw = _theme_manifest_text(session, site_id, theme)
+    if not raw:
+        return {}
+    try:
+        manifest = theme_package.manifest_from_json(raw, legacy_key=theme)
+    except ValueError as exc:
+        logger.warning("主题 %s 的 theme.json 解析失败：%s", theme, exc)
+        return {}
+    return theme_package.resolve_settings(manifest, site_settings)
+
+
+def _is_home(model: dict[str, Any]) -> bool:
+    """这一页是不是站点首页。
+
+    列表页的 kind 一律是 "list"（首页 / 分类 / 标签 / 搜索都走同一个模型），
+    模板没法靠 kind 分出首页。canonical 是三类页面都有的字段，
+    首页的 path 恒为 "/"，从它判断最稳。
+    """
+    canonical = model.get("canonical") or ""
+    if not canonical:
+        return False
+    try:
+        from urllib.parse import urlparse
+
+        return urlparse(canonical).path in ("", "/")
+    except Exception:  # pragma: no cover - urlparse 几乎不抛
+        return False
+
+
+def _build_context(
+    model: dict[str, Any],
+    ctx: TemplateContext,
+    base: str,
+    css: str,
+    theme: str,
+    session=None,
+) -> dict[str, Any]:
     data = ctx.as_globals()
     data.update({
         "page": model,
@@ -258,6 +316,13 @@ def _build_context(model: dict[str, Any], ctx: TemplateContext, base: str, css: 
         "base_url": base,
         "theme_css": css,
         "theme_name": theme,
+        # 主题设置：清单里的默认值 + 站长改过的值。
+        # 模板里写 {{ theme.brand_color }}，永远有值 —— 不会因为站长没配过
+        # 就渲染出 None。默认值兜底这件事必须在渲染时做，不能在模板里做，
+        # 否则每个设置项都要写一遍 if。
+        "theme": _theme_settings(session, ctx.site_id, theme, ctx.site_meta()) if session else {},
+        # 模板里判断首页用：{% if is_home %} 放 Hero / 大标题
+        "is_home": _is_home(model),
         "now": datetime.now(),
     })
     return data
@@ -280,7 +345,7 @@ def _render_sync(
         token = jinja_env.set_resolver(resolver)
         ctx = TemplateContext(session, site_id=site_id, base=base, theme=active_theme)
         css = resolver("assets/style.css") or ""
-        context = _build_context(model, ctx, base, css, active_theme)
+        context = _build_context(model, ctx, base, css, active_theme, session)
         tpl_name = KIND_TEMPLATE.get(model.get("kind") or "article", "detail.html")
         # 栏目级模板覆盖：栏目配了 template 且主题里真有这个文件才启用，
         # 否则回退按 kind 的默认模板 —— 不会因为填错文件名整页 500。

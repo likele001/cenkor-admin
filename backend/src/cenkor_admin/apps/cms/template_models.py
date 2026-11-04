@@ -28,7 +28,8 @@ from cenkor_admin.core.db import Base
 __all__ = ["THEME_FILE_KINDS", "CmsTemplate"]
 
 # layout 骨架 / list 列表 / detail 详情 / page 自定义页 / partial 片段 / macro 宏 / asset 样式脚本
-THEME_FILE_KINDS = ("layout", "list", "detail", "page", "partial", "macro", "asset")
+# meta 是 theme.json 这类清单文件：不进渲染，但跟着主题走（导出/导入/换版本）
+THEME_FILE_KINDS = ("layout", "list", "detail", "page", "partial", "macro", "asset", "meta")
 
 
 class CmsTemplate(Base):

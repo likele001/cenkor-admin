@@ -104,8 +104,18 @@ class CmsLoader(BaseLoader):
         source = resolver(template)
         if source is None:
             raise TemplateNotFound(template)
-        # 缓存交给上层（get_template 按源码 md5 缓存），这里声明永不过期即可
-        return source, template, lambda: True
+
+        # 过期判断按**源码指纹**，不能返回常量 True。
+        # Jinja 的 env 缓存 key 是模板名、不含主题，恒真的 uptodate 会让
+        # 换主题后的同名模板（layout.html / list.html）继续用上一个主题的版本。
+        # 编译缓存那层（_compile）本来就按 name+source 做 key，不受影响。
+        digest = hashlib.sha1(source.encode()).hexdigest()
+
+        def _uptodate() -> bool:
+            current = resolver(template)
+            return current is not None and hashlib.sha1(current.encode()).hexdigest() == digest
+
+        return source, template, _uptodate
 
 
 # ---------------------------------------------------------------- 沙箱
@@ -543,6 +553,11 @@ def get_env() -> CmsSandbox:
             lstrip_blocks=True,
             keep_trailing_newline=True,
             undefined=_make_undefined(),
+            # 关掉 Jinja 自带的模板缓存：它的 key 是 (loader, 模板名)、不含主题，
+            # auto_reload=False 又让它在命中时不问 uptodate —— 换主题后同名模板
+            # （layout.html / list.html）会继续用上一个主题的版本。
+            # 编译缓存由 _compile 负责，key 是「名字 + 源码 sha1」，不会串。
+            cache_size=0,
             auto_reload=False,
         )
         _register_filters(env)
@@ -584,7 +599,10 @@ def reset_resolver(token) -> None:
 def clear_template_cache() -> None:
     with _CACHE_LOCK:
         _TEMPLATE_CACHE.clear()
-    if _ENV is not None:
+    # cache_size=0 时 Jinja 不建 cache 对象（_ENV.cache is None），必须判空。
+    # 少这一句，保存模板/切换主题的"善后"环节会先抛 AttributeError，
+    # 表面看像是保存失败。
+    if _ENV is not None and _ENV.cache is not None:
         _ENV.cache.clear()
 
 
@@ -601,6 +619,11 @@ def flush_compiled_templates() -> None:
     """
     env = _ENV
     if env is None:
+        return
+    # cache_size=0 时 Jinja 根本不建 cache 对象（env.cache is None）。
+    # 这里必须判空 —— 否则每次保存模板/切换主题，清理缓存这一步就先炸了，
+    # 而异常发生在"善后"环节，看上去像是保存失败。
+    if env.cache is None:
         return
     with _CACHE_LOCK:
         env.cache.clear()

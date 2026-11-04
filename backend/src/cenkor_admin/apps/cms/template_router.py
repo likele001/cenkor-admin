@@ -26,13 +26,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cenkor_admin.apps.cms import builtin_theme, models, static_cache
+from cenkor_admin.apps.cms import builtin_theme, models, static_cache, theme_package
 from cenkor_admin.apps.cms.render import (
     KIND_TEMPLATE,
     RENDER_TIMEOUT,
     _load_disk_template,
     disk_theme_paths,
     invalidate_theme_cache,
+    load_disk_template,
     make_preview_resolver,
     resolve_theme,
     theme_documents,
@@ -122,6 +123,15 @@ class ThemeCreateRequest(BaseModel):
     site_id: int = DEFAULT_SITE_ID
 
 
+class ThemeSettingsRequest(BaseModel):
+    """主题配置提交。``values`` 只收 theme.json 里声明过的 key。"""
+
+    site_id: int = DEFAULT_SITE_ID
+    values: dict[str, Any] = Field(default_factory=dict)
+    # 要还原成默认值的 key（站长点了「恢复默认」）
+    reset: list[str] = Field(default_factory=list)
+
+
 class ThemeActiveRequest(BaseModel):
     theme: str
     site_id: int = DEFAULT_SITE_ID
@@ -138,7 +148,32 @@ async def templates_validate(body: TemplateValidateRequest):
     `type="csp"` 是跑得起来但脚本／事件不执行。后者更坑 —— 作者看代码没毛病。
     """
     source = body.text()
-    ok, error = jinja_env.validate_theme_source(source, path=body.path)
+    path = (body.path or "").strip()
+
+    # theme.json 不走 Jinja 校验（它是 JSON 不是模板），单独验：
+    # 结构错了不会让页面白屏，但会让配置页整个空掉 —— 这种"静默失效"
+    # 最难查，所以在编辑时就要标出来。
+    if path == theme_package.MANIFEST_NAME:
+        try:
+            manifest = theme_package.manifest_from_json(source, legacy_key=None)
+        except ValueError as exc:
+            return {"valid": False, "ok": False,
+                    "error": {"message": str(exc), "line": 1, "type": "json"},
+                    "message": str(exc), "kind": "json"}
+
+        probe = theme_package.PackageCheck(ok=True, manifest=manifest)
+        theme_package._check_manifest(manifest, probe)  # 复用同一套字段校验
+        if probe.errors:
+            first = probe.errors[0]
+            msg = f"{first.get('field', '')} {first.get('message', '')}".strip()
+            return {"valid": False, "ok": False,
+                    "error": {"message": msg, "line": 1, "type": "manifest",
+                              "all": probe.errors},
+                    "message": msg, "kind": "manifest"}
+        return {"valid": True, "ok": True, "error": None, "message": None,
+                "kind": None, "settings": len(manifest.settings)}
+
+    ok, error = jinja_env.validate_theme_source(source, path=path)
     return {
         "valid": ok,
         "ok": ok,
@@ -302,29 +337,43 @@ async def templates_themes(site_id: int = DEFAULT_SITE_ID, db: AsyncSession = De
     for theme in rows:
         counts[theme] = counts.get(theme, 0) + 1
 
-    out = []
-    for name in builtin_theme.list_builtin_themes():
-        meta = builtin_theme.get_builtin_meta(name) or {}
-        out.append({
-            "theme": name, "name": meta.get("name") or name,
-            "version": meta.get("version"), "author": meta.get("author"),
-            "description": meta.get("description"), "source": "builtin",
-            "files": len(builtin_theme.BUILTIN_THEMES.get(name, {})),
+    site_row = (await db.execute(
+        select(models.Site).where(models.Site.id == site_id)
+    )).scalars().first()
+    site_settings = dict(site_row.settings or {}) if site_row else {}
+
+    async def decorate(name: str, *, source: str, files: int) -> dict[str, Any]:
+        """把清单信息摊平进列表项 —— 前端不用为每个主题再发一次请求。"""
+        manifest = await _theme_manifest_of(db, site_id, name)
+        if manifest is not None:
+            values = theme_package.resolve_settings(manifest, site_settings)
+            changed = [k for k, v in values.items() if manifest.defaults().get(k) != v]
+        else:
+            values, changed = {}, []
+        return {
+            "theme": name,
+            "name": manifest.name if manifest else name,
+            "version": manifest.version if manifest else None,
+            "author": manifest.author if manifest else None,
+            "description": manifest.description if manifest else None,
+            "icon": manifest.icon if manifest else "",
+            "tags": list(manifest.tags) if manifest else [],
+            "settings_count": len(manifest.settings) if manifest else 0,
+            "settings_changed": len(changed),
+            "source": source,
+            "files": files,
             "custom_files": counts.get(name, 0),
             "editable": True,
-            "deletable": False,
+            "deletable": source == "db" and name != active,
             "active": name == active,
-        })
+        }
+
+    out = [await decorate(n, source="builtin", files=len(builtin_theme.BUILTIN_THEMES.get(n, {})))
+           for n in builtin_theme.list_builtin_themes()]
     for name, count in counts.items():
         if name in builtin_theme.BUILTIN_THEMES:
             continue
-        out.append({
-            "theme": name, "name": name, "version": None, "author": None,
-            "description": None, "source": "db", "files": count,
-            "custom_files": count, "editable": True,
-            "deletable": name != active,
-            "active": name == active,
-        })
+        out.append(await decorate(name, source="db", files=count))
     return {"items": out, "active": active}
 
 
@@ -407,6 +456,145 @@ async def templates_theme_active(body: ThemeActiveRequest, db: AsyncSession = De
     await db.commit()
     await _invalidate_all(db, body.site_id)
     return {"ok": True, "active": theme}
+
+
+# ---------------------------------------------------------------- 主题配置
+
+
+async def _theme_manifest_of(
+    db: AsyncSession, site_id: int, theme: str
+) -> theme_package.ThemeManifest | None:
+    """取主题清单：本主题内置 → DB → 磁盘。**不回落 default**。
+
+    回落会让用户主题借到 default 的 settings，站长的配置全打到
+    ``theme.default.*`` 下面，改哪个都没反应 —— 而且看起来一切正常。
+    """
+    raw = builtin_theme.get_builtin_source(theme, theme_package.MANIFEST_NAME)
+    if raw is None:
+        raw = (await db.execute(
+            select(models.CmsTemplate.content).where(
+                models.CmsTemplate.site_id == site_id,
+                models.CmsTemplate.theme == theme,
+                models.CmsTemplate.path == theme_package.MANIFEST_NAME,
+            )
+        )).scalars().first()
+    if raw is None:
+        raw = load_disk_template(theme, theme_package.MANIFEST_NAME)
+    if raw is None:
+        return None
+    try:
+        return theme_package.manifest_from_json(raw, legacy_key=theme)
+    except ValueError as exc:
+        logger.warning("主题 %s 的 theme.json 解析失败：%s", theme, exc)
+        return None
+
+
+async def _settings_payload(
+    db: AsyncSession, site_id: int, theme: str, site_settings: dict[str, Any]
+) -> dict[str, Any]:
+    """组装配置页要的全部数据：schema（按组）+ 当前值 + 默认值 + 改过哪些。"""
+    manifest = await _theme_manifest_of(db, site_id, theme)
+    if manifest is None:
+        return {
+            "theme": theme, "supports_settings": False, "groups": [], "values": {},
+            "defaults": {}, "changed": [],
+            "manifest": {"name": theme, "version": None, "icon": "", "description": ""},
+        }
+
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for spec in manifest.settings:
+        groups.setdefault(spec.group or "通用", []).append(spec.as_dict())
+
+    values = theme_package.resolve_settings(manifest, site_settings)
+    defaults = manifest.defaults()
+
+    return {
+        "theme": theme,
+        "supports_settings": bool(manifest.settings),
+        "groups": [{"name": name, "items": items} for name, items in groups.items()],
+        "values": values,
+        "defaults": defaults,
+        "changed": [k for k, v in values.items() if defaults.get(k) != v],
+        "manifest": {
+            "name": manifest.name,
+            "version": manifest.version,
+            "icon": manifest.icon,
+            "description": manifest.description,
+            "author": manifest.author,
+            "license": manifest.license,
+            "tags": list(manifest.tags),
+        },
+    }
+
+
+async def _site_settings_of(db: AsyncSession, site_id: int) -> tuple[Any, dict[str, Any]]:
+    row = (await db.execute(select(models.Site).where(models.Site.id == site_id))).scalars().first()
+    if row is None:
+        raise HTTPException(404, "站点不存在")
+    return row, dict(row.settings or {})
+
+
+@router.get("/templates/themes/{theme}/settings")
+async def templates_theme_settings(
+    theme: str,
+    site_id: int = DEFAULT_SITE_ID,
+    db: AsyncSession = Depends(get_db),
+):
+    """读主题配置：返回自动渲染表单所需的全部信息。"""
+    if not _THEME_RE.match(theme or ""):
+        raise HTTPException(400, "非法主题名")
+    _row, settings = await _site_settings_of(db, site_id)
+    return await _settings_payload(db, site_id, theme, settings)
+
+
+@router.put("/templates/themes/{theme}/settings")
+async def templates_theme_settings_update(
+    theme: str,
+    body: ThemeSettingsRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """写主题配置。
+
+    只接受 theme.json 声明过的 key —— 否则这里就成了一个可以往
+    ``Site.settings`` 任意塞东西的洞（那里面还有 cms.theme、seo.* 等
+    别处依赖的配置）。未知 key 直接 400，不做"忽略"处理：
+    静默丢弃会让前端以为存成功了。
+    """
+    if not _THEME_RE.match(theme or ""):
+        raise HTTPException(400, "非法主题名")
+
+    manifest = await _theme_manifest_of(db, body.site_id, theme)
+    if manifest is None:
+        raise HTTPException(400, f"主题「{theme}」没有 theme.json，不接受配置")
+    if not manifest.settings:
+        raise HTTPException(400, f"主题「{theme}」没有声明任何可配置项")
+
+    allowed = {spec.key for spec in manifest.settings}
+    unknown = sorted(set(body.values) - allowed)
+    if unknown:
+        raise HTTPException(400, f"主题没有声明这些配置项：{unknown}")
+    unknown_reset = sorted(set(body.reset) - allowed)
+    if unknown_reset:
+        raise HTTPException(400, f"主题没有声明这些配置项：{unknown_reset}")
+
+    row, settings = await _site_settings_of(db, body.site_id)
+
+    for key, raw in body.values.items():
+        spec = manifest.setting(key)
+        assert spec is not None  # 上面已经校验过
+        # 类型强制 + 范围夹紧都在 coerce_setting 里，路由不重复实现
+        settings[theme_package.setting_storage_key(manifest.key, key)] = theme_package.coerce_setting(raw, spec)
+
+    for key in body.reset:
+        settings.pop(theme_package.setting_storage_key(manifest.key, key), None)
+
+    row.settings = settings
+    await db.commit()
+
+    # 配置一变，已落盘的静态页全是旧色值 —— 不清的话站长会一直以为没保存成功
+    await _invalidate_all(db, body.site_id, theme)
+
+    return {"ok": True, **await _settings_payload(db, body.site_id, theme, settings)}
 
 
 # ---------------------------------------------------------------- 主题 / 文件
@@ -644,7 +832,12 @@ async def templates_import(
     overwrite: bool = Form(True),
     db: AsyncSession = Depends(get_db),
 ):
-    """导入主题包。先全量校验（路径合法性 + Jinja 语法），有一处不合格就整体拒绝。"""
+    """导入主题包。
+
+    校验走 ``theme_package.validate_package`` —— 跟商店提交、“cenkor-theme lint”
+    是同一份实现，不会出现「后台能装、商店拒收」这种口径漂移。
+    有任何一处不合格就整体拒绝：装半套主题进去比装不上更糟，线上会白屏。
+    """
     theme = (theme or "").strip()
     if not _THEME_RE.match(theme):
         raise HTTPException(400, "主题名只能用小写字母、数字、连字符和下划线（2-64 位）")
@@ -652,46 +845,60 @@ async def templates_import(
     raw = await file.read()
     if not raw:
         raise HTTPException(400, "上传文件为空")
-    if len(raw) > MAX_ZIP_BYTES:
-        raise HTTPException(413, f"主题包不能超过 {MAX_ZIP_BYTES // 1024 // 1024}MB")
+    if len(raw) > theme_package.MAX_PACKAGE_BYTES:
+        raise HTTPException(413, f"主题包不能超过 {theme_package.MAX_PACKAGE_BYTES // 1024 // 1024}MB")
 
     try:
         zf = zipfile.ZipFile(io.BytesIO(raw))
     except zipfile.BadZipFile as exc:
         raise HTTPException(400, f"不是合法的 zip 文件：{exc}") from exc
 
-    errors: list[dict[str, Any]] = []
-    accepted: dict[str, str] = {}
     infos = [i for i in zf.infolist() if not i.is_dir()]
-    if len(infos) > MAX_ZIP_FILES:
-        raise HTTPException(413, f"主题包内文件数上限 {MAX_ZIP_FILES}")
+    if len(infos) > theme_package.MAX_PACKAGE_FILES:
+        raise HTTPException(413, f"主题包内文件数上限 {theme_package.MAX_PACKAGE_FILES}")
 
+    # 解 zip 只做「读出来 + 去垃圾」，路径安全 / 体积 / 语法 / CSP 全交给公共校验，
+    # 但单文件体积要在这里先拦 —— 免得把一个 800MB 的文件读进内存。
+    raw_files: dict[str, str] = {}
+    too_big: list[dict[str, str]] = []
     for info in infos:
         name = info.filename.replace("\\", "/")
         if any(part in name for part in _SKIP_PARTS):
             continue
-        if not jinja_env.is_safe_template_name(name):
-            errors.append({"path": name, "message": "路径非法或扩展名不在白名单"})
-            continue
-        if info.file_size > MAX_ZIP_FILE_BYTES:
-            errors.append({"path": name, "message": f"单文件超过 {MAX_ZIP_FILE_BYTES // 1024}KB"})
+        if info.file_size > theme_package.MAX_FILE_BYTES:
+            too_big.append({"path": name,
+                            "message": f"单文件超过 {theme_package.MAX_FILE_BYTES // 1024}KB"})
             continue
         try:
-            content = zf.read(info).decode("utf-8")
+            raw_files[name] = zf.read(info).decode("utf-8")
         except UnicodeDecodeError:
-            errors.append({"path": name, "message": "不是 UTF-8 文本"})
-            continue
-        if name.endswith((".html", ".xml")):
-            # 语法 + CSP 双检：内联 <script>／内联事件属性在这个包里就是死的，
-            # 与其导入后线上空白，不如整包拒掉并指出是哪一行
-            ok, err = jinja_env.validate_theme_source(content, name=name, path=name)
-            if not ok:
-                errors.append({"path": name, **(err or {"message": "语法错误"})})
-                continue
-        accepted[name] = content
+            too_big.append({"path": name, "message": "不是 UTF-8 文本"})
 
+    check = theme_package.validate_package(raw_files, expected_key=theme, require_manifest=False)
+
+    errors = too_big + check.errors
     if errors:
-        raise HTTPException(400, {"message": f"{len(errors)} 个文件未通过校验，已整体拒绝", "errors": errors})
+        raise HTTPException(
+            400,
+            {"message": f"{len(errors)} 个文件未通过校验，已整体拒绝",
+             "errors": errors, "warnings": check.warnings},
+        )
+
+    accepted = dict(check.files)
+
+    # 清单的 key 跟随导入目标名 —— 允许把同一个主题装成多个变体。
+    # 包里有清单才改写；legacy 包（上一版导出产物）不补，补一个空清单
+    # 会让配置页显示"可配置"却一个项都没有，比没有更困惑。
+    actual_key = theme
+    if check.manifest is not None and not check.manifest.legacy and check.manifest.key != theme:
+        rewritten = check.manifest.as_dict()
+        rewritten["key"] = theme
+        accepted[theme_package.MANIFEST_NAME] = json.dumps(rewritten, ensure_ascii=False, indent=2)
+        check.warnings.append({
+            "path": theme_package.MANIFEST_NAME,
+            "message": f"清单里的 key 是「{check.manifest.key}」，已按导入目标改写为「{theme}」",
+        })
+
     if not accepted:
         raise HTTPException(400, "主题包里没有可导入的文件")
 
@@ -726,8 +933,23 @@ async def templates_import(
 
     await db.commit()
     await _invalidate_all(db, site_id, theme)
-    return {"ok": True, "theme": theme, "written": written, "skipped": skipped,
-            "files": sorted(accepted)}
+
+    manifest = check.manifest
+    return {
+        "ok": True,
+        "theme": theme,
+        "actual_key": actual_key,
+        "written": written,
+        "skipped": skipped,
+        "files": sorted(accepted),
+        "warnings": check.warnings,
+        "legacy": check.legacy,
+        "manifest": {
+            "name": manifest.name if manifest else theme,
+            "version": manifest.version if manifest else None,
+            "settings": len(manifest.settings) if manifest else 0,
+        },
+    }
 
 
 # ---------------------------------------------------------------- 教程数据

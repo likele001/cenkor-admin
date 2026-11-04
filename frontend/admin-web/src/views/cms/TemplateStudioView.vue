@@ -6,6 +6,7 @@ import { html as htmlLang } from '@codemirror/lang-html'
 import { css as cssLang } from '@codemirror/lang-css'
 import { setDiagnostics, lintGutter, type Diagnostic } from '@codemirror/lint'
 import { api } from '@/lib/api'
+import ThemeSettingsDialog from '@/components/cms/ThemeSettingsDialog.vue'
 
 const BASE = '/api/v1/cms/templates'
 
@@ -59,6 +60,14 @@ const diffText = ref('')
 const diffStat = ref({ added: 0, removed: 0 })
 
 const newTheme = ref('')
+// 主题配置弹窗：表单由主题自己的 theme.json settings 声明生成
+const showThemeSettings = ref(false)
+
+async function onThemeSaved(theme: string) {
+  // 配置改完必须重载主题列表 —— 列表里的「已改 N 项」和图标都来自同一份数据
+  await loadThemes()
+  flash('ok', `「${theme}」的配置已保存，前台刷新即可看到新样式（已自动清理静态缓存）`)
+}
 
 // ---------------------------------------------------------------- 标签速查
 // 写模板最卡的是「不知道能调什么」——以前只能去翻 docs/template-guide.md。
@@ -582,6 +591,13 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
         >
           设为生效
         </button>
+        <button
+          class="btn-ghost text-sm"
+          title="按主题声明的可配置项调整主色、字号、文案等"
+          @click="showThemeSettings = true"
+        >
+          主题配置
+        </button>
         <button class="btn-ghost text-sm" @click="exportTheme">导出 zip</button>
         <button class="btn-ghost text-sm" @click="importInput?.click()">导入 zip</button>
         <input ref="importInput" type="file" accept=".zip" class="hidden" @change="doImport" />
@@ -827,4 +843,11 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
       </div>
     </div>
   </div>
+
+  <ThemeSettingsDialog
+    :open="showThemeSettings"
+    :theme="currentTheme"
+    @close="showThemeSettings = false"
+    @saved="onThemeSaved"
+  />
 </template>
