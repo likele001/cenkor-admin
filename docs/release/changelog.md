@@ -10,6 +10,20 @@ release/cenkor-admin-core-<version>-<YYYYMMDD>.tar.gz
 
 ## 发版日志
 
+### 0.5.18 · 2026-11-04
+
+- 新增 widget 组件沙箱（模板市场第四期）：模板可以把交互部分做成组件，跑在没有同源权限的 iframe 里 —— 开放交互但**不需要信任模板作者**
+- 三层防护各自独立：`iframe sandbox="allow-scripts"`（无 `allow-same-origin`）、宿主页响应头 `sandbox allow-scripts`（地址栏直开也受限）、子文档 CSP `default-src 'none'` + `connect-src 'none'`
+- 组件脚本用 sha256 哈希白名单放行，不用 `'self'`：opaque origin 下 `'self'` 匹配不到任何东西，外链脚本会被静默拦下
+- 新增 `GET /public/theme-widgets/{theme}/{name}` 宿主页路由；刻意不发 `X-Frame-Options`（`SAMEORIGIN` 在 opaque origin 下会把 iframe 直接拒掉）
+- `theme.json` 新增 `widgets` 声明（name / title / height / description），组件文件为 `widgets/<name>.html` + 可选 `.js`
+- 新增模板函数 `widget(name, args, height=, title=)`；参数走 URL（base64url JSON），不依赖父页面脚本
+- 新增配置 `CMS_THEME_ALLOW_JS`（默认 `false`）：同源脚本与站点同权，需要显式开启；关闭时 `script()` 只留一句 HTML 注释，不静默失败
+- 内置 `corporate` 主题新增 `stats` 数字统计组件（1.1.0）作为官方样板，作者可 `init --from corporate` 直接取用
+- 包校验：声明了组件却缺 `widgets/<name>.html` 拒包；`asset_kinds` 比对改为只看 `assets/` 下的文件（此前任何 `.js` 都被算进 `js` 资源，等于逼作者为换个轮播图声明整站同权）
+- 修 `cenkor-theme init --from` 只拷 `widgets/*.html` 不拷声明，作者一 lint 就被告知「组件没声明」
+- 无数据库迁移；需重启服务
+- 产物：`release/cenkor-admin-core-0.5.18-20261104.tar.gz`
 ### 0.5.17 · 2026-11-04
 
 - 新增公开页严格 CSP：`script-src 'self'`、`frame-ancestors 'self'`、`base-uri 'self'`、`form-action 'self'`；5 处 HTML 出口统一走 `csp.html_response()`
