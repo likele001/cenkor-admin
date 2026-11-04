@@ -40,6 +40,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from cenkor_admin.apps.cms import widget_sandbox
+
 __all__ = [
     "MANIFEST_NAME",
     "MAX_FILE_BYTES",
@@ -50,6 +52,7 @@ __all__ = [
     "PackageCheck",
     "SettingSpec",
     "ThemeManifest",
+    "WidgetSpec",
     "coerce_setting",
     "manifest_from_json",
     "resolve_settings",
@@ -135,6 +138,30 @@ class SettingSpec:
 
 
 @dataclass(frozen=True)
+class WidgetSpec:
+    """主题声明的一个可嵌入组件（``widgets/<name>.html`` + 可选 ``.js``）。
+
+    组件跑在 iframe 沙箱里（opaque origin），所以它**不需要**
+    ``asset_kinds`` 里的 ``js`` —— 声明 js 意味着「允许同源脚本」，
+    而组件的脚本本来就没有同源权限。这两件事必须分开，否则作者想加个
+    轮播图就得把整个模板的脚本权限打开。
+    """
+
+    name: str
+    title: str = ""
+    height: int = 320
+    description: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {"name": self.name, "height": self.height}
+        if self.title:
+            out["title"] = self.title
+        if self.description:
+            out["description"] = self.description
+        return out
+
+
+@dataclass(frozen=True)
 class ThemeManifest:
     """``theme.json`` 的解析结果。"""
 
@@ -151,6 +178,7 @@ class ThemeManifest:
     tags: tuple[str, ...] = ()
     requires: dict[str, Any] = field(default_factory=dict)
     settings: tuple[SettingSpec, ...] = ()
+    widgets: tuple[WidgetSpec, ...] = ()
     changelog: str = ""
     files: tuple[str, ...] = ()
     # 包里没有 theme.json 时由文件名补出来的清单，审核口径要区别对待
@@ -165,6 +193,12 @@ class ThemeManifest:
         """声明的资源类型。没声明等于「只用模板 + CSS」，审核据此放行。"""
         kinds = self.requires.get("asset_kinds") or []
         return tuple(k for k in kinds if isinstance(k, str))
+
+    def widget(self, name: str) -> WidgetSpec | None:
+        for spec in self.widgets:
+            if spec.name == name:
+                return spec
+        return None
 
     def setting(self, key: str) -> SettingSpec | None:
         for spec in self.settings:
@@ -190,6 +224,8 @@ class ThemeManifest:
             "settings": [s.as_dict() for s in self.settings],
             "files": list(self.files),
         }
+        if self.widgets:
+            data["widgets"] = [w.as_dict() for w in self.widgets]
         if self.screenshots:
             data["screenshots"] = list(self.screenshots)
         if self.demo_url:
@@ -277,6 +313,23 @@ def manifest_from_json(raw: str | dict[str, Any], *, legacy_key: str | None = No
             )
         )
 
+    widget_list: list[WidgetSpec] = []
+    for item in obj.get("widgets") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            h = int(item.get("height") or 320)
+        except (TypeError, ValueError):
+            h = 320
+        widget_list.append(
+            WidgetSpec(
+                name=str(item.get("name") or "").strip(),
+                title=str(item.get("title") or "").strip(),
+                height=h,
+                description=str(item.get("description") or ""),
+            )
+        )
+
     author = obj.get("author")
     if isinstance(author, str):
         author = {"name": author}
@@ -301,6 +354,7 @@ def manifest_from_json(raw: str | dict[str, Any], *, legacy_key: str | None = No
         tags=tuple(str(t) for t in (obj.get("tags") or []) if t),
         requires=requires,
         settings=tuple(spec_list),
+        widgets=tuple(widget_list),
         changelog=str(obj.get("changelog") or ""),
         files=tuple(str(f) for f in (obj.get("files") or []) if f),
         legacy=bool(obj.get("_legacy")),
@@ -375,6 +429,29 @@ def _check_manifest(m: ThemeManifest, check: PackageCheck) -> None:
         check.error(
             "requires.cms_features 必须是数组", path=MANIFEST_NAME, field_name="requires.cms_features"
         )
+
+    seen_widgets: set[str] = set()
+    for w in m.widgets:
+        where = f"widgets[{w.name or '?'}]"
+        if not widget_sandbox.WIDGET_NAME_RE.match(w.name or ""):
+            check.error(
+                f"{where}: name 只能用小写字母、数字、连字符、下划线，且以小写字母开头"
+                "（1-48 位）—— 它同时是文件名 widgets/<name>.html",
+                path=MANIFEST_NAME,
+                field_name=where,
+            )
+            continue
+        if w.name in seen_widgets:
+            check.error(f"{where}: name 重复", path=MANIFEST_NAME, field_name=where)
+            continue
+        seen_widgets.add(w.name)
+        if not (widget_sandbox.MIN_HEIGHT <= w.height <= widget_sandbox.MAX_HEIGHT):
+            check.error(
+                f"{where}: height 必须在 {widget_sandbox.MIN_HEIGHT}-"
+                f"{widget_sandbox.MAX_HEIGHT} 之间，当前是 {w.height}",
+                path=MANIFEST_NAME,
+                field_name=where,
+            )
 
     unknown_kinds = [k for k in m.asset_kinds if k not in _ASSET_KIND_EXT]
     if unknown_kinds:
@@ -536,6 +613,15 @@ def validate_package(
             if not ok:
                 item = dict(err or {"message": "语法错误"})
                 item["path"] = norm
+                # 组件结构的脚本要放到同名的 .js 里，不是 assets/ —— 通用提示会把人
+                # 引到一个跑不通的方向（assets/ 的脚本是父页面的同源脚本，
+                # 在沙箱里根本加载不到）。
+                if norm.startswith("widgets/") and item.get("type") == "csp":
+                    widget_name = norm[len("widgets/"):].rsplit(".", 1)[0]
+                    item["message"] = (
+                        f"组件结构里不能写内联脚本。请把脚本放到 widgets/{widget_name}.js，"
+                        "平台会把它和结构一起装进沙箱页"
+                    )
                 check.errors.append(item)
                 continue
         elif ext == ".js":
@@ -548,8 +634,10 @@ def validate_package(
         check.error(f"包解压后超过 {MAX_PACKAGE_BYTES // 1024 // 1024}MB")
 
     # ---- asset_kinds 声明与实际文件比对（审核自动化的抓手）
+    # 只数 assets/ 下的文件。widgets/ 里的 .js 是沙箱内脚本、没有同源权限，
+    # 不该逼作者声明 asset_kinds: js（那等于要求他把整站权限打开换一个轮播图）。
     present_kinds = {kind for kind, ext in _ASSET_KIND_EXT.items()
-                     if any(p.endswith(ext) for p in accepted)}
+                     if any(p.startswith("assets/") and p.endswith(ext) for p in accepted)}
     declared = set(check.manifest.asset_kinds) if check.manifest else set()
     undeclared = present_kinds - declared
     if undeclared:
@@ -565,6 +653,32 @@ def validate_package(
             f"声明了 {sorted(missing)} 但包里没有对应文件",
             path=MANIFEST_NAME,
             field_name="requires.asset_kinds",
+        )
+
+    # ---- widgets 声明与文件比对。声明了就必须有结构文件，否则 widget() 会渲染出空白框
+    if check.manifest and check.manifest.widgets:
+        for w in check.manifest.widgets:
+            if not w.name:
+                continue
+            if f"widgets/{w.name}.html" not in accepted:
+                check.error(
+                    f"widgets 声明了 {w.name}，但包里没有 widgets/{w.name}.html",
+                    path=MANIFEST_NAME,
+                    field_name=f"widgets[{w.name}]",
+                )
+
+    packaged_widgets = {
+        p[len("widgets/"):-len(".html")]
+        for p in accepted
+        if p.startswith("widgets/") and p.endswith(".html")
+    }
+    declared_widgets = {w.name for w in check.manifest.widgets} if check.manifest else set()
+    if packaged_widgets - declared_widgets:
+        check.warn(
+            f"包里有未在 widgets 里声明的组件：{sorted(packaged_widgets - declared_widgets)}。"
+            "没声明就调不到 —— widget() 只认清单里有的名字",
+            path=MANIFEST_NAME,
+            field_name="widgets",
         )
 
     # ---- files 清单与实际内容比对。声明清单是为了让安装器知道该期待哪些文件，

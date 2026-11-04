@@ -17,7 +17,7 @@ from markupsafe import Markup
 from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from cenkor_admin.apps.cms import models, url_resolver
+from cenkor_admin.apps.cms import models, url_resolver, widget_sandbox
 from cenkor_admin.apps.cms.csp import THEME_ASSET_PREFIX
 from cenkor_admin.core.jinja_env import app_template_functions, bind_app_function
 
@@ -176,6 +176,13 @@ class TemplateContext:
         self.base = (base or "").rstrip("/")
         # 当前渲染用的主题名：script() 要拼主题资源地址，不知道主题就拼不出来
         self.theme = (theme or "").strip()
+        # 本主题声明的组件（name → 声明 dict）。由 render 层按 theme.json 填。
+        # 空字典意味着「这个主题没有组件」——widget() 会返回空串，不生成坏 iframe。
+        self.widgets: dict[str, dict[str, Any]] = {}
+        # 是否允许主题自带的同源脚本（assets/*.js）。默认关闭：
+        # 同源脚本与站点同权，能读 cookie、能改父页面，不是「模板文件」该有的能力。
+        # widget() 走 iframe 沙箱，不受这个开关限制。
+        self.allow_js: bool = False
         # content_type_id → key 的懒加载缓存，一次渲染里最多查一次
         self._ct_keys: dict[int, str] | None = None
         # URL 规则集，同样一次渲染只取一次
@@ -717,11 +724,63 @@ class TemplateContext:
           反而制造"看着有防护"的假象。详见 ``apps/cms/csp.py`` 顶部说明。
 
         路径为空或主题未知时返回空串，不生成指向 404 的坏标签。
+
+        **同源脚本需要显式开启**（``CMS_THEME_ALLOW_JS=true``）。默认关闭的理由：
+        同源脚本与站点同权 —— 能读 cookie、能以访客身份发请求、能改整个页面。
+        这不是「主题文件」应该有的能力。需要交互的模板请用 ``widget()``，
+        它跑在 iframe 沙箱里，不需要这个开关。
         """
+        if not self.allow_js:
+            # 留一条 HTML 注释而不是静默吞掉：作者查看页面源码就知道为什么没反应，
+            # 又不会在生产日志里刷屏。返回空串而不是抛异常 —— 脚本缺席不该让整页 500。
+            return Markup("<!-- theme script disabled: set CMS_THEME_ALLOW_JS=true to enable -->")
         src = self.theme_asset(path)
         if not src:
             return Markup("")
         return Markup('<script src="{}" defer></script>').format(src)
+
+    @cms_api
+    def widget(
+        self,
+        name: str = "",
+        args: dict[str, Any] | None = None,
+        *,
+        height: int = 0,
+        title: str = "",
+    ) -> Markup:
+        """嵌入一个沙箱组件。**模板获得交互能力的默认方式。**
+
+        ``{{ widget('chart', {'series': [1, 2, 3]}) }}``
+
+        渲染成 ``<iframe sandbox="allow-scripts">``，内文档是 opaque origin：
+        读不到 cookie、碰不到父页面 DOM、发不出网络请求。所以它**不需要**打开
+        ``CMS_THEME_ALLOW_JS`` —— 沙箱里的脚本连自己的 origin 都没有。
+
+        拿不到主题、名字没在 ``theme.json`` 的 ``widgets`` 里声明、参数超限 ——
+        一律返回空串。宁可少一块，也不要吐一个必然 404 的 iframe：
+        空 iframe 在页面上是白框，站长会以为主题坏了。
+
+        ``args`` 走 URL（base64url JSON）。不走 postMessage 是因为父页面要发消息
+        就得有同源脚本参与，那等于为了传参数把沙箱门又打开。
+        """
+        key = (name or "").strip()
+        spec = self.widgets.get(key)
+        if not spec or not self.theme:
+            return Markup("")
+        try:
+            token = widget_sandbox.encode_args(args or {})
+        except ValueError:
+            return Markup("")
+        try:
+            h = int(height or spec.get("height") or widget_sandbox.DEFAULT_HEIGHT)
+        except (TypeError, ValueError):
+            h = widget_sandbox.DEFAULT_HEIGHT
+        src = f"{self.base}{widget_sandbox.WIDGET_PREFIX}/{self.theme}/{key}?d={token}"
+        return widget_sandbox.widget_iframe(
+            src,
+            height=h,
+            title=title or str(spec.get("title") or "") or key,
+        )
 
     def theme_asset(self, path: str = "") -> str:
         """主题资源 URL。只认 ``assets/`` 下的 css / js（服务端也只放行这两种）。
@@ -896,6 +955,7 @@ class TemplateContext:
             "pagination": self.pagination,
             "asset": self.asset,
             "script": self.script,
+            "widget": self.widget,
             "url": self.url,
             "comments": self.comments,
             "form": self.form,

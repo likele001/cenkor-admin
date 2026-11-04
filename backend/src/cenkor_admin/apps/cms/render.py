@@ -265,18 +265,39 @@ def _theme_manifest_text(session, site_id: int, theme: str) -> str | None:
     return raw
 
 
+def _theme_manifest(session, site_id: int, theme: str) -> theme_package.ThemeManifest | None:
+    """本主题清单的解析结果。解析失败返回 None，不让渲染挂掉。"""
+    raw = _theme_manifest_text(session, site_id, theme)
+    if not raw:
+        return None
+    try:
+        return theme_package.manifest_from_json(raw, legacy_key=theme)
+    except ValueError as exc:
+        logger.warning("主题 %s 的 theme.json 解析失败：%s", theme, exc)
+        return None
+
+
+def apply_theme_capabilities(ctx: TemplateContext, session, theme: str):
+    """把「本主题有哪些组件」「能不能跑同源脚本」挂到 context 上。
+
+    真实渲染和后台预览都走这里 —— 两处各写一遍的话，会出现「预览里 widget 是
+    白的、线上是好的」（或反过来），而作者只会以为自己理解错了模板机制。
+    """
+    from cenkor_admin.core.config import get_settings
+
+    manifest = _theme_manifest(session, ctx.site_id, theme) if session is not None else None
+    ctx.widgets = {w.name: w.as_dict() for w in manifest.widgets} if manifest else {}
+    ctx.allow_js = bool(get_settings().CMS_THEME_ALLOW_JS)
+    return manifest
+
+
 def _theme_settings(session, site_id: int, theme: str, site_settings: dict[str, Any] | None) -> dict[str, Any]:
     """主题设置 = 清单默认值 + 站点覆盖。没有清单就是空 dict。
 
     清单解析失败不让渲染挂掉 —— 配置是元数据，坏了顶多设置项不生效，页面照出。
     """
-    raw = _theme_manifest_text(session, site_id, theme)
-    if not raw:
-        return {}
-    try:
-        manifest = theme_package.manifest_from_json(raw, legacy_key=theme)
-    except ValueError as exc:
-        logger.warning("主题 %s 的 theme.json 解析失败：%s", theme, exc)
+    manifest = _theme_manifest(session, site_id, theme)
+    if manifest is None:
         return {}
     return theme_package.resolve_settings(manifest, site_settings)
 
@@ -307,6 +328,10 @@ def _build_context(
     theme: str,
     session=None,
 ) -> dict[str, Any]:
+    # 组件声明与脚本开关必须在 as_globals() 之前挂好：widget() / script() 读的是
+    # context 实例上的属性，晚一步设置，模板里拿到的就是空。
+    manifest = apply_theme_capabilities(ctx, session, theme) if session else None
+
     data = ctx.as_globals()
     data.update({
         "page": model,
@@ -320,7 +345,7 @@ def _build_context(
         # 模板里写 {{ theme.brand_color }}，永远有值 —— 不会因为站长没配过
         # 就渲染出 None。默认值兜底这件事必须在渲染时做，不能在模板里做，
         # 否则每个设置项都要写一遍 if。
-        "theme": _theme_settings(session, ctx.site_id, theme, ctx.site_meta()) if session else {},
+        "theme": theme_package.resolve_settings(manifest, ctx.site_meta()) if manifest else {},
         # 模板里判断首页用：{% if is_home %} 放 Hero / 大标题
         "is_home": _is_home(model),
         "now": datetime.now(),

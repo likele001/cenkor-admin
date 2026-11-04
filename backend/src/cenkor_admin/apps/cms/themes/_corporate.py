@@ -19,7 +19,7 @@ MANIFEST_JSON = """{
   "schema_version": 1,
   "key": "corporate",
   "name": "Corporate · \u4f01\u4e1a\u5b98\u7f51",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "\u4f01\u4e1a\u5b98\u7f51\u4e3b\u9898\uff1a\u6df1\u8272\u9876\u680f\u3001Hero \u533a\u3001\u7279\u8272\u5361\u7247\u3001\u591a\u5217\u9875\u811a\u3002\u9002\u5408 B2B \u5236\u9020\u4e1a\u3001\u65b9\u6848\u5546\u3001\u54a8\u8be2\u670d\u52a1\u5c55\u793a\u3002",
   "author": { "name": "Cenkor", "url": "https://cenkor.com" },
   "license": "MIT",
@@ -41,10 +41,15 @@ MANIFEST_JSON = """{
     { "key": "contact_phone", "type": "text", "label": "\u8054\u7cfb\u7535\u8bdd", "default": "", "group": "\u9875\u811a" },
     { "key": "icp_no", "type": "text", "label": "\u5907\u6848\u53f7", "default": "", "help": "\u586b\u4e86\u5c31\u5728\u9875\u811a\u663e\u793a", "group": "\u9875\u811a" }
   ],
-  "changelog": "1.0.0 \u9996\u53d1",
+  "widgets": [
+    { "name": "stats", "title": "\u6570\u5b57\u7edf\u8ba1", "height": 150,
+      "description": "\u9996\u5c4f\u4e0b\u65b9\u7684\u5173\u952e\u6307\u6807\u6761\uff0c\u6570\u5b57\u4ece 0 \u6eda\u52a8\u5230\u76ee\u6807\u503c\u3002\u8dd1\u5728 iframe \u6c99\u7bb1\u91cc\uff0c\u4e0d\u9700\u8981\u5f00\u540c\u6e90\u811a\u672c" }
+  ],
+  "changelog": "1.1.0 \u65b0\u589e stats \u6570\u5b57\u7edf\u8ba1\u7ec4\u4ef6\uff08iframe \u6c99\u7bb1\uff0c\u96f6\u540c\u6e90\u811a\u672c\uff09",
   "files": [
     "layout.html", "list.html", "page.html",
     "partials/header.html", "partials/footer.html", "partials/card.html",
+    "widgets/stats.html", "widgets/stats.js",
     "assets/style.css"
   ]
 }
@@ -141,6 +146,15 @@ LIST = """{% extends "layout.html" %}
     {% if theme.hero_cta_text %}
     <a class="btn btn-accent btn-lg" href="{{ theme.hero_cta_url or '/contact/' }}">{{ theme.hero_cta_text }}</a>
     {% endif %}
+    {{ widget('stats', {
+         'accent': theme.accent_color,
+         'items': [
+           {'value': 1200, 'suffix': '+', 'label': '服务企业'},
+           {'value': 36, 'suffix': '%', 'label': '平均降本'},
+           {'value': 72, 'suffix': 'h', 'label': '上线耗时'},
+           {'value': 99.9, 'suffix': '%', 'label': '交付准时率'}
+         ]
+       }, height=150) }}
   </div>
 </section>
 {% endif %}
@@ -312,6 +326,91 @@ main.container { padding-top: 56px; padding-bottom: 72px; }
 }
 """
 
+WIDGET_STATS_HTML = """<style>
+/* 组件自带样式：宿主页只做 reset，视觉归组件自己。
+   变量 --cms-accent 由 stats.js 按参数注入，所以颜色能跟着主题设置走。 */
+.cms-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px 12px;
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+}
+.cms-stat { text-align: center; }
+.cms-stat b {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--cms-accent, #f59e0b);
+  font-variant-numeric: tabular-nums;
+}
+.cms-stat span {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  opacity: 0.72;
+}
+@media (max-width: 560px) {
+  .cms-stat b { font-size: 26px; }
+}
+</style>
+<div class="cms-stats" id="cms-stats"></div>
+"""
+
+WIDGET_STATS_JS = """(function () {
+  // 沙箱内脚本：opaque origin，读不到 cookie、碰不到父页面 DOM。
+  // 参数由宿主页塞进 #cms-widget-data（不执行，CSP 也不需要为它放行）。
+  var root = document.getElementById('cms-stats');
+  if (!root) return;
+
+  var cfg = {};
+  try {
+    cfg = JSON.parse(document.getElementById('cms-widget-data').textContent || '{}');
+  } catch (e) {
+    cfg = {};
+  }
+  if (cfg.accent) root.style.setProperty('--cms-accent', String(cfg.accent));
+
+  var items = Array.isArray(cfg.items) ? cfg.items : [];
+
+  function text(v, d) {
+    return d > 0 ? v.toFixed(d) : String(Math.round(v));
+  }
+
+  items.slice(0, 6).forEach(function (it) {
+    var to = Number(it && it.value);
+    if (!isFinite(to)) to = 0;
+    var suffix = (it && it.suffix) ? String(it.suffix) : '';
+    var decimals = to % 1 !== 0 ? 1 : 0;
+
+    var box = document.createElement('div');
+    box.className = 'cms-stat';
+    var num = document.createElement('b');
+    var label = document.createElement('span');
+    num.textContent = text(0, decimals) + suffix;
+    label.textContent = (it && it.label) ? String(it.label) : '';
+    box.appendChild(num);
+    box.appendChild(label);
+    root.appendChild(box);
+
+    // 组件是懒加载的（iframe loading=lazy），进视口时才开始跑，不用再做一轮观察
+    var t0 = null;
+    var dur = 900;
+    function step(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      num.textContent = text(to * eased, decimals) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+})();
+"""
+
 FILES: dict[str, str] = {
     "theme.json": MANIFEST_JSON,
     "layout.html": LAYOUT,
@@ -320,5 +419,7 @@ FILES: dict[str, str] = {
     "partials/header.html": HEADER,
     "partials/footer.html": FOOTER,
     "partials/card.html": CARD,
+    "widgets/stats.html": WIDGET_STATS_HTML,
+    "widgets/stats.js": WIDGET_STATS_JS,
     "assets/style.css": STYLE,
 }

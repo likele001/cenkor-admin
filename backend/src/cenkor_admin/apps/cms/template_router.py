@@ -31,6 +31,7 @@ from cenkor_admin.apps.cms.render import (
     KIND_TEMPLATE,
     RENDER_TIMEOUT,
     _load_disk_template,
+    apply_theme_capabilities,
     disk_theme_paths,
     invalidate_theme_cache,
     load_disk_template,
@@ -245,6 +246,8 @@ def _preview_page_sync(body: PreviewRequest) -> str:
         theme = (body.theme or "").strip() or resolve_theme(session, body.site_id)
         resolver = make_preview_resolver(session, body.site_id, theme, overrides)
         ctx = TemplateContext(session, site_id=body.site_id, base="", theme=theme)
+        # 预览也挂组件声明，否则编辑器里 widget() 永远是空的、线上却是好的
+        manifest = apply_theme_capabilities(ctx, session, theme)
 
         item = ctx.content(body.kind, body.slug) if body.slug else None
         if item is None:
@@ -275,6 +278,9 @@ def _preview_page_sync(body: PreviewRequest) -> str:
             "base_url": "",
             "theme_css": resolver("assets/style.css") or "",
             "theme_name": theme,
+            # 预览是单页渲染，没有 canonical 可推，按「没给 slug 的列表类模板」算首页
+            "is_home": not body.slug and body.kind not in ("article", "page"),
+            "theme": theme_package.resolve_settings(manifest, ctx.site_meta()) if manifest else {},
         }
         # 预览的 resolver 带有编辑器里**还没保存**的内容。Jinja 按模板名缓存编译产物
         # （key 不含源码），不清的话 {% include %} 出来的 partial 永远是上一次的版本，

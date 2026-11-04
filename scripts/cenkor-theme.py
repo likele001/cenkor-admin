@@ -221,8 +221,9 @@ def _lint_with_backend(files: dict[str, str]) -> tuple[list[str], list[str]]:
     if check.ok:
         m = check.manifest
         if m:
+            extra = f"，{len(m.widgets)} 个组件" if m.widgets else ""
             say(f"  清单：{m.name} v{m.version}，{len(m.settings)} 个配置项，"
-                f"声明资源 {list(m.asset_kinds) or ['css（默认）']}")
+                f"声明资源 {list(m.asset_kinds) or ['css（默认）']}{extra}")
     return errors, warns
 
 
@@ -313,6 +314,11 @@ def cmd_init(args: argparse.Namespace) -> int:
         "changelog": "0.1.0 从内置主题初始化",
         "files": sorted(docs),
     }
+    # 组件声明必须跟着文件一起走。只拷 widgets/*.html 而不带声明，
+    # 作者改完一 lint 就被告知「组件没声明」，还得自己回去翻源主题的清单格式。
+    widgets = _base_widgets(base)
+    if widgets:
+        manifest["widgets"] = widgets
     (dest / "theme.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
@@ -337,6 +343,14 @@ def _base_settings(base: str) -> list[dict[str, Any]]:
 
     m = builtin_theme.get_theme_manifest(base)
     return [s.as_dict() for s in m.settings] if m else []
+
+
+def _base_widgets(base: str) -> list[dict[str, Any]]:
+    """基线主题的组件声明，原样带到新清单里。"""
+    from cenkor_admin.apps.cms import builtin_theme
+
+    m = builtin_theme.get_theme_manifest(base)
+    return [w.as_dict() for w in m.widgets] if m else []
 
 
 def _readme(key: str, base: str) -> str:

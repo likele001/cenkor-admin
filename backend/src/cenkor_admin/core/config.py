@@ -192,6 +192,28 @@ class Settings(BaseSettings):
     # 落盘根目录，留空用 backend/var/htmlcache
     CMS_STATIC_CACHE_ROOT: str = ""
 
+    # ---- 主题脚本权限（模板市场第四期）----
+    # 是否允许主题自带的同源脚本（assets/*.js）执行。**默认关闭**。
+    #
+    # 同源脚本与站点同权：能读 cookie、能以访客身份调后台接口、能改整个页面。
+    # 这不是"主题文件"应该有的能力，而 CSP 的 script-src 'self' 只管脚本从哪来、
+    # 不管脚本做什么 —— 所以信任一个模板的 js 等于信任它的作者。
+    #
+    # 需要交互的模板请用 {{ widget() }}：它跑在 iframe 沙箱里（opaque origin），
+    # 不需要这个开关。只有在完全信任来源（比如自己写的、审过的）时才打开。
+    CMS_THEME_ALLOW_JS: bool = False
+
+    # ---- 主题脚本权限（模板市场第四期）----
+    # 是否允许主题自带的同源脚本（assets/*.js）执行。**默认关闭**。
+    #
+    # 同源脚本与站点同权：能读 cookie、能以访客身份调后台接口、能改整个页面。
+    # 这不是"主题文件"应该有的能力，而 CSP 的 script-src 'self' 只管脚本从哪来、
+    # 不管脚本做什么 —— 所以信任一个模板的 js 等于信任它的作者。
+    #
+    # 需要交互的模板请用 {{ widget() }}：它跑在 iframe 沙箱里（opaque origin），
+    # 不需要这个开关。只有在完全信任来源（比如自己写的、审过的）时才打开。
+    CMS_THEME_ALLOW_JS: bool = False
+
     @property
     def ai_ready(self) -> bool:
         """AI 是否真正可用（开关 + 密钥双检）"""

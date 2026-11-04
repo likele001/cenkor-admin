@@ -25,6 +25,7 @@ from cenkor_admin.apps.cms.site_router import router as cms_site_router
 from cenkor_admin.apps.cms.template_router import router as template_router
 from cenkor_admin.apps.cms.theme_asset_router import router as cms_theme_asset_router
 from cenkor_admin.apps.cms.url_rules_router import router as cms_url_rules_router
+from cenkor_admin.apps.cms.widget_router import router as cms_widget_router
 from cenkor_admin.apps.notification.router import router as notification_router
 from cenkor_admin.apps.portal.admin_router import router as portal_admin_router
 from cenkor_admin.apps.portal.router import router as portal_router
@@ -45,6 +46,9 @@ api_v1_router.include_router(cms_public_router, prefix="/public", tags=["public"
 # 主题静态资源（assets/*.css / *.js）。严格 CSP 禁内联脚本后，
 # 脚本只能由这里对外提供；前缀与 csp.THEME_ASSET_PREFIX 必须一致。
 api_v1_router.include_router(cms_theme_asset_router, prefix="/public", tags=["public"])
+# widget 宿主页（iframe 沙箱里那一层文档）。响应头自带 sandbox 指令，
+# 顶层直接打开也一样受限；不要给它加 X-Frame-Options，否则 opaque origin 下会被拒嵌。
+api_v1_router.include_router(cms_widget_router, prefix="/public", tags=["public"])
 api_v1_router.include_router(portal_router, prefix="/public/portal", tags=["portal"])
 # SSO 授权跳转与回调必须匿名（理由见 apps/sso/router.py 顶部注释）
 from cenkor_admin.apps.sso.router import public_router as sso_public_router
