@@ -166,7 +166,10 @@ async def suggest_links(
                 },
             ],
             temperature=0.3,
-            max_tokens=4000,
+            # 4000 不够：推理模型（reasoner 类）光思考就能吃掉 1.4 万字符，
+            # 预算一满就只返回 reasoning_content、没有正文，表现为「AI 调用失败」。
+            # 内链建议只需要一小段 JSON，但思考预算必须留够。
+            max_tokens=16000,
         )
     except LLMNotConfiguredError:
         return {
