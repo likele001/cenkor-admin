@@ -42,6 +42,7 @@ PROMPT_LABELS: dict[str, str] = {
     "illustration": "AI 配图提示词",
     "seo": "SEO/GEO 元数据",
     "rewrite": "文本改写",
+    "fact_check": "事实核验",
 }
 
 TTL = 30.0

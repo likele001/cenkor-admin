@@ -9,6 +9,7 @@ import DynamicFieldRenderer from '@/components/cms/DynamicFieldRenderer.vue'
 import AiRewriteDialog from '@/components/cms/AiRewriteDialog.vue'
 import EntryAiPanel from '@/components/cms/EntryAiPanel.vue'
 import VersionDiffDialog from '@/components/cms/VersionDiffDialog.vue'
+import FactCheckDialog from '@/components/cms/FactCheckDialog.vue'
 
 interface FieldDef {
   id: number; field_key: string; label: string; field_type: string
@@ -87,6 +88,9 @@ const showVersionPreview = ref(false)
 // 版本对比：diffTo 为空则由弹层自己选「最新 vs 上一版」
 const diffOpen = ref(false)
 const diffTo = ref<number | null>(null)
+
+// 事实核验：只对已保存的内容跑，草稿没落库时按钮不出现
+const factCheckOpen = ref(false)
 
 function openDiff(toVersion?: number) {
   diffTo.value = toVersion ?? null
@@ -801,6 +805,9 @@ onMounted(async () => {
             🚀 分发到渠道
           </button>
           <button class="btn-ghost text-sm text-blue-600 w-full" @click="previewEntry">🖥 暂存预览（未发布）</button>
+          <button class="btn-ghost text-sm text-amber-600 w-full" @click="factCheckOpen = true">
+            🔍 事实核验（查正文里的具体说法有没有依据）
+          </button>
           <div v-if="form.status === 'draft' || form.status === 'approved'" class="flex gap-2">
             <button class="btn-ghost text-sm text-purple-600 w-full" @click="submitReview">提交审核</button>
           </div>
@@ -884,6 +891,12 @@ onMounted(async () => {
       :entry-id="Number(route.params.id)"
       :versions="versions"
       :initial-to="diffTo"
+    />
+    <!-- 事实核验：把 AI 稿子里没依据的具体说法指出来，只提示不阻断 -->
+    <FactCheckDialog
+      v-if="!isNew"
+      v-model:open="factCheckOpen"
+      :entry-id="Number(route.params.id)"
     />
     <!-- AI 改写弹层：标题用纯文本模式，正文用 HTML 分块模式 -->
     <AiRewriteDialog

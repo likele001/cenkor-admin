@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import search_logs
-from cenkor_admin.apps.cms.ai import copilot, pricing
+from cenkor_admin.apps.cms.ai import copilot, fact_check, pricing
 from cenkor_admin.apps.cms.ai import ingest as ingest_mod
 from cenkor_admin.apps.cms.ai.admin_router import router as admin_router
 from cenkor_admin.apps.cms.ai.batch_router import router as batch_router
@@ -856,6 +856,47 @@ async def suggest_seo(
     except Exception as exc:
         await db.rollback()
         raise _map_llm_error(exc) from exc
+
+
+# ---------------------------------------------------------------------------
+# 事实溯源
+# ---------------------------------------------------------------------------
+@router.post("/entries/{entry_id}/fact-check", summary="事实核验：标出正文里没有依据的具体说法")
+async def fact_check_entry(
+    entry_id: int,
+    body: dict[str, Any] = Body(default={}),
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """核验一条内容里的事实主张，返回逐句判定与出处。
+
+    刻意**不调 `_require_ai`**：规则层（数字 / 专名与证据比对）完全不依赖模型，
+    没配 AI 的站点也该能用它做最基本的事实查漏。模型判定失败时内部降级
+    （`degraded=True`），不会像其它 AI 端点那样回 503。
+
+    `materials` 可选：把这篇稿子的原始素材传进来，作为最高优先级的依据
+    （比如起草时用的产品参数表、客户给的原始数据）。
+    """
+    entry = await _load_entry(db, entry_id)
+    materials = body.get("materials")
+    if materials is not None and not isinstance(materials, list):
+        raise HTTPException(status_code=400, detail="materials 必须是字符串数组")
+
+    try:
+        result = await fact_check.check_entry(
+            db,
+            entry,
+            materials=[str(m)[:4000] for m in (materials or [])][:5],
+            created_by=user.id,
+        )
+        # 核验本身不写条目，但 _record 会落一条 AI 用量，需要提交
+        await db.commit()
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"事实核验失败：{exc}") from exc
 
 
 # ---------------------------------------------------------------------------
