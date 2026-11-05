@@ -145,7 +145,7 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         env:
-          REGISTRY: ${{ env.REGISTRY }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ github.repository_owner }}
           IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
 
       - name: 创建 Release
