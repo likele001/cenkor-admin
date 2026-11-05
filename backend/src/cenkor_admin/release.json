@@ -1,5 +1,5 @@
 {
-  "version": "0.5.19",
+  "version": "0.5.20",
   "channel": "stable",
   "released_at": "2026-11-04",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "修复分页字段名不一致：corporate 主题的 Hero 在真实页面上从未显示；build_pagination 增加 current 别名；后台预览补齐 theme / is_home / 组件声明"
+  "notes": "模板市场：商店新增 theme 商品类型（主题模板），附 theme.json 包规范与校验器；后台「内容管理 → 模板市场」可浏览官方目录并一键安装；开发者门户补齐「发布主题模板」入口与主题开发文档；新增两个官方样例主题 墨痕 Inkwell（博客）与 青云 Qingyun（企业官网）"
 }

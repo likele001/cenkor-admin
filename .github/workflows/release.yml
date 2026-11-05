@@ -33,7 +33,7 @@ jobs:
         id: check
         run: |
           TAG="${GITHUB_REF_NAME}"                 # 如 v0.2.0
-          FILE_VER="$(tr -d ' \n' < backend/src/cenkor_admin/VERSION)"
+          FILE_VER="$(tr -d ' \r\n' < backend/src/cenkor_admin/VERSION)"
           TAG_VER="${TAG#v}"                        # 去掉前缀 v
           echo "tag=${TAG_VER}  VERSION文件=${FILE_VER}"
           if [ "$TAG_VER" != "$FILE_VER" ]; then
@@ -41,6 +41,22 @@ jobs:
             exit 1
           fi
           echo "version=${FILE_VER}" >> "$GITHUB_OUTPUT"
+
+      # release.json 是 GitHub Release 正文与 spoke 检查接口的数据源。
+      # 它落后于 VERSION 时，发版页会贴上一版的说明（v0.5.20 真实发生过），
+      # 所以这里必须一起卡住，不能只校验 tag ↔ VERSION。
+      - name: 校验 release.json 声明与 VERSION 一致
+        run: |
+          FILE_VER="$(tr -d ' \r\n' < backend/src/cenkor_admin/VERSION)"
+          JSON_VER="$(python3 -c 'import json;print(json.load(open("backend/src/cenkor_admin/release.json",encoding="utf-8"))["version"].strip())')"
+          echo "VERSION=${FILE_VER}  release.json=${JSON_VER}"
+          if [ "$JSON_VER" != "$FILE_VER" ]; then
+            echo "::error::release.json 的 version (${JSON_VER}) 与 VERSION (${FILE_VER}) 不一致，发布页说明会贴成上一版内容。修复：bash scripts/release.sh sync"
+            exit 1
+          fi
+          if [ "$(python3 -c 'import json;print(0 if json.load(open("backend/src/cenkor_admin/release.json",encoding="utf-8")).get("notes","").strip() else 1)')" = "1" ]; then
+            echo "::warning::release.json 的 notes 为空，GitHub Release 正文会没有内容"
+          fi
 
   # ---------- 1. 核心包 ----------
   core-package:
