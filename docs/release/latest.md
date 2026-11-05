@@ -5,26 +5,26 @@
 | 项 | 值 |
 |----|-----|
 | 类型 | 核心平台（不含官网） |
-| 版本 | 0.5.20 |
-| 打包日期 | 2026-11-04 |
-| 文件名 | `cenkor-admin-core-0.5.20-20261104.tar.gz` |
+| 版本 | 0.5.21 |
+| 打包日期 | 2026-11-05 |
+| 文件名 | `cenkor-admin-core-0.5.21-20261105.tar.gz` |
 | 路径 | `/www/wwwroot/cenkor-admin/release/`（与 GitHub Release 附件同一份） |
 | 打包命令 | CI 自动（`scripts/package-core.sh`，tag 触发） |
-| 发布页 | `https://github.com/likele001/cenkor-admin/releases/tag/v0.5.20` |
-| 容器镜像 | `ghcr.io/likele001/cenkor-admin:0.5.20`（amd64 / arm64） |
-| SHA256 | `04ae9b80873014ceb965ff50d811dc5caf58f06dd438afa87faf95bd50bfc089` |
+| 发布页 | `https://github.com/likele001/cenkor-admin/releases/tag/v0.5.21` |
+| 容器镜像 | `ghcr.io/likele001/cenkor-admin:0.5.21`（amd64 / arm64） |
+| SHA256 | `d9e2c290c445ad16912eeea1c0f682ac2f0dccaffdfdb96108e5a40ec0fc24b5` |
 
 详细说明见 [../packaging.md](../packaging.md)。
 
-> **已知瑕疵**：0.5.20 的包内 `release.json` 仍是 `0.5.19`。当时 `release.sh` 在「VERSION
-> 已是目标版本」时直接退出，声明文件没同步；打包发生在修正之前。包内 `VERSION` 是正确的
-> `0.5.20`，安装后以站点 `VERSION` 为准。该缺陷已在 `release.sh` 修复，下个版本起包内声明
-> 不再落后，CI Preflight 也会拦住漂移。
+> **包内声明已对齐**：0.5.21 的包内 `VERSION` 与 `release.json` 均为 `0.5.21`。
+> 0.5.20 曾出现「包内 `release.json` 落后一版」的瑕疵，根因是 `release.sh` 在版本未变时
+> 直接退出；该缺陷已修（新增 `sync` / `check`），CI Preflight 也会在打包前拦住漂移。
 
 ## 最近几个版本
 
 | 版本 | 日期 | 主要变化 |
 |------|------|----------|
+| 0.5.21 | 2026-11-05 | 发版链路加固：`release.sh` 补 `sync`/`check` 并容忍 CRLF，CI 增加 `release.json` ↔ `VERSION` 一致性闸门；修复发布页 Docker 镜像名缺 owner；模板市场提交限定门户账号、后台已安装列表 Tab 串页修复；新增宝塔 Nginx 反代与伪静态配置说明 |
 | 0.5.20 | 2026-11-04 | 模板市场：商店新增 `theme` 商品类型 + `theme.json` 包规范与校验器；后台「内容管理 → 模板市场」浏览官方目录并一键安装；开发者门户补「发布主题模板」入口与主题开发文档；官方样例主题 墨痕 Inkwell / 青云 Qingyun |
 | 0.5.19 | 2026-11-04 | 修 corporate 主题 Hero 在真实页面从未显示（分页字段名对不上）；`build_pagination` 增加 `current` 别名；后台预览补齐 theme / is_home / 组件声明 |
 | 0.5.18 | 2026-11-04 | widget 组件沙箱：模板可带交互组件，跑在 opaque origin 的 iframe 里，开放交互但不需要同源权限；内置 corporate 加 stats 组件样板 |
