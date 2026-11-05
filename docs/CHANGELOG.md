@@ -13,6 +13,34 @@
 > - 要点二
 > ```
 
+## 2026-11-05　发版链路加固：版本漂移闸门 + 反代文档
+
+**【修复】**
+
+- 模板市场提交页：已登录的 admin 账号提交应用会被错认成 `user_id` 相同的开发者，现限制仅门户（开发者）账号可提交
+- 后台「内容管理 → 模板市场」切换 Tab 后，已安装卡片串到「下载主题」页一页排开，已按 `activeTab` 隔离
+
+**【发版机制】**
+
+- `release.sh` 新增 `sync` / `check` 子命令：`sync` 按当前 VERSION 对齐 release.json，`check` 只读校验漂移（退出码 1，可进 CI）
+- `release.sh` 在「VERSION 已是目标版本」时不再直接退出，改为继续同步 release.json，堵住「bump 一半」
+- 版本文件读取容忍 CRLF（Windows `core.autocrlf=true` 会把 VERSION 读成 `0.5.20\r` 这种毒值）
+- CI 新增第三道闸门：`release.json.version` 必须等于 `VERSION`，否则中断发版，防止发布页贴成上一版说明
+- 修复发布页 Docker 镜像名缺 owner：`ghcr.io/cenkor-admin-backend:<ver>` → `ghcr.io/likele001/cenkor-admin-backend:<ver>`
+
+**【文档】**
+
+- 新增「宝塔 Nginx 反代与伪静态配置说明」：三条铁律、站点全景表、反代与伪静态代码、`$` 锚定事故复盘、变更 SOP、curl 验证清单、9 条故障速查
+
+**【工程化】**
+
+- ruff 全量清零：导入排序 + 未使用解包变量
+
+**【注意】**
+
+- 无数据库迁移，升级后重启后端即可生效
+- 本次含前端改动（admin-web），升级需同步更新 `frontend/admin-web/dist`，否则 Tab 串页修复不生效
+
 ## 2026-11-04　模板市场：主题模板上架 + 一键安装 ⭐
 
 **【新增：模板市场】**

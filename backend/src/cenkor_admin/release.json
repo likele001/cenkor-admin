@@ -1,12 +1,12 @@
 {
-  "version": "0.5.20",
+  "version": "0.5.21",
   "channel": "stable",
-  "released_at": "2026-11-04",
+  "released_at": "2026-11-05",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
   "docker_registry": "ghcr.io/likele001",
   "docker_image": "cenkor-admin",
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "模板市场：商店新增 theme 商品类型（主题模板），附 theme.json 包规范与校验器；后台「内容管理 → 模板市场」可浏览官方目录并一键安装；开发者门户补齐「发布主题模板」入口与主题开发文档；新增两个官方样例主题 墨痕 Inkwell（博客）与 青云 Qingyun（企业官网）"
+  "notes": "发版链路加固：release.sh 补 sync/check 子命令并容忍 CRLF 版本文件，CI 新增 release.json 与 VERSION 一致性闸门；修复发布页 Docker 镜像名缺 owner 前缀；模板市场提交仅限门户账号、后台已安装列表 Tab 串页修复；新增宝塔 Nginx 反代与伪静态配置说明"
 }
