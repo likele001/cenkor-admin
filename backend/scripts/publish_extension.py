@@ -79,6 +79,53 @@ def find_dsn() -> str:
     return ""
 
 
+
+def iter_env_dsns() -> list[str]:
+    """按 SYNC 优先的顺序，把 .env 里的候选 DSN 都取出来。"""
+    out: list[str] = []
+    for f in ENV_FILES:
+        if not os.path.isfile(f):
+            continue
+        for line in open(f, encoding="utf8", errors="ignore"):
+            st = line.strip()
+            if st.startswith("DATABASE_URL_SYNC=") or st.startswith("DATABASE_URL="):
+                out.append(st.split("=", 1)[1])
+    return out
+
+
+def connect_dsn(psycopg2):
+    """先试正在服务的进程 DSN，连不上再回退 .env。
+
+    2026-11-06 实测：8002 进程环境里的 pg 口令是旧的（改过库口令但进程没重启），
+    进程活着、连接池里是老连接，但新连接直接 password authentication failed。
+    只认进程环境会让发布脚本永久失效，所以必须回退，并打印用的是哪一份。
+    """
+    candidates: list[tuple[str, str]] = []
+    d1 = find_dsn()
+    if d1:
+        candidates.append(("进程环境", d1))
+    for d in iter_env_dsns():
+        candidates.append((".env", d))
+
+    seen: set[str] = set()
+    last_err: Exception | None = None
+    for label, dsn in candidates:
+        url = re.sub(r"^postgresql\+(?:asyncpg|psycopg2)://", "postgresql://", dsn)
+        if url in seen:
+            continue
+        seen.add(url)
+        try:
+            conn = psycopg2.connect(url)
+        except Exception as e:  # noqa: BLE001 —— 换下一个候选
+            last_err = e
+            print(f"  连接失败（来源：{label}）：{str(e)[:90]}", file=sys.stderr)
+            continue
+        print(f"连接：{mask(url)}（来源：{label}）")
+        return conn
+    print(f"没有可用的数据库连接：{last_err}", file=sys.stderr)
+    return None
+
+
 def sha256(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as fh:
@@ -305,13 +352,10 @@ def main() -> int:
         print("需要 psycopg2：用 /www/server/pyporject_evn/cenkor/bin/python 跑本脚本", file=sys.stderr)
         return 2
 
-    dsn = find_dsn()
-    if not dsn:
-        print("取不到 DATABASE_URL（8002 进程与 .env 都没有）", file=sys.stderr)
+    conn = connect_dsn(psycopg2)
+    if conn is None:
+        print("取不到可用的 DATABASE_URL（8002 进程与 .env 都连不上）", file=sys.stderr)
         return 2
-    url = re.sub(r"^postgresql\+asyncpg://", "postgresql://", dsn)
-    print(f"连接：{mask(url)}")
-    conn = psycopg2.connect(url)
 
     if args.all:
         keys = sorted(
