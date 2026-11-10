@@ -3,16 +3,15 @@
 import { watch, onBeforeUnmount, ref, computed } from 'vue'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
-import Table from '@tiptap/extension-table'
+import { Table } from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import TextAlign from '@tiptap/extension-text-align'
-import TextStyle from '@tiptap/extension-text-style'
+import { TextStyle } from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
 import { api } from '@/lib/api'
 
@@ -71,8 +70,9 @@ const editor = useEditor({
   content: props.modelValue || '',
   editable: !props.disabled,
   extensions: [
-    StarterKit,
-    Underline,
+    // Tiptap 3 的 StarterKit 已内置 link / underline；这里禁用内置 link，
+    // 否则与下面自定义 rel/target 的 Link 扩展重名，编辑器会拒绝初始化。
+    StarterKit.configure({ link: false }),
     Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' } }),
     ResizableImage.configure({ inline: false, HTMLAttributes: { class: 'rte-image' } }),
     Placeholder.configure({ placeholder: props.placeholder }),
@@ -109,7 +109,8 @@ const editor = useEditor({
 watch(() => props.modelValue, (val) => {
   const e = editor.value
   if (e && val !== e.getHTML()) {
-    e.commands.setContent(val || '', false)
+    // v3 起 setContent 第二个参数是 options 对象，不再是 emitUpdate 布尔值
+    e.commands.setContent(val || '', { emitUpdate: false })
     charCount.value = e.getText().replace(/\s/g, '').length
   }
 })
