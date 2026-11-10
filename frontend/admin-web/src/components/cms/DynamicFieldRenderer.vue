@@ -33,6 +33,16 @@ const fieldValue = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
+// vue-tsc 3 会把「迭代 any」的 v-for 索引推断成 string | number，
+// 于是 number 下标 / splice / i + 1 全部报错（i + 1 还会变成字符串拼接）。
+// 用显式类型的 computed 收窄，索引稳定为 number；非数组值回落空数组也更安全。
+const urlList = computed<string[]>(() =>
+  Array.isArray(fieldValue.value) ? (fieldValue.value as string[]) : [],
+)
+const repeaterRows = computed<unknown[]>(() =>
+  Array.isArray(fieldValue.value) ? (fieldValue.value as unknown[]) : [],
+)
+
 const uploading = ref(false)
 const uploadError = ref('')
 
@@ -372,7 +382,7 @@ function onImageError(e: Event) {
     <!-- images -->
     <div v-else-if="definition.field_type === 'images'" class="field-input-wrapper">
       <div class="images-grid">
-        <div v-for="(url, i) in (fieldValue || [])" :key="i" class="image-card">
+        <div v-for="(url, i) in urlList" :key="i" class="image-card">
           <img :src="url" class="preview-img" @error="onImageError" />
           <div class="image-overlay">
             <button type="button" class="overlay-btn" @click="removeImage(i)">🗑️</button>
@@ -416,11 +426,11 @@ function onImageError(e: Event) {
     <!-- files -->
     <div v-else-if="definition.field_type === 'files'" class="field-input-wrapper">
       <div class="file-list">
-        <div v-for="(url, i) in (fieldValue || [])" :key="i" class="file-card">
+        <div v-for="(url, i) in urlList" :key="i" class="file-card">
           <span class="file-icon">📄</span>
           <input :value="url" type="url" class="field-input flex-1" placeholder="文件 URL"
-            @input="($event: Event) => { const arr = [...(fieldValue || [])]; arr[i] = ($event.target as HTMLInputElement).value; fieldValue = arr }" />
-          <button type="button" class="action-btn delete" @click="($event: Event) => { const arr = [...(fieldValue || [])]; arr.splice(i, 1); fieldValue = arr }">🗑️</button>
+            @input="($event: Event) => { const arr = [...urlList]; arr[i] = ($event.target as HTMLInputElement).value; fieldValue = arr }" />
+          <button type="button" class="action-btn delete" @click="($event: Event) => { const arr = [...urlList]; arr.splice(i, 1); fieldValue = arr }">🗑️</button>
         </div>
         <button type="button" class="add-file-btn" :disabled="disabled || uploading"
           @click="onMultiFileUpload('files')">
@@ -495,14 +505,14 @@ function onImageError(e: Event) {
     <!-- repeater -->
     <div v-else-if="definition.field_type === 'repeater'" class="field-input-wrapper">
       <div class="repeater-list">
-        <div v-for="(_, i) in (fieldValue || [])" :key="i" class="repeater-item">
+        <div v-for="(_, i) in repeaterRows" :key="i" class="repeater-item">
           <div class="repeater-header">
             <span class="repeater-number">#{{ i + 1 }}</span>
             <button type="button" class="action-btn delete" @click="removeRepeaterRow(i)">🗑️ 删除</button>
           </div>
-          <textarea :value="JSON.stringify(fieldValue[i], null, 2)" class="field-textarea field-code"
+          <textarea :value="JSON.stringify(repeaterRows[i], null, 2)" class="field-textarea field-code"
             :disabled="disabled" rows="4"
-            @input="($event: Event) => { try { (fieldValue as any[])[i] = JSON.parse(($event.target as HTMLTextAreaElement).value); fieldValue = [...fieldValue] } catch {} }"></textarea>
+            @input="($event: Event) => { try { const rows = [...repeaterRows]; rows[i] = JSON.parse(($event.target as HTMLTextAreaElement).value); fieldValue = rows } catch {} }"></textarea>
         </div>
         <button type="button" class="add-repeater-btn" :disabled="disabled" @click="addRepeaterRow">
           <span class="btn-icon">➕</span>
