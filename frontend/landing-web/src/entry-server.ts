@@ -8,7 +8,7 @@
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory } from 'vue-router'
-import { createHead } from '@unhead/vue'
+import { createHead } from '@unhead/vue/server'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { createAppRouter } from './router'
