@@ -24,6 +24,13 @@ updates:
           - "patch"
         patterns:
           - "*"
+    # TypeScript 7 调整了 package exports，vue-tsc 3.x 仍解析
+    # typescript/lib/tsc，type-check 会 ERR_PACKAGE_PATH_NOT_EXPORTED。
+    # 等 vue-tsc 适配 TS 7 后移除本条 ignore 并重新评估升级。
+    ignore:
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
     commit-message:
       prefix: "deps"
 
