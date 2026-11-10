@@ -1,6 +1,6 @@
 import { createApp, createSSRApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createHead } from '@unhead/vue'
+import { createHead } from '@unhead/vue/client'
 import { createWebHistory } from 'vue-router'
 import App from './App.vue'
 import { createAppRouter } from './router'

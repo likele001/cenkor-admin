@@ -116,7 +116,7 @@ def connect_dsn(psycopg2):
         seen.add(url)
         try:
             conn = psycopg2.connect(url)
-        except Exception as e:  # noqa: BLE001 —— 换下一个候选
+        except Exception as e:  # 换下一个候选
             last_err = e
             print(f"  连接失败（来源：{label}）：{str(e)[:90]}", file=sys.stderr)
             continue

@@ -1,0 +1,68 @@
+# Dependabot 分组策略（2026-11-10）
+#
+# 背景：2026-11-04 的分组 PR 把 echarts 5→6、vite 6→8、vue-tsc 2→3 等多个
+# major 捆绑进同一个 PR，vue-tsc 3 类型检查变严导致 admin-web CI 失败，
+# 7 条安全告警因此一直没修。这里的原则：
+#   1. minor / patch 合并成一个 PR，减少噪音；
+#   2. major 保持「单包单 PR」，跨 major 需配套改代码或成对升 peer，必须人工排期；
+#   3. 每个 npm 清单独立配置，避免跨目录捆绑（模板目录不自动更新，由人工维护）。
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    groups:
+      npm-nonbreaking:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "npm"
+    directory: "/backend/src/cenkor_admin/apps/cloud_storage/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      npm-nonbreaking:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "npm"
+    directory: "/backend/src/cenkor_admin/codegen/runtime_plugin"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      npm-nonbreaking:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
