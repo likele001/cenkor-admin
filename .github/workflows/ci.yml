@@ -168,10 +168,38 @@ jobs:
         env:
           VITE_API_BASE_URL: http://localhost:8000
 
+  frontend-lock:
+    name: Frontend (lock 一致性)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # 为什么单独一个 job、而不是塞进上面的 matrix：
+      #
+      # 上面的 matrix 是 working-directory 到 frontend/<app> 里跑 npm ci，
+      # npm 只校验「该 workspace 实际需要的依赖」，看不见别的 workspace 的
+      # 缺口。2026-11-11 就是这样漏掉的：c075dab 把 admin-web 的 Tiptap 升到
+      # 3.33.0 重生成 lock，把 developer-web 仍声明的 Tiptap 2.x 实体节点整段
+      # 删了，matrix 两个 app 全绿，而仓库根任何一次 npm ci 都被拒。
+      #
+      # 这个 job 只读 package.json + package-lock.json + .npmrc，不需要
+      # node_modules，跑几秒就完。详见 scripts/check-npm-lock.py 的模块文档。
+      #
+      # 注意 frontend/developer-web 是刻意不入库的闭源资产，CI 里没有它的
+      # 源码。脚本会改用 lock 自带的该 workspace 声明块来校验 —— 恰好就是
+      # 能抓到上面那个 bug 的那一层。
+      - name: Check lock consistency
+        run: python3 scripts/check-npm-lock.py
+
   integration:
     name: Integration
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend, frontend, frontend-lock]
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

@@ -3,6 +3,7 @@
 #   1) 防止商业应用被误提交进公开仓库      → scripts/check-app-tracking.sh
 #   2) 防止 alembic 迁移链在公开仓库断裂    → scripts/check-migration-graph.py
 #   3) 防止同名 App 内置/外置双份互相遮蔽   → scripts/check-app-shadowing.py
+#   4) 防止 package-lock 悄悄残缺           → scripts/check-npm-lock.py
 #
 # 为什么要有第 2 项：迁移文件也分「开源 / 闭源」两类，闭源的被 .gitignore 排除。
 # 一旦把平台自己的迁移挂在闭源链中间，公开仓库就会断链 —— 表现为
@@ -10,6 +11,13 @@
 #
 # 为什么要有第 3 项：内置目录优先于外置目录参与导入解析，同名双份会让外置源码
 # 被静默遮蔽（改了不生效）—— payment 1.0.0 装进内置目录后遮蔽外置新版即为此例。
+#
+# 为什么要有第 4 项：2026-11-11 的 c075dab 把 admin-web 的 Tiptap 升到 3.33.0
+# 并重生成 lock，顺手把 developer-web 仍声明的 Tiptap 2.x 实体节点整段删了。
+# CI 的前端 matrix 是 working-directory 到子目录跑 npm ci，看不见别的 workspace
+# 的缺口，两个 app 全绿；而仓库根任何一次 npm ci 都被全量校验拒绝，本地从此
+# 无法重建前端。这个钩子在有源码的机器上跑，是最早能拦住它的地方。
+# 只读 package.json / package-lock.json / .npmrc，不需要 node_modules，毫秒级。
 #
 # 启用（每个 clone 需执行一次）：
 #   git config core.hooksPath .githooks
@@ -36,6 +44,16 @@ fi
 # 3) App 目录遮蔽检查（同一 key 在内置与外置目录各有一份）
 if [ -f "$ROOT/scripts/check-app-shadowing.py" ] && command -v python3 >/dev/null 2>&1; then
   ( cd "$ROOT" && python3 scripts/check-app-shadowing.py --quiet ) || rc=1
+fi
+
+# 4) npm lock 与 workspace 声明一致性
+#    只在本次提交涉及前端依赖文件时才跑，避免改后端也被它拖慢。
+if [ -f "$ROOT/scripts/check-npm-lock.py" ] && command -v python3 >/dev/null 2>&1; then
+  changed="$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null \
+    | grep -E '^(package\.json|package-lock\.json|\.npmrc)$|^frontend/[^/]+/package\.json$' || true)"
+  if [ -n "$changed" ]; then
+    ( cd "$ROOT" && python3 scripts/check-npm-lock.py --quiet ) || rc=1
+  fi
 fi
 
 exit $rc
