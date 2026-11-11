@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/lib/api'
 import { fromProductApi, toProductPayload } from '@/lib/transform'
 import DynamicFieldRenderer from '@/components/cms/DynamicFieldRenderer.vue'
+import WebsiteContentEditor from '@/components/cms/WebsiteContentEditor.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -74,6 +75,14 @@ async function load() {
       loadFieldDefs('product'),
     ])
     Object.assign(form.value, fromProductApi(prodRes.data))
+    // 官网读 custom_fields.seo_*；后台 SEO 表单历史上提交顶层 seo_* 字段，库中并不存在。
+    // 这里把两个来源对齐，保证后台界面能看到、并且能改官网真正使用的值。
+    form.value.custom_fields = form.value.custom_fields || {}
+    const wcf = form.value.custom_fields
+    // 以 custom_fields 为准（官网真源）；顶层 seo_* 是历史字段，可能残留旧值。
+    form.value.seoTitle = wcf.seo_title || form.value.seoTitle || ''
+    form.value.seoDescription = wcf.seo_description || form.value.seoDescription || ''
+    form.value.seoKeywords = wcf.seo_keywords || form.value.seoKeywords || ''
   } catch (e: any) {
     error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
   } finally {
@@ -89,7 +98,14 @@ async function save() {
   error.value = ''
   success.value = ''
   try {
-    const payload = toProductPayload(form.value)
+    // SEO 同步写回 custom_fields，官网构建器从这里取值。
+    const wcf = {
+      ...(form.value.custom_fields || {}),
+      seo_title: form.value.seoTitle || null,
+      seo_description: form.value.seoDescription || null,
+      seo_keywords: form.value.seoKeywords || null,
+    }
+    const payload = toProductPayload({ ...form.value, custom_fields: wcf })
     if (isNew) {
       const { data } = await api.post('/api/v1/cms/products', payload)
       success.value = 't("productEdit.已创建")'
@@ -224,7 +240,7 @@ onMounted(load)
         <!-- SEO -->
         <div class="card space-y-4">
           <h2 class="font-semibold text-lg">SEO</h2>
-          <p class="text-sm text-ink-500">覆盖站点默认 meta，留空则使用站点全局配置。</p>
+          <p class="text-sm text-ink-500">官网产品详情页的 title / description / keywords。保存后写入自定义字段，并自动同步到 www.cenkor.cn。</p>
           <div class="grid sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium mb-1.5">Meta 标题（title）</label>
@@ -240,6 +256,9 @@ onMounted(load)
             </div>
           </div>
         </div>
+
+        <!-- 官网内容：www.cenkor.cn 静态站的产品级文案 -->
+        <WebsiteContentEditor v-model="form.custom_fields" />
 
         <!-- 自定义字段 -->
         <div v-if="fieldDefs.length" class="card space-y-4">
