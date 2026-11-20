@@ -259,7 +259,7 @@ async def _refresh_from_cloud(db: AsyncSession, app_key: str, cache: dict[str, A
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.post(
-                f"{cloud}/api/v1/store/licenses/heartbeat",
+                f"{cloud}/api/v1/store/licenses/{license_key}/heartbeat",
                 json={
                     "license_key": license_key,
                     "instance_fp": compute_instance_fp(),

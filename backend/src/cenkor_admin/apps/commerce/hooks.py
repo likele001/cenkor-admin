@@ -15,7 +15,7 @@
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import structlog
 from sqlalchemy import select
@@ -240,6 +240,38 @@ async def settle_on_tick(**kwargs) -> dict | None:
     if settled:
         log.info("commerce.settle_tick", settled=settled)
     return {"settled": settled}
+
+
+_last_remind_at: datetime | None = None
+REMIND_INTERVAL_HOURS = 6
+
+
+@hook("scheduler.tick", app_key="commerce", priority=60)
+async def remind_expiring_on_tick(**kwargs) -> dict | None:
+    """周期任务：授权到期前 30/7 天提醒门户买家。
+
+    scheduler 每 30 秒 tick 一次，提醒按 6 小时节流；真正「只发一次」靠
+    reminders 里的去重键（跨重启有效）。
+    """
+    global _last_remind_at
+    now = _now()
+    if _last_remind_at and (now - _last_remind_at) < timedelta(hours=REMIND_INTERVAL_HOURS):
+        return None
+    _last_remind_at = now
+
+    from cenkor_admin.apps.commerce import reminders
+    from cenkor_admin.core.db import AsyncSessionLocal
+
+    try:
+        async with AsyncSessionLocal() as db:
+            stats = await reminders.run_expiry_reminders(db)
+    except Exception as e:
+        log.warning("commerce.expiry_reminder_tick_failed", error=str(e))
+        return None
+
+    if stats.get("sent"):
+        log.info("commerce.expiry_reminder_tick", **stats)
+    return stats
 
 
 # ============================================================

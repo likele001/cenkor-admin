@@ -95,6 +95,97 @@ def _spoke_guard() -> str:
     return cloud
 
 
+async def activate_license_local(
+    db: AsyncSession, license_key: str, app_key: str
+) -> dict[str, Any]:
+    """把授权码落到本实例：绑定实例指纹 → 换取签名凭证 → 写本地授权缓存。
+
+    安装付费应用后必须调用，否则应用的接口守卫（``require_app_license``）
+    会一直返回 402。两种部署共用：
+
+    * 授权中心（``CENKOR_CLOUD_URL`` 为空）：本地授权记录直接绑定本机并重新签发；
+    * 客户实例：调官方 ``/store/licenses/{key}/activate`` 换 token，本地只存缓存。
+    """
+    s = get_settings()
+    license_key = license_key.strip().upper()
+    fp = licensing.compute_instance_fp()
+    domain = (s.PUBLIC_BASE_URL or "").split("//")[-1].split("/")[0] or None
+    cloud = _cloud_base()
+
+    if cloud:
+        import httpx
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{cloud}/api/v1/store/licenses/{license_key}/activate",
+                    json={"instance_fp": fp, "domain": domain, "version": s.APP_VERSION},
+                )
+        except Exception as e:
+            raise HTTPException(502, f"连接授权中心失败：{e}") from e
+        if resp.status_code != 200:
+            try:
+                reason = (resp.json() or {}).get("detail") or resp.text[:200]
+            except Exception:
+                reason = resp.text[:200]
+            raise HTTPException(400, f"授权激活失败：{reason}")
+        data = dict(resp.json() or {})
+        if str(data.get("app_key") or "") != app_key:
+            raise HTTPException(400, "授权码与当前应用不匹配")
+        token = str(data.get("token") or "")
+    else:
+        # 本机即授权中心：不许自证清白，必须存在本地授权记录
+        row = (await db.execute(
+            select(cm.AppLicense).where(cm.AppLicense.license_key == license_key)
+        )).scalar_one_or_none()
+        if not row or row.app_key != app_key:
+            raise HTTPException(404, "授权码不存在，或与本应用不匹配")
+        if row.status in ("revoked", "refunded"):
+            raise HTTPException(400, f"授权已{ '吊销' if row.status == 'revoked' else '退款' }，无法激活")
+        if row.expires_at and row.expires_at < _now():
+            raise HTTPException(400, "授权已到期，请续费后再激活")
+        if row.instance_fp and row.instance_fp != fp:
+            if row.rebind_count >= row.max_rebind:
+                raise HTTPException(409, "该授权绑定次数已用尽，请在授权中心换绑")
+            row.rebind_count += 1
+        row.instance_fp = fp
+        if domain:
+            row.bound_domain = domain
+        row.status = "active"
+        row.activated_at = row.activated_at or _now()
+        row.last_check_at = _now()
+
+        from cenkor_admin.apps.commerce.commerce_router import _resign
+
+        await _resign(db, row)
+        await db.commit()
+        token = row.token or ""
+
+    # 本地验签兜底：只有「签给本实例、且就是本应用」的凭证才允许落缓存
+    payload = licensing.verify_license_token(token)
+    if (
+        not payload
+        or payload.get("app") != app_key
+        or (payload.get("fp") and payload.get("fp") != fp)
+    ):
+        raise HTTPException(502, "授权中心返回的凭证校验失败，请联系管理员")
+
+    await licensing.write_cache(db, app_key, {
+        "license_key": license_key,
+        "token": token,
+        "checked_at": _now().isoformat(),
+        "cloud_ok": True,
+        "invalid_reason": None,
+    })
+    log.info("licensing.activated_local", app=app_key, license=license_key, fp=fp)
+    return {
+        "ok": True,
+        "app_key": app_key,
+        "license_key": license_key,
+        "license_state": (await licensing.get_license_state(db, app_key, force_refresh=False)).to_dict(),
+    }
+
+
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
@@ -582,9 +673,155 @@ async def account_revoke_instance(
     return {"ok": True, "instance_uid": instance_uid, "revoked": True}
 
 
+@router.get("/account/licenses", response_model=dict[str, Any])
+async def account_licenses(
+    db: AsyncSession = Depends(get_db),
+    who: dict = Depends(require_portal_or_admin),
+):
+    """门户「授权管理」：按授权码聚合，并带出每个授权的实例绑定明细。
+
+    与 ``/account/purchases`` 的分工：那边面向「我买过什么」，这里面向
+    「授权现在绑在哪台机器上」，供换机时自助解绑。按门户登录态过滤，
+    不提供任何跨账号查询。
+    """
+    _hub_guard()
+    uid = await _portal_uid(who)
+    lics = (await db.execute(
+        select(cm.AppLicense)
+        .where(cm.AppLicense.buyer_type == "portal", cm.AppLicense.buyer_id == uid)
+        .order_by(cm.AppLicense.id.desc())
+    )).scalars().all()
+    if not lics:
+        return {"items": [], "total": 0}
+
+    rows = (await db.execute(
+        select(cm.AppLicenseBinding)
+        .where(cm.AppLicenseBinding.license_id.in_([l.id for l in lics]))
+        .order_by(cm.AppLicenseBinding.activated_at.desc())
+    )).scalars().all()
+
+    fps = sorted({r.instance_fp for r in rows if r.instance_fp})
+    inst_map: dict[str, cm.CloudInstance] = {}
+    if fps:
+        insts = (await db.execute(
+            select(cm.CloudInstance).where(cm.CloudInstance.instance_uid.in_(fps))
+        )).scalars().all()
+        inst_map = {i.instance_uid: i for i in insts}
+
+    by_lic: dict[int, list[dict[str, Any]]] = {}
+    for r in rows:
+        inst = inst_map.get(r.instance_fp)
+        by_lic.setdefault(r.license_id, []).append({
+            "binding_id": r.id,
+            "instance_fp": r.instance_fp,
+            "fp_short": r.instance_fp[:10],
+            "instance_name": inst.name if inst else None,
+            "instance_url": inst.instance_url if inst else None,
+            "domain": r.domain or (inst.instance_url if inst else None),
+            "version": r.version,
+            "activated_at": _iso(r.activated_at),
+            "last_seen_at": _iso(r.last_seen_at),
+            "revoked": r.revoked_at is not None,
+            "revoked_at": _iso(r.revoked_at),
+        })
+
+    items = [
+        {
+            "license_key": l.license_key,
+            "app_key": l.app_key,
+            "app_name": l.app_name,
+            "product": l.product,
+            "model": l.model,
+            "seats": l.seats,
+            "status": l.status,
+            "issued_at": _iso(l.issued_at),
+            "activated_at": _iso(l.activated_at),
+            "expires_at": _iso(l.expires_at),
+            "permanent": l.expires_at is None,
+            "max_instances": l.max_instances,
+            "active_instances": sum(1 for b in by_lic.get(l.id, []) if not b["revoked"]),
+            "bindings": by_lic.get(l.id, []),
+        }
+        for l in lics
+    ]
+    return {"items": items, "total": len(items)}
+
+
+@router.post(
+    "/account/licenses/{license_key}/bindings/{binding_id}/unbind",
+    response_model=dict[str, Any],
+)
+async def account_unbind_binding(
+    license_key: str,
+    binding_id: int,
+    db: AsyncSession = Depends(get_db),
+    who: dict = Depends(require_portal_or_admin),
+):
+    """门户：解绑某台实例。解绑后该实例心跳会被拒，需重新激活才能恢复。"""
+    _hub_guard()
+    uid = await _portal_uid(who)
+    lic = (await db.execute(
+        select(cm.AppLicense).where(cm.AppLicense.license_key == license_key.upper())
+    )).scalars().first()
+    if not lic or lic.buyer_type != "portal" or lic.buyer_id != uid:
+        raise HTTPException(404, "授权不存在或不属于当前账号")
+
+    binding = (await db.execute(
+        select(cm.AppLicenseBinding).where(
+            cm.AppLicenseBinding.id == binding_id,
+            cm.AppLicenseBinding.license_id == lic.id,
+        )
+    )).scalars().first()
+    if not binding:
+        raise HTTPException(404, "绑定记录不存在")
+    if binding.revoked_at is None:
+        binding.revoked_at = _now()
+        # 主绑定指纹指向该实例时一并清掉，避免旧指纹挡住后续换机
+        if lic.instance_fp == binding.instance_fp:
+            lic.instance_fp = None
+            lic.bound_domain = None
+        await db.commit()
+        log.info("cloud.binding_unbound", license=lic.license_key,
+                 binding=binding_id, fp=binding.instance_fp, by=uid)
+    return {
+        "ok": True,
+        "license_key": lic.license_key,
+        "binding_id": binding_id,
+        "revoked": True,
+        "message": "已解绑；该实例下次心跳失效，重新激活授权后可再次使用",
+    }
+
+
 # ============================================================
 # 客户实例侧：绑定
 # ============================================================
+
+@router.get("/cloud/licenses/status", response_model=dict[str, Any])
+async def licenses_status(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_permission("rbac:role:read")),
+):
+    """本机付费应用的授权状态（应用管理页徽标用）。
+
+    只返回 manifest 声明了 ``license_required`` 的应用：免费应用不需要授权，
+    前端拿到空值就不渲染徽标，避免把「免费」误显示成「未授权」。
+    """
+    rows = (await db.execute(select(InstalledApp))).scalars().all()
+    items: dict[str, Any] = {}
+    for app in rows:
+        if not licensing.is_license_required(app.key):
+            continue
+        st = (await licensing.get_license_state(db, app.key)).to_dict()
+        items[app.key] = {
+            "status": st["status"],          # valid/grace/expired/missing/invalid...
+            "valid": st["valid"],
+            "reason": st["reason"],
+            "expires_at": st["expires_at"],
+            "license_key": st["license_key"],
+            "seats": st["seats"],
+        }
+    return {"items": items, "total": len(items)}
+
 
 @router.get("/cloud/status", response_model=dict[str, Any])
 async def spoke_status(

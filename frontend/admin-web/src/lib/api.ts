@@ -43,6 +43,21 @@ api.interceptors.response.use(
   async (err) => {
     const status = err.response?.status
     const config = err.config as RetryConfig | undefined
+    // 402 = 付费应用未授权/授权失效（后端 require_app_license）。
+    // 广播给全局提示条，避免每个页面自己处理时把 detail 渲染成 [object Object]。
+    if (status === 402) {
+      const detail = err.response?.data?.detail
+      const info = typeof detail === 'object' && detail ? detail : {}
+      window.dispatchEvent(
+        new CustomEvent('license-required', {
+          detail: {
+            appKey: String(info.app_key || ''),
+            message: String(info.message || detail || '该应用尚未授权'),
+          },
+        }),
+      )
+      return Promise.reject(err)
+    }
     if (status !== 401 || !config || config._retry) {
       return Promise.reject(err)
     }

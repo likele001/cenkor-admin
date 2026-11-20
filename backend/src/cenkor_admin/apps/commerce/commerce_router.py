@@ -1049,9 +1049,13 @@ def _client_ip(request: Request) -> str | None:
 
 async def _bind_instance(
     db: AsyncSession, lic: cm.AppLicense, instance_fp: str, domain: str | None,
-    ip: str | None, version: str | None,
+    ip: str | None, version: str | None, *, allow_reactivate: bool = False,
 ) -> None:
-    """绑定实例。已存在的按 fp 更新 last_seen；新 fp 受 max_instances 限制。"""
+    """绑定实例。已存在的按 fp 更新 last_seen；新 fp 受 max_instances 限制。
+
+    ``allow_reactivate`` 只在「用户主动激活」时传 True：门户解绑后，
+    实例心跳会持续被拒，必须重新填授权码才能恢复。
+    """
     binding = (await db.execute(
         select(cm.AppLicenseBinding).where(
             cm.AppLicenseBinding.license_id == lic.id,
@@ -1060,6 +1064,11 @@ async def _bind_instance(
     )).scalar_one_or_none()
 
     if binding:
+        if binding.revoked_at is not None:
+            if not allow_reactivate:
+                raise HTTPException(409, "该实例已在门户解绑，请在实例后台重新激活授权")
+            binding.revoked_at = None
+            binding.activated_at = _now()
         binding.last_seen_at = _now()
         if domain:
             binding.domain = domain
@@ -1118,6 +1127,7 @@ async def activate_license(
     try:
         await _bind_instance(
             db, lic, instance_fp, body.get("domain"), _client_ip(request), body.get("version"),
+            allow_reactivate=True,
         )
     except HTTPException as e:
         if e.status_code == 409 and lic.max_rebind > lic.rebind_count:
@@ -1186,6 +1196,19 @@ async def heartbeat_license(
         "seats": lic.seats,
         "expires_at": _iso(lic.expires_at),
     }
+
+
+@router.post("/reminders/run", response_model=dict[str, Any])
+async def run_license_reminders(
+    dry_run: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: auth_models.User = Depends(require_permission("rbac:role:write")),
+):
+    """手工触发一次授权到期提醒（排查 / 补发用；定时任务见 scheduler.tick）。"""
+    from cenkor_admin.apps.commerce import reminders
+
+    stats = await reminders.run_expiry_reminders(db, dry_run=dry_run)
+    return {"ok": True, "dry_run": dry_run, **stats}
 
 
 @router.post("/licenses/{license_key}/rebind", response_model=dict[str, Any])

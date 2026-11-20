@@ -12,6 +12,7 @@ import AppCenterView from '@/views/AppCenterView.vue'
 import AppDetailView from '@/views/AppDetailView.vue'
 import ConnectView from '@/views/ConnectView.vue'
 import MyAppsView from '@/views/MyAppsView.vue'
+import LicensesView from '@/views/LicensesView.vue'
 import SsoCallbackView from '@/views/SsoCallbackView.vue'
 
 export const router = createRouter({
@@ -31,6 +32,7 @@ export const router = createRouter({
     { path: '/apps/:key', component: AppDetailView, meta: { public: true } },
     { path: '/connect', component: ConnectView, meta: { public: true } },
     { path: '/my/apps', component: MyAppsView },
+    { path: '/my/licenses', component: LicensesView },
     { path: '/profile', component: ProfileView },
     { path: '/products', redirect: '/list/product' },
     { path: '/cases', redirect: '/list/case' },

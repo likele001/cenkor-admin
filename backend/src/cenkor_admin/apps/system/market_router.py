@@ -521,6 +521,12 @@ async def market_install(
             await db.commit()
         except ValueError as e:
             raise HTTPException(400, str(e)) from e
+        # 本地已带代码的付费应用：代码不用下发，但授权仍要落到本实例，
+        # 否则装完就被接口守卫 402 挡住。
+        if license_key:
+            from cenkor_admin.apps.commerce.cloud_router import activate_license_local
+
+            await activate_license_local(db, license_key, app_key)
         log.info("market.installed_system", app_key=app_key, by=user.id)
         return {
             "ok": True,
@@ -649,6 +655,11 @@ async def market_install(
     finally:
         with contextlib.suppress(OSError):
             os.unlink(tmp_path)
+
+    # 授权包安装完成：立即把授权落到本实例（客户实例换 token / 授权中心本地签发）
+    from cenkor_admin.apps.commerce.cloud_router import activate_license_local
+
+    await activate_license_local(db, license_key, app_key)
 
     log.info("market.installed_package", app_key=app_key, by=user.id)
     return {"ok": True, "app_key": app_key, "mode": "package", **result}

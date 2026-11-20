@@ -71,13 +71,8 @@ from cenkor_admin.apps.cms.tracking_router import router as cms_tracking_router
 
 api_v1_router.include_router(cms_tracking_router, prefix="/public", tags=["tracking"])
 
-# CMS 兜底路由（按后台配置的 URL 规则反解地址）
-# ⚠️ 必须放在所有 public 子路由**之后**：/{full_path:path} 是通配路由，
-# 排在前面会把 /public/comments、/public/forms、/public/track、/public/lp/*
-# 全吃掉（表现为接口返回 CMS 的 HTML 404，且日志里一条 ERROR 都没有）。
-from cenkor_admin.apps.cms.cms_fallback_router import router as cms_fallback_router
-
-api_v1_router.include_router(cms_fallback_router, prefix="/public", tags=["public"])
+# CMS 兜底路由（按后台配置的 URL 规则反解地址）注册在本文件末尾，
+# 见文件底部：/{full_path:path} 是通配路由，必须先注册完所有 /public 子路由。
 
 # ============================================================
 # 页面渲染前缀 /page
@@ -302,6 +297,13 @@ def register_app_router(app_key: str) -> bool:
             return False
 
         prefix = f"/{app_key}"
+        # 收费应用：manifest 声明 license_required=True 时，未激活授权一律 402。
+        # 只在需要授权时挂载，免费应用不额外查一次库。
+        from cenkor_admin.core.licensing import is_license_required, require_app_license
+
+        license_deps = (
+            [Depends(require_app_license(app_key))] if is_license_required(app_key) else []
+        )
         api_v1_router.include_router(
             module.router,
             prefix=prefix,
@@ -309,6 +311,7 @@ def register_app_router(app_key: str) -> bool:
             dependencies=[
                 Depends(get_current_user),
                 Depends(app_enabled_dependency(app_key)),
+                *license_deps,
                 # cms 在上方已手动注册过一份（保留是为了让旧路由优先于 V2 匹配），
                 # 自动发现这里会 getattr 到同名模块并再 import 一次，形成同路径两份。
                 # 两份都必须挂守卫，否则「谁先注册谁生效」就成了隐式安全边界。
@@ -468,3 +471,14 @@ async def me(user: auth_models.User = Depends(get_current_user)):
     """当前用户信息（含权限 + 菜单）"""
     from cenkor_admin.apps.auth.router import _build_user_brief
     return _build_user_brief(user)
+
+
+# ============================================================
+# CMS 兜底路由（按后台配置的 URL 规则反解地址）
+# ⚠️ 必须放在所有 /public 子路由**之后**：/{full_path:path} 是通配路由，
+# 排在前面会把 /public/comments、/public/forms、/public/track、/public/lp/*
+# /public/payment/* 全吃掉（表现为接口返回 CMS 的 HTML 404，且日志里一条
+# ERROR 都没有）。所以放在本文件最末尾注册。
+from cenkor_admin.apps.cms.cms_fallback_router import router as cms_fallback_router
+
+api_v1_router.include_router(cms_fallback_router, prefix="/public", tags=["public"])

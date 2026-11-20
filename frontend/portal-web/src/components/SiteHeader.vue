@@ -29,6 +29,7 @@ const mobileOpen = ref(false)
         <template v-else>
           <span class="text-sm text-[#6b6e76]">{{ auth.user?.nickname || auth.user?.username }}</span>
           <RouterLink to="/my/apps" class="nav-link">我的应用</RouterLink>
+          <RouterLink to="/my/licenses" class="nav-link">授权管理</RouterLink>
           <RouterLink to="/profile" class="nav-link">{{ t('nav.profile') }}</RouterLink>
         </template>
       </nav>
@@ -49,6 +50,7 @@ const mobileOpen = ref(false)
         </template>
         <template v-else>
           <RouterLink to="/my/apps" class="py-2">我的应用</RouterLink>
+          <RouterLink to="/my/licenses" class="py-2">授权管理</RouterLink>
           <RouterLink to="/profile" class="py-2">个人中心</RouterLink>
         </template>
         <LocaleSwitcher />

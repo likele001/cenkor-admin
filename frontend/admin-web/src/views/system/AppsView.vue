@@ -36,6 +36,16 @@ interface AppItem {
   }
 }
 
+/** 付费应用授权状态（GET /store/cloud/licenses/status） */
+interface LicenseStatus {
+  status: string
+  valid: boolean
+  reason: string
+  expires_at: string | null
+  license_key: string | null
+  seats: number
+}
+
 interface PendingApp {
   id: number
   app_key: string
@@ -106,6 +116,44 @@ const statusLabel: Record<string, string> = {
   missing: t('apps.status_missing'),
 }
 
+const licenseMap = ref<Record<string, LicenseStatus>>({})
+
+async function loadLicenseStatus() {
+  try {
+    const { data } = await api.get('/api/v1/store/cloud/licenses/status')
+    licenseMap.value = data.items || {}
+  } catch {
+    // 授权状态只是辅助信息，接口不可用时静默降级，不影响应用管理主流程
+    licenseMap.value = {}
+  }
+}
+
+function licenseDaysLeft(ls: LicenseStatus): number | null {
+  if (!ls.expires_at) return null
+  const t = new Date(ls.expires_at).getTime()
+  if (Number.isNaN(t)) return null
+  return Math.ceil((t - Date.now()) / 86_400_000)
+}
+
+function licenseText(key: string): string {
+  const ls = licenseMap.value[key]
+  if (!ls) return ''
+  if (!ls.valid) return ls.status === 'expired' ? '授权已过期' : '未授权'
+  if (ls.status === 'grace') return '离线宽限期'
+  const d = licenseDaysLeft(ls)
+  if (d !== null && d <= 30) return `${d} 天后到期`
+  return '已授权'
+}
+
+function licenseClass(key: string): string {
+  const ls = licenseMap.value[key]
+  if (!ls) return ''
+  if (!ls.valid) return 'bg-red-50 text-red-600'
+  const d = licenseDaysLeft(ls)
+  if (d !== null && d <= 30) return 'bg-amber-50 text-amber-700'
+  return 'bg-emerald-50 text-emerald-700'
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -117,6 +165,7 @@ async function load() {
   } finally {
     loading.value = false
   }
+  void loadLicenseStatus()
 }
 
 async function install(key: string) {
@@ -779,6 +828,12 @@ function categoryLabel(c: string): string {
                 v-if="app.enabled === false"
                 class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500"
               >{{ t('apps.disabled') }}</span>
+              <span
+                v-if="licenseMap[app.key]"
+                class="text-xs px-2 py-0.5 rounded-full"
+                :class="licenseClass(app.key)"
+                :title="licenseMap[app.key].reason || ''"
+              >{{ licenseText(app.key) }}</span>
             </div>
             <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
             <div v-if="app.registered_counts" class="flex flex-wrap gap-2 mt-2 text-xs">
