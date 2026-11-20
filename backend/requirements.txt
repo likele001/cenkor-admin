@@ -35,5 +35,6 @@ Pillow>=10.0.0
 Jinja2>=3.1.6
 python-liquid>=2.2.0   # @deprecated 过渡期保留，随下个版本移除
 markdown>=3.5.0
+nh3>=0.2               # markdown 输出 HTML 净化（防存储型 XSS，core/jinja_env.py）
 pgvector>=0.3.0
 PyYAML>=6.0

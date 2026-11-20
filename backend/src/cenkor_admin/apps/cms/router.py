@@ -30,6 +30,42 @@ log = structlog.get_logger(__name__)
 router = APIRouter()
 
 
+# ---- 媒体上传安全约束（2026-11-11 安全修复）----
+# 白名单思路：公开桶浏览器可直接访问，HTML/SVG/JS 传上去就是存储型 XSS
+# （尤其经 nginx 同域代理时）。只放行常见媒体/文档格式，其余一律拒绝。
+_MEDIA_ALLOWED_EXTS = frozenset({
+    "jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "ico",
+    "mp4", "webm", "mov", "m4v",
+    "mp3", "wav", "ogg", "m4a", "flac",
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "txt", "md", "csv", "zip",
+})
+_MEDIA_MAX_PROXY_BYTES = 50 * 1024 * 1024      # 服务端代理上传 50MB
+_MEDIA_MAX_PRESIGN_BYTES = 200 * 1024 * 1024   # 前端直传 200MB
+# 允许浏览器内联渲染的 MIME；其余一律 octet-stream（触发下载而非执行）
+_MEDIA_INLINE_MIME_PREFIXES = ("image/", "video/", "audio/")
+_MEDIA_INLINE_MIME_EXACT = frozenset({"application/pdf"})
+
+
+def _media_ext(filename: str | None) -> str:
+    """提取并校验扩展名：仅小写字母数字且在白名单内，否则 400。"""
+    name = (filename or "").rsplit("/", 1)[-1]
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if not ext.isalnum() or ext not in _MEDIA_ALLOWED_EXTS:
+        raise HTTPException(400, f"不支持的文件格式：.{ext or '(无扩展名)'}")
+    return ext
+
+
+def _safe_media_mime(mime: str | None) -> str:
+    """MIME 收口：SVG 即使伪装成 image/* 也不给内联渲染机会。"""
+    m = (mime or "").split(";")[0].strip().lower()
+    if m.startswith(_MEDIA_INLINE_MIME_PREFIXES) and "svg" not in m:
+        return m
+    if m in _MEDIA_INLINE_MIME_EXACT:
+        return m
+    return "application/octet-stream"
+
+
 async def _media_public_url(bucket: str, key: str, *, presigned_fallback: str | None = None) -> str:
     """与 presign_upload 一致的公网访问 URL。"""
     try:
@@ -591,14 +627,17 @@ async def presign_upload(
     current: auth_models.User = Depends(get_current_user),
 ):
     """前端直传预签名（推荐）"""
-    bucket = body.bucket or await s3.public_bucket()
+    # bucket 由服务端决定：请求体 bucket 曾允许任何登录用户拿到
+    # 私有桶的写预签名（2026-11-11 修复），body.bucket 字段仅作兼容保留
+    bucket = await s3.public_bucket()
     await s3.ensure_bucket(bucket)
+    if body.size < 0 or body.size > _MEDIA_MAX_PRESIGN_BYTES:
+        raise HTTPException(400, "文件大小超限（直传 ≤200MB）")
+    ext = _media_ext(body.filename)
+    mime = _safe_media_mime(body.mime)
 
-    # 构造 key：日期/uuid-filename
-    ext = body.filename.rsplit(".", 1)[-1] if "." in body.filename else ""
-    from datetime import datetime
-    key = f"{datetime.now().strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}" if ext else \
-          f"{datetime.now().strftime('%Y/%m')}/{uuid.uuid4().hex}"
+    # 构造 key：日期/uuid-filename（扩展名已经白名单校验）
+    key = f"{datetime.now().strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
 
     expires = 600
     upload_url = await s3.presigned_put_url(bucket, key, expires=expires)
@@ -606,7 +645,7 @@ async def presign_upload(
 
     # 写媒体库记录（前端确认上传完成后再调 confirm）
     media = models.Media(
-        bucket=bucket, key=key, url=public_url, mime=body.mime,
+        bucket=bucket, key=key, url=public_url, mime=mime,
         size=body.size, uploader_id=current.id,
     )
     db.add(media)
@@ -616,7 +655,7 @@ async def presign_upload(
     return schemas.MediaPresignResponse(
         upload_url=upload_url, key=key, public_url=public_url,
         expires_in=expires,
-        headers={"Content-Type": body.mime},
+        headers={"Content-Type": mime},
         media_id=media.id,
     )
 
@@ -649,24 +688,31 @@ async def upload_file(
     """服务端代理上传（适合小文件，自动提取图片元数据）"""
     bucket = await s3.public_bucket()
     await s3.ensure_bucket(bucket)
+    ext = _media_ext(file.filename)
+    ctype = _safe_media_mime(file.content_type)
 
-    content = await file.read()
-    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else ""
-    from datetime import datetime
-    key = f"{datetime.now().strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}" if ext else \
-          f"{datetime.now().strftime('%Y/%m')}/{uuid.uuid4().hex}"
+    # 流式限长：旧实现 await file.read() 全量进内存，单个大文件即可耗尽内存
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(1024 * 1024):
+        total += len(chunk)
+        if total > _MEDIA_MAX_PROXY_BYTES:
+            raise HTTPException(413, "文件大小超限（代理上传 ≤50MB）")
+        chunks.append(chunk)
+    content = b"".join(chunks)
+    key = f"{datetime.now().strftime('%Y/%m')}/{uuid.uuid4().hex}.{ext}"
 
     import io
-    await s3.upload_fileobj(bucket, key, io.BytesIO(content), file.content_type or "application/octet-stream")
-    await _mirror_to_local(bucket, key, content, file.content_type or "application/octet-stream")
+    await s3.upload_fileobj(bucket, key, io.BytesIO(content), ctype)
+    await _mirror_to_local(bucket, key, content, ctype)
     public_url = await _media_public_url(bucket, key)
 
     # 提取图片元数据
-    img_meta = _extract_image_metadata(content, file.content_type or "")
+    img_meta = _extract_image_metadata(content, ctype)
 
     media = models.Media(
         bucket=bucket, key=key, url=public_url,
-        mime=file.content_type or "application/octet-stream",
+        mime=ctype,
         size=len(content),
         width=img_meta.get("width"),
         height=img_meta.get("height"),

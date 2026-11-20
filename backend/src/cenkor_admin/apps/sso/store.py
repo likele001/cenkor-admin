@@ -276,7 +276,7 @@ class PortalAccountStore(AccountStore):
 
     def issue_tokens(self, user: portal_models.PortalUser) -> dict[str, Any]:
         return {
-            "access_token": create_portal_access_token(user.id),
+            "access_token": create_portal_access_token(user.id, token_version=user.token_version),
             "refresh_token": create_portal_refresh_token(user.id, user.token_version),
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             "user": {
@@ -383,7 +383,9 @@ class AdminAccountStore(AccountStore):
         from cenkor_admin.core.security import create_access_token, create_refresh_token
 
         return {
-            "access_token": create_access_token(user.id, extra={"username": user.username}),
+            "access_token": create_access_token(
+                user.id, extra={"username": user.username}, token_version=user.token_version,
+            ),
             "refresh_token": create_refresh_token(user.id, user.token_version),
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             "user": {

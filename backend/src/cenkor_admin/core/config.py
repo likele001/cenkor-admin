@@ -203,17 +203,6 @@ class Settings(BaseSettings):
     # 不需要这个开关。只有在完全信任来源（比如自己写的、审过的）时才打开。
     CMS_THEME_ALLOW_JS: bool = False
 
-    # ---- 主题脚本权限（模板市场第四期）----
-    # 是否允许主题自带的同源脚本（assets/*.js）执行。**默认关闭**。
-    #
-    # 同源脚本与站点同权：能读 cookie、能以访客身份调后台接口、能改整个页面。
-    # 这不是"主题文件"应该有的能力，而 CSP 的 script-src 'self' 只管脚本从哪来、
-    # 不管脚本做什么 —— 所以信任一个模板的 js 等于信任它的作者。
-    #
-    # 需要交互的模板请用 {{ widget() }}：它跑在 iframe 沙箱里（opaque origin），
-    # 不需要这个开关。只有在完全信任来源（比如自己写的、审过的）时才打开。
-    CMS_THEME_ALLOW_JS: bool = False
-
     @property
     def ai_ready(self) -> bool:
         """AI 是否真正可用（开关 + 密钥双检）"""
@@ -255,6 +244,23 @@ class Settings(BaseSettings):
     @property
     def is_sqlite(self) -> bool:
         return self.db_dialect == "sqlite"
+
+    def assert_production_ready(self) -> None:
+        """生产环境启动安全断言（main.lifespan 调用）。
+
+        历史上出过「宝塔环境文件只设 APP_ENV=production、其余全默认」的事故：
+        默认 SECRET_KEY 意味着任何人能伪造 JWT。与其静默跑在默认密钥上，
+        不如启动即炸，把配置错误暴露在部署阶段而不是被入侵之后。
+        """
+        if self.APP_ENV != "production":
+            return
+        problems: list[str] = []
+        if self.SECRET_KEY == "dev-secret-change-me-32-bytes-min" or len(self.SECRET_KEY) < 32:
+            problems.append("SECRET_KEY 仍为默认值或长度不足 32 字节")
+        if "*" in self.cors_origins_list:
+            problems.append("CORS_ORIGINS 含通配符 *（生产禁止）")
+        if problems:
+            raise RuntimeError("生产配置安全检查未通过：" + "；".join(problems))
 
 
 @lru_cache

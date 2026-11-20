@@ -44,6 +44,21 @@ async def notifications_ws(
         await websocket.close(code=4001)
         return
 
+    # 与 HTTP 依赖同等待遇：查用户状态 + token_version。
+    # 否则被禁用/删除的用户、已登出的会话仍能挂着 WS 收通知直到 token 过期
+    from cenkor_admin.apps.auth import models as auth_models
+    from cenkor_admin.core.db import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as session:
+        ws_user = await session.get(auth_models.User, user_id)
+    if ws_user is None or ws_user.deleted_at is not None or ws_user.status != "active":
+        await websocket.close(code=4001)
+        return
+    tv = payload.get("tv")
+    if tv is not None and tv != (ws_user.token_version or 0):
+        await websocket.close(code=4001)
+        return
+
     await websocket.accept()
     log.info("ws.connected", user_id=user_id)
 

@@ -1,6 +1,7 @@
 """安全工具：JWT + 密码哈希（支持 SECRET_KEY 轮换）"""
 from __future__ import annotations
 
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -24,8 +25,15 @@ def create_access_token(
     subject: str | int,
     extra: dict[str, Any] | None = None,
     expires_minutes: int | None = None,
+    token_version: int | None = None,
 ) -> str:
-    """创建 access token（用最新 SECRET_KEY）"""
+    """创建 access token（用最新 SECRET_KEY）。
+
+    token_version 写入 payload["tv"]：登出 / 改密会 bump 用户的 token_version，
+    校验端（api.deps / portal / ws）比对 tv 即可即时撤销未过期的 access token。
+    不传 tv 的旧调用方签出的 token 不带该字段，校验端按「遗留 token」放行，
+    最多存活一个 ACCESS_TOKEN_EXPIRE_MINUTES 窗口后自然淘汰。
+    """
     minutes = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
@@ -35,6 +43,8 @@ def create_access_token(
         "iat": now,
         "exp": now + timedelta(minutes=minutes),
     }
+    if token_version is not None:
+        payload["tv"] = token_version
     if extra:
         payload.update(extra)
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
@@ -47,6 +57,9 @@ def create_refresh_token(subject: str | int, token_version: int = 0) -> str:
         "type": "refresh",
         "iss": "cenkor-admin",
         "tv": token_version,
+        # jti：refresh 一次性旋转的凭据。消费记录存 Redis（core.auth_guard），
+        # 同一 jti 第二次出现即判定重放，撤销该用户全部会话。
+        "jti": secrets.token_urlsafe(16),
         "iat": now,
         "exp": now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     }

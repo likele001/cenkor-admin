@@ -139,29 +139,23 @@ def test_send_email_no_smtp_configured():
 
 
 # ---- core/config  方言检测 ----
-def test_db_dialect_detects_sqlite(monkeypatch):
-    # 重置 lru_cache
-    from cenkor_admin.core.config import get_settings
-    get_settings.cache_clear()
+def test_db_dialect_detects_sqlite():
+    # 直接构造 Settings：初始化参数优先级最高，且 _env_file=None 屏蔽本机 .env。
+    # 不能用 monkeypatch.setenv —— pydantic-settings 里 env_file 优先于进程环境变量，
+    # 本机 backend/.env 的 postgres URL 会盖掉注入值（CI 无 .env 才碰巧能过）。
+    from cenkor_admin.core.config import Settings
 
-    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    s = get_settings()
+    s = Settings(DATABASE_URL="sqlite+aiosqlite:///:memory:", _env_file=None)
     assert s.db_dialect == "sqlite"
     assert s.is_sqlite is True
     assert s.is_postgres is False
     assert s.is_mysql is False
 
-    get_settings.cache_clear()
 
+def test_db_dialect_detects_postgres():
+    from cenkor_admin.core.config import Settings
 
-def test_db_dialect_detects_postgres(monkeypatch):
-    from cenkor_admin.core.config import get_settings
-    get_settings.cache_clear()
-
-    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://x/y")
-    s = get_settings()
+    s = Settings(DATABASE_URL="postgresql+asyncpg://x/y", _env_file=None)
     assert s.db_dialect == "postgresql"
     assert s.is_postgres is True
     assert s.is_sqlite is False
-
-    get_settings.cache_clear()

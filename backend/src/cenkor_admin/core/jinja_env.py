@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import markdown as _md
+import nh3
 import structlog
 from jinja2 import BaseLoader, ChainableUndefined, Template, TemplateNotFound, TemplateSyntaxError
 from jinja2.exceptions import SecurityError
@@ -219,7 +220,11 @@ def _f_markdown(text: Any) -> Markup:
         extensions=["fenced_code", "tables", "sane_lists"],
         output_format="html",
     )
-    return Markup(html)
+    # markdown 库默认放行内嵌 HTML：内容里的 <script> / onerror 会原样输出。
+    # autoescape 救不了这里——过滤器返回 Markup 等于主动声明「我可信」。
+    # nh3（Rust ammonia）剥掉脚本/事件属性/危险协议，保留排版标签。
+    # 低权限编辑埋脚本 → 管理员浏览页被偷 localStorage token 的链路在此切断。
+    return Markup(nh3.clean(html))
 
 
 def _f_currency(value: Any, symbol: str = "¥") -> str:

@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -62,7 +63,8 @@ async def _authorize(request: Request) -> None:
             detail="MCP 未配置密钥：请在 .env 设置 MCP_API_KEY=<随机长串> 后重试",
         )
 
-    if _extract_token(request) != expected:
+    # 常量时间比较：普通 != 的短路行为会泄露「前几位猜对了」的时序侧信道
+    if not hmac.compare_digest(_extract_token(request), expected):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="MCP 密钥无效：请在 X-MCP-Key 或 Authorization: Bearer 里带上正确密钥",

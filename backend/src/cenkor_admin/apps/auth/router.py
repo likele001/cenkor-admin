@@ -4,6 +4,7 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -23,10 +24,19 @@ from cenkor_admin.apps.rbac.models import (
     RolePermission,
     UserRole,
 )
+from cenkor_admin.core.auth_guard import (
+    check_login_rate,
+    check_public_rate,
+    consume_refresh_jti,
+    record_login_failure,
+    record_login_success,
+    refresh_ttl_seconds,
+)
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.hooks import dispatch
 from cenkor_admin.core.mail import send_email
+from cenkor_admin.core.secrets import encrypt_secret
 from cenkor_admin.core.security import (
     create_access_token,
     create_refresh_token,
@@ -41,6 +51,34 @@ settings = get_settings()
 
 
 # ---- 工具 ----
+def _safe_reset_base(candidate: str | None) -> str:
+    """密码重置链接的域名白名单校验。
+
+    candidate 来自请求体，不做校验就等于允许攻击者把重置链接指向钓鱼站
+    （受害者邮箱收到的 token 直接送给攻击者）。只放行 PUBLIC_BASE_URL 与
+    CORS 白名单里的前端源；其余一律回落服务端默认值。
+    """
+    default = settings.PUBLIC_BASE_URL.rstrip("/")
+    allowed = {urlparse(default).netloc}
+    for origin in settings.cors_origins_list:
+        netloc = urlparse(origin).netloc
+        if netloc:
+            allowed.add(netloc)
+    if candidate:
+        parsed = urlparse(candidate)
+        if parsed.scheme in ("http", "https") and parsed.netloc in allowed:
+            return candidate.rstrip("/")
+    return default
+
+
+def _csv_cell(value: Any) -> str:
+    """CSV 单元格公式注入防护：= + - @ 开头的串会被 Excel 当公式执行。"""
+    s = "" if value is None else str(value)
+    if s and s[0] in "=+-@\t\r":
+        s = "'" + s
+    return s
+
+
 async def _load_user_with_perms(db: AsyncSession, user_id: int) -> models.User:
     """加载用户 + 角色 + 权限 + 菜单（带 selectinload 预加载）"""
     stmt = (
@@ -134,52 +172,15 @@ def _verify_slider_captcha(token: str | None) -> None:
 
 @router.post("/register", response_model=schemas.TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
-    """注册后台用户（已废弃 — V2 已分离前后台用户体系）
+    """已下线（2026-11-11 安全修复）。
 
-    前台用户请使用 `/api/v1/public/portal/auth/register`
-    后台用户由管理员通过 `/api/v1/auth/users` 创建
-
-    本接口保留以保证向后兼容，但仅创建后台 User 实体。
+    历史上本接口公开创建后台 User 且接受请求体里的 role_ids，
+    任何人可注册并指定管理员角色 → 提权。滑动验证码也仅是格式校验。
+    保留路由壳子返回 410，让旧客户端拿到明确语义而不是静默成功。
+    后台账号一律由管理员通过 /api/v1/auth/users 创建；
+    前台用户走 /api/v1/public/portal/auth/register。
     """
-    _verify_slider_captcha(body.captcha_token)
-    existing = await db.execute(
-        select(models.User).where(
-            (models.User.email == body.email) | (models.User.username == body.username),
-            models.User.deleted_at.is_(None),
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(409, "用户名或邮箱已存在")
-
-    user = models.User(
-        username=body.username,
-        email=body.email,
-        nickname=body.nickname or body.username,
-        phone=body.phone,
-        password_hash=hash_password(body.password),
-        is_superuser=False,
-        status="active",
-    )
-    db.add(user)
-    await db.flush()
-
-    role_ids = body.role_ids
-    if not role_ids:
-        viewer = (await db.execute(select(Role).where(Role.code == "viewer"))).scalar_one_or_none()
-        if viewer:
-            role_ids = [viewer.id]
-    for rid in role_ids:
-        db.add(UserRole(user_id=user.id, role_id=rid))
-
-    await db.commit()
-    user = await _load_user_with_perms(db, user.id)
-    brief = _build_user_brief(user)
-    return schemas.TokenResponse(
-        access_token=create_access_token(user.id, {"is_superuser": user.is_superuser}),
-        refresh_token=create_refresh_token(user.id, user.token_version),
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=brief,
-    )
+    raise HTTPException(410, "后台注册接口已下线，请联系管理员创建账号")
 
 
 @router.patch("/profile", response_model=schemas.UserBrief)
@@ -189,7 +190,21 @@ async def update_profile(
     current: models.User = Depends(get_current_user),
 ):
     """当前用户更新资料"""
-    for k, v in body.model_dump(exclude_unset=True, exclude={"role_ids", "status"}).items():
+    data = body.model_dump(exclude_unset=True, exclude={"role_ids", "status"})
+    # 邮箱变更必须查唯一性：重复邮箱会让 forgot-password 的
+    # scalar_one_or_none 抛 MultipleResultsFound，可被用来瘫痪他人重置流程
+    new_email = data.get("email")
+    if new_email and new_email != current.email:
+        dup = await db.execute(
+            select(models.User).where(
+                models.User.email == new_email,
+                models.User.id != current.id,
+                models.User.deleted_at.is_(None),
+            )
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(409, "邮箱已被其他账号使用")
+    for k, v in data.items():
         setattr(current, k, v)
     await db.commit()
     user = await _load_user_with_perms(db, current.id)
@@ -214,6 +229,9 @@ async def change_own_password(
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """账号密码登录。username 可以是邮箱、用户名或手机号。"""
+    ip = request.client.host if request.client else "unknown"
+    # 应用层限流 + 账号锁定（不依赖 nginx 边缘规则，见 core.auth_guard）
+    await check_login_rate(ip, body.username)
     if await _is_captcha_required(db):
         _verify_slider_captcha(body.captcha_token)
     # 查找用户
@@ -225,10 +243,10 @@ async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession =
     )
     user = (await db.execute(stmt)).scalar_one_or_none()
 
-    ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")[:500]
 
     if not user or not verify_password(body.password, user.password_hash):
+        await record_login_failure(ip, body.username)
         log.warning("auth.login.failed", username=body.username, ip=ip)
         # 记录失败日志（user_id 可能是 0 / None）
         if user is not None:
@@ -248,6 +266,7 @@ async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession =
         raise HTTPException(status_code=403, detail=f"账号已{user.status}")
 
     # 更新最后登录
+    await record_login_success(ip, body.username)
     user.last_login_at = datetime.now(UTC)
     user.last_login_ip = ip
     # 成功登录日志
@@ -269,7 +288,9 @@ async def login(body: schemas.LoginRequest, request: Request, db: AsyncSession =
     brief = _build_user_brief(user)
 
     return schemas.TokenResponse(
-        access_token=create_access_token(user.id, {"is_superuser": user.is_superuser}),
+        access_token=create_access_token(
+            user.id, {"is_superuser": user.is_superuser}, token_version=user.token_version,
+        ),
         refresh_token=create_refresh_token(user.id, user.token_version),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=brief,
@@ -301,8 +322,20 @@ async def refresh(body: schemas.RefreshRequest, db: AsyncSession = Depends(get_d
     if user.status != "active":
         raise HTTPException(403, f"账号已{user.status}")
 
+    # 一次性旋转：jti 消费失败 = 旧 token 重放（可能已泄露），
+    # bump token_version 撤销该用户全部会话，迫使重新登录。
+    # 无 jti 的遗留 token（升级前签发）放行，7 天窗口后自然淘汰。
+    jti = payload.get("jti")
+    if jti and not await consume_refresh_jti(jti, refresh_ttl_seconds(payload)):
+        user.token_version = (user.token_version or 0) + 1
+        await db.commit()
+        log.warning("auth.refresh.replay_detected", user_id=user.id)
+        raise HTTPException(401, "Refresh token 已被使用，所有会话已失效，请重新登录")
+
     return schemas.TokenResponse(
-        access_token=create_access_token(user.id, {"is_superuser": user.is_superuser}),
+        access_token=create_access_token(
+            user.id, {"is_superuser": user.is_superuser}, token_version=user.token_version,
+        ),
         refresh_token=create_refresh_token(user.id, user.token_version),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=_build_user_brief(user),
@@ -331,7 +364,12 @@ async def forgot_password(body: dict, request: Request, db: AsyncSession = Depen
     email = (body.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(400, "请输入邮箱")
-    frontend_base = body.get("frontend_base") or settings.PUBLIC_BASE_URL
+    # 防邮件轰炸 / 枚举探测：单 IP 每分钟最多 5 次
+    await check_public_rate(
+        request.client.host if request.client else "unknown", "forgot_password", limit=5,
+    )
+    # 重置链接域名走白名单，杜绝请求体投毒到钓鱼站
+    frontend_base = _safe_reset_base(body.get("frontend_base"))
 
     # 查用户
     user = (await db.execute(
@@ -346,7 +384,9 @@ async def forgot_password(body: dict, request: Request, db: AsyncSession = Depen
         return {"ok": True, "message": "如果该邮箱已注册，重置链接已发送"}
 
     # 生成 token + 失效时间
-    token = secrets.token_urlsafe(48)[:64]
+    # adm- 前缀：与前台重置令牌隔离（共用 password_resets 表，
+    # 不带区分会让前台令牌重置同 id 的后台账号）
+    token = "adm-" + secrets.token_urlsafe(48)[:60]
     expires = datetime.now(UTC) + timedelta(hours=1)
     db.add(PasswordReset(
         user_id=user.id, token=token, expires_at=expires,
@@ -385,6 +425,9 @@ async def reset_password(body: dict, db: AsyncSession = Depends(get_db)):
     new_password = body.get("new_password") or ""
     if not token or len(new_password) < 8:
         raise HTTPException(400, "参数错误：token 必填，新密码 ≥8 位")
+    # 拒绝前台体系签发的重置令牌（ptl- 前缀），防跨体系重置
+    if token.startswith("ptl-"):
+        raise HTTPException(400, "重置链接无效或已过期")
 
     reset = (await db.execute(
         select(PasswordReset).where(PasswordReset.token == token)
@@ -471,8 +514,10 @@ async def feishu_callback(
         db.add(models.UserOAuth(
             user_id=user.id, provider="feishu", open_id=fs_user["open_id"],
             union_id=fs_user.get("union_id"),
-            access_token_enc=fs_user["access_token"],  # MVP：明文存，生产要加密
-            refresh_token_enc=fs_user.get("refresh_token"),
+            # 第三方 token 与 API Key 同等待遇：Fernet 加密落库，
+            # 避免 pg_dump / 只读账号 / 运维 SELECT * 散落明文
+            access_token_enc=encrypt_secret(fs_user["access_token"]),
+            refresh_token_enc=encrypt_secret(fs_user.get("refresh_token")),
             expires_at=None,
         ))
         await db.commit()
@@ -483,7 +528,9 @@ async def feishu_callback(
 
     brief = _build_user_brief(user)
     return {
-        "access_token": create_access_token(user.id, {"is_superuser": user.is_superuser}),
+        "access_token": create_access_token(
+            user.id, {"is_superuser": user.is_superuser}, token_version=user.token_version,
+        ),
         "refresh_token": create_refresh_token(user.id, user.token_version),
         "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "user": brief.model_dump() if hasattr(brief, "model_dump") else brief,
@@ -575,8 +622,8 @@ async def export_users_csv(
                 u.created_at.isoformat() if u.created_at else "",
             ]
             line = ",".join(
-                f'"{str(c).replace(chr(34), chr(34)*2)}"' if c and any(ch in str(c) for ch in [",", '"', "\n"]) else str(c)
-                for c in cells
+                f'"{c.replace(chr(34), chr(34)*2)}"' if c and any(ch in c for ch in [",", '"', "\n"]) else c
+                for c in (_csv_cell(x) for x in cells)
             )
             yield line + "\r\n"
 
@@ -631,6 +678,7 @@ async def get_user_login_history(
 async def create_user(
     body: dict,
     db: AsyncSession = Depends(get_db),
+    current: models.User = Depends(get_current_user),
     _: models.User = Depends(require_permission("rbac:user:write")),
 ):
     """创建用户（管理端）"""
@@ -639,6 +687,10 @@ async def create_user(
     password = body.get("password", "")
     if not username or not email or len(password) < 8:
         raise HTTPException(400, "username / email / password 必填且密码 ≥8 字符")
+    # 提权收口：只有超管能造超管。否则「管用户的人」可给自己造一个
+    # is_superuser 账号，rbac:user:write 就成了事实上的最高权限
+    if body.get("is_superuser") and not current.is_superuser:
+        raise HTTPException(403, "只有超级管理员能创建超级管理员")
 
     # 重名检查
     existing = await db.execute(select(models.User).where(
@@ -669,12 +721,19 @@ async def update_user(
     user_id: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    current: models.User = Depends(get_current_user),
     _: models.User = Depends(require_permission("rbac:user:write")),
 ):
     """更新用户（昵称/邮箱/状态/角色）"""
     user = await db.get(models.User, user_id)
     if not user or user.deleted_at:
         raise HTTPException(404, "User not found")
+    # 超管账号只能由超管修改；is_superuser 字段 likewise。
+    # 堵住「改超管邮箱/角色」与「自我提权」两条路径
+    if user.is_superuser and not current.is_superuser:
+        raise HTTPException(403, "无权修改超级管理员账号")
+    if "is_superuser" in body and not current.is_superuser:
+        raise HTTPException(403, "只有超级管理员能授予/撤销超级管理员")
 
     if "nickname" in body: user.nickname = body["nickname"]
     if "email" in body:    user.email = body["email"]
@@ -699,6 +758,7 @@ async def change_password(
     user_id: int,
     body: dict,
     db: AsyncSession = Depends(get_db),
+    current: models.User = Depends(get_current_user),
     _: models.User = Depends(require_permission("rbac:user:write")),
 ):
     """管理端强制重置密码"""
@@ -708,6 +768,8 @@ async def change_password(
     user = await db.get(models.User, user_id)
     if not user:
         raise HTTPException(404, "User not found")
+    if user.is_superuser and not current.is_superuser:
+        raise HTTPException(403, "无权重置超级管理员密码")
     user.password_hash = hash_password(new_pwd)
     user.token_version = (user.token_version or 0) + 1  # 强制旧 token 失效
     await db.commit()
@@ -728,6 +790,8 @@ async def delete_user(
     user = await db.get(models.User, user_id)
     if not user or user.deleted_at:
         raise HTTPException(404, "User not found")
+    if user.is_superuser and not current.is_superuser:
+        raise HTTPException(403, "无权删除超级管理员账号")
     user.deleted_at = datetime.now(UTC)
     user.token_version = (user.token_version or 0) + 1
     await db.commit()

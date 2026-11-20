@@ -1,6 +1,7 @@
 """Portal JWT 独立签发（与 admin auth 完全隔离，支持 SECRET_KEY 轮换）"""
 from __future__ import annotations
 
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -43,6 +44,7 @@ def create_portal_access_token(
     subject: str | int,
     extra: dict[str, Any] | None = None,
     expires_minutes: int | None = None,
+    token_version: int | None = None,
 ) -> str:
     minutes = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
     now = datetime.now(UTC)
@@ -53,6 +55,9 @@ def create_portal_access_token(
         "iat": now,
         "exp": now + timedelta(minutes=minutes),
     }
+    # 与 admin 同语义：tv 用于登出/改密后即时撤销 access token
+    if token_version is not None:
+        payload["tv"] = token_version
     if extra:
         payload.update(extra)
     return jwt.encode(payload, _portal_keys()[0], algorithm=settings.JWT_ALGORITHM)
@@ -65,6 +70,7 @@ def create_portal_refresh_token(subject: str | int, token_version: int = 0) -> s
         "type": "refresh",
         "iss": PORTAL_JWT_ISSUER,
         "tv": token_version,
+        "jti": secrets.token_urlsafe(16),
         "iat": now,
         "exp": now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     }

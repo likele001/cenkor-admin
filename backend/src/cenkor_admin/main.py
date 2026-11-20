@@ -27,6 +27,9 @@ log = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """启动 / 关闭钩子。"""
+    # 生产配置安全断言：默认 SECRET_KEY / CORS 通配符直接拒绝启动，
+    # 把配置错误暴露在部署阶段（见 Settings.assert_production_ready）
+    settings.assert_production_ready()
     log.info("app.starting", env=settings.APP_ENV, version=__version__)
     # 启动时 ping 一下依赖
     try:
@@ -344,9 +347,10 @@ cors_kwargs = {
     "expose_headers": ["X-Request-Id", "Content-Language"],
     "max_age": 600,  # 10 min
 }
-if settings.APP_ENV == "production":
-    # 生产环境不允许 allow_origins=["*"]（已通过 cors_origins_list 控制）
-    pass
+if settings.APP_ENV == "production" and "*" in settings.cors_origins_list:
+    # 生产禁通配符：allow_credentials=True + * 会被浏览器拒绝，
+    # 但更危险的是有人为了「修好」把 credentials 关掉——这里直接启动报错
+    raise RuntimeError("生产环境 CORS_ORIGINS 不允许包含 *")
 app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # 审计（写操作 + 鉴权请求）

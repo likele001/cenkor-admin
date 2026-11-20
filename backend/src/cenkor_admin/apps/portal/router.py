@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.auth.models import SystemSetting
+from cenkor_admin.apps.auth.router import _safe_reset_base
 from cenkor_admin.apps.portal import models, schemas
 from cenkor_admin.apps.portal.auth import (
     JWTError,
@@ -23,10 +24,19 @@ from cenkor_admin.apps.portal.auth import (
     hash_password,
     verify_password,
 )
+from cenkor_admin.core.auth_guard import (
+    check_login_rate,
+    check_public_rate,
+    consume_refresh_jti,
+    record_login_failure,
+    record_login_success,
+    refresh_ttl_seconds,
+)
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.mail import send_email
 from cenkor_admin.core.redis import redis_client
+from cenkor_admin.core.secrets import encrypt_secret
 
 log = structlog.get_logger()
 router = APIRouter()
@@ -165,6 +175,10 @@ async def get_current_portal_user(
         raise HTTPException(401, "用户不存在")
     if user.status != "active":
         raise HTTPException(403, f"账号已{user.status}")
+    # tv 撤销校验（与 admin deps 同语义；遗留无 tv token 放行至自然过期）
+    tv = payload.get("tv")
+    if tv is not None and tv != (user.token_version or 0):
+        raise HTTPException(401, "Token 已被撤销")
     return user
 
 
@@ -179,6 +193,10 @@ async def portal_register(
     db: AsyncSession = Depends(get_db),
 ):
     _verify_captcha(body.captcha_token, db)
+    # 防批量注册：单 IP 每分钟 5 次
+    await check_public_rate(
+        request.client.host if request.client else "unknown", "portal_register", limit=5,
+    )
 
     existing = await db.execute(
         select(models.PortalUser).where(
@@ -209,7 +227,7 @@ async def portal_register(
         raise HTTPException(409, "用户名或邮箱已存在")
 
     return schemas.PortalTokenResponse(
-        access_token=create_portal_access_token(user.id),
+        access_token=create_portal_access_token(user.id, token_version=user.token_version),
         refresh_token=create_portal_refresh_token(user.id, user.token_version),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=schemas.PortalUserBrief(
@@ -230,6 +248,8 @@ async def portal_login(
     db: AsyncSession = Depends(get_db),
 ):
     _verify_captcha(body.captcha_token, db)
+    ip = request.client.host if request.client else "unknown"
+    await check_login_rate(ip, body.username)
 
     stmt = select(models.PortalUser).where(
         models.PortalUser.deleted_at.is_(None),
@@ -239,10 +259,10 @@ async def portal_login(
     )
     user = (await db.execute(stmt)).scalar_one_or_none()
 
-    ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")[:500]
 
     if not user or not verify_password(body.password, user.password_hash):
+        await record_login_failure(ip, body.username)
         if user:
             db.add(models.PortalLoginLog(
                 user_id=user.id, ip=ip, user_agent=ua,
@@ -254,6 +274,7 @@ async def portal_login(
     if user.status != "active":
         raise HTTPException(403, f"账号已{user.status}")
 
+    await record_login_success(ip, body.username)
     user.last_login_at = datetime.now(UTC)
     user.last_login_ip = ip
     db.add(models.PortalLoginLog(
@@ -263,7 +284,7 @@ async def portal_login(
     await db.refresh(user)
 
     return schemas.PortalTokenResponse(
-        access_token=create_portal_access_token(user.id),
+        access_token=create_portal_access_token(user.id, token_version=user.token_version),
         refresh_token=create_portal_refresh_token(user.id, user.token_version),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=schemas.PortalUserBrief(
@@ -299,8 +320,16 @@ async def portal_refresh(
     if user.status != "active":
         raise HTTPException(403, f"账号已{user.status}")
 
+    # 一次性旋转 + 重放检测（与 admin 同语义）
+    jti = payload.get("jti")
+    if jti and not await consume_refresh_jti(jti, refresh_ttl_seconds(payload)):
+        user.token_version = (user.token_version or 0) + 1
+        await db.commit()
+        log.warning("portal.refresh.replay_detected", user_id=user.id)
+        raise HTTPException(401, "Refresh token 已被使用，所有会话已失效，请重新登录")
+
     return schemas.PortalTokenResponse(
-        access_token=create_portal_access_token(user.id),
+        access_token=create_portal_access_token(user.id, token_version=user.token_version),
         refresh_token=create_portal_refresh_token(user.id, user.token_version),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=schemas.PortalUserBrief(
@@ -328,7 +357,20 @@ async def portal_update_profile(
     db: AsyncSession = Depends(get_db),
     user: models.PortalUser = Depends(get_current_portal_user),
 ):
-    for k, v in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    # 邮箱变更查唯一性（与 admin 同语义，防重复邮箱瘫痪重置流程）
+    new_email = data.get("email")
+    if new_email and new_email != user.email:
+        dup = await db.execute(
+            select(models.PortalUser).where(
+                models.PortalUser.email == new_email,
+                models.PortalUser.id != user.id,
+                models.PortalUser.deleted_at.is_(None),
+            )
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(409, "邮箱已被其他账号使用")
+    for k, v in data.items():
         if v is not None:
             setattr(user, k, v)
     await db.commit()
@@ -380,8 +422,8 @@ async def portal_bind_oauth(
         provider=body.provider,
         open_id=body.open_id,
         union_id=body.union_id,
-        access_token_enc=body.access_token,
-        refresh_token_enc=body.refresh_token,
+        access_token_enc=encrypt_secret(body.access_token),
+        refresh_token_enc=encrypt_secret(body.refresh_token),
     )
     db.add(oauth)
     await db.commit()
@@ -430,6 +472,9 @@ async def portal_forgot_password(
     email = (body.email or "").strip().lower()
     if not email:
         raise HTTPException(400, "请输入邮箱")
+    await check_public_rate(
+        request.client.host if request.client else "unknown", "portal_forgot", limit=5,
+    )
 
     user = (await db.execute(
         select(models.PortalUser).where(
@@ -441,7 +486,9 @@ async def portal_forgot_password(
     if not user:
         return {"ok": True, "message": "如果该邮箱已注册，重置链接已发送"}
 
-    token = secrets.token_urlsafe(48)[:64]
+    # ptl- 前缀：与后台重置令牌隔离。两套用户体系共用 password_resets 表，
+    # 不带区分会让前台重置令牌能重置同 id 的后台账号（跨体系提权）
+    token = "ptl-" + secrets.token_urlsafe(48)[:60]
     from cenkor_admin.apps.notification.models import PasswordReset
     expires = datetime.now(UTC) + timedelta(hours=1)
     db.add(PasswordReset(
@@ -450,7 +497,7 @@ async def portal_forgot_password(
     ))
     await db.commit()
 
-    frontend_base = body.frontend_base or settings.PUBLIC_BASE_URL
+    frontend_base = _safe_reset_base(body.frontend_base)
     reset_link = f"{frontend_base.rstrip('/')}/reset-password?token={token}"
 
     with contextlib.suppress(Exception):
@@ -471,6 +518,9 @@ async def portal_reset_password(
     token = (body.token or "").strip()
     if not token:
         raise HTTPException(400, "参数错误")
+    # 拒绝后台体系签发的重置令牌（adm- 前缀），防跨体系重置
+    if token.startswith("adm-"):
+        raise HTTPException(400, "重置链接无效或已过期")
 
     from cenkor_admin.apps.notification.models import PasswordReset
     reset = (await db.execute(
@@ -557,8 +607,8 @@ async def portal_feishu_callback(
         db.add(models.PortalUserOAuth(
             user_id=user.id, provider="feishu", open_id=fs_user["open_id"],
             union_id=fs_user.get("union_id"),
-            access_token_enc=fs_user["access_token"],
-            refresh_token_enc=fs_user.get("refresh_token"),
+            access_token_enc=encrypt_secret(fs_user["access_token"]),
+            refresh_token_enc=encrypt_secret(fs_user.get("refresh_token")),
             expires_at=None,
         ))
         await db.commit()
@@ -568,7 +618,7 @@ async def portal_feishu_callback(
         raise HTTPException(403, f"账号已{user.status}")
 
     return schemas.PortalTokenResponse(
-        access_token=create_portal_access_token(user.id),
+        access_token=create_portal_access_token(user.id, token_version=user.token_version),
         refresh_token=create_portal_refresh_token(user.id, user.token_version),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=schemas.PortalUserBrief(

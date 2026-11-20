@@ -73,6 +73,12 @@ async def get_current_user(
         raise HTTPException(401, "用户不存在")
     if user.status != "active":
         raise HTTPException(403, f"账号已{user.status}")
+    # token_version 撤销校验：登出 / 改密 / refresh 重放都会 bump tv，
+    # 带 tv 的 access token 必须与库一致。不带 tv 的是升级前签发的
+    # 遗留 token，放行至自然过期（≤ ACCESS_TOKEN_EXPIRE_MINUTES）。
+    tv = payload.get("tv")
+    if tv is not None and tv != (user.token_version or 0):
+        raise HTTPException(401, "Token 已被撤销")
     return user
 
 
