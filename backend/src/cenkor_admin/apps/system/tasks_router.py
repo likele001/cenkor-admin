@@ -4,10 +4,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
