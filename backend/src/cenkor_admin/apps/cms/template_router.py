@@ -142,6 +142,8 @@ async def templates_validate(body: TemplateValidateRequest):
         try:
             manifest = theme_package.manifest_from_json(source, legacy_key=None)
         except ValueError as exc:
+            # codeql[py/stack-trace-exposure] -- 主题编辑器校验反馈：message 出自自有
+            # JSON/manifest 解析器的校验信息（不含服务器内部细节），刻意返回以定位编辑错误。
             return {"valid": False, "ok": False,
                     "error": {"message": str(exc), "line": 1, "type": "json"},
                     "message": str(exc), "kind": "json"}
@@ -159,6 +161,7 @@ async def templates_validate(body: TemplateValidateRequest):
                 "kind": None, "settings": len(manifest.settings)}
 
     ok, error = jinja_env.validate_theme_source(source, path=path)
+    # codeql[py/stack-trace-exposure] -- Jinja 校验反馈是模板编辑器功能，message 为自有校验器输出，刻意返回。
     return {
         "valid": ok,
         "ok": ok,

@@ -347,7 +347,8 @@ async def draft_entry_stream(
                 await db.rollback()
             except Exception:
                 pass
-            detail = str(exc)[:300] or "AI 服务调用失败"
+            logger.warning("cms.ai.draft_stream_failed err={}", str(exc))
+            detail = "AI 服务调用失败，详见服务端日志"
             yield f"event: error\ndata: {json.dumps({'detail': detail}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

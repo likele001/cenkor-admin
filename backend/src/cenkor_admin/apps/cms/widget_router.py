@@ -104,6 +104,9 @@ async def theme_widget(
         title=name,
     )
 
+    # codeql[py/reflective-xss] -- 用户参数 d 经 widget_sandbox.decode_args 严格解码后，由
+    # _json_literal 把 <>& 全部转成 \uXXXX 才进 JSON 数据岛（无法闭合标签）；title 经
+    # 正则白名单 + HTML escape；响应另带哈希锁定脚本的 sandbox CSP。反射型 XSS 已被阻断。
     return Response(
         content=html,
         media_type="text/html; charset=utf-8",

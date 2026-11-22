@@ -199,6 +199,19 @@ def _ver_key(sub: store_models.AppSubmission) -> tuple:
     return (ver_tuple(sub.version), sub.id or 0)
 
 
+def _within(root: str, target: Path) -> bool:
+    """判断 target 是否严格落在 root 之内（两者均须为 realpath 后的绝对路径）。
+
+    不用 ``str(target).startswith(root)``：裸前缀比较会把 ``/x/uploads_evil``
+    误判成 ``/x/uploads`` 的子路径。用 commonpath 按路径段比较。
+    """
+    try:
+        common = os.path.commonpath([root, str(target)])
+    except ValueError:
+        return False
+    return common == root and str(target) != root
+
+
 # ============================================================
 # manifest v2 发布校验（与实例侧 extension_host/manifest.py 同源）
 # ============================================================
@@ -1149,10 +1162,17 @@ async def submit_app(
     except zipfile.BadZipFile:
         raise HTTPException(400, "ZIP 文件损坏") from None
 
-    # 包体校验全部通过，此刻才允许占住 UPLOAD_DIR/{app_key}-{version}.zip
+    # 包体校验全部通过，此刻才允许占住 UPLOAD_DIR/{product}/{app_key}/{version}/
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    zip_dir = UPLOAD_DIR / product / app_key / version
-    zip_path = zip_dir / f"{file_hash}.zip"
+    # 路径注入防御（CodeQL py/path-injection）：上面的正则白名单不被 CodeQL 认作 barrier，
+    # 补 realpath 包含性校验，下游统一使用净化后的 zip_dir / zip_path。
+    upload_root = os.path.realpath(UPLOAD_DIR)
+    zip_dir = Path(os.path.realpath(os.path.join(upload_root, product, app_key, version)))
+    if not _within(upload_root, zip_dir):
+        raise HTTPException(400, "提交路径越出上传目录")
+    zip_path = Path(os.path.realpath(os.path.join(str(zip_dir), f"{file_hash}.zip")))
+    if not _within(upload_root, zip_path):
+        raise HTTPException(400, "提交路径越出上传目录")
     if zip_path.exists():
         if hashlib.sha256(zip_path.read_bytes()).hexdigest() != file_hash:
             raise HTTPException(409, "同版本已存在不同内容的包，拒绝覆盖")
@@ -1569,7 +1589,7 @@ async def install_submission(
     except Exception as e:
         # 迁移失败 == 表没建出来，不能当装成功（理由同 install_app_from_zip）。
         log.error("store.migration_upgrade_fail", app_key=sub.app_key, error=str(e))
-        warnings.append(f"数据库迁移失败，数据表可能未创建：{e}")
+        warnings.append("数据库迁移失败，数据表可能未创建，详见服务端日志")
 
     # 更新状态
     sub.status = "installed"
@@ -1580,7 +1600,7 @@ async def install_submission(
         await install_app(db, sub.app_key)
     except Exception as e:
         log.warning("store.install.auto_failed", app_key=sub.app_key, error=str(e))
-        raise HTTPException(500, f"应用注册失败: {e}")
+        raise HTTPException(500, "应用注册失败，详见服务端日志")
 
     # 动态注册 API 路由（无需重启后端）
     route_registered = False
@@ -1591,7 +1611,7 @@ async def install_submission(
             warnings.append("API 路由注册失败，请检查 router.py 中的 import 路径")
     except Exception as e:
         log.warning("store.route_register_failed", app_key=sub.app_key, error=str(e))
-        warnings.append(f"API 路由注册异常: {e}")
+        warnings.append("API 路由注册异常，详见服务端日志")
 
     # 更新 has_frontend 标记
     installed_row = (await db.execute(
@@ -1886,8 +1906,17 @@ async def install_app_from_zip(
     if not zip_path.exists():
         raise HTTPException(400, "ZIP 文件不存在")
 
-    _guard_against_shadowed_source(app_key)
-    app_dir = APPS_DIR / app_key
+    # 路径注入防御（CodeQL py/path-injection）：白名单正则 + realpath 包含性校验，
+    # 下游统一使用净化后的 app_dir / safe_key，不再拿原始 app_key 拼路径。
+    if not KEY_RE.match(app_key):
+        raise HTTPException(400, f"非法应用 key（须匹配 ^[a-z][a-z0-9_]{{1,63}}$）: {app_key}")
+    apps_root = os.path.realpath(APPS_DIR)
+    app_dir = Path(os.path.realpath(os.path.join(apps_root, app_key)))
+    if not _within(apps_root, app_dir):
+        raise HTTPException(400, f"应用 key 越出安装目录: {app_key}")
+    safe_key = app_dir.name
+
+    _guard_against_shadowed_source(safe_key)
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             _extract_app_zip(zf, app_dir)
@@ -1900,14 +1929,14 @@ async def install_app_from_zip(
     has_frontend = False
     frontend_src = app_dir / "frontend" / "dist"
     if frontend_src.exists():
-        target_dir = FRONTEND_STATIC_DIR / app_key
+        target_dir = FRONTEND_STATIC_DIR / safe_key
         if target_dir.exists():
             shutil.rmtree(target_dir)
         shutil.copytree(frontend_src, target_dir)
         has_frontend = True
 
     # 数据库迁移文件
-    _copy_migration_files(app_dir, app_key)
+    _copy_migration_files(app_dir, safe_key)
     warnings: list[str] = []
     try:
         from alembic.config import Config
@@ -1923,29 +1952,30 @@ async def install_app_from_zip(
         # 迁移失败 == 表没建出来。绝不能只 warning 就当装成功：否则界面显示「已安装」，
         # 而接口一访问就报 relation does not exist。故用 error 级日志并显式回报给调用方。
         log.error("store.migration_upgrade_fail", app_key=app_key, error=str(e))
-        warnings.append(f"数据库迁移失败，数据表可能未创建：{e}")
+        warnings.append("数据库迁移失败，数据表可能未创建，详见服务端日志")
 
     try:
         from cenkor_admin.apps.system.app_registry import install_app
 
-        await install_app(db, app_key)
+        await install_app(db, safe_key)
     except Exception as e:
         log.warning("store.install.auto_failed", app_key=app_key, error=str(e))
-        raise HTTPException(500, f"应用注册失败: {e}") from e
+        # 同 install_submission：异常原文只进日志，不回给客户端（CodeQL py/stack-trace-exposure）
+        raise HTTPException(500, "应用注册失败，详见服务端日志") from e
 
     route_registered = False
     try:
         from cenkor_admin.api.v1 import register_app_router
 
-        route_registered = register_app_router(app_key)
+        route_registered = register_app_router(safe_key)
         if not route_registered and (app_dir / "router.py").exists():
             warnings.append("API 路由注册失败，请检查 router.py 中的 import 路径")
     except Exception as e:
         log.warning("store.route_register_failed", app_key=app_key, error=str(e))
-        warnings.append(f"API 路由注册异常: {e}")
+        warnings.append("API 路由注册异常，详见服务端日志")
 
     installed_row = (await db.execute(
-        select(InstalledApp).where(InstalledApp.key == app_key)
+        select(InstalledApp).where(InstalledApp.key == safe_key)
     )).scalar_one_or_none()
     if installed_row:
         installed_row.has_frontend = has_frontend
@@ -1980,11 +2010,59 @@ def _clean_str_list(value, limit=50):
     return out
 
 
+def _strip_html_block(s: str, tag: str) -> str:
+    """线性扫描剥离 <tag ...>...</tag> 块（大小写不敏感）。
+
+    不用正则：`<tag.*?</tag>` 类惰性量词在大量未闭合标签头重复时会退化出
+    多项式复杂度（CodeQL py/polynomial-redos）。未闭合的块原样保留。
+    """
+    low = s.lower()
+    opener = "<" + tag
+    closer = "</" + tag
+    # 快速路径：全文没有闭合标签时不可能剥离任何块，直接返回（避免大量
+    # 未闭合标签头重复时逐个开标签向后扫描的 O(n²) 开销）。
+    if closer not in low:
+        return s
+    out: list[str] = []
+    i, n = 0, len(s)
+    while i < n:
+        j = low.find(opener, i)
+        if j < 0:
+            out.append(s[i:])
+            break
+        k = j + len(opener)
+        # 标签名必须到此为止（后接空白 / '/' / '>'），避免误伤 <scriptx 之类
+        if k < n and low[k] not in " \t\r\n\f/>":
+            out.append(s[i:k])
+            i = k
+            continue
+        gt = low.find(">", k)
+        if gt < 0:
+            out.append(s[i:])
+            break
+        close = low.find(closer, gt + 1)
+        end = -1
+        while close >= 0:
+            end = low.find(">", close + len(closer))
+            if end >= 0 and not low[close + len(closer):end].strip():
+                break
+            close = low.find(closer, close + len(closer))
+        if close < 0:
+            # 没有匹配的闭合标签：保留开标签继续往后找（与正则不匹配的行为一致）
+            out.append(s[i:gt + 1])
+            i = gt + 1
+            continue
+        out.append(s[i:j])
+        i = end + 1
+    return "".join(out)
+
+
 def _clean_long_html(value):
     """富文本 HTML 纵深防御：体积上限 + 剥离 script/iframe/on* /javascript:。
 
     真正的 XSS 边界在渲染端（门户用 DOMPurify 净化后再 v-html）；这里的剥离只是避免
-    库内长期存着明显的可执行片段。
+    库内长期存着明显的可执行片段。剥离一律用线性扫描/无重叠量词，避免多项式
+    ReDoS（CodeQL py/polynomial-redos）。
     """
     if value is None:
         return None
@@ -1992,12 +2070,12 @@ def _clean_long_html(value):
     s = str(value)
     if len(s) > _INTRO_MAX_HTML:
         s = s[:_INTRO_MAX_HTML]
-    s = _re.sub(r'(?is)<\\s*script.*?<\\s*/\\s*script\\s*>', '', s)
-    s = _re.sub(r'(?is)<\\s*iframe.*?<\\s*/\\s*iframe\\s*>', '', s)
-    s = _re.sub(r'(?is)\\son[a-z]+\\s*=\\s*\"[^\"]*\"', '', s)
-    s = _re.sub("(?is)"+chr(34)+"\\son[a-z]+\\s*=\\s*"+chr(39)+"[^"+chr(39)+"]*"+chr(39)+chr(34), "", s)
-    s = _re.sub(r'(?is)\\son[a-z]+\\s*=\\s*[^\\s>]+', '', s)
-    s = _re.sub(r'(?is)javascript:', '', s)
+    s = _strip_html_block(s, "script")
+    s = _strip_html_block(s, "iframe")
+    s = _re.sub(r'(?i)\son[a-z]+\s*=\s*"[^"]*"', '', s)
+    s = _re.sub(r"(?i)\son[a-z]+\s*=\s*'[^']*'", '', s)
+    s = _re.sub(r'(?i)\son[a-z]+\s*=\s*[^\s>]+', '', s)
+    s = _re.sub(r'(?i)javascript:', '', s)
     return s
 
 

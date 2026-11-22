@@ -55,6 +55,12 @@ function getI18nMap(): Record<string, string> {
   }
 }
 
+// 剥离 HTML 标签：除完整 <...> 外，连尾部未闭合的 "<script..." 残段一并去掉。
+// 只写 /<[^>]+>/g 会漏掉没有 '>' 的尾巴（CodeQL js/incomplete-multi-character-sanitization）。
+function stripHtmlTags(input: string): string {
+  return input.replace(/<[^>]*>?/g, '')
+}
+
 function registerFilters(engine: Liquid): void {
   // 字符串
   engine.registerFilter('upcase', (s: unknown) => String(s ?? '').toUpperCase())
@@ -81,8 +87,7 @@ function registerFilters(engine: Liquid): void {
       .replace(/'/g, '&#39;')
   })
   engine.registerFilter('strip_html', (s: unknown) => {
-    const str = String(s ?? '')
-    return str.replace(/<[^>]+>/g, '')
+    return stripHtmlTags(String(s ?? ''))
   })
   engine.registerFilter('replace', (s: unknown, oldStr = '', newStr = '') => {
     return String(s ?? '').split(oldStr).join(newStr)
@@ -236,7 +241,7 @@ function registerFilters(engine: Liquid): void {
 
   // reading_time
   engine.registerFilter('reading_time', (content: unknown) => {
-    const text = String(content ?? '').replace(/<[^>]+>/g, '')
+    const text = stripHtmlTags(String(content ?? ''))
     return Math.max(1, Math.round(text.length / 500))
   })
 }

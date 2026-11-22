@@ -202,6 +202,8 @@ async def validate(
     try:
         order = eng.topo_order(graph)
     except eng.GraphError as exc:
+        # codeql[py/stack-trace-exposure] -- GraphError 为自有工作流校验信息（成环/缺节点），
+        # 保存前校验功能刻意返回，不含服务器内部细节。
         return {"ok": False, "problems": [str(exc)], "order": []}
 
     for node in order:

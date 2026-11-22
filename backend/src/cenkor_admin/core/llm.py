@@ -1194,9 +1194,29 @@ class _RetryableError(Exception):
 # 单例
 # --------------------------------------------------------------------------
 _llm: LLMClient | None = None
-# 按能力缓存的客户端。key = "<capability>:<密钥指纹>"——指纹进 key 是为了让
-# 「后台换了密钥」这件事能自动失效旧连接池，否则新 key 永远不生效，很容易踩。
+# 按能力缓存的客户端。key = "<capability>:<api_key 指纹>"——把密钥指纹放进 key，
+# 是为了让「后台换了密钥」自动失效旧连接池，否则新 key 永远不生效，很容易踩。
+#
+# 这里保留哈希、不放原文：缓存键常年出现在调试输出、异常 locals、内存 dump 里，
+# 一旦是原文就等于把密钥散落各处。哈希的用途是「区分不同密钥」而非「保护口令」，
+# 故不适用 CWE-916 要求的慢哈希（PBKDF2/Argon2）——刻意豁免。
 _cap_clients: dict[str, LLMClient] = {}
+
+
+def _key_fingerprint(api_key: str) -> str:
+    """把 API Key 收敛成定长指纹，避免密钥原文进入进程内的缓存键。
+
+    Args:
+        api_key: 服务商 API Key 原文，可能为空。
+
+    Returns:
+        完整 sha256 十六进制摘要（64 字符）。用全长而非截断：截断到 10 位只有
+        40 bit，理论上存在碰撞，碰撞后果是「换了密钥却复用旧客户端」——正是这段
+        缓存最需要避免的情形。
+    """
+    # codeql[py/weak-sensitive-data-hashing] -- 仅作内存缓存键的派生标识（区分用途），
+    # 不是口令存储/校验，无需慢哈希；原文不落盘、不进日志。
+    return hashlib.sha256((api_key or "").encode("utf-8")).hexdigest()
 
 
 def get_llm_for(capability: str) -> LLMClient:
@@ -1213,8 +1233,7 @@ def get_llm_for(capability: str) -> LLMClient:
             f"能力「{capability}」尚未配置：请在后台 AI 设置里绑定服务商与模型"
         )
 
-    fingerprint = hashlib.sha256((ep.api_key or "").encode("utf-8")).hexdigest()[:10]
-    sig = f"{capability}:{fingerprint}"
+    sig = f"{capability}:{_key_fingerprint(ep.api_key or '')}"
     cached = _cap_clients.get(sig)
     if cached is not None:
         return cached

@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import importlib.util
+import os
 import pkgutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -104,9 +105,28 @@ def _scan_external_apps(manifests: dict[str, AppManifest]) -> None:
             continue
 
 
+def _within(root: str, target: Path) -> bool:
+    """判断 target 是否严格落在 root 之内（两者均须为 realpath 后的绝对路径）。
+
+    不用 ``str(target).startswith(root)``：裸前缀比较会把 ``/x/apps_evil``
+    误判成 ``/x/apps`` 的子路径，等于给兄弟目录留了穿越口子。
+    """
+    try:
+        common = os.path.commonpath([root, str(target)])
+    except ValueError:
+        return False
+    return common == root and str(target) != root
+
+
 def _detect_app_has_frontend(key: str) -> bool:
     """检测 App 是否包含可供 admin-web 动态加载的前端资源。"""
-    static_app_dir = Path(__file__).resolve().parent.parent.parent / "static" / "apps" / key
+    # 路径注入防御（CodeQL py/path-injection）：realpath 包含性校验。
+    static_root = os.path.realpath(
+        Path(__file__).resolve().parent.parent.parent / "static" / "apps"
+    )
+    static_app_dir = Path(os.path.realpath(os.path.join(static_root, key)))
+    if not _within(static_root, static_app_dir):
+        return False
     return (static_app_dir / "plugin.js").exists()
 
 

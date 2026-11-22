@@ -98,7 +98,10 @@ class UpyunDriver:
     def _make_download_token(self, bucket: str, key: str, expires: int) -> str:
         """又拍私有空间下载签名：HMAC-SHA1"""
         e = int(time.time()) + expires
+        # codeql[py/weak-sensitive-data-hashing] -- 又拍私有空间 _upt 下载 token 官方算法为 MD5(password) + HMAC-SHA1，
+        # 算法由第三方协议固定、无法更改。
         s = f"{key}&{e}&{hashlib.md5(self._password.encode()).hexdigest()}"
+        # codeql[py/weak-sensitive-data-hashing] -- 同上，HMAC-SHA1 为又拍 _upt 协议组成部分。
         h = hmac.new(self._password.encode(), s.encode(), hashlib.sha1).hexdigest()[:20]
         return f"{h}{e}"
 

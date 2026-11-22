@@ -1439,7 +1439,8 @@ async def import_entries(
                 results.append({"row": i, "ok": True, "action": "created", "id": obj.id})
         except Exception as e:
             failed += 1
-            results.append({"row": i, "ok": False, "error": str(e)[:200]})
+            log.warning("cms.bulk_import_row_failed", row=i, error=str(e))
+            results.append({"row": i, "ok": False, "error": "导入失败，详见服务端日志"})
     return {
         "total": len(raw_items), "created": created,
         "updated": updated, "failed": failed, "results": results,

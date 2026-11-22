@@ -1101,6 +1101,28 @@ def _collect_simple(obj: Any, out: list[str], depth: int = 0) -> None:
             _collect_simple(v, out, depth + 1)
 
 
+def _strip_tags(text: str) -> str:
+    """把 <...> 标签替换为空格（线性扫描，无回溯）。
+
+    不用 re.sub(r"<[^>]+>")：未闭合的 '<' 会让该正则在大量 '<' 重复时
+    退化出多项式复杂度（CodeQL py/polynomial-redos）。语义与旧正则一致：
+    只替换「< 与 > 之间至少一个字符」的完整标签，尾部未闭合的 '<...' 原样保留。
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "<":
+            j = text.find(">", i + 1)
+            if j > i + 1:
+                out.append(" ")
+                i = j + 1
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _draft_to_text(title: str, content: Any) -> str:
     """把 draft 的标题+正文压成可检索纯文本（查重用，覆盖标题/正文/自定义/SEO）。
 
@@ -1112,12 +1134,12 @@ def _draft_to_text(title: str, content: Any) -> str:
         parts.append(str(title).strip())
 
     if isinstance(content, str):
-        parts.append(re.sub(r"<[^>]+>", " ", content))
+        parts.append(_strip_tags(content))
     elif isinstance(content, dict):
         for key in ("text", "body", "markdown", "md", "summary"):
             v = content.get(key)
             if isinstance(v, str) and v.strip():
-                parts.append(re.sub(r"<[^>]+>", " ", v))
+                parts.append(_strip_tags(v))
         custom = content.get("custom_fields")
         if isinstance(custom, dict):
             extra: list[str] = []
@@ -1265,7 +1287,7 @@ def _content_excerpt(content: dict[str, Any] | None, limit: int = 1200) -> str:
     for k in ("text", "body", "markdown", "summary"):
         v = (content or {}).get(k)
         if isinstance(v, str) and v.strip():
-            return re.sub(r"<[^>]+>", " ", v)[:limit].strip()
+            return _strip_tags(v)[:limit].strip()
     return ""
 
 

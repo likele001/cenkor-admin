@@ -76,8 +76,10 @@ async def get_developer_doc(
     _: auth_models.User = Depends(get_current_user),
 ):
     """获取单个文档的 Markdown 内容。"""
-    filename = f"{doc_id}.md"
-    if filename not in _DOC_WHITELIST:
+    # 从常量白名单取值切断用户输入污点（CodeQL py/path-injection
+    # 不认 in 检查为 barrier，只认从常量取值）。
+    filename = next((k for k in _DOC_WHITELIST if k == f"{doc_id}.md"), None)
+    if filename is None:
         raise HTTPException(404, f"文档不存在：{doc_id}")
 
     path = _DOCS_ROOT / filename
@@ -110,9 +112,11 @@ async def import_docs_to_kb(
     doc_ids = (body or {}).get("doc_ids") or list(_DOC_WHITELIST.keys())
 
     imported, skipped, errors = [], [], []
-    for filename in doc_ids:
-        if filename not in _DOC_WHITELIST:
-            errors.append(f"未知文档：{filename}")
+    for wanted in doc_ids:
+        # 从常量白名单取值切断污点（理由同上）。
+        filename = next((k for k in _DOC_WHITELIST if k == wanted), None)
+        if filename is None:
+            errors.append(f"未知文档：{wanted}")
             continue
 
         path = _DOCS_ROOT / filename
@@ -140,7 +144,7 @@ async def import_docs_to_kb(
                 skipped.append(filename)
         except Exception as exc:
             logger.warning("developer_docs.import_failed", doc=filename, error=str(exc))
-            errors.append(f"{filename}: {exc}")
+            errors.append(f"{filename}: 导入失败，详见服务端日志")
 
     await db.commit()
 

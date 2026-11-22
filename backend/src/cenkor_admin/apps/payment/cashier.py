@@ -210,9 +210,16 @@ _QR_IMG_MARKS = ("/payments/wechat/qrcode", "/payments/alipay/qrcode", "/qrcode/
 
 
 def _is_qr_image_url(value: str) -> bool:
-    return value.startswith("http") and "xunhupay.com" in value and any(
-        m in value for m in _QR_IMG_MARKS
-    )
+    # 按解析后的主机名/路径判断，不用整串子串包含（CodeQL
+    # py/incomplete-url-substring-sanitization）："xunhupay.com" 出现在
+    # 任意位置（如 evil.com/xunhupay.com）都算命中会被绕过。
+    parts = urlsplit(value)
+    if parts.scheme not in ("http", "https"):
+        return False
+    host = (parts.hostname or "").lower()
+    if host != "xunhupay.com" and not host.endswith(".xunhupay.com"):
+        return False
+    return any(m in parts.path for m in _QR_IMG_MARKS)
 
 
 def _is_self_page(url: str, out_trade_no: str) -> bool:

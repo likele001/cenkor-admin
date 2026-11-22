@@ -160,7 +160,8 @@ async def test_channel(
     try:
         result = await handler.test(db, channel)
     except Exception as exc:
-        return {"ok": False, "detail": f"测试异常：{exc}"}
+        log.warning("cms.publish_channel_test_failed", channel=channel.channel_type, error=str(exc))
+        return {"ok": False, "detail": "测试异常，详见服务端日志"}
     return result
 
 

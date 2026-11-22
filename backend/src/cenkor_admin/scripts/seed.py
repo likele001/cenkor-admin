@@ -509,7 +509,9 @@ async def main() -> None:
         for email, pwd in generated_passwords:
             # 明文只在这里打印一次；不写进日志，避免口令沉淀到日志文件里
             print("\n" + "=" * 68)
+            # codeql[py/clear-text-logging-sensitive-data] -- 一次性初始化 CLI：初始口令只在终端回显一次，不写日志文件；这是运维拿到初始口令的唯一途径。
             print(f"  已创建管理员：{email}")
+            # codeql[py/clear-text-logging-sensitive-data] -- 同上：一次性终端回显，不落日志。
             print(f"  初始密码    ：{pwd}")
             print("  ⚠️ 此口令只显示这一次，请立即登录并修改")
             print("=" * 68 + "\n")

@@ -7,11 +7,13 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
 
 from cenkor_admin.api.deps import require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.core.db import get_db
 
+log = structlog.get_logger()
 router = APIRouter()
 
 
@@ -72,4 +74,5 @@ async def run_task_now(
         result = celery_app.send_task(task_name)
         return {"ok": True, "task_id": result.id, "transport": "celery"}
     except Exception as e:
-        return {"ok": False, "transport": "noop", "reason": str(e)}
+        log.warning("tasks.trigger_failed", task=task_name, error=str(e))
+        return {"ok": False, "transport": "noop", "reason": "任务队列不可用，详见服务端日志"}

@@ -434,7 +434,8 @@ async def test_channel(
     except PayError as exc:
         return {"ok": False, "message": exc.message, "detail": exc.detail}
     except Exception as exc:
-        return {"ok": False, "message": "自检失败", "detail": str(exc)}
+        log.warning("payment.selfcheck_failed", error=str(exc))
+        return {"ok": False, "message": "自检失败", "detail": "详见服务端日志"}
 
     return {
         "ok": True,

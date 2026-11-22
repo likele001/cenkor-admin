@@ -2168,9 +2168,9 @@ async def kind_paged(
         # 制造重复页面。第 1 页统一回基路径。
         site_id, _, _ = await _resolve_site(db, request)
         base_path = await _list_base_path(db, site_id, kind)
-        return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}{base_path}", status_code=301
-        )
+        # 相对路径重定向（CodeQL py/url-redirection）：不拼 request.base_url ——
+        # 它来自可伪造的 Host 头；相对地址由浏览器在当前源内解析，天然没有开放重定向。
+        return RedirectResponse(base_path, status_code=301)
     return await _serve_list_page(request, db, kind=kind, page=page_no)
 
 
@@ -2189,10 +2189,8 @@ async def category_paged(
     if page_no <= 1:
         site_id, _, _ = await _resolve_site(db, request)
         base_path = await _list_base_path(db, site_id, "article", category_slug=slug)
-        return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}{base_path}",
-            status_code=301,
-        )
+        # 相对路径重定向，理由同 list_paged（不拼可伪造的 Host 头）。
+        return RedirectResponse(base_path, status_code=301)
     return await _serve_list_page(request, db, kind="article", page=page_no, category_slug=slug)
 
 
@@ -2211,10 +2209,8 @@ async def tag_paged(
     if page_no <= 1:
         site_id, _, _ = await _resolve_site(db, request)
         base_path = await _list_base_path(db, site_id, "article", tag_slug=slug)
-        return RedirectResponse(
-            f"{str(request.base_url).rstrip('/')}{base_path}",
-            status_code=301,
-        )
+        # 相对路径重定向，理由同 list_paged（不拼可伪造的 Host 头）。
+        return RedirectResponse(base_path, status_code=301)
     return await _serve_list_page(request, db, kind="article", page=page_no, tag_slug=slug)
 
 
@@ -2229,7 +2225,7 @@ async def search_page(
     kw = kw.strip()
     if not kw:
         # 空搜索页就是 /article/ 的副本，留着只会让爬虫收到两份一样的内容
-        return RedirectResponse(f"{str(request.base_url).rstrip('/')}/article/", status_code=302)
+        return RedirectResponse("/article/", status_code=302)
     return await _serve_list_page(request, db, kind="article", page=page, kw=kw)
 
 

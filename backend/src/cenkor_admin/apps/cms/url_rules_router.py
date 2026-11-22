@@ -280,8 +280,8 @@ async def preview_url_rule(
         samples.append(permalink.build_url(normalized, values))
     except permalink.RuleNotApplicable:
         samples.append("（该规则要求栏目，但示例内容没有栏目）")
-    except permalink.RuleError as exc:
-        samples.append(f"（无法生成示例：{exc}）")
+    except permalink.RuleError:
+        samples.append("（无法生成示例：规则校验未通过）")
     # 再补几条不同 slug 的样本，看路径形态是否稳定
     for alt in ("another-post", "third-post"):
         v2 = dict(values)

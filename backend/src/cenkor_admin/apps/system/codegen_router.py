@@ -102,7 +102,9 @@ def _migration_head() -> tuple:
     try:
         return B.current_head(ALEMBIC_VERSIONS_DIR), None
     except SystemExit as exc:
-        return None, str(exc)
+        from loguru import logger
+        logger.warning("codegen.migration_head_failed err={}", str(exc))
+        return None, "迁移链状态异常（多 head 或缺失），详见服务端日志"
 
 
 # ---------------------------------------------------------------------------

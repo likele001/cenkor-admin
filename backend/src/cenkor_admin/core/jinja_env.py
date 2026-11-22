@@ -688,8 +688,11 @@ _RE_SCRIPT_INERT = re.compile(
     r"""type\s*=\s*["']?(?:application/ld\+json|application/json|text/template|text/x-template)""",
     re.IGNORECASE,
 )
+# 空白量词限长：无界 \s* 在引号缺席时会重叠回溯，大量空格重复时退化出
+# 多项式复杂度（CodeQL py/polynomial-redos）；属性内空白不可能超过这个量级。
 _RE_JS_URL = re.compile(
-    r"""\b(?:href|src|action|formaction)\s*=\s*["']?\s*javascript:""", re.IGNORECASE
+    r"""\b(?:href|src|action|formaction)\s{0,64}=\s{0,8}["']?\s{0,8}javascript:""",
+    re.IGNORECASE,
 )
 
 

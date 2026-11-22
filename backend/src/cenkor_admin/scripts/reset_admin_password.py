@@ -65,6 +65,7 @@ async def reset(email: str, password: str | None) -> int:
 
         print("\n" + "=" * 68)
         print(f"  账号      ：{email}（用户名 {username}）")
+        # codeql[py/clear-text-logging-sensitive-data] -- 一次性 CLI 重置工具：新口令只在终端回显一次，不写日志文件；这是运维拿到新口令的唯一途径。
         print(f"  新口令    ：{new_password}")
         print(f"  来源      ：{'本次随机生成' if generated else '命令行指定'}")
         print("  ⚠️ 口令只显示这一次，且旧会话已全部失效，请立即保存")

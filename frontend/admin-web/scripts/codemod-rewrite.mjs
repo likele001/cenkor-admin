@@ -89,7 +89,8 @@ function newKey(namespace, cnText) {
 
 function splitRegions(content) {
   const regions = []
-  const re = /<script\b[^>]*>[\s\S]*?<\/script>/g
+  // i 标志：HTML 标签大小写不敏感，<SCRIPT> 同样要识别（CodeQL js/bad-tag-filter）
+  const re = /<script\b[^>]*>[\s\S]*?<\/script>/gi
   let m
   let cursor = 0
   while ((m = re.exec(content)) !== null) {
@@ -231,7 +232,7 @@ function rewriteFile(filePath) {
   for (const r of regions) {
     if (r.kind === 'script') {
       const block = orig.slice(r.start, r.end)
-      const bodyMatch = block.match(/<script\b[^>]*>([\s\S]*?)<\/script>/)
+      const bodyMatch = block.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i)
       if (!bodyMatch) continue
       const body = bodyMatch[1]
       const bodyOffset = r.start + block.indexOf(body)
@@ -300,9 +301,9 @@ function rewriteFile(filePath) {
 
   // 加 useI18n
   if (!newContent.includes('useI18n') && newContent.includes("t('")) {
-    if (newContent.match(/<script setup[^>]*>/)) {
+    if (newContent.match(/<script setup[^>]*>/i)) {
       newContent = newContent.replace(
-        /(<script setup[^>]*>)/,
+        /(<script setup[^>]*>)/i,
         `$1\nimport { useI18n } from 'vue-i18n'\nconst { t } = useI18n()`,
       )
     }

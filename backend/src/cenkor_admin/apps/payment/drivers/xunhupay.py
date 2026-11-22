@@ -79,6 +79,8 @@ def _sign(params: dict[str, Any], secret: str) -> str:
         if k != "hash" and v not in (None, "")
     )
     raw = "&".join(f"{k}={v}" for k, v in items) + secret
+    # codeql[py/weak-sensitive-data-hashing] -- 虎皮椒（讯虎）协议强制 MD5 签名（原值拼接 + appsecret），
+    # 算法由第三方固定、无法升级；签名仅用于支付请求防篡改。
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 

@@ -7,6 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# 最小权限（CodeQL actions/missing-workflow-permissions）：所有 job 只需
+# checkout 读源码，显式收窄 GITHUB_TOKEN，避免默认宽权限被供应链滥用。
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "22"

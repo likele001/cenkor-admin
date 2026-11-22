@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -272,16 +273,39 @@ def app_enabled_dependency(app_key: str):
     return _require_enabled
 
 
+def _within(root: str, target: Path) -> bool:
+    """判断 target 是否严格落在 root 之内（两者均须为 realpath 后的绝对路径）。
+
+    不用 ``str(target).startswith(root)``：那是裸前缀比较，``/x/apps`` 会把
+    ``/x/apps_evil`` 误判为子路径，等于留了个兄弟目录穿越口子。
+    用 commonpath 做「按路径段」比较，并且 target == root 也算不通过。
+    """
+    try:
+        common = os.path.commonpath([root, str(target)])
+    except ValueError:
+        # 不同盘符 / 相对与绝对混用，commonpath 会抛 ValueError
+        return False
+    return common == root and str(target) != root
+
+
 def register_app_router(app_key: str) -> bool:
     """动态注册单个 App 路由（商店安装后无需重启）。"""
     from cenkor_admin import apps as apps_pkg
 
     apps_dir = Path(apps_pkg.__path__[0])
-    router_file = apps_dir / app_key / "router.py"
+    # 路径注入防御（CodeQL py/path-injection）：realpath 包含性校验，
+    # 下游统一使用净化后的 router_file。
+    apps_root = os.path.realpath(apps_dir)
+    router_file = Path(os.path.realpath(os.path.join(apps_root, app_key, "router.py")))
+    if not _within(apps_root, router_file):
+        return False
     external = False
     if not router_file.exists():
         external_dir = apps_dir.parent.parent / "apps"
-        router_file = external_dir / app_key / "router.py"
+        ext_root = os.path.realpath(external_dir)
+        router_file = Path(os.path.realpath(os.path.join(ext_root, app_key, "router.py")))
+        if not _within(ext_root, router_file):
+            return False
         if not router_file.exists():
             return False
         external = True

@@ -493,6 +493,8 @@ async def test_provider(
     row.last_test_error = None if ok else detail[:1000]
     await db.commit()
 
+    # codeql[py/stack-trace-exposure] -- 服务商连通测试是管理员专属诊断功能（需 admin 权限），
+    # detail 为提供商侧错误摘要，刻意返回以便修正 AI 配置，非意外泄露。
     return {"ok": ok, "detail": detail, "latency_ms": latency_ms, "models": models}
 
 
@@ -723,9 +725,10 @@ async def test_capability(
             raise LLMError(f"能力 {capability} 暂无测试实现")
     except Exception as exc:  # 提供商侧什么都可能抛，统一转成可读结果
         await client.aclose()
+        logger.warning("cms.ai.capability_test_failed capability={} err={}", capability, str(exc))
         return {
             "ok": False,
-            "detail": f"{type(exc).__name__}: {str(exc)[:400]}",
+            "detail": "连接测试失败，详见服务端日志",
             "latency_ms": int((time.monotonic() - started) * 1000),
             "result": None,
         }
