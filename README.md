@@ -33,20 +33,22 @@ systemctl enable --now docker
 docker compose version    # 确认能输出 v2.x
 ```
 
-> 中国大陆如果构建很慢，先把
-> `cp docker/fullstack/env.fullstack.example .env` 拷一份，再打开里面的
-> `APT_MIRROR` / `PIP_INDEX_URL` / `NPM_REGISTRY` 三行注释（「构建加速」段）。
->
-> WSL2 下尤其明显：默认不继承 Windows 主机的代理设置，直连 pypi.org 约 30 kB/s，
-> 装完 `requirements.txt` 要 20 分钟以上；换成国内镜像后通常 1~2 分钟。
-
-**第 1 步 · 一条命令部署**：
+**第 1 步 · 一条命令部署**（含换源，二选一）：
 
 ```bash
 git clone https://github.com/likele001/cenkor-admin.git
 cd cenkor-admin
+
+# 中国大陆 / WSL2：先换镜像源再构建（自动选阿里云 / 清华 / 腾讯云里可达的）
+bash scripts/bootstrap-fullstack.sh --mirror cn
+
+# 海外服务器 / GitHub Actions：用官方源（不加参数也会自动探测，慢才切）
 bash scripts/bootstrap-fullstack.sh
 ```
+
+> 直连 `pypi.org` 在国内约 30 kB/s，`pip install` 一步要 20 分钟以上，换源后 1~2 分钟。
+> **海外机器别加 `--mirror cn`**，国内镜像反而可能超时。
+> 换源细节、可用镜像站与手工改法见 [`docs/fullstack_deploy.md`](docs/fullstack_deploy.md)。
 
 脚本会自动完成全部步骤，中途无需干预：
 

@@ -81,6 +81,59 @@ FS_MINIO_API_PORT=9006
 FS_MINIO_CONSOLE_PORT=9007
 ```
 
+### 构建加速：怎么换镜像源（国内 / WSL 必看）
+
+构建镜像要下载 apt 包、pip wheel、npm 包，默认全走官方源。**海外机器这样最快**；
+中国大陆直连 `pypi.org` 实测只有约 30 kB/s，光 `pip install` 一步就要 20 分钟以上。
+
+这三个变量写在 `.env` 里，只影响 `docker build`，不影响运行时：
+
+| 变量 | 作用 | 默认值 | 国内可选值 |
+|---|---|---|---|
+| `APT_MIRROR` | Debian apt 源，**只写域名** | `deb.debian.org` | `mirrors.aliyun.com` / `mirrors.tuna.tsinghua.edu.cn` |
+| `PIP_INDEX_URL` | pip 索引，**带 `https://`** | `https://pypi.org/simple` | `https://mirrors.aliyun.com/pypi/simple/` |
+| `NPM_REGISTRY` | npm registry，**带 `https://`** | `https://registry.npmjs.org` | `https://registry.npmmirror.com` |
+
+**推荐做法：让脚本选，不用手改文件。**
+
+```bash
+bash scripts/bootstrap-fullstack.sh --mirror cn        # 强制国内镜像（WSL / 大陆机器）
+bash scripts/bootstrap-fullstack.sh --mirror global    # 强制官方源（海外服务器 / CI）
+bash scripts/bootstrap-fullstack.sh                    # 默认 auto：探测后决定
+```
+
+`auto` 会测 `pypi.org` 的首字节耗时，偏慢才切国内镜像；`cn` 会按阿里云 → 清华 → 腾讯云
+的顺序探测，取第一个可达的，三个全不可达则回退官方源并告警（不会中断部署）。
+
+`--mirror` 在 `.env` 已存在时同样生效：它会**就地改写**那三行，其余配置原样保留。
+所以已经部署过的机器想换源，直接重跑带参数的命令即可，不用删 `.env`。
+不加 `--mirror` 时脚本**不会改动**已有 `.env`，只在检测到网络偏慢时提示你加参数。
+
+**手工改也可以**（不想用脚本时）：
+
+```bash
+cp docker/fullstack/env.fullstack.example .env    # 或直接编辑已有的 .env
+vim .env                                          # 打开「构建加速」段，取消那三行注释
+```
+
+**或者只在这一次构建生效**（不改文件）：
+
+```bash
+APT_MIRROR=mirrors.aliyun.com \
+PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
+NPM_REGISTRY=https://registry.npmmirror.com \
+docker compose -f docker-compose.fullstack.yml up -d --build
+```
+
+> **换源后要重新构建才生效。** `build-arg` 变了，对应镜像层缓存自动失效，pip / npm 层会重跑。
+> wheel 缓存在 BuildKit cache mount 里，同一台机器后续改业务代码不必重下。
+>
+> **别指望 WSL2 走 Windows 的代理。** 它默认不继承主机代理设置，Windows 上开了代理，
+> WSL 里直连 pypi.org 依然是 30 kB/s。必须换源（或在 WSL 内单独配代理）。
+>
+> **海外机器不要开国内源。** 实测某些海外主机访问国内镜像站直接不可达（超时），
+> 会让构建失败。这类机器保持注释，或显式 `--mirror global`。
+
 ---
 
 ## 2. 一条命令启动全栈
@@ -88,6 +141,9 @@ FS_MINIO_CONSOLE_PORT=9007
 ```bash
 bash scripts/bootstrap-fullstack.sh
 ```
+
+> 上一节选了国内镜像的话，这条命令带上同样的参数即可（如 `--mirror cn`）：
+> 它只影响镜像构建、不影响启动，带上一次就够了。
 
 脚本内部等价于（外加 `.env` 生成、就绪等待与结果汇总）：
 
