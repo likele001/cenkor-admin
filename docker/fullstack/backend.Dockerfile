@@ -35,9 +35,27 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # 先装依赖（利用构建缓存）；requirements.txt 由 pyproject.toml 同步
 COPY backend/requirements.txt ./
-RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
-    pip install --upgrade pip --index-url "${PIP_INDEX_URL}" && \
-    pip install -r requirements.txt --index-url "${PIP_INDEX_URL}"
+# ---- 用 uv 装依赖，不用 pip ----
+#   pip 的下载是串行的（一个包装完才下一个），40 个直接依赖在慢网下
+#   实测 1335s —— 换国内镜像也没用，因为瓶颈是"串行 × 单文件速度"。
+#   uv 默认并发下载，同等带宽下通常能压到几分之一。
+#
+#   · --system           直接装进容器的系统 Python（容器内不需要 venv）
+#   · UV_LINK_MODE=copy  必须设：cache mount 与 site-packages 跨文件系统，
+#                        默认的硬链接会逐条失败告警并退回全量复制，反而更慢
+#   · UV_HTTP_TIMEOUT    慢网下单个大 wheel 容易超过默认超时
+#   · 装完把 uv 本体卸掉：运行时用不到，别让镜像白背 30MB
+#
+#   依赖结果与 pip 逐包比对过：88 个包，包集合与版本零差异。
+ENV UV_CACHE_DIR=/root/.cache/uv \
+    UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=120
+
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --index-url "${PIP_INDEX_URL}" uv \
+    && uv pip install --system -r requirements.txt --index-url "${PIP_INDEX_URL}" \
+    && pip uninstall -y uv
 
 # 业务代码 + 迁移（启动时 lifespan 会自动 alembic upgrade head）
 COPY backend/src ./src
