@@ -1,5 +1,5 @@
 {
-  "version": "0.5.24",
+  "version": "0.5.25",
   "channel": "stable",
   "released_at": "2026-11-24",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "三种容器化部署（fullstack/prod/dev）的 nginx 转发与上传限制补全：修复插件应用页面 404、实时通知失效、大于 1MB 上传 413"
+  "notes": "v0.5.25 — 部署体验与构建速度\n\n## 一键部署支持选择软件源\n\n`scripts/bootstrap-fullstack.sh` 新增 `--mirror auto|cn|global`：自动探测 pypi.org 首字节耗时，偏慢时切换到阿里云 / 清华 / 腾讯云（按顺序探测取第一个可达的，全不可达则回退官方源并告警，不中断部署）。\n\n解决的是国内与 WSL2 上直连 pypi.org 只有约 30 kB/s、`pip install` 单步要 20 分钟以上的问题。\n\n显式传 `--mirror` 才会改写现有 `.env` 的软件源三行，其余配置原样保留；不传参数时脚本绝不改动已有配置文件，只在检测到慢网络时提示。旧 `.env` 缺这三行时会在末尾追加一节。\n\n## 镜像构建提速\n\n全栈后端与前端 Dockerfile 启用 BuildKit cache mount（pip / npm / apt），并移除 `PIP_NO_CACHE_DIR=1`（它会让 cache mount 完全失效）。实测：修改 `requirements.txt` 触发 pip 层重建，全部 wheel 命中 `Using cached`，25 秒完成，此前每次要重新下载。\n\n## 落地页优化\n\n- 导航由 `<a @click.prevent>` 改为 `<router-link>`，站内链接可被搜索引擎抓取\n- 补齐 `aria-expanded` / `aria-controls` / `aria-label`，文档下拉支持键盘操作，新增 `:focus-visible` 焦点环与 `prefers-reduced-motion` 支持\n- `transition: all` 全部拆为具体属性，避免无关属性触发重排\n- 文档中心新增 `architecture.md` 等 3 篇\n- 文案校正：15 个内置应用、21 种字段类型、AI 能力八类\n\n## 协议声明修正\n\n`check_pricing_rows.py` 的 SPDX 声明与官网文案统一回 MIT，与根 `LICENSE` 保持一致（此前文案写 AGPL-3.0，与 LICENSE 的 MIT 冲突）。\n\n---\n\n部署：`bash scripts/bootstrap-fullstack.sh --mirror cn`（中国大陆 / WSL2）或 `bash scripts/bootstrap-fullstack.sh`（海外服务器 / CI）"
 }
