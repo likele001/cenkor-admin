@@ -8,7 +8,8 @@ ARG FRONTEND
 ARG NPM_REGISTRY=https://registry.npmjs.org
 WORKDIR /repo/frontend/$FRONTEND
 COPY frontend/$FRONTEND/package.json frontend/$FRONTEND/package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci --registry="$NPM_REGISTRY"; else npm install --registry="$NPM_REGISTRY"; fi
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    if [ -f package-lock.json ]; then npm ci --registry="$NPM_REGISTRY"; else npm install --registry="$NPM_REGISTRY"; fi
 
 COPY frontend/$FRONTEND/ ./
 # 兄弟目录：供 ../../design-tokens/tokens.css 等相对路径解析

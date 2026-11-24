@@ -6,9 +6,11 @@ FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONPATH=/app/src
+# ⚠️ 不要加 PIP_NO_CACHE_DIR=1：它会让下面的 cache mount 完全失效，
+#    每次重建都要重下全部 wheel（WSL / 国内网络下单次 20 分钟以上）。
+#    wheel 缓存留在构建机的 cache mount 里，不进最终镜像层，体积不受影响。
 
 WORKDIR /app
 
@@ -22,7 +24,8 @@ ARG APT_MIRROR=deb.debian.org
 ARG PIP_INDEX_URL=https://pypi.org/simple
 
 # 系统依赖：asyncpg / psycopg2 编译 + 健康检查 curl
-RUN if [ "$APT_MIRROR" != "deb.debian.org" ]; then \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    if [ "$APT_MIRROR" != "deb.debian.org" ]; then \
       sed -i "s@deb.debian.org@${APT_MIRROR}@g" /etc/apt/sources.list.d/debian.sources 2>/dev/null || true; \
       sed -i "s@deb.debian.org@${APT_MIRROR}@g" /etc/apt/sources.list 2>/dev/null || true; \
     fi; \
@@ -32,7 +35,8 @@ RUN if [ "$APT_MIRROR" != "deb.debian.org" ]; then \
 
 # 先装依赖（利用构建缓存）；requirements.txt 由 pyproject.toml 同步
 COPY backend/requirements.txt ./
-RUN pip install --upgrade pip --index-url "${PIP_INDEX_URL}" && \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --upgrade pip --index-url "${PIP_INDEX_URL}" && \
     pip install -r requirements.txt --index-url "${PIP_INDEX_URL}"
 
 # 业务代码 + 迁移（启动时 lifespan 会自动 alembic upgrade head）

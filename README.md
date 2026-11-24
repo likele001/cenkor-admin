@@ -36,6 +36,9 @@ docker compose version    # 确认能输出 v2.x
 > 中国大陆如果构建很慢，先把
 > `cp docker/fullstack/env.fullstack.example .env` 拷一份，再打开里面的
 > `APT_MIRROR` / `PIP_INDEX_URL` / `NPM_REGISTRY` 三行注释（「构建加速」段）。
+>
+> WSL2 下尤其明显：默认不继承 Windows 主机的代理设置，直连 pypi.org 约 30 kB/s，
+> 装完 `requirements.txt` 要 20 分钟以上；换成国内镜像后通常 1~2 分钟。
 
 **第 1 步 · 一条命令部署**：
 
