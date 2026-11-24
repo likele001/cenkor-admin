@@ -36,6 +36,28 @@ const EXCLUDE_DIRS = new Set(['archive', '_bak'])
 // 对外不放的内部文档（打包发版流程，纯内部用）
 const EXCLUDE_FILES = new Set(['packaging.md'])
 
+// docs/ 之外、但应纳入文档中心的源文件（保持单一事实源，构建时同步进来，避免复制进 docs/ 产生漂移）
+// src: 仓库绝对路径；dest: docs-content/ 内的相对路径（决定侧栏分组）；transform: 可选内容改写
+const EXTRA_FILES = [
+  {
+    src: path.join(REPO_ROOT, 'architecture.md'),
+    dest: 'architecture.md',
+    transform: (t) => t.replace(/docs\/deploy\.md/g, 'deploy.md')
+  },
+  {
+    src: path.join(REPO_ROOT, 'admin_system_comparison.md'),
+    dest: 'admin_system_comparison.md',
+    transform: (t) =>
+      `> ⚠️ **历史快照**：本文生成于 2026-01-08，为早期架构分析。当前架构与应用数量已大幅演进，`
+      + `请以 \`architecture.md\` 与各模块操作手册为准。\n\n`
+      + t
+  },
+  {
+    src: path.join(REPO_ROOT, 'backend/src/cenkor_admin/apps/erp/docs/DEVELOPMENT.md'),
+    dest: 'apps/erp-development.md'
+  }
+]
+
 function walk(dir, base) {
   const out = []
   for (const name of fs.readdirSync(dir).sort()) {
@@ -54,9 +76,9 @@ function walk(dir, base) {
   return out
 }
 
-/** 从 md 提取标题与首段描述 */
-function metaOf(rel) {
-  const text = fs.readFileSync(path.join(SRC, rel), 'utf-8')
+/** 从 md 提取标题与首段描述（fullPath 为文件绝对路径） */
+function metaOf(fullPath) {
+  const text = fs.readFileSync(fullPath, 'utf-8')
   const lines = text.split('\n')
   let title = ''
   let desc = ''
@@ -72,7 +94,7 @@ function metaOf(rel) {
       break
     }
   }
-  if (!title) title = path.basename(rel, '.md')
+  if (!title) title = path.basename(fullPath, '.md')
   return { title, desc }
 }
 
@@ -95,9 +117,26 @@ for (const rel of files) {
   const norm = rel.split(path.sep).join('/')
   fs.mkdirSync(path.dirname(path.join(DEST, norm)), { recursive: true })
   fs.copyFileSync(path.join(SRC, rel), path.join(DEST, norm))
-  const { title, desc } = metaOf(rel)
+  const { title, desc } = metaOf(path.join(SRC, rel))
   const dir = norm.includes('/') ? norm.slice(0, norm.lastIndexOf('/')) : ''
   manifest.push({ path: norm, title, desc, dir })
+}
+
+// docs/ 之外的源文件：同步内容（可改写）+ 登记 manifest
+for (const ef of EXTRA_FILES) {
+  if (!fs.existsSync(ef.src)) {
+    console.warn(`⚠ 跳过不存在的额外文档源: ${ef.src}`)
+    continue
+  }
+  const norm = ef.dest.split(path.sep).join('/')
+  const dir = norm.includes('/') ? norm.slice(0, norm.lastIndexOf('/')) : ''
+  let text = fs.readFileSync(ef.src, 'utf-8')
+  if (ef.transform) text = ef.transform(text)
+  fs.mkdirSync(path.dirname(path.join(DEST, norm)), { recursive: true })
+  fs.writeFileSync(path.join(DEST, norm), text, 'utf-8')
+  const { title, desc } = metaOf(ef.src)
+  manifest.push({ path: norm, title, desc, dir })
+  console.log(`    + 额外同步: ${ef.src} → ${norm}`)
 }
 
 // 分组：根级在前，其余按显示名排序
@@ -121,7 +160,7 @@ for (const key of dirKeys) {
 fs.writeFileSync(
   MANIFEST_TS,
   `// ⚠️ 本文件由 scripts/copy-docs.mjs 生成，不要手改；重跑构建即可更新。\n`
-  + `// 数据源：仓库 docs/（${files.length} 份，生成时间见 git log）。\n\n`
+  + `// 数据源：仓库 docs/ 及登记的额外源文件（共 ${manifest.length} 份，生成时间见 git log）。\n\n`
   + `export interface DocMeta {\n  path: string\n  title: string\n  desc: string\n  dir: string\n}\n\n`
   + `export interface DocGroup {\n  key: string\n  label: string\n  items: DocMeta[]\n}\n\n`
   + `export const DOCS_GROUPS: DocGroup[] = ${JSON.stringify(groups, null, 2)}\n\n`
@@ -129,5 +168,5 @@ fs.writeFileSync(
   'utf-8'
 )
 
-console.log(`✓ 文档同步完成：${files.length} 份 md → public/docs-content/，manifest → src/config/docs-manifest.generated.ts`)
+console.log(`✓ 文档同步完成：${manifest.length} 份 md → public/docs-content/，manifest → src/config/docs-manifest.generated.ts`)
 for (const g of groups) console.log(`    ${g.label}: ${g.items.length} 份`)

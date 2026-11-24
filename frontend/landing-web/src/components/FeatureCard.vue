@@ -44,7 +44,7 @@ function hexToRgb(hex: string): string {
   background: $bg-white;
   border-radius: $radius-lg;
   padding: $spacing-xl;
-  transition: all $transition-normal;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal, background-color $transition-normal, color $transition-normal, opacity $transition-normal;
   border: 1px solid $border-light;
 
   &:hover {

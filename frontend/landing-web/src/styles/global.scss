@@ -26,6 +26,7 @@ h1, h2, h3, h4, h5, h6 {
   font-family: $font-display;
   font-weight: 600;
   line-height: 1.3;
+  text-wrap: balance;
 }
 
 h1 {
@@ -277,5 +278,47 @@ li {
 
   &:hover {
     background: $gray-400;
+  }
+}
+
+// 文本选中高亮
+::selection {
+  background: rgba($primary, 0.18);
+  color: $text-primary;
+}
+
+// 全站统一的可见键盘焦点环（鼠标点击不触发，仅键盘）
+:focus-visible {
+  outline: 2px solid $primary;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+// 统计/对比数字使用等宽数字，避免跳动
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+// 尊重系统「减少动态效果」偏好：关闭平滑滚动、动画与过渡，并让滚动揭示元素直接可见
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal,
+  .reveal-left,
+  .reveal-right,
+  .reveal-scale {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

@@ -69,7 +69,7 @@
             <h3>辰科Cenkor Admin</h3>
             <ul>
               <li class="yes">应用中心按需安装，即插即用</li>
-              <li class="yes">动态建模，后台即可扩字段（21+ 类型）</li>
+              <li class="yes">动态建模，后台即可扩字段（21 种类型）</li>
               <li class="yes">AI CMS：说一句话建模型、起草、翻译</li>
               <li class="yes">REST / GraphQL / MCP 三协议出口</li>
               <li class="yes">在线升级：版本提示 + 应用 OTA 免重启</li>
@@ -115,7 +115,7 @@ const advantages = [
   {
     icon: '🧩',
     title: '动态建模与多站点',
-    description: '动态字段定义 + 21+ 字段类型 + 多级分类标签，后台 UI 即可扩字段；多站点站群会话级隔离。',
+    description: '动态字段定义 + 21 种字段类型 + 多级分类标签，后台 UI 即可扩字段；多站点站群会话级隔离。',
     bg: 'rgba(245, 158, 11, 0.1)'
   },
   {
@@ -228,7 +228,7 @@ const techStack = [
   border-radius: $radius-lg;
   padding: $spacing-xl;
   border: 1px solid $border-light;
-  transition: all $transition-normal;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal, background-color $transition-normal, color $transition-normal, opacity $transition-normal;
 
   &:hover {
     transform: translateY(-4px);

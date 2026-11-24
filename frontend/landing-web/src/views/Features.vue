@@ -76,7 +76,7 @@
       <div class="container">
         <SectionTitle
           tag="内容引擎"
-          title="21+ 字段类型的通用建模"
+          title="21 种字段类型的通用建模"
           description="后台即可动态增删字段，无需改代码；字段改名改类型前先算影响面"
           :center="true"
         />
@@ -130,8 +130,8 @@ const featureItems = [
   {
     icon: '📝',
     title: '动态建模与多站点',
-    description: 'V2 通用 cms_entries + 动态字段定义，后台 UI 即可增删改字段，支持 21+ 字段类型、多级分类树、标签系统与多站点站群。',
-    points: ['动态字段增删改', '21+ 字段类型', '多站点会话级隔离']
+    description: 'V2 通用 cms_entries + 动态字段定义，后台 UI 即可增删改字段，支持 21 种字段类型、多级分类树、标签系统与多站点站群。',
+    points: ['动态字段增删改', '21 种字段类型', '多站点会话级隔离']
   },
   {
     icon: '🔀',
@@ -183,8 +183,11 @@ const apps = [
   { icon: '📇', name: 'CRM 销售', desc: '线索到回款' },
   { icon: '🏭', name: 'ERP 管理', desc: '进销存与往来' },
   { icon: '⚙️', name: 'MES 制造', desc: '排产与报工' },
+  { icon: '💳', name: '支付中心', desc: '多渠道收款对账' },
+  { icon: '🔐', name: '统一登录', desc: '第三方登录 SSO' },
   { icon: '🔀', name: '工作流审批', desc: '可视化流程' },
   { icon: '🎫', name: '工单系统', desc: '工单流转处理' },
+  { icon: '🧲', name: '内容采集', desc: '规则抓取零成本' },
   { icon: '☁️', name: '云存储', desc: '多驱动对象存储' },
   { icon: '📢', name: '公告管理', desc: '公告与通知' },
   { icon: '🔔', name: '通知中心', desc: '多渠道推送' },
@@ -194,9 +197,10 @@ const apps = [
 ]
 
 const fields = [
-  '文本', '多行文本', '富文本', '数字', '日期', '时间', '日期时间',
-  '单选', '多选', '下拉选择', '多级下拉', '开关', '颜色',
-  '图片', '图片多选', '文件', '视频', 'URL', 'Email', '电话', 'JSON'
+  '文本', '多行文本', '富文本', 'Markdown', '数字', '开关',
+  '日期', '日期时间', 'URL', 'Email', '电话',
+  '图片', '图片多选', '文件', '文件多选',
+  '单选', '多选', '颜色', 'JSON', '重复器', '关联引用'
 ]
 </script>
 
@@ -258,7 +262,7 @@ const fields = [
   background: $bg-white;
   border-radius: $radius-xl;
   border: 1px solid $border-light;
-  transition: all $transition-normal;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal, background-color $transition-normal, color $transition-normal, opacity $transition-normal;
 
   &:hover {
     box-shadow: $shadow-lg;
@@ -350,7 +354,7 @@ const fields = [
   padding: $spacing-xl;
   text-align: center;
   border: 1px solid $border-light;
-  transition: all $transition-normal;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal, background-color $transition-normal, color $transition-normal, opacity $transition-normal;
 
   &:hover {
     transform: translateY(-4px);
@@ -413,7 +417,7 @@ const fields = [
   background: $bg-white;
   border: 1px solid $border-light;
   border-radius: $radius-md;
-  transition: all $transition-fast;
+  transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast, background-color $transition-fast, color $transition-fast, opacity $transition-fast;
 
   &:hover {
     border-color: rgba($primary, 0.4);

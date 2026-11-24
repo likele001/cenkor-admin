@@ -1,5 +1,5 @@
 # Copyright (C) 2026 CenkorAdmin Project
-# SPDX-License-Identifier: AGPL-3.0
+# SPDX-License-Identifier: MIT
 """只读哨兵：找出「已上架可售、却没有定价行」的应用。
 
 背景：定价行的定位键是 (product, app_key)。缺行**不等于免费** —— 下单端点缺行即拒单

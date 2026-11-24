@@ -91,9 +91,15 @@
   font-weight: 500;
   border-radius: $radius-md;
   cursor: pointer;
-  transition: all $transition-normal;
+  transition: background-color $transition-normal, color $transition-normal,
+    transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal;
   border: none;
   outline: none;
+
+  &:focus-visible {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
+  }
 
   &:disabled {
     opacity: 0.6;

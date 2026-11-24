@@ -89,7 +89,7 @@ const sections = [
     icon: '🤖',
     title: 'AI CMS 内容管理',
     paragraphs: [
-      '进入后台「内容管理」，用 AI 建模向导描述业务，生成内容类型与字段定义草案，确认后才真正落库（支持 21+ 字段类型）。',
+      '进入后台「内容管理」，用 AI 建模向导描述业务，生成内容类型与字段定义草案，确认后才真正落库（支持 21 种字段类型）。',
       '配置多级分类与标签，维护内容条目；AI 起草的稿件强制为 draft，必须人工审核通过才能发布。',
       '内容完成审核后，可在发布渠道推到官网、Webhook、微信公众号草稿箱，或导出到第三方平台。'
     ],
@@ -100,7 +100,7 @@ const sections = [
     title: 'AI 模型接入',
     paragraphs: [
       '进入「AI 设置」，新增服务商（OpenAI 兼容协议，填 base_url 与密钥），保存后可用连通性测试发一次最小请求验证。',
-      '把 chat / embedding / vision / image / rerank / asr / tts 七类能力分别绑定到服务商与模型，chat 与 embedding 可来自不同服务商。',
+      '把 chat / embedding / vision / image / video / rerank / asr / tts 八类能力分别绑定到服务商与模型（其中 asr / tts 为仅配置态），chat 与 embedding 可来自不同服务商。',
       '密钥出接口只返回掩码，编辑时原样回传即等于不修改；用量按输入 / 输出 / 缓存分段统计，配合价格表算真实成本。'
     ],
     tip: '不接模型也能用：AI 端点会返回明确的 503 提示，而建模、审核、REST / GraphQL / MCP 只读工具完全不受影响。'
@@ -227,7 +227,7 @@ onMounted(() => {
   cursor: pointer;
   font-size: 0.9rem;
   color: $text-secondary;
-  transition: all $transition-fast;
+  transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast, background-color $transition-fast, color $transition-fast, opacity $transition-fast;
   background: transparent;
   border: none;
   font-family: inherit;

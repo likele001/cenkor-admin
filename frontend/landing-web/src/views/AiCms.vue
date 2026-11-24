@@ -22,8 +22,8 @@
             <router-link to="/features" class="btn btn-secondary btn-large">全部功能</router-link>
           </div>
           <div class="hero-trust">
-            <span><i class="tick">✓</i> 21+ 字段类型动态建模</span>
-            <span><i class="tick">✓</i> OpenAI 兼容，七类能力可绑定</span>
+            <span><i class="tick">✓</i> 21 种字段类型动态建模</span>
+            <span><i class="tick">✓</i> OpenAI 兼容，八类能力可绑定</span>
             <span><i class="tick">✓</i> 不配 AI 也能完整跑</span>
           </div>
         </div>
@@ -256,7 +256,7 @@
         <div class="cta-content">
           <ScrollReveal>
             <h2>先让内容跑起来，再让 AI 接管重复劳动</h2>
-            <p>AI CMS 已随 v0.3.0 发布，私有化部署在自己服务器上</p>
+            <p>AI CMS 已随 v0.4.0 发布，私有化部署在自己服务器上</p>
             <div class="cta-actions">
               <router-link to="/deploy" class="btn btn-primary btn-large">查看部署方式</router-link>
               <router-link to="/docs/guide" class="btn btn-secondary btn-large">使用指南</router-link>
@@ -348,7 +348,7 @@ const controls = [
   { icon: '🔐', title: '密钥永不明文出接口', desc: '接口只返回掩码，编辑时原样回传掩码即等于不修改；密钥加密落库。' },
   { icon: '🧪', title: '连通性真实测试', desc: '保存不报错 ≠ 能用。每个服务商都能发一次最小请求，把「配了但连不上」暴露在界面上。' },
   { icon: '🧮', title: '用量三段计费', desc: '按输入 / 输出 / 缓存分列统计，配合价格表算出真实成本，超预算一眼看到。' },
-  { icon: '🧬', title: '七类能力分别绑定', desc: 'chat / embedding / vision / image / rerank / asr / tts 各绑各的模型，chat 与 embedding 可来自不同服务商。' },
+  { icon: '🧬', title: '八类能力分别绑定', desc: 'chat / embedding / vision / image / video / rerank / asr / tts 各绑各的模型，其中 asr / tts 当前为仅配置态；chat 与 embedding 可来自不同服务商。' },
   { icon: '🛡️', title: 'AI 权限独立收口', desc: '读配置要 cms:ai:read，改密钥要 cms:ai:manage —— 高危动作只给管理员。' },
   { icon: '🧯', title: '失败可降级', desc: '向量检索超时降级关键词，模型不可用降级人工流程，内容平台本身不跟着挂。' }
 ]
@@ -643,7 +643,7 @@ const controls = [
   border-radius: $radius-xl;
   padding: $spacing-xl;
   height: 100%;
-  transition: all $transition-normal;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal, background-color $transition-normal, color $transition-normal, opacity $transition-normal;
 
   &:hover {
     transform: translateY(-4px);
@@ -728,7 +728,7 @@ const controls = [
   border-radius: $radius-lg;
   padding: $spacing-lg;
   height: 100%;
-  transition: all $transition-normal;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal, background-color $transition-normal, color $transition-normal, opacity $transition-normal;
 
   &:hover {
     border-color: rgba($primary, 0.4);

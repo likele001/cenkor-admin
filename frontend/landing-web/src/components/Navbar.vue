@@ -20,21 +20,27 @@
           <span class="logo-text">辰科 Cenkor Admin</span>
         </router-link>
 
-        <div class="nav-links" :class="{ active: mobileMenuOpen }">
-          <a @click.prevent="navigate('/')">首页</a>
-          <a @click.prevent="navigate('/ai-cms')" class="nav-hot">
+        <div class="nav-links" id="mobile-nav" :class="{ active: mobileMenuOpen }">
+          <router-link to="/" @click="closeMobile">首页</router-link>
+          <router-link to="/ai-cms" class="nav-hot" @click="closeMobile">
             AI CMS
-            <span class="hot-dot"></span>
-          </a>
-          <a @click.prevent="navigate('/features')">功能</a>
-          <a @click.prevent="navigate('/advantages')">优势</a>
-          <a @click.prevent="navigate('/deploy')">私有部署</a>
-          <div class="dropdown">
-            <span class="dropdown-trigger">文档</span>
-            <div class="dropdown-menu">
-              <a @click.prevent="navigate('/docs')">文档中心</a>
-              <a @click.prevent="navigate('/docs/guide')">使用指南</a>
-              <a @click.prevent="navigate('/deploy')">部署教程</a>
+            <span class="hot-dot" aria-hidden="true"></span>
+          </router-link>
+          <router-link to="/features" @click="closeMobile">功能</router-link>
+          <router-link to="/advantages" @click="closeMobile">优势</router-link>
+          <router-link to="/deploy" @click="closeMobile">私有部署</router-link>
+          <div class="dropdown" @mouseenter="dropdownOpen = true" @mouseleave="dropdownOpen = false">
+            <button
+              type="button"
+              class="dropdown-trigger"
+              :aria-expanded="dropdownOpen"
+              aria-haspopup="true"
+              @click="toggleDropdown"
+            >文档</button>
+            <div class="dropdown-menu" :class="{ open: dropdownOpen }">
+              <router-link to="/docs" @click="closeDropdown">文档中心</router-link>
+              <router-link to="/docs/guide" @click="closeDropdown">使用指南</router-link>
+              <router-link to="/deploy" @click="closeDropdown">部署教程</router-link>
             </div>
           </div>
         </div>
@@ -44,10 +50,18 @@
           <a :href="urls.github" target="_blank" rel="noopener" class="btn btn-primary btn-small">GitHub</a>
         </div>
 
-        <button class="mobile-toggle" @click="toggleMobile" :class="{ active: mobileMenuOpen }">
-          <span></span>
-          <span></span>
-          <span></span>
+        <button
+          type="button"
+          class="mobile-toggle"
+          :class="{ active: mobileMenuOpen }"
+          :aria-expanded="mobileMenuOpen"
+          aria-controls="mobile-nav"
+          aria-label="切换导航菜单"
+          @click="toggleMobile"
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
         </button>
       </div>
     </div>
@@ -57,14 +71,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { SITE_URLS } from '@/config/site'
 
 const urls = SITE_URLS
-const router = useRouter()
 const isScrolled = ref(false)
 const mobileMenuOpen = ref(false)
+const dropdownOpen = ref(false)
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 20
@@ -95,11 +108,13 @@ const closeMobile = () => {
   unlockScroll()
 }
 
-const navigate = (path: string) => {
+const toggleDropdown = () => {
+  dropdownOpen.value = !dropdownOpen.value
+}
+
+const closeDropdown = () => {
+  dropdownOpen.value = false
   closeMobile()
-  nextTick(() => {
-    router.push(path)
-  })
 }
 
 onMounted(() => {
@@ -121,7 +136,7 @@ onUnmounted(() => {
   z-index: $z-modal;
   background: #ffffff;
   border-bottom: 1px solid $border-light;
-  transition: all $transition-normal;
+  transition: box-shadow $transition-normal, border-color $transition-normal;
 
   &.scrolled {
     box-shadow: $shadow-md;
@@ -214,6 +229,10 @@ onUnmounted(() => {
   position: relative;
 
   .dropdown-trigger {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
     color: $text-secondary;
     font-size: 15px;
     font-weight: 500;
@@ -248,7 +267,7 @@ onUnmounted(() => {
     min-width: 160px;
     opacity: 0;
     visibility: hidden;
-    transition: all $transition-fast;
+    transition: opacity $transition-fast, transform $transition-fast, visibility $transition-fast;
 
     a {
       display: block;
@@ -262,7 +281,9 @@ onUnmounted(() => {
     }
   }
 
-  &:hover .dropdown-menu {
+  &:hover .dropdown-menu,
+  .dropdown-menu.open,
+  &:focus-within .dropdown-menu {
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(0);
@@ -295,7 +316,7 @@ onUnmounted(() => {
     height: 2px;
     background: $text-primary;
     border-radius: 2px;
-    transition: all $transition-fast;
+    transition: transform $transition-fast, opacity $transition-fast;
   }
 
   &.active {

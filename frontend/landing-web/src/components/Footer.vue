@@ -57,7 +57,7 @@
       </div>
 
       <div class="footer-bottom">
-        <p>&copy; {{ new Date().getFullYear() }} 辰科科技 Cenkor Admin. 保留所有权利.</p>
+        <p>&copy; {{ new Date().getFullYear() }} 辰科科技 Cenkor Admin. &middot; 开源协议 AGPL-3.0 &middot; 保留所有权利.</p>
       </div>
     </div>
   </footer>

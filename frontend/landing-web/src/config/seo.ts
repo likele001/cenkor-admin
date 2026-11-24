@@ -70,7 +70,7 @@ export const SEO: Record<string, SeoEntry> = {
   '/features': {
     title: '辰科Cenkor Admin - 核心功能 | AI CMS 与应用中心',
     description:
-      '辰科Cenkor Admin 核心功能：AI CMS 内容引擎、应用中心（12 个可插拔应用）、RBAC 三级权限、动态建模与多站点、工作流审批、多渠道发布与效果统计、REST / GraphQL / MCP 开放接口、在线升级、私有化部署。',
+      '辰科Cenkor Admin 核心功能：AI CMS 内容引擎、应用中心（15 个内置应用）、RBAC 三级权限、动态建模与多站点、工作流审批、多渠道发布与效果统计、REST / GraphQL / MCP 开放接口、在线升级、私有化部署。',
   },
   '/advantages': {
     title: '辰科Cenkor Admin - 技术优势 | AI 原生内容层',
@@ -85,7 +85,7 @@ export const SEO: Record<string, SeoEntry> = {
   '/docs': {
     title: '辰科Cenkor Admin - 文档中心 | 使用教程与二次开发',
     description:
-      '辰科Cenkor Admin 文档中心：13 本用户手册、模板标签参考（数据 API / 过滤器 / App 注册标签）、'
+      '辰科Cenkor Admin 文档中心：14 本用户手册、模板标签参考（数据 API / 过滤器 / App 注册标签）、'
         + '应用开发规范与二次开发指南，全部在线可查。',
   },
   '/docs/guide': {

@@ -34,8 +34,8 @@
           </div>
           <div class="hero-trust">
             <span><i class="tick">✓</i> 开源 AGPL-3.0</span>
-            <span><i class="tick">✓</i> 12 个可插拔应用</span>
-            <span><i class="tick">✓</i> AI CMS v0.3.0</span>
+            <span><i class="tick">✓</i> 15 个内置应用</span>
+            <span><i class="tick">✓</i> AI CMS v0.4.0</span>
             <span><i class="tick">✓</i> 100% 私有化</span>
           </div>
         </div>
@@ -65,7 +65,7 @@
             <div class="card-footer">
               <span class="pulse-dot"></span>
               <span>系统运行中 · AI CMS 已就绪</span>
-              <span class="footer-ver">v0.3.0</span>
+              <span class="footer-ver">v0.4.0</span>
             </div>
           </div>
         </div>
@@ -91,7 +91,7 @@
       <div class="container">
         <div class="ai-wrap">
           <div class="ai-copy">
-            <span class="ai-tag">旗舰能力 · v0.3.0 新增</span>
+            <span class="ai-tag">旗舰能力 · v0.4.0</span>
             <h2>
               AI CMS：<br>
               <span class="ai-gradient">说一句话，建一个内容模型</span>
@@ -215,7 +215,7 @@
       <div class="container">
         <SectionTitle
           tag="内置应用"
-          title="12 个可插拔业务应用"
+          title="15 个内置业务应用"
           description="CRM、ERP、MES、工作流、CMS、工单、云存储等，通过应用中心统一安装，支持授权码 OTA 升级"
           :center="true"
         />
@@ -285,8 +285,8 @@ import { SITE_URLS } from '@/config/site'
 const urls = SITE_URLS
 
 const stats = [
-  { value: 12, label: '可插拔业务应用', suffix: '' },
-  { value: 21, label: 'CMS 字段类型', suffix: '+' },
+  { value: 15, label: '内置业务应用', suffix: '' },
+  { value: 21, label: 'CMS 字段类型', suffix: '' },
   { value: 10, label: '道 AI 内容工序', suffix: '' },
   { value: 3, label: '内容出口协议', suffix: ' 种' }
 ]
@@ -332,7 +332,7 @@ const features = [
   {
     icon: '📝',
     title: '动态建模与多站点',
-    description: '21+ 字段类型后台即可增删，多级分类标签，多站点站群会话级隔离',
+    description: '21 种字段类型后台即可增删，多级分类标签，多站点站群会话级隔离',
     features: ['动态字段', '多级分类标签', '多站点站群'],
     color: '#f59e0b'
   },
@@ -405,8 +405,11 @@ const apps = [
   { icon: '📇', name: 'CRM 销售', desc: '线索到回款全流程' },
   { icon: '🏭', name: 'ERP 管理', desc: '客户/供应商/进销存' },
   { icon: '⚙️', name: 'MES 制造', desc: '订单/排产/报工' },
+  { icon: '💳', name: '支付中心', desc: '多渠道收款与对账' },
+  { icon: '🔐', name: '统一登录', desc: '微信/飞书/GitHub 等 SSO' },
   { icon: '🔀', name: '工作流审批', desc: '可视化流程编排' },
   { icon: '🎫', name: '工单系统', desc: '问题工单流转处理' },
+  { icon: '🧲', name: '内容采集', desc: '规则抓取，零 AI 成本' },
   { icon: '☁️', name: '云存储', desc: '多驱动对象存储' },
   { icon: '📢', name: '公告管理', desc: '公告发布与通知' },
   { icon: '🔔', name: '通知中心', desc: '多渠道通知推送' },
@@ -429,7 +432,7 @@ const faqs = [
   { q: 'AI 会不会乱写内容？', a: '三道闸口：起草强制 draft 状态必须人审才可发布；知识库把产品手册、FAQ、历史方案变成可检索依据，让模型引用事实而不是编事实；问答检索查不到时明确返回「查不到」，宁可空着也不编。另外还有抽样质检与模型 A/B，好坏有数据可比。' },
   { q: '支持哪些部署方式？怎么升级？', a: '三种：Docker Compose（一条命令拉起全栈）、宝塔静态、裸机 systemd。核心平台有新版本时后台顶部会出现升级横幅，用 upgrade.sh 或拉新镜像完成；可插拔应用在应用中心用授权码 OTA 升级，免重启。' },
   { q: '是开源的还是商业的？', a: '开源。代码托管在 GitHub（AGPL-3.0 协议），可自由下载部署使用；应用中心按需扩展，业务模块即插即用。' },
-  { q: '应用中心是怎么工作的？', a: '每个应用通过 manifest 声明内容类型、字段、分类、权限与菜单，安装时自动注册到系统，卸载时自动清理，无需改代码。当前内置 12 个可插拔应用。' },
+  { q: '应用中心是怎么工作的？', a: '每个应用通过 manifest 声明内容类型、字段、分类、权限与菜单，安装时自动注册到系统，卸载时自动清理，无需改代码。当前内置 15 个应用，应用中心还能继续扩展。' },
   { q: 'RBAC 权限如何隔离？', a: '角色、权限规则、数据权限三级控制；后台（运营）与前台（C 端用户）双用户体系完全隔离。CMS 与 AI 能力还做了细分权限：读配置与改密钥是两码事，审核动作也独立于编辑。' },
   { q: '需要哪些基础服务？', a: 'PostgreSQL（主库）、Redis（缓存/队列）、MinIO（对象存储）以及 backend / admin-web / portal-web 三端服务，容器化一键编排。' }
 ]
@@ -658,7 +661,7 @@ const faqs = [
       background: $gray-50;
       border-radius: $radius-md;
       border: 1px solid transparent;
-      transition: all $transition-fast;
+      transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast, background-color $transition-fast, color $transition-fast, opacity $transition-fast;
 
       &:hover {
         border-color: rgba($primary, 0.3);
@@ -743,6 +746,7 @@ const faqs = [
     font-weight: 800;
     color: $primary;
     font-family: $font-display;
+    font-variant-numeric: tabular-nums;
 
     @include mobile {
       font-size: 2rem;
@@ -1057,7 +1061,7 @@ const faqs = [
   background: $bg-white;
   border-radius: $radius-md;
   border: 1px solid $border-light;
-  transition: all $transition-fast;
+  transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast, background-color $transition-fast, color $transition-fast, opacity $transition-fast;
 
   &:hover {
     box-shadow: $shadow-md;
@@ -1152,7 +1156,7 @@ const faqs = [
   border-radius: $radius-md;
   padding: $spacing-lg;
   border: 1px solid $border-light;
-  transition: all $transition-normal;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal, background-color $transition-normal, color $transition-normal, opacity $transition-normal;
 
   &:hover {
     transform: translateY(-4px);
@@ -1234,7 +1238,7 @@ const faqs = [
   border-radius: $radius-full;
   background: $gray-100;
   color: $text-secondary;
-  transition: all $transition-fast;
+  transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast, background-color $transition-fast, color $transition-fast, opacity $transition-fast;
 
   svg {
     transition: transform $transition-fast;
