@@ -256,7 +256,7 @@
         <div class="cta-content">
           <ScrollReveal>
             <h2>先让内容跑起来，再让 AI 接管重复劳动</h2>
-            <p>AI CMS 已随 v0.4.0 发布，私有化部署在自己服务器上</p>
+            <p>AI CMS 已随 v0.5.24 发布，私有化部署在自己服务器上</p>
             <div class="cta-actions">
               <router-link to="/deploy" class="btn btn-primary btn-large">查看部署方式</router-link>
               <router-link to="/docs/guide" class="btn btn-secondary btn-large">使用指南</router-link>

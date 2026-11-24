@@ -33,9 +33,9 @@
             </router-link>
           </div>
           <div class="hero-trust">
-            <span><i class="tick">✓</i> 开源 AGPL-3.0</span>
+            <span><i class="tick">✓</i> 开源 MIT</span>
             <span><i class="tick">✓</i> 15 个内置应用</span>
-            <span><i class="tick">✓</i> AI CMS v0.4.0</span>
+            <span><i class="tick">✓</i> AI CMS v0.5.24</span>
             <span><i class="tick">✓</i> 100% 私有化</span>
           </div>
         </div>
@@ -65,7 +65,7 @@
             <div class="card-footer">
               <span class="pulse-dot"></span>
               <span>系统运行中 · AI CMS 已就绪</span>
-              <span class="footer-ver">v0.4.0</span>
+              <span class="footer-ver">v0.5.24</span>
             </div>
           </div>
         </div>
@@ -91,7 +91,7 @@
       <div class="container">
         <div class="ai-wrap">
           <div class="ai-copy">
-            <span class="ai-tag">旗舰能力 · v0.4.0</span>
+            <span class="ai-tag">旗舰能力 · v0.5.24</span>
             <h2>
               AI CMS：<br>
               <span class="ai-gradient">说一句话，建一个内容模型</span>
@@ -431,7 +431,7 @@ const faqs = [
   { q: 'AI 怎么写、用哪个模型？数据会外传吗？', a: '任何 OpenAI 兼容协议的服务都能接：OpenAI、DeepSeek、通义千问、Moonshot、智谱、本地 vLLM / Ollama 或自建网关，改 base_url 与模型名即可，chat 与 embedding 还能绑不同服务商。数据只发往你自己配置的模型服务，平台不中转、不代建账号。' },
   { q: 'AI 会不会乱写内容？', a: '三道闸口：起草强制 draft 状态必须人审才可发布；知识库把产品手册、FAQ、历史方案变成可检索依据，让模型引用事实而不是编事实；问答检索查不到时明确返回「查不到」，宁可空着也不编。另外还有抽样质检与模型 A/B，好坏有数据可比。' },
   { q: '支持哪些部署方式？怎么升级？', a: '三种：Docker Compose（一条命令拉起全栈）、宝塔静态、裸机 systemd。核心平台有新版本时后台顶部会出现升级横幅，用 upgrade.sh 或拉新镜像完成；可插拔应用在应用中心用授权码 OTA 升级，免重启。' },
-  { q: '是开源的还是商业的？', a: '开源。代码托管在 GitHub（AGPL-3.0 协议），可自由下载部署使用；应用中心按需扩展，业务模块即插即用。' },
+  { q: '是开源的还是商业的？', a: '开源。代码托管在 GitHub（MIT 协议），可自由下载部署使用；应用中心按需扩展，业务模块即插即用。' },
   { q: '应用中心是怎么工作的？', a: '每个应用通过 manifest 声明内容类型、字段、分类、权限与菜单，安装时自动注册到系统，卸载时自动清理，无需改代码。当前内置 15 个应用，应用中心还能继续扩展。' },
   { q: 'RBAC 权限如何隔离？', a: '角色、权限规则、数据权限三级控制；后台（运营）与前台（C 端用户）双用户体系完全隔离。CMS 与 AI 能力还做了细分权限：读配置与改密钥是两码事，审核动作也独立于编辑。' },
   { q: '需要哪些基础服务？', a: 'PostgreSQL（主库）、Redis（缓存/队列）、MinIO（对象存储）以及 backend / admin-web / portal-web 三端服务，容器化一键编排。' }
