@@ -13,6 +13,37 @@
 > - 要点二
 > ```
 
+## 2026-11-24　部署链路修补：三种容器化方式的 nginx 缺口
+
+**【修复】**
+
+- fullstack 一键部署（`docker/fullstack/nginx-app.conf`）：缺 `client_max_body_size`，走 nginx 默认 1m。
+  实测 512K 放行、2M / 10M 直接 413；而应用中心安装包、媒体库、知识库文档全部走 multipart
+  （无 MinIO 预签名直传），导致**安装应用必然失败**。已补 `50m`。
+- prod 部署（`deploy/nginx/nginx.prod.conf`）：缺 `/.app-assets/` 转发。该配置的 `location /`
+  反代到跑 `serve -s dist` 的前端容器，插件脚本被 SPA 回退成 `index.html`，
+  云存储 / 待办 / 速记 / 支付等插件应用页面一律显示「页面不存在」。已补 `^~` 前缀块。
+- dev 部署（`deploy/nginx/nginx.conf`）：缺 WebSocket 与 `/.app-assets/`，且未设上传上限。
+  经 nginx 的 WS 握手返回 404（后端收不到 `Upgrade`），实时通知静默失效；已一并补齐。
+- admin-web 开发服务（`frontend/admin-web/vite.config.ts`）：`server.proxy` 只代理 `/api`，
+  本机 `npm run dev` 时 `/.app-assets/{key}/plugin.js` 落到 vite 静态目录 → 404，
+  插件路由注册不上。已补 `/.app-assets` 代理条目，并给 `/api` 开启 `ws: true`。
+
+**【验证】**
+
+- 三份 nginx 配置 `nginx -t` 全部通过；
+- 用「假后端返回 BACKEND / 假前端返回 FRONTEND」区分落点实测：fullstack 512K–40M 全部放行
+  （502 = 到达 upstream），prod 与 dev 的 `/.app-assets/*` 均落到 BACKEND（修复前落到前端容器）；
+- CI：Backend + Frontend(admin-web/portal-web) + lock + Integration 全绿。
+
+**【提醒】**
+
+- 自建 nginx 托管 admin 静态产物时，必须转发 4 条路径：
+  `/api/`、`/api/v1/ws/`（带 `Upgrade`/`Connection`）、`/.app-assets/`（必须 `^~`）、
+  `/api/v1/cms/ai/`；并设 `client_max_body_size 50m`。
+- 这份配置请纳入版本管理。游离在仓库外的部署文件不会随升级更新，
+  本次问题正是 8 月手写的配置遇上 10 月新增的 App 插件机制所致。
+
 ## 2026-11-05　发版链路加固：版本漂移闸门 + 反代文档
 
 **【修复】**

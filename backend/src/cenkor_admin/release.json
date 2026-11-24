@@ -1,12 +1,12 @@
 {
-  "version": "0.5.23",
+  "version": "0.5.24",
   "channel": "stable",
-  "released_at": "2026-11-22",
+  "released_at": "2026-11-24",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
   "docker_registry": "ghcr.io/likele001",
   "docker_image": "cenkor-admin",
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "CodeQL 安全基线收口：①后端对外错误响应统一脱敏，异常原文只进服务端日志，不再把 str(exc) 回给客户端；②应用路由注册、静态资源探测、商店 ZIP 提交与解压改为 realpath + commonpath 包含性校验，并修正原实现用裸 startswith 做前缀比较、可被兄弟目录（apps_evil）绕过的缺陷；③富文本 script/iframe 剥离、AI 查重去标签、JS URL 检测改用线性扫描或有界量词，消除多项式 ReDoS；④门户分页 301/302 改用相对地址，不再拼接来自可伪造 Host 头的 request.base_url；⑤虎皮椒二维码识别改为解析 scheme + hostname + path，堵住 evil.com/xunhupay.com 这类子串绕过；⑥LLM 客户端缓存键恢复为 sha256 指纹，避免 api_key 原文散落到调试输出与异常 locals；⑦又拍 _upt、虎皮椒 MD5 签名、CLI 一次性口令回显、沙箱 widget 等第三方协议或设计内行为加显式豁免说明；⑧前端 Liquid strip_html / reading_time 补齐未闭合标签剥离，codemod 脚本补 i 标志识别大写 SCRIPT；⑨CI 显式把 GITHUB_TOKEN 收窄到 contents: read。另升级 Tiptap 3.33.0 → 3.35.0。"
+  "notes": "三种容器化部署（fullstack/prod/dev）的 nginx 转发与上传限制补全：修复插件应用页面 404、实时通知失效、大于 1MB 上传 413"
 }
