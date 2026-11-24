@@ -1,4 +1,4 @@
-# Dependabot 分组策略（2026-11-10）
+# Dependabot 分组策略（2026-11-10 建；2026-11-25 追加 major 冻结）
 #
 # 背景：2026-11-04 的分组 PR 把 echarts 5→6、vite 6→8、vue-tsc 2→3 等多个
 # major 捆绑进同一个 PR，vue-tsc 3 类型检查变严导致 admin-web CI 失败，
@@ -6,6 +6,15 @@
 #   1. minor / patch 合并成一个 PR，减少噪音；
 #   2. major 保持「单包单 PR」，跨 major 需配套改代码或成对升 peer，必须人工排期；
 #   3. 每个 npm 清单独立配置，避免跨目录捆绑（模板目录不自动更新，由人工维护）。
+#
+# 2026-11-25 落地第 2 条：所有生态统一加 semver-major 的 ignore 通配。
+# 起因是 11-10 那一轮一次开出 9 个 major PR（vite 6→8、vue-router 4→5、
+# plugin-vue 5→6、css-injected 3→5、三个 actions），两周无人排期，每周还
+# 会因为重新扫描再触发一轮 CI，纯噪音。minor/patch 照常自动开。
+#
+# 怎么解冻单个包升 major：
+#   把对应块的 `dependency-name: "*"` 换成显式包名列表，只放要升的那个包，
+#   Dependabot 下次扫描就会重新开 PR。全量解冻 = 删掉该块的 ignore。
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -24,11 +33,11 @@ updates:
           - "patch"
         patterns:
           - "*"
-    # TypeScript 7 调整了 package exports，vue-tsc 3.x 仍解析
-    # typescript/lib/tsc，type-check 会 ERR_PACKAGE_PATH_NOT_EXPORTED。
-    # 等 vue-tsc 适配 TS 7 后移除本条 ignore 并重新评估升级。
     ignore:
-      - dependency-name: "typescript"
+      # 解冻 typescript 时注意：TS 7 调整了 package exports，vue-tsc 3.x 仍解析
+      # typescript/lib/tsc，type-check 会 ERR_PACKAGE_PATH_NOT_EXPORTED。
+      # 必须与 vue-tsc 成对升级，不能单独升。
+      - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
     commit-message:
@@ -47,6 +56,10 @@ updates:
           - "patch"
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     commit-message:
       prefix: "deps"
 
@@ -63,6 +76,10 @@ updates:
           - "patch"
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     commit-message:
       prefix: "deps"
 
@@ -71,5 +88,11 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
+    ignore:
+      # actions 的 major 多数只是 Node runtime 换代（如 actions/setup-node 4→7），
+      # 风险低于 npm 生态。想跟进时按上面「怎么解冻」处理即可。
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     commit-message:
       prefix: "deps"
