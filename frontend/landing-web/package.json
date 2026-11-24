@@ -15,12 +15,12 @@
     "docs:sync": "node scripts/copy-docs.mjs"
   },
   "dependencies": {
-    "@unhead/vue": "^2.1.13",
+    "@unhead/vue": "^2.1.18",
     "highlight.js": "^11.12.0",
     "markdown-it": "^14.3.3",
     "pinia": "^2.1.7",
-    "vue": "^3.5.45",
-    "vue-router": "^4.4.0"
+    "vue": "^3.5.46",
+    "vue-router": "^4.6.5"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.2.0",
@@ -29,7 +29,7 @@
     "@vue/server-renderer": "^3.5.42",
     "sass": "^1.108.2",
     "typescript": "^5.5.3",
-    "vite": "^6.4.5",
+    "vite": "^6.4.6",
     "vue-tsc": "^3.3.14"
   }
 }
