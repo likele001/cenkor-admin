@@ -198,3 +198,9 @@ frontend/landing/*
 !frontend/landing/features.html
 !frontend/landing/docs/
 !frontend/landing/docs/guide.html
+
+# Trae IDE 本地导出产物、独立落地页副本与运行日志（不入库）
+/.trae-html-share-packages/
+/landing-page/
+/backend/logs/
+*.log.*
