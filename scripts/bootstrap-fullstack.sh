@@ -27,11 +27,13 @@ usage() {
   cat <<'EOF'
 用法：bash scripts/bootstrap-fullstack.sh [--mirror auto|cn|global]
 
-  --mirror auto     默认。探测 pypi.org 首字节耗时，偏慢则自动切国内镜像
-  --mirror cn       强制国内镜像（阿里云 / 清华 / 腾讯云，自动选第一个可达的）
+  --mirror auto     默认。实测各源下载吞吐，国内明显更快时才切镜像
+  --mirror cn       强制国内镜像（阿里云 / 清华 / 腾讯云，比较吞吐后选最快的）
   --mirror global   强制官方源（海外服务器、GitHub Actions 等）
   -h, --help        显示本帮助
 
+判断依据是实测下载吞吐，不是「能不能连上」——索引页 49ms 返回、
+真实 wheel 只有 200 KB/s 的源确实存在，只看首字节会选中最慢的那个。
 国内 / WSL2 构建慢到 30 kB/s 量级时，用 --mirror cn。
 显式传 --mirror 时会同步改写已存在 .env 的软件源三行，不用手工编辑。
 EOF
@@ -99,40 +101,111 @@ MK_PIP="https://pypi.org/simple"
 MK_APT="deb.debian.org"
 MK_NPM="https://registry.npmjs.org"
 
-# 国内候选源，按优先级排列；字段用 | 分隔：名称|pip|apt 域名|npm
+# 国内候选源，字段用 | 分隔：名称|pip 索引|apt 域名|npm registry。
+# 注意：这个数组不是优先级顺序，真正选谁由下面的吞吐测速决定。
 MIRROR_CANDIDATES=(
   "阿里云|https://mirrors.aliyun.com/pypi/simple/|mirrors.aliyun.com|https://registry.npmmirror.com"
   "清华|https://pypi.tuna.tsinghua.edu.cn/simple|mirrors.tuna.tsinghua.edu.cn|https://registry.npmmirror.com"
   "腾讯云|https://mirrors.cloud.tencent.com/pypi/simple/|mirrors.cloud.tencent.com|https://mirrors.cloud.tencent.com/npm/"
 )
 
-# 返回毫秒整数；不可达返回空串。--max-time 4 保证部署前不会长时间卡住。
-probe_ms() {
-  local url="$1" t
-  t="$(curl -fsS -o /dev/null --max-time 4 -w '%{time_total}' "$url" 2>/dev/null || true)"
-  [ -n "$t" ] || return 0
-  awk -v t="$t" 'BEGIN { printf "%d", t * 1000 }'
+# ---------- 测速参数 ----------
+# 探测对象不是索引页根路径，而是某个包的大体积索引页：aiohttp 版本极多，
+# 这页有数百 KB，足以反映 CDN 吞吐。
+#
+# 为什么不再用 %{time_total} 测首字节：首字节只证明「服务器肯不肯应答」。
+# 实测出现过索引页 49ms 返回、真实 wheel 下载却只有 200 KB/s 的情况
+# —— 按顺序取第一个可达的，就会选中最慢的那个源，pip 照样跑 22 分钟。
+# 必须用 %{speed_download} 测吞吐，才接近用户的真实下载体验。
+PROBE_PATH="aiohttp/"
+PROBE_TIMEOUT=6
+# 低于此吞吐仅用于告警，不用来淘汰候选：官方源可能更慢，
+# 淘汰只会让用户更惨。300 KB/s 是按 pip 串行下载 40 个依赖、
+# 总下载量数百 MB 反推的，低于这个值必然是分钟级累加。
+MIRROR_MIN_BPS=300000
+
+# 字节/秒 -> 人类可读
+fmt_bps() {
+  awk -v b="$1" 'BEGIN {
+    if (b >= 1048576)      printf "%.1f MB/s", b / 1048576;
+    else if (b >= 1024)    printf "%.0f KB/s", b / 1024;
+    else                   printf "%d B/s", b;
+  }'
 }
 
-# 按优先级探测国内镜像，第一个可达的写进 MK_*；全不可达返回 1。
+# 测吞吐：输出 "<bytes_per_sec> <sample_bytes>"；不可达或失败输出空串。
+probe_bps() {
+  local url="$1" out
+  out="$(curl -fsS -o /dev/null --max-time "$PROBE_TIMEOUT" \
+        -w '%{speed_download} %{size_download}' \
+        "${url%/}/${PROBE_PATH}" 2>/dev/null || true)"
+  [ -n "$out" ] || return 0
+  local bps bytes
+  bps="$(awk -v v="${out% *}"   'BEGIN { printf "%d", v }')"
+  bytes="$(awk -v v="${out#* }" 'BEGIN { printf "%d", v }')"
+  [ "${bps:-0}" -gt 0 ] || return 0
+  printf '%s %s' "$bps" "$bytes"
+}
+
+# 三个国内候选全部测速，取吞吐最大的写进 MK_*。
+# 全部不可达返回 1；有可达但都偏慢时仍选最快的那个（比官方源近）。
 pick_cn_mirror() {
-  local entry name pip apt npm
+  local entry name pip apt npm res bps bytes
+  local best_name="" best_pip="" best_apt="" best_npm="" best_bps=0
+  local reachable=0
   for entry in "${MIRROR_CANDIDATES[@]}"; do
     IFS='|' read -r name pip apt npm <<< "$entry"
-    if curl -fsS -o /dev/null --max-time 4 "$pip" 2>/dev/null; then
-      MK_NAME="$name"; MK_PIP="$pip"; MK_APT="$apt"; MK_NPM="$npm"
-      return 0
+    res="$(probe_bps "$pip")"
+    if [ -z "$res" ]; then
+      printf '    - %s：不可达\n' "$name"
+      continue
+    fi
+    reachable=1
+    bps="${res% *}"; bytes="${res#* }"
+    printf '    - %s：%s（样本 %s 字节）\n' "$name" "$(fmt_bps "$bps")" "$bytes"
+    if [ "$bps" -gt "$best_bps" ]; then
+      best_bps="$bps"; best_name="$name"
+      best_pip="$pip"; best_apt="$apt"; best_npm="$npm"
     fi
   done
-  return 1
+  [ "$reachable" -eq 1 ] || return 1
+  MK_NAME="$best_name"; MK_PIP="$best_pip"; MK_APT="$best_apt"; MK_NPM="$best_npm"
+  MK_BPS="$best_bps"
+  return 0
 }
 
+# 测官方源吞吐，结果写进 OFFICIAL_BPS（不可达时留空）
+probe_official() {
+  local res
+  OFFICIAL_BPS=""
+  res="$(probe_bps "https://pypi.org/simple/")"
+  [ -n "$res" ] || { printf '    - %s：不可达\n' "官方"; return 0; }
+  OFFICIAL_BPS="${res% *}"
+  printf '    - %s：%s（样本 %s 字节）\n' "官方" "$(fmt_bps "$OFFICIAL_BPS")" "${res#* }"
+}
+
+MK_BPS=0
+OFFICIAL_BPS=""
+
 decide_mirror() {
-  local t
+  # 已有可用的 .env 镜像配置、且用户没显式指定时，不重复测速（省 10~20 秒）。
+  # 想重新测速就显式传 --mirror auto。
+  if [ "$MIRROR_EXPLICIT" = 0 ] && [ -f .env ] \
+     && grep -qE '^PIP_INDEX_URL=.+' .env 2>/dev/null; then
+    MK_NAME="(取自 .env)"
+    say "软件源：沿用 .env 中已启用的 PIP_INDEX_URL"
+    return
+  fi
+
   case "$MIRROR_MODE" in
     cn)
+      say "正在测速国内镜像（每源最多 ${PROBE_TIMEOUT} 秒）"
       if pick_cn_mirror; then
-        say "软件源：已启用国内镜像（$MK_NAME）"
+        say "软件源：国内镜像 $MK_NAME（实测 $(fmt_bps "$MK_BPS")）"
+        if [ "$MK_BPS" -lt "$MIRROR_MIN_BPS" ]; then
+          warn "最快的国内镜像也只有 $(fmt_bps "$MK_BPS")，构建仍会偏慢"
+          warn "若本机有可用代理，给 Docker 配上后改用 --mirror global 可能更快"
+        fi
       else
         warn "阿里云 / 清华 / 腾讯云三个镜像都不可达，回退官方源（构建可能很慢）"
       fi
@@ -141,22 +214,26 @@ decide_mirror() {
       say "软件源：官方（deb.debian.org / pypi.org / registry.npmjs.org）"
       ;;
     auto)
-      t="$(probe_ms 'https://pypi.org/simple/pip/')"
-      if [ -z "$t" ]; then
-        warn "探测 pypi.org 超时或不可达（>4s）"
-      else
-        say "pypi.org 首字节 ${t} ms"
-      fi
-      # 海外 / 优质网络首字节通常 < 800ms；国内直连常见 2000ms 以上。
-      if [ -z "$t" ] || [ "$t" -gt 1500 ]; then
-        if pick_cn_mirror; then
-          say "网络偏慢，自动启用国内镜像（$MK_NAME）"
-          warn "要换回官方源：bash scripts/bootstrap-fullstack.sh --mirror global"
+      say "正在测速（官方源 + 三个国内镜像，最多约 $((PROBE_TIMEOUT * 4)) 秒）"
+      probe_official
+      if pick_cn_mirror; then
+        # 国内源要比官方快 20% 以上才切，避免两边接近时来回摇摆
+        if [ -z "$OFFICIAL_BPS" ] || [ "$MK_BPS" -gt $((OFFICIAL_BPS * 12 / 10)) ]; then
+          say "软件源：国内镜像 $MK_NAME（实测 $(fmt_bps "$MK_BPS")）"
+          if [ -n "$OFFICIAL_BPS" ]; then
+            say "          官方源 $(fmt_bps "$OFFICIAL_BPS")，明显更慢"
+          else
+            say "          官方源不可达"
+          fi
         else
-          warn "国内镜像也不可达，继续用官方源（构建会很慢）"
+          say "软件源：官方（实测 $(fmt_bps "$OFFICIAL_BPS")），国内镜像没有明显更快"
         fi
       else
-        say "网络正常，使用官方源"
+        if [ -n "$OFFICIAL_BPS" ]; then
+          say "软件源：官方（实测 $(fmt_bps "$OFFICIAL_BPS")），国内镜像全部不可达"
+        else
+          warn "官方源与国内镜像都不可达，仍用官方源（构建可能失败或极慢）"
+        fi
       fi
       ;;
   esac
