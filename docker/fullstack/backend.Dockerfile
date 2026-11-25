@@ -59,6 +59,23 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 
 # 业务代码 + 迁移（启动时 lifespan 会自动 alembic upgrade head）
 COPY backend/src ./src
+
+# 外置 App 的额外依赖（collect 的 parsel/trafilatura/feedparser 等）。
+# 这些刻意不在主 requirements 里：只有装了对应 App 才需要。
+# apps/ 不入 git —— CI 与客户 checkout 没有该目录，这里会自动跳过，
+# 所以不会因为「文件不存在」让镜像构建失败。复用上面的 uv 缓存。
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    if ls src/apps/*/requirements.txt >/dev/null 2>&1; then \
+      pip install --index-url "${PIP_INDEX_URL}" uv; \
+      for f in src/apps/*/requirements.txt; do \
+        echo ">>> App 额外依赖: $f"; \
+        uv pip install --system -r "$f" --index-url "${PIP_INDEX_URL}" || exit 1; \
+      done; \
+      pip uninstall -y uv; \
+    else \
+      echo ">>> 无 apps 目录，跳过 App 额外依赖"; \
+    fi
+
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/alembic ./alembic
 
