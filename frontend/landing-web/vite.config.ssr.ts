@@ -20,7 +20,10 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: '@import "@/styles/variables.scss";\n@import "@/styles/mixins.scss";\n'
+        // 与 vite.config.ts 保持一致：@import 已弃用，改用 @use。
+        // ⚠️ 两者必须同步修改——SPA 与 SSR 各走一份配置，只改一处会在
+        //    SSR 阶段因 @import 与 @use 混用而报 "both define a variable"。
+        additionalData: '@use "@/styles/variables.scss" as *;\n@use "@/styles/mixins.scss" as *;\n'
       }
     }
   },

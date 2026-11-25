@@ -1,3 +1,7 @@
+// mixins 内部用到 $primary 等变量（如 gradient-bg 的默认参数）。
+// @import 时代靠调用方的全局上下文，@use 时代必须自己引入。
+@use './variables' as *;
+
 // 响应式断点
 @mixin mobile {
   @media (max-width: #{$breakpoint-md - 1px}) {

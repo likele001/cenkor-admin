@@ -23,7 +23,10 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: '@import "@/styles/variables.scss";\n@import "@/styles/mixins.scss";\n'
+        // @import 已弃用（Dart Sass 3.0 移除），注入改为 @use。
+        // `as *` 让 SFC 的 <style lang="scss"> 里继续直接写 $font-display、
+        // @include mobile()，不必改成 variables.$font-display。
+        additionalData: '@use "@/styles/variables.scss" as *;\n@use "@/styles/mixins.scss" as *;\n'
       }
     }
   }

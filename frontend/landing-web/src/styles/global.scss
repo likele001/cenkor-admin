@@ -1,6 +1,9 @@
-@import './variables.scss';
-@import './mixins.scss';
-@import './animations.scss';
+// @import 已弃用（Dart Sass 3.0 移除），改用模块系统 @use。
+// variables / mixins 用 `as *`，源文件里的 $var 与 @include 写法保持不变；
+// animations 只有 @keyframes 和全局类，不取成员，直接 @use 即可输出其 CSS。
+@use './variables' as *;
+@use './mixins' as *;
+@use './animations';
 
 * {
   margin: 0;
