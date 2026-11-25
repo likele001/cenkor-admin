@@ -152,6 +152,16 @@ docker compose -f docker-compose.fullstack.yml up -d --build
 
 依赖结果逐包比对过：包集合与版本完全一致，零差异。uv 本体装完即卸载，不进最终镜像。
 
+**外置 App 的依赖也会被装进镜像。**
+
+`apps/*/requirements.txt` 由各 App 自己声明（如 `collect` 的 `parsel` /
+`trafilatura` / `feedparser`），主 `requirements.txt` 刻意不含 —— 开源版没有
+这些 App，装着是浪费。镜像在 `COPY backend/src` 之后会遍历安装，`apps/` 不存在
+（CI 与客户 checkout）时自动跳过，所以两种构建都能成功。
+
+自己往镜像里加 App 时，只要把目录放进 `backend/src/apps/<key>/`、清单写进
+`<key>/requirements.txt`，重新 `--build` 即可，不用改 Dockerfile。
+
 > **别指望 WSL2 走 Windows 的代理。** 它默认不继承主机代理设置，Windows 上开了代理，
 > WSL 里直连 pypi.org 依然是 30 kB/s。必须换源（或在 WSL 内单独配代理）。
 >

@@ -350,6 +350,18 @@ MANIFEST = AppManifest(
    field_definitions / field_options / categories_seed（幂等，重复启动不重复插）
 4. 扫描 `apps/*/router.py` → 自动挂载到 `/api/v1/{key}`
 
+> **三方依赖不会自动装。** App 有自己的依赖时写在 `apps/<key>/requirements.txt`
+> （例如 `collect` 需要 `parsel` / `trafilatura` / `feedparser`，这三个刻意不在主
+> `requirements.txt` 里 —— 只有装了该 App 才有意义）。部署时手动执行一次：
+>
+> ```bash
+> pip install -r backend/src/apps/<key>/requirements.txt
+> ```
+>
+> 缺依赖的表现是**应用注册失败**（顶层 `import` 直接 ImportError），而不是等到
+> 用到该功能才报错。定位方法：`python -c "import cenkor_admin.apps.<key>.router"`。
+> Docker 镜像构建会自动读这些文件（`apps/` 不存在时自动跳过，不影响开源版构建）。
+
 **无需手动执行 install**。改了 manifest 重启后端即生效。
 
 ---
