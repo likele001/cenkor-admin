@@ -62,7 +62,7 @@ dependencies = [
 
     # CMS 能力：附件解析 + GraphQL（函数内 import，缺包时上传对应格式 500）
     "strawberry-graphql[fastapi]>=0.235.0",
-    "pymupdf>=1.24.0",      # PDF
+    "pymupdf>=1.24.0,<2",   # PDF；<2 避开 onnxruntime（OCR 走远程视觉模型）
     "python-docx>=1.1.0",   # Word
     "openpyxl>=3.1.0",      # Excel
     "numpy>=1.26.0",        # 向量检索加速（可选，缺失自动退化）
