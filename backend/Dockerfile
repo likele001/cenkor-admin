@@ -23,38 +23,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     gcc libpq-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 先装依赖（利用 Docker 缓存）
-COPY pyproject.toml ./
+# 依赖统一从 requirements.txt 装 —— 与宝塔环境、生产镜像同一份清单。
+#
+# 这里以前是一份硬编码列表，独立演进后和 requirements 漂移了：
+# 缺 Jinja2 / nh3 / pgvector / PyYAML，dev 镜像里 CMS 模板渲染、markdown 净化、
+# 向量检索会直接 ImportError；反过来又多装了一个代码根本没用到的 boto3。
+# 硬编码列表注定会再漂一次，所以干脆改成读同一份文件。
+COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     pip install --upgrade pip && \
-    pip install \
-    "fastapi>=0.110.0" \
-    "uvicorn[standard]>=0.27.0" \
-    "pydantic>=2.6.0" \
-    "pydantic-settings>=2.2.0" \
-    "pydantic-extra-types>=2.5.0" \
-    "sqlalchemy[asyncio]>=2.0.25" \
-    "alembic>=1.13.0" \
-    "asyncpg>=0.29.0" \
-    "aiomysql>=0.2.0" \
-    "psycopg2-binary>=2.9.9" \
-    "redis>=5.0.0" \
-    "celery[redis]>=5.3.0" \
-    "python-jose[cryptography]>=3.3.0" \
-    "passlib[bcrypt]>=1.7.4" \
-    "bcrypt>=3.2.0,<4.0" \
-    "python-dotenv>=1.0.0" \
-    "httpx>=0.27.0" \
-    "boto3>=1.34.0" \
-    "aiobotocore>=2.5.0" \
-    "structlog>=24.1.0" \
-    "loguru>=0.7.2" \
-    "email-validator>=2.1.0" \
-    "python-slugify>=8.0.0" \
-    "python-multipart>=0.0.9" \
-    "markdown>=3.5.0" \
-    "python-liquid>=2.2.0" \
-    "Pillow>=10.0.0"
+    pip install -r requirements.txt
 
 # 代码（开发模式挂载）
 COPY src ./src
