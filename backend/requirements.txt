@@ -18,11 +18,13 @@ redis>=5.0.0
 celery[redis]>=5.3.0
 
 python-jose[cryptography]>=3.3.0
+cryptography>=42.0.0  # core/secrets.py 顶层 Fernet 加密；不要指望 python-jose 的 extras 带
 passlib[bcrypt]>=1.7.4
 bcrypt>=4.1,<5  # 4.1+ 删了 __about__，core/pwd.py 已垫片；<5 规避 72 字节抛错
 python-dotenv>=1.0.0
 
 httpx>=0.27.0
+aiohttp>=3.9.0  # cloud_storage 又拍云驱动（drivers/upyun.py 顶层 import）
 aiobotocore>=2.26.0,<3  # 2.x 每个版本钉死一个 botocore，上界防意外跳 3.x
 
 structlog>=24.1.0
@@ -38,3 +40,19 @@ markdown>=3.5.0
 nh3>=0.2               # markdown 输出 HTML 净化（防存储型 XSS，core/jinja_env.py）
 pgvector>=0.3.0
 PyYAML>=6.0
+
+# 框架强绑定：代码里是顶层 import，但一直靠 fastapi / jinja2 的传递依赖装上的。
+# 显式声明，避免上游调整依赖树后静默崩（这类缺失报错位置离 import 点很远，极难查）。
+starlette>=0.36.0      # core/audit.py 审计中间件
+anyio>=4.0.0           # cloud_storage 七牛驱动（drivers/qiniu.py 顶层 import）
+markupsafe>=2.1.0      # core/jinja_env.py、cms/template_context.py
+packaging>=23.0        # system/store_router.py 比较插件版本号
+
+# CMS 能力：附件解析 + GraphQL。
+# ingest.py 用函数内 import，缺包不会拦住启动，但用户上传对应格式时直接 500
+# （ModuleNotFoundError 不在 extract_attachment 的处理器里，只能靠 500 兜底）。
+strawberry-graphql[fastapi]>=0.235.0  # apps/cms/graphql.py；缺失时只 warning 不挂载路由
+pymupdf>=1.24.0        # PDF 解析（含文本密度判断、扫描件转图）
+python-docx>=1.1.0     # Word(.docx) 解析
+openpyxl>=3.1.0        # Excel(.xlsx/.xlsm) 解析
+numpy>=1.26.0          # 向量检索矩阵加速；缺失时 cms/ai/search.py 自动退化纯 Python
