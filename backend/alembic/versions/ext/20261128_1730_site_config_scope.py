@@ -47,6 +47,7 @@ Create Date: 2026-11-28 17:30
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -175,7 +176,7 @@ def downgrade() -> None:
     # 索引先删（它依赖列存在）
     try:
         op.drop_index("ix_cms_site_config_key", table_name="cms_site_config")
-    except Exception:  # noqa: BLE001 —— 索引可能本来就不存在
+    except Exception:
         pass
 
     if pk == ["site_id", "key"]:

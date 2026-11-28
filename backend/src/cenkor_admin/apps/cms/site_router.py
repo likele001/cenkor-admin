@@ -545,9 +545,9 @@ def _nginx_has_server(domain: str) -> bool:
                 stripped = line.strip()
                 if stripped.startswith("#"):
                     continue
-                if stripped.startswith("server_name"):
-                    if d in stripped.split():
-                        return True
+                # and 短路：非 server_name 行不会走到 split()，语义与嵌套 if 相同
+                if stripped.startswith("server_name") and d in stripped.split():
+                    return True
     except OSError:
         return False
     return False

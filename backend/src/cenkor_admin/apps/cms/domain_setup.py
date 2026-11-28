@@ -64,7 +64,7 @@ async def _resolve_a(host: str, timeout: float = 3.0) -> list[str]:
         resolver.lifetime = timeout
         ans = await resolver.resolve(host, "A")
         return sorted({str(r) for r in ans})
-    except Exception as exc:  # noqa: BLE001 —— 各种 DNS 异常都归为「查不到」
+    except Exception as exc:
         log.debug("dns.resolve_failed", host=host, err=str(exc))
         return []
 
@@ -376,16 +376,16 @@ def _nginx_conf(d: str, site_key: str, port: int, *, with_ssl: bool) -> str:
     """
     ssl_block = ""
     if with_ssl:
-        ssl_block = """    listen 443 ssl;
+        ssl_block = f"""    listen 443 ssl;
     http2 on;
-    ssl_certificate     {cert}/{d}/fullchain.pem;
-    ssl_certificate_key {cert}/{d}/privkey.pem;
+    ssl_certificate     {settings.CMS_CERT_DIR}/{d}/fullchain.pem;
+    ssl_certificate_key {settings.CMS_CERT_DIR}/{d}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-""".format(d=d, cert=settings.CMS_CERT_DIR)
+"""
 
-    return """server {{
+    return f"""server {{
     listen 80;
-{ssl}    server_name {d};
+{ssl_block}    server_name {d};
 
     charset utf-8;
     client_max_body_size 50m;
@@ -407,7 +407,7 @@ def _nginx_conf(d: str, site_key: str, port: int, *, with_ssl: bool) -> str:
         default_type text/plain;
     }}
 }}
-""".format(ssl=ssl_block, d=d, port=port)
+"""
 
 
 def hint_for(status: str) -> str:
