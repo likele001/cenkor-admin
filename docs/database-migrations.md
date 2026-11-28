@@ -1,5 +1,25 @@
 # cenkor-admin 数据库迁移规范（开发者必读）
 
+## 一句话看懂整条线路
+
+整张图只有**一条公开主链**，闭源应用是以**四条支线**挂在主链中途，最后用 merge 收回一个点。
+主链从 `initial` 单线走到 `20261031_1600_cms_permalink` **分了一次叉**——一路直达
+`0035_app_publish`（**erp / crm / mes 共 34 条支线锚这里**），另一路绕 CMS 那五个迁移，
+两路在 `20261103_1200_merge_commerce` **并回一条**；合流后继续单线，依次路过
+`0025_cloud`（**workflow 锚**）、`0100_app_schema`（**collect 锚**），终点
+`20261127_1700_cms_ab`（**monitor 锚**，也就是公开 head）。闭源侧再用 `merge_closed`
+收拢支线、用 `merge_closed_cms` 与公开 head 合并。**所以公开视图正好 1 个 head，
+全量视图是 2 个**（`merge_closed_cms` + `monitor`）。四个锚点位置**固定不动**，
+**新增一条公开迁移只改它自己那行 `down_revision`，闭源文件一个都不用碰**。
+
+记住三句就够干活了：
+
+> **公开链单线走；闭源挂中途不碰它；升级永远用 `heads`（复数）。**
+
+（主链怎么走、四个锚在哪、为什么是 2 个 head、为什么必须 `heads` —— 展开见 §1 与 §3。）
+
+---
+
 > 状态基线：**2026-11-28 实测（v0.5.28）**。适用于 cenkor-admin（hub）后端全部开发者。
 >
 > 本文是**唯一权威规范**。姊妹篇 [`migrations.md`](./migrations.md) 只有一件事——
@@ -170,8 +190,8 @@ $PY ../scripts/check-migration-graph.py --tracked-only   # 公开仓库视图：
 
 > 三个「反直觉」的地方：
 >
-> 1. **锚点固定，不顺延**：三条闭源支线分别锚在 `0035_app_publish` / `0025_cloud` /
->    `0100_app_schema` 上，位置不再随公开链增长而变化。公开链在它们之后继续长，
+> 1. **锚点固定，不顺延**：四条闭源支线分别锚在 `0035_app_publish` / `0025_cloud` /
+>    `0100_app_schema` / `cms_ab` 上，位置不再随公开链增长而变化。公开链在它们之后继续长，
 >    不影响任何一条支线。
 > 2. **日期不单调**：`erp_init` 是 2026-08-31 建的，却排在 2026-10-20 的
 >    `0035_app_publish` 之后——拓扑只看 `down_revision`，不看文件名日期。
@@ -227,24 +247,26 @@ file_template = %%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev)
 
 ### 规则二：闭源支线的锚点固定，不随公开链顺延
 
-闭源侧不是「一条挂在公开链末端的链」，而是**三条锚点固定的独立支线**：
+闭源侧不是「一条挂在公开链末端的链」，而是**四条锚点固定的独立支线**：
 
 | 支线 | 规模 | 锚在哪个公开 revision |
 |---|---:|---|
 | erp / crm / mes | 34 | `20261020_0035_app_publish` |
 | workflow | 1 | `20260924_0025_cloud` |
-| collect | 5 | `20261027_0100_app_schema`（恰好是公开 head） |
+| collect | 5 | `20261027_0100_app_schema` |
+| monitor | 1 | `20261127_1700_cms_ab`（= 公开 head） |
 
-三条线最后在 `20261103_1300_merge_closed`（闭源合流点，纯拓扑、零 DDL）汇成一个 head。
+四条线最后在 `20261103_1300_merge_closed`（闭源合流点，纯拓扑、零 DDL）汇成一个 head，
+再由 `20261104_1200_merge_closed_cms` 与公开 head 合到一起。
 
-**新增公开迁移不需要动任何锚点。** 公开链往前长，三条支线原地不动——这是 v0.5.11
+**新增公开迁移不需要动任何锚点。** 公开链往前长，四条支线原地不动——这是 v0.5.11
 之后相对旧模型最大的简化。旧规则「挂载点跟随公开 head，每加一条迁移顺延一次」已作废。
 
 > 🔴 **不要「顺延」锚点，尤其是别用自动工具。** v0.5.12 之前
 > `codegen/builder.py::rebase_closed_chain` 会把「`down_revision` 恰好等于公开 head 的
-> 闭源迁移」改挂到新迁移下面。现在 collect 支线的锚点**就是**公开 head，一旦触发：
+> 闭源迁移」改挂到新迁移下面。现在 monitor 支线的锚点**就是**公开 head，一旦触发：
 >
-> 1. collect 支线被拖到新迁移之下；
+> 1. 那条被改挂的闭源支线拖到新迁移之下；
 > 2. 新迁移因此进入闭源合流点 `merge_closed` 的**祖先闭包**；
 > 3. 已部署库跑 `upgrade heads` 判定它「已应用」——**不报错、不建表**，
 >    直到代码查那张表才 500。
@@ -401,13 +423,14 @@ git check-ignore -v backend/alembic/versions/crm/2026xxxx_xxxx_crm_add_xxx.py
 
 - `down_revision` 取**自己那条支线的 head**，不要接别的应用：
 
-  | 支线 | 接在谁后面（2026-11-03） |
+  | 支线 | 接在谁后面（2026-11-28 实测） |
   |---|---|
   | erp / crm / mes | `20260904_mes_0009` |
   | workflow | `20260925_0027_workflow` |
   | collect | `20261102_1100_collect` |
+  | monitor | `20261127_1500_monitor` |
 
-- **不要接在合流点 `merge_closed` 上**——它已经收拢三条支线，往上接会重新分裂出 head。
+- **不要接在合流点 `merge_closed` 上**——它已经收拢三条支线（erp·crm·mes / workflow / collect），往上接会重新分裂出 head。
 - 跨支线挂会把两条独立线缝成一条，将来任何一方调整都牵连另一方。
 - `commerce/` 现在全部公开，不用考虑忽略规则。`ext/` 是混合目录（13 公开 / 2 闭源）：
   确实要放闭源迁移时**必须逐个加 `.gitignore`**（见 §7.2），否则 `git add -A` 会带进公开仓库。
@@ -748,7 +771,7 @@ SELECT current_database(),
 
 1. **优先向前修**：新增一条修正迁移（补列 / 补索引 / 补数据），生产上比 downgrade 安全。
 2. `alembic downgrade -1` 只适用于**你自己刚加的、还没被业务写入依赖**的迁移。
-3. 真正回退发版：代码 `git checkout <tag>` + **数据库用升级前的备份**（PostgreSQL 用 `pg_dump` 快照），不要指望 `alembic downgrade` 一条条走完整条链（现在 100 个迁移，且途中会穿过三条闭源支线）。
+3. 真正回退发版：代码 `git checkout <tag>` + **数据库用升级前的备份**（PostgreSQL 用 `pg_dump` 快照），不要指望 `alembic downgrade` 一条条走完整条链（现在 107 个迁移，且途中会穿过四条闭源支线）。
 4. stamp 有风险：`alembic stamp <rev>` 只改版本号不动结构。stamp 前必须 `check_alembic_drift.py` 全绿，否则等于把真问题藏起来。
 
 ---
