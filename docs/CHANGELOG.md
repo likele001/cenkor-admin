@@ -98,6 +98,29 @@
 - 改造后验收：死字符串 631 → 0、key 命中率 98.2%（缺失 40 个全是 HEAD 原有）、
   长文本跨模块串用 0 种、`npm run build` 通过（22.07s），且类型检查报错与原始 HEAD
   **完全一致**（仅 5 条 echarts 环境问题）
+- **脚本正式 apply 到工作区**：84 个文件、1652 处中文文案替换为 `t()` 调用，新增 1296 个 key。
+  apply 后才撞出第 10 个缺陷（静态校验全部通过，只有真渲染页面才看得见）：
+  **裸 key 覆盖命名空间**。`_extracted/<ns>.json` 的顶层裸 key 被 `Object.assign` 压到与
+  `common.json` 同一层，若某个裸 key 恰好等于命名空间名，就会把整个对象覆盖成字符串 ——
+  实测 `marketPricing.json` 的 `"app": "应用"` 干掉了 `app.*` 全部 17 个子键、
+  `searchResults.json` 的 `"products": "产品"` 干掉 `products.*`，共丢 42 个子键，
+  登录页标题因此从「Cenkor Admin」退化显示为 `app.name`。修法是在 `newKey()` 加
+  `RESERVED_NS` 黑名单（取 `common.json` 的顶层对象键名），冲突时退回内容哈希
+- **en-US 补齐全量英文翻译**：1092 条中文值、908 条唯一文本、60 个命名空间。
+  做法是先把唯一文本导出成一张「中文 → 英文」总表（878 条短词 + 长句混排），
+  再按文本值回填 —— 不按命名空间分批，避免同一个中文词在不同模块译成不同英文而漂移。
+  回填脚本只替换「值含中文且映射表里有」的条目，已是英文的一律不动，因此可重复执行
+- 同时清掉 `en-US/common.json` 里 57 条仍未翻译的文案，以及 zh/en 两侧 `usersList` 下
+  20 条碎片垃圾键（早期 codemod 按内联 `<code>` 标签切断句子留下的残余：
+  `"字符": "字符）"`、`"吗": "吗？"`、`"失败": "失败：'"` 之类）。
+  这批只在 `en-US/common.json` 里暴露，因为 zh 侧值本来就是中文、看不出异常
+- 注意 `en-US/_extracted/_index.json` 必须用裸 key 重建（1745 条），否则带前缀的镜像
+  只认裸 key 的 `_extracted/<ns>.json`，`import.meta.glob` 两个都加载，缺一个就有一半
+  key 解析不到。此外中文 `_extracted` 在 `src/locales/_extracted/`、英文在
+  `src/locales/en-US/_extracted/`，**路径不对称**，写校验脚本时按 `zh-CN/_extracted` 找会全部落空
+- 最终验收：中英双侧各 1819 个 `t()` key **100% 命中、0 缺失**；`en-US` 侧仅剩
+  `日本語` 一条（语言名示例，应按原文保留）；`npm run build` 通过（22.46s）；
+  登录页中/英双语实测渲染正确（含 `换一张` → `Shuffle`、`使用飞书登录` → `Sign in with Feishu`）
 
 ## 2026-11-24　部署链路修补：三种容器化方式的 nginx 缺口
 
