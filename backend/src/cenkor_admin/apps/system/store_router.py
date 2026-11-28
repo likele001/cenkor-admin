@@ -1584,7 +1584,9 @@ async def install_submission(
         _alembic_cfg = Config(
             str(Path(__file__).resolve().parent.parent.parent.parent.parent / "alembic.ini")
         )
-        command.upgrade(_alembic_cfg, "head")
+        # 必须用 heads（复数）：公开链与闭源链是两个 head，
+        # 单数 head 在多 head 图上会抛 MultipleHeads，安装即失败。
+        command.upgrade(_alembic_cfg, "heads")
         log.info("store.migration_upgrade_ok", app_key=sub.app_key)
     except Exception as e:
         # 迁移失败 == 表没建出来，不能当装成功（理由同 install_app_from_zip）。
@@ -1946,7 +1948,7 @@ async def install_app_from_zip(
         _alembic_cfg = Config(
             str(Path(__file__).resolve().parent.parent.parent.parent.parent / "alembic.ini")
         )
-        command.upgrade(_alembic_cfg, "head")
+        command.upgrade(_alembic_cfg, "heads")
         log.info("store.migration_upgrade_ok", app_key=app_key)
     except Exception as e:
         # 迁移失败 == 表没建出来。绝不能只 warning 就当装成功：否则界面显示「已安装」，
