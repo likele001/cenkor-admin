@@ -572,6 +572,69 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 | autogenerate 想 `create_table` 已存在的视图 | 视图托管表没过滤 | 确认走的是 `schema_filters.make_include_object` |
 | 公开仓库 clone 后建表不全 | 正常：闭源迁移/代码不在仓库（公开版 101 表 vs 完整版 241 表） | 不要试图补；闭源部署用完整工作区 |
 | 提交后发现闭源迁移进了仓库 | `git add -A` | `git rm --cached` + 补 `.gitignore`，再 `check-migration-graph --tracked-only` |
+| `UndefinedTable: relation "cms_sites" does not exist`（升级到 `20261127_1200_cms_site_plans` 时） | 版本戳已越过 CMS 分支，但分支 DDL 从未执行：2026-11 给 `merge_commerce` 追加 `cms_orphan` 为第二父节点时，越过合流点的老库只改了版本戳、没补跑分支 | `python3 scripts/repair-cms-branch.py --db <库名>` 补齐分支，再 `alembic upgrade heads`；纯开发库可直接重建（见 §10.1） |
+
+### 10.1 版本戳领先于真实结构（`cms_sites` 一类报错）
+
+**症状**：`alembic upgrade heads` 跑到新迁移时报
+`UndefinedTable: relation "cms_sites" does not exist`，而 `alembic_version`
+显示的版本**在迁移图上明明位于 `20261031_1300_cms_multisite` 之后**。
+
+**为什么会这样**：迁移图是自洽的，全新库按顺序跑一定有 `cms_sites`
+（`cms_multisite` 是 `cms_search_logs` 的祖先）。出问题的是**库本身**：
+
+2026-11 给合流迁移 `merge_commerce` 追加了 `cms_orphan` 作为第二个父节点，
+把 CMS 分支（`cms_multisite` 起的一段）挂进了合流点。当时已经越过
+`merge_commerce` 的老库被直接改了版本戳，却没有补跑那段分支 ——
+于是「版本号说在 `cms_sites` 之后、库里却没有 `cms_sites`」。
+
+alembic 判断「某迁移是否已跑」靠的是版本戳在 DAG 上的相对位置，
+不会去查真实表结构，所以它认定 `cms_multisite` 已应用，直接跳过。
+
+**诊断**：
+
+```bash
+cd /www/wwwroot/cenkor-admin
+PY=/www/server/pyporject_evn/cenkor/bin/python3
+
+# 只看诊断，不动库
+PYTHONPATH=backend/src $PY scripts/repair-cms-branch.py --db <库名> --dry-run
+```
+
+输出会列出 `cms_sites` / `cms_templates` / `cms_embeddings` / `cms_entry_links`
+哪些存在、哪些缺失。
+
+**修复**：
+
+```bash
+# 方案 A：保留数据，补跑缺失的 CMS 分支
+PYTHONPATH=backend/src $PY scripts/repair-cms-branch.py --db <库名> --yes
+cd backend && CENKOR_DATABASE_URL='...' $PY -m alembic upgrade heads
+
+# 方案 B：纯开发库、数据可弃，直接重建
+dropdb <库名> && createdb <库名> && alembic upgrade heads
+```
+
+方案 A 的原理：把版本戳回退到分支起点之前的 `20261014_124200_schema_versions`，
+重放到 `20261103_1100_cms_orphan`，再恢复原版本号。重放区间里已存在的
+table/column/index 由幂等层（§6.4）自动跳过，只补真正缺的那些。
+脚本在失败时会主动把版本戳写回原值，不会停在中间态。
+
+> ⚠️ `--db` 之前务必看清输出里的「数据库」那一行。脚本会 `DELETE/INSERT`
+> `alembic_version`，连到生产库就不是演练了；不带 `--yes` 时它只打印计划不执行。
+
+**哪些库会中招**：判断依据不是库名，而是「版本戳在 `merge_commerce` 之后
++ 缺 `cms_sites`」。用一条 SQL 就能筛：
+
+```sql
+SELECT current_database(),
+       (SELECT string_agg(version_num, ',') FROM alembic_version) AS ver,
+       to_regclass('public.cms_sites') IS NOT NULL AS has_cms_sites;
+```
+
+**预防**：新增迁移若依赖某张表，在 `upgrade()` 开头显式判存并抛可读错误，
+别让 PG 的原生 `UndefinedTable` 冒上去 —— 它的报错位置离真实原因太远。
+`20261127_1200_cms_site_plans.py` 里的 `_require_cms_sites()` 就是范例。
 
 ---
 
@@ -656,6 +719,7 @@ $PY -m alembic+head              # ← 多 head 时会 MultipleHeads，整条不
 | `backend/scripts/enable_pgvector.py` | 扩展装晚了用它把 `cms_embeddings.vector` 升级成 pgvector |
 | `backend/scripts/seed_ai_prompts.py` | 把代码里的 5 套默认提示词种进 `cms_ai_prompts`（幂等） |
 | `backend/scripts/clean_alembic_version_rows.py` | 收口挂载点后清掉 `alembic_version` 里的冗余祖先行（见规则五） |
+| `scripts/repair-cms-branch.py` | 修复「版本戳越过 CMS 分支但 DDL 没跑」的库（补跑 `cms_multisite` 起的一段）；`--dry-run` 只诊断（见 §10.1） |
 | `backend/src/cenkor_admin/codegen/builder.py::rebase_closed_chain` | **已废弃（v0.5.12）**：旧的自动顺延入口，恒返回空列表。别重新启用，理由见规则二 |
 
 ### 13.3 术语
