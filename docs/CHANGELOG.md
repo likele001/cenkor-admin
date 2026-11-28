@@ -13,6 +13,53 @@
 > - 要点二
 > ```
 
+## 2026-11-28　多站点可用化 + 授权产品轴修复 + 迁移链自洽（⭐）
+
+**【多站点】**
+
+- 站点隔离改为 **fail-closed**：此前查不到站点上下文静默放行，后台任务容易把 A 站数据当成 B 站。
+  现在缺上下文抛 `SiteScopeMissing`，写入时 `site_id` 为 NULL 也报错。隔离范围从 10 张表扩到 30+，
+  AI 产物、工作流、知识库、模板、统计全部纳入
+- 新增站点管理页、顶栏站点切换器、建站方案页（此前多站点只有后端、实际只用 1 个站）
+- 新增站点级自动化开关：`auto_publish` / `auto_image` / `auto_seo` / `auto_push` / `auto_translate`。
+  调度器在算 `due_ids` **之前**就过滤掉关掉的站点；`auto_push` 关闭时推送任务标记为 `skipped` 而非删除，
+  便于运维看出「为什么没发」
+
+**【新增能力】**
+
+- 建站方案：一句话需求 → 栏目 + 选题 + TDK 规划 → 人工确认 → 自动产出（方案先落库再执行，模型输出不直接变生产数据）
+- 敏感词过滤：拦截点放在**提交审核**而非保存草稿，避免写稿过程被打断
+- 页面级 A/B 测试：按 cookie 分流，A/B 页**不写静态缓存**并下发 `Cache-Control: private, no-store`，防止变体互相污染
+- 收录推送 + 按域名生成 `robots.txt`；批量编辑 / 静态包导出 / 产品 AI / CDN 刷新
+- 站点可用性巡检 + 告警（此前零监控）
+
+**【修复】**
+
+- **授权落在了没有包的产品轴上**：历史事故是 11 个 cenkor-process 应用被以 cenkormes 试用授权签发，
+  实例安装时 404。根因是两处都按 `app_key` 跨产品轴兜底 —— `_latest_version_map` 无差别补
+  `(app_key, None)` 兜底键，`_purchases_for` 取 `latest_version` 时 `or` 回退到兜底键。
+  现在有产品轴的发布行只归到自己的产品轴，下单与手工签发前新增 `_assert_distributable` 校验
+- **应用安装迁移用 `heads` 而非 `head`**：全量图有 2 个 head，单数会抛 `MultipleHeads`，安装即失败
+- **商业闭源应用不再随包交付**：三条泄漏路径全部封堵（打包脚本 `static/apps` 改白名单、
+  补 `backend/.dockerignore`、文档中心排除商业模块手册，含一份已上线公网的 267 行 ERP 内部设计文档）
+
+**【迁移】**
+
+- 新增迁移从 `20261104_1100_cms_search_logs` 往后接：
+  `1200_site_plans` → `1300_sensitive` → `1600_seo_push` → `1700_cms_ab`
+- 闭源合流桥 `merge_closed_cms` 改挂最新公开 head，全量图恢复自洽（此前它自己是孤立 head）
+- **命令请用 `alembic upgrade heads`（复数）**，单数 `head` 在多 head 图上会抛 `MultipleHeads`
+- 老库若撞 `UndefinedTable: relation "cms_sites" does not exist`，**不是本次改动引入的 bug**，
+  而是该库版本戳不可信：2026-11 给 `merge_commerce` 追加 `cms_orphan` 为第二父节点时，
+  越过合流点的老库只改了版本戳、没补跑 CMS 分支。用 `scripts/repair-cms-branch.py --db <库名>`
+  补齐，详见 `docs/database-migrations.md` §10.1
+
+**【工程】**
+
+- 补 `.gitattributes` 统一行尾为 LF：索引里原有 52 个 CRLF 文件，任一工具改成 LF 就会让 git 把整文件
+  当重写 —— 出现过 3315 行的「改动」实际只有 25 行
+- 新增迁移若依赖某张表，在 `upgrade()` 开头显式判存并抛可读错误，别让 PG 原生异常冒上去
+
 ## 2026-11-24　部署链路修补：三种容器化方式的 nginx 缺口
 
 **【修复】**
