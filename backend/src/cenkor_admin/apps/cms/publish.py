@@ -528,6 +528,17 @@ async def run_job(db: AsyncSession, job: Any) -> PublishResult:
     if result.payload:
         job.payload = result.payload
     await db.commit()
+    # 只有最终失败才派发：还有重试机会时推「失败」只是制造噪声
+    if job.status == "failed" and entry is not None:
+        try:
+            from cenkor_admin.core.hooks import dispatch as _dispatch
+
+            await _dispatch(
+                "publish.failed",
+                entry=entry, db=db, user=None, channel=channel, error=job.error or "",
+            )
+        except Exception as exc:
+            log.warning("cms.publish.dispatch_failed", job_id=job.id, error=str(exc))
     return result
 
 

@@ -1494,6 +1494,11 @@ async def submit_entry_for_review(
     )
     await db.commit()
     await db.refresh(entry)
+    # 事件派发放在 commit 之后：审核记录已落库，通知失败重试也不会重复提交
+    try:
+        await dispatch("entry.submitted", entry=entry, db=db, user=current)
+    except Exception as e:
+        log.warning("hook.dispatch_failed", hook="entry.submitted", error=str(e))
     return _entry_to_dict(entry)
 
 

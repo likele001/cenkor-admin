@@ -169,6 +169,8 @@ backend/src/cenkor_admin/apps/*/schema.sql
 backend/alembic/versions/ext/20260925_0027_workflow.py
 backend/alembic/versions/ext/20261103_1300_merge_closed.py
 backend/alembic/versions/ext/20261104_1200_merge_closed_cms.py
+#   · 20261127_1500_monitor           —— 站点可用性巡检（mon_* 四表），apps/monitor 闭源
+backend/alembic/versions/ext/20261127_1500_monitor.py
 
 # ===== 一次性运维与迁移补丁脚本（2026-10-30 新增）=====
 # 这些是「跑一次就完」的临时脚本：直接改线上数据库、手工改服务商配置、
