@@ -12,12 +12,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.api.deps import get_current_user
 from cenkor_admin.apps.auth import models as auth_models
-from cenkor_admin.apps.cms import cdn_service, models, static_cache
+from cenkor_admin.apps.cms import cdn_service, static_cache
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.site_scope import require_site_id
 

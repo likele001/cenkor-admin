@@ -51,12 +51,10 @@ async def save_conf(db: AsyncSession, site_id: int, patch: dict[str, Any]) -> di
     for k in ("provider", "zone_id", "webhook_url"):
         if k in patch:
             conf[k] = (patch[k] or "").strip() if isinstance(patch[k], str) else patch[k]
-    if "token" in patch:
-        if patch["token"] or not keep_secret:
-            conf["token"] = (patch["token"] or "").strip()
-    if "webhook_secret" in patch:
-        if patch["webhook_secret"] or not keep_hook:
-            conf["webhook_secret"] = (patch["webhook_secret"] or "").strip()
+    if "token" in patch and (patch["token"] or not keep_secret):
+        conf["token"] = (patch["token"] or "").strip()
+    if "webhook_secret" in patch and (patch["webhook_secret"] or not keep_hook):
+        conf["webhook_secret"] = (patch["webhook_secret"] or "").strip()
     settings = _site_settings(site)
     settings["cdn"] = conf
     site.settings = settings
@@ -120,5 +118,7 @@ async def purge(
             "message": f"未实现的提供商 {provider}，请用 webhook 中转",
             "purged": 0,
         }
-    except Exception as exc:  # noqa: BLE001 - 网络/签名错误都只回原因
+    except Exception as exc:
+        # 宽泛捕获是有意的：网络超时、签名错误、上游 5xx 都统一降级成原因回显，
+        # 由调用方决定重试，避免刷新缓存失败连带整个保存流程报错。
         return {"ok": False, "provider": provider, "message": str(exc)[:200], "purged": 0}

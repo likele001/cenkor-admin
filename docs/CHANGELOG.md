@@ -67,6 +67,14 @@
 - 顺手修掉文档中心的 MIME：`llms.txt` 索引的 44 篇 `docs-content/*.md` 此前返回
   `application/octet-stream`（nginx 的 `mime.types` 没有 md），爬虫当二进制附件丢弃。
   现在 `text/markdown; charset=utf-8`；注意 `charset` 需配 `charset_types` 才生效
+- **后端 CI 的 ruff 门禁恢复绿**：14 处 lint 从 `e7aa257`（批量编辑/导出/产品AI/CDN）与
+  `aa1127d`（站点隔离 fail-closed）带入，一直红着。修法：import 区重排（I001×4）、
+  删真正未用的导入（F401×3：`sqlalchemy.func` / `select` / `cms.models`）、
+  嵌套 `if` 合并（SIM102×4，`A and B` 与原两层 `if A: if B:` 等价）、
+  `SiteScopeMissing` → `SiteScopeMissingError`（N818，**保留旧名为别名**，外部脚本按旧名
+  捕获不受影响）、删掉指向未启用规则 `BLE001` 的失效 `# noqa`（RUF100）并改写成解释性注释
+- 关掉 pnpm 时代的残留：删 `frontend/*/pnpm-workspace.yaml`，`.gitignore` 补
+  `pnpm-lock.yaml` / `yarn.lock` / `frontend/*/package-lock.json` 防回归
 
 ## 2026-11-24　部署链路修补：三种容器化方式的 nginx 缺口
 

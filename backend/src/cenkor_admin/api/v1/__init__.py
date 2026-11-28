@@ -19,22 +19,23 @@ from cenkor_admin.apps.auth.schemas import UserBrief
 from cenkor_admin.apps.cms.ai.router import router as cms_ai_router
 from cenkor_admin.apps.cms.content_engine_router import router as content_engine_router
 from cenkor_admin.apps.cms.mcp.router import router as cms_mcp_router
+from cenkor_admin.apps.cms.product_ai_router import router as cms_product_ai_router
 from cenkor_admin.apps.cms.public_router import router as cms_public_router
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.apps.cms.router import router as cms_router
-from cenkor_admin.apps.cms.site_router import router as cms_site_router
-from cenkor_admin.apps.cms.site_plan_router import router as cms_site_plan_router
 from cenkor_admin.apps.cms.sensitive_router import router as cms_sensitive_router
-from cenkor_admin.apps.cms.product_ai_router import router as cms_product_ai_router
+from cenkor_admin.apps.cms.site_plan_router import router as cms_site_plan_router
+from cenkor_admin.apps.cms.site_router import router as cms_site_router
+
 # 站点监控是商业闭源模块，公开包中没有它
 try:
     from cenkor_admin.apps.monitor.router import router as monitor_router
 except (ImportError, ModuleNotFoundError):
     monitor_router = None  # type: ignore[assignment]
-from cenkor_admin.apps.cms.bulk_edit_router import router as cms_bulk_edit_router
-from cenkor_admin.apps.cms.seo_push_router import router as cms_seo_push_router
 from cenkor_admin.apps.cms.ab_router import router as cms_ab_router
+from cenkor_admin.apps.cms.bulk_edit_router import router as cms_bulk_edit_router
 from cenkor_admin.apps.cms.export_router import router as cms_delivery_router
+from cenkor_admin.apps.cms.seo_push_router import router as cms_seo_push_router
 from cenkor_admin.apps.cms.template_router import router as template_router
 from cenkor_admin.apps.cms.theme_asset_router import router as cms_theme_asset_router
 from cenkor_admin.apps.cms.theme_market_router import router as theme_market_router

@@ -61,8 +61,12 @@ _current_site_id: ContextVar[int | None] = ContextVar("cms_current_site_id", def
 _bypass: ContextVar[bool] = ContextVar("cms_site_bypass", default=False)
 
 
-class SiteScopeMissing(RuntimeError):
+class SiteScopeMissingError(RuntimeError):
     """strict 模式下查了带站点的表，却没有站点上下文。"""
+
+
+# 兼容旧名：v0.5.27 之前叫 SiteScopeMissing，外部脚本可能还按旧名捕获。
+SiteScopeMissing = SiteScopeMissingError
 
 
 # fail-open / fail-closed 开关。默认 False 保持脚本与 CLI 的旧行为，
@@ -77,6 +81,7 @@ def scoped_models() -> tuple[type, ...]:
     global _SCOPED
     if _SCOPED is None:
         from cenkor_admin.apps.builder.models import Page
+        from cenkor_admin.apps.cms.ab_models import AbTest
         from cenkor_admin.apps.cms.ai.models import (
             CmsAiAbRun,
             CmsAiBatchItem,
@@ -96,13 +101,12 @@ def scoped_models() -> tuple[type, ...]:
             CmsTrackEvent,
         )
         from cenkor_admin.apps.cms.knowledge_models import KbDoc
-        from cenkor_admin.apps.cms.site_plan_models import SitePlan, SitePlanItem
         from cenkor_admin.apps.cms.seo_push_models import SeoPushJob
-        from cenkor_admin.apps.cms.ab_models import AbTest
+        from cenkor_admin.apps.cms.site_plan_models import SitePlan, SitePlanItem
         # monitor 是商业闭源模块（不进公开仓库）。公开包里没有它，
         # 这里必须降级成空元组，否则 scoped_models() 直接 ImportError。
         try:
-            from cenkor_admin.apps.monitor.models import MonTarget, MonChannel
+            from cenkor_admin.apps.monitor.models import MonChannel, MonTarget
             _mon_models: tuple[type, ...] = (MonTarget, MonChannel)
         except (ImportError, ModuleNotFoundError):
             _mon_models = ()
@@ -208,7 +212,7 @@ def _install_events() -> None:
             # 旧行为：静默放行（脚本/迁移）。strict 下改成直接报错，
             # 否则后台任务会把 A 站的数据当成 B 站的。
             if _strict.get():
-                raise SiteScopeMissing(
+                raise SiteScopeMissingError(
                     "站点上下文缺失：本次查询命中带 site_id 的表，但没有当前站点。"
                     "后台任务入口请用 site_scope_for(site_id) 包一层；"
                     "确需跨站请显式 with site_scope_bypass()。"
@@ -240,7 +244,7 @@ def _install_events() -> None:
                 isinstance(o, scoped_models()) and getattr(o, "site_id", None) is None
                 for o in session.new
             ):
-                raise SiteScopeMissing(
+                raise SiteScopeMissingError(
                     "写入被拦：对象缺 site_id 且没有当前站点。"
                     "请用 site_scope_for(site_id) 包住写入逻辑。"
                 )

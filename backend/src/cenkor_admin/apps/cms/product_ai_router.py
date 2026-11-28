@@ -86,17 +86,23 @@ async def generate(
     updated: list[str] = []
     changed: dict[str, Any] = {}
 
-    if "tagline" in body.sections and result.get("tagline"):
-        if body.overwrite or not (product.tagline or "").strip():
-            product.tagline = str(result["tagline"])[:200]
-            updated.append("tagline")
-            changed["tagline"] = product.tagline
+    if (
+        "tagline" in body.sections
+        and result.get("tagline")
+        and (body.overwrite or not (product.tagline or "").strip())
+    ):
+        product.tagline = str(result["tagline"])[:200]
+        updated.append("tagline")
+        changed["tagline"] = product.tagline
 
-    if "desc" in body.sections and result.get("desc"):
-        if body.overwrite or not (product.desc or "").strip():
-            product.desc = str(result["desc"])
-            updated.append("desc")
-            changed["desc"] = product.desc
+    if (
+        "desc" in body.sections
+        and result.get("desc")
+        and (body.overwrite or not (product.desc or "").strip())
+    ):
+        product.desc = str(result["desc"])
+        updated.append("desc")
+        changed["desc"] = product.desc
 
     if "features" in body.sections and isinstance(result.get("features"), list):
         feats = [
@@ -110,17 +116,22 @@ async def generate(
             changed["features"] = feats
 
     seo = result.get("seo") if isinstance(result.get("seo"), dict) else {}
-    if "seo" in body.sections and seo:
-        if body.overwrite or not (product.seo_title or "").strip():
-            product.seo_title = str(seo.get("title") or "")[:200] or product.seo_title
-            product.seo_description = str(seo.get("description") or "")[:2000] or product.seo_description
-            product.seo_keywords = str(seo.get("keywords") or "")[:500] or product.seo_keywords
-            updated.append("seo")
-            changed["seo"] = {
-                "title": product.seo_title,
-                "description": product.seo_description,
-                "keywords": product.seo_keywords,
-            }
+    if (
+        "seo" in body.sections
+        and seo
+        and (body.overwrite or not (product.seo_title or "").strip())
+    ):
+        product.seo_title = str(seo.get("title") or "")[:200] or product.seo_title
+        product.seo_description = (
+            str(seo.get("description") or "")[:2000] or product.seo_description
+        )
+        product.seo_keywords = str(seo.get("keywords") or "")[:500] or product.seo_keywords
+        updated.append("seo")
+        changed["seo"] = {
+            "title": product.seo_title,
+            "description": product.seo_description,
+            "keywords": product.seo_keywords,
+        }
 
     if not updated:
         raise HTTPException(409, "没有可写入的字段（可能全部已有内容且未开启覆盖）")
