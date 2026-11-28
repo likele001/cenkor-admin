@@ -59,6 +59,11 @@
 - 补 `.gitattributes` 统一行尾为 LF：索引里原有 52 个 CRLF 文件，任一工具改成 LF 就会让 git 把整文件
   当重写 —— 出现过 3315 行的「改动」实际只有 25 行
 - 新增迁移若依赖某张表，在 `upgrade()` 开头显式判存并抛可读错误，别让 PG 原生异常冒上去
+- 官网补齐 `llms.txt`（AI 爬虫的站点索引）：此前 `/llms.txt` 根本不存在，nginx 的 SPA 回退
+  把它兜成 `index.html`，爬虫拿到 `text/html` 解析必然失败。现由
+  `frontend/landing-web/scripts/gen-llms-txt.mjs` 从 `seo.ts` + `docs-manifest` **生成**（不手写，
+  避免与页面漂移），随构建进 `dist/` 再同步到 `frontend/landing/`；伪静态排除清单与 vhost
+  精确 `location` 两处都必须加 `llms.txt`，只加一处仍会被 rewrite 吃掉
 
 ## 2026-11-24　部署链路修补：三种容器化方式的 nginx 缺口
 

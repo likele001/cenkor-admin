@@ -18,7 +18,7 @@
 
 | 域名 / 路径 | 站点根目录(root) | 反代到后端 | 伪静态(SPA 回退) | 说明 |
 |---|---|---|---|---|
-| `admin.cenkor.cn` | `cenkor-admin/frontend/admin-web/dist` | `/api/`、`/api/v1/cms/ai/`、`/api/v1/ws/`、`/.app-assets/` → `:8002` | 有,排除项最多 | 管理后台 SPA |
+| `admin.cenkor.cn` | `cenkor-admin/frontend/admin-web/dist` | `/api/`、`/api/v1/cms/ai/`、`/api/v1/ws/`、`/.app-assets/` → `:8002` | 有,排除项最多(`= /robots.txt`、`= /sitemap.xml`、`= /llms.txt` 走 landing 产物) | 管理后台 SPA |
 | `admin.cenkor.cn/landing/` | `cenkor-admin/frontend/landing/` | **无** | 有(`^~ /landing/` 优先) | 官网 + 文档中心,同域下的独立静态子站 |
 | `portal.cenkor.cn` | `cenkor-admin/frontend/portal-web/dist` | `/api/`、`= /llms.txt` → `:8002` | 有(本次修复过) | 用户中心 / 应用中心 SPA |
 | `dev.cenkor.cn` | `cenkor-admin/frontend/developer-web/dist` | `/api/` → `:8002`(由**宝塔反向代理面板**生成) | 有(最简版) | 开发者门户 SPA |
@@ -42,7 +42,8 @@
 | 前端同域调后端接口 | **反代** `location /api/` | 所有站点,避免 CORS 与跨域 cookie 问题 |
 | WebSocket 长连接 | **反代** + `Upgrade` 头 + 超长超时 | `admin` 的 `/api/v1/ws/`,`read_timeout 86400s` |
 | AI 生成类长请求 | **反代** + 600s 超时 + 关缓存 | `admin` 的 `/api/v1/cms/ai/`(实测 112s,默认 60s 会被掐成 504) |
-| 后端动态生成的文本 | **精确 location 反代** | `/llms.txt`、`/sitemap.xml` → `/api/v1/public/...` |
+| 后端动态生成的文本 | **精确 location 反代** | `portal` 的 `/llms.txt`、`/sitemap.xml` → `/api/v1/public/...` |
+| 静态站自带的文本文件 | **精确 location `alias` 直出** | `admin` 的 `/robots.txt`、`/sitemap.xml`、`/llms.txt` → `frontend/landing/*` |
 | CMS 动态页(静态文件不存在) | **`try_files` 末尾命名 location 反代** | `www` 站的 `@cms_dynamic` → `/api/v1/page$uri` |
 | 后台托管的插件静态资源 | **反代**(文件不在前端 dist) | `admin` 的 `/.app-assets/` |
 | 前端构建产物 `/assets/*` | **不反代**,直出 + 365d 长缓存 | 所有 SPA |
@@ -308,7 +309,7 @@ if ($spa_fallback = 11) {
 #   /api/                     后端接口
 #   /.app-assets/             应用插件静态资源(反代到后端)
 #   /landing                  品牌官网(独立静态站,走 server 里的 location ^~ /landing/)
-#   /robots.txt /sitemap.xml  独立文本文件,由主配置的 location = 精确匹配提供
+#   /robots.txt /sitemap.xml /llms.txt  独立文本文件,由主配置的 location = 精确匹配提供
 
 set $spa_fallback 0;
 if ($uri !~ ^/api/) {
@@ -320,7 +321,7 @@ if ($uri ~ ^/\.app-assets/) {
 if ($uri ~ ^/landing) {
     set $spa_fallback 0;
 }
-if ($uri ~ ^/(robots\.txt|sitemap\.xml)$) {
+if ($uri ~ ^/(robots\.txt|sitemap\.xml|llms\.txt)$) {
     set $spa_fallback 0;
 }
 if (!-e $request_filename) {
@@ -344,9 +345,25 @@ location = /sitemap.xml {
     default_type application/xml;
     expires -1;
 }
+location = /llms.txt {
+    alias /www/wwwroot/cenkor-admin/frontend/landing/llms.txt;
+    default_type text/plain;
+    charset utf-8;
+    expires -1;
+}
 ```
 
-> 缺这两段时请求会被下方 `location /` 兜成 SPA 外壳 HTML,爬虫拿到 `text/html` 解析失败,robots 规则等于没生效。
+> 缺这几段时请求会被下方 `location /` 兜成 SPA 外壳 HTML,爬虫拿到 `text/html` 解析失败,robots 规则等于没生效。
+
+**`llms.txt`(2026-11-28 补)**:AI 爬虫(ChatGPT / Perplexity / Claude)按约定取站点根的 `/llms.txt`。它与 `robots.txt` 一样无法放在 `root`(admin-web 的 dist)里——真实文件在 landing 目录。漏加排除项的症状很好认:
+
+```bash
+curl -sI https://admin.cenkor.cn/llms.txt | grep -i content-type
+# 错误:text/html(且 content-length 是 admin-web index.html 的大小 464)
+# 正确:text/plain; charset=utf-8(7614 字节)
+```
+
+文件由 `frontend/landing-web/scripts/gen-llms-txt.mjs` 生成,数据取自 `src/config/seo.ts` + `docs-manifest.generated.ts`,输出 `public/llms.txt`,随 `vite build` 进 `dist/`,再由 `build-frontends.sh` 的 `rsync -a --delete` 同步到 `frontend/landing/`。**注意 `--delete`**:若 `dist/` 里没有这个文件,线上那份会被删,所以改了生成逻辑必须重新构建。
 
 ### 4.4 dev 站版(最简)
 

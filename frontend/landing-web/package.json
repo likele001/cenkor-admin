@@ -12,7 +12,8 @@
     "prerender": "node scripts/prerender.mjs",
     "build:prerender": "npm run build:spa && npm run build:ssr && npm run prerender",
     "preview": "vite preview --port 9910",
-    "docs:sync": "node scripts/copy-docs.mjs"
+    "docs:sync": "node scripts/copy-docs.mjs && node scripts/gen-llms-txt.mjs",
+    "llms": "node scripts/gen-llms-txt.mjs"
   },
   "dependencies": {
     "@unhead/vue": "^2.1.18",

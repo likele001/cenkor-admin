@@ -1,0 +1,84 @@
+# 辰科 Cenkor Admin
+
+> 企业级后台管理平台：FastAPI + Vue3，内置应用中心、RBAC 权限、通用内容引擎、
+> 用户中心与审计日志；应用按需安装，支持私有化部署与 AI CMS。
+
+- 官网：https://admin.cenkor.cn/landing/
+- 文档中心：https://admin.cenkor.cn/landing/docs
+- 语言：zh-CN
+- 更新：2026-11-28
+
+## 官网页面
+
+- [辰科Cenkor Admin - 企业级平台 × AI CMS | 私有化部署](https://admin.cenkor.cn/landing/)：辰科Cenkor Admin 企业级平台，FastAPI + Vue3 架构，内置应用中心、RBAC 权限、工作流审批、AI CMS 内容引擎、用户中心与审计日志。AI CMS 支持对话式建模、AI 起草翻译、语义检索，内容以 REST / GraphQL / MCP 三协议输出，支持私有化部署。
+- [辰科Cenkor Admin - AI CMS 内容引擎 | 对话式建模 · AI 起草 · MCP 出口](https://admin.cenkor.cn/landing/ai-cms)：辰科 AI CMS：用中文描述业务直接生成内容模型，AI 起草与批量翻译，语义检索带引用溯源，内容健康度体检、选题 Gap 分析、问答式站内搜索、AI 配图与视频、多渠道再分发。内容以 REST / GraphQL / MCP 三种协议供给任意前端与 Agent。
+- [辰科Cenkor Admin - 核心功能 | AI CMS 与应用中心](https://admin.cenkor.cn/landing/features)：辰科Cenkor Admin 核心功能：AI CMS 内容引擎、应用中心（15 个内置应用）、RBAC 三级权限、动态建模与多站点、工作流审批、多渠道发布与效果统计、REST / GraphQL / MCP 开放接口、在线升级、私有化部署。
+- [辰科Cenkor Admin - 技术优势 | AI 原生内容层](https://admin.cenkor.cn/landing/advantages)：辰科Cenkor Admin 技术优势：FastAPI + Vue3 现代架构、应用中心生态、动态建模、AI 原生内容层（可选增强）、三协议开放接口、在线升级、前后台双用户体系与三种部署模式。
+- [辰科Cenkor Admin - 私有部署 | 企业级平台](https://admin.cenkor.cn/landing/deploy)：辰科Cenkor Admin 私有化部署指南。Docker Compose、宝塔静态 dist、裸机 systemd 三种模式，PostgreSQL + Redis + MinIO + Backend + Admin + Portal；含 AI 模型接入与在线升级说明。
+- [辰科Cenkor Admin - 文档中心 | 使用教程与二次开发](https://admin.cenkor.cn/landing/docs)：辰科Cenkor Admin 文档中心：14 本用户手册、模板标签参考（数据 API / 过滤器 / App 注册标签）、应用开发规范与二次开发指南，全部在线可查。
+- [辰科Cenkor Admin - 使用指南 | 企业级平台](https://admin.cenkor.cn/landing/docs/guide)：辰科Cenkor Admin 使用入门指南：系统登录、应用中心安装、RBAC 权限、AI CMS 建模与内容管理、工作流审批、用户中心快速上手。
+
+## 技术文档中心
+
+共 44 篇：
+
+- [Cenkor Admin 系统更新日志](https://admin.cenkor.cn/landing/docs-content/CHANGELOG.md)
+- [AI 配置 · 后台可视化管理](https://admin.cenkor.cn/landing/docs-content/ai-settings.md)
+- [Cenkor Admin · 宝塔面板完整部署指南](https://admin.cenkor.cn/landing/docs-content/baota_static_deploy.md)
+- [CMS AI 能力](https://admin.cenkor.cn/landing/docs-content/cms-ai.md)
+- [Cenkor Admin · 核心平台（不含官网）](https://admin.cenkor.cn/landing/docs-content/core_platform.md)
+- [cenkor-admin 数据库迁移规范（开发者必读）](https://admin.cenkor.cn/landing/docs-content/database-migrations.md)
+- [Cenkor Admin · 部署方案（权威）](https://admin.cenkor.cn/landing/docs-content/deploy.md)
+- [Cenkor Platform V2 — 开发者指南](https://admin.cenkor.cn/landing/docs-content/dev_guide.md)
+- [Cenkor Admin · 域名绑定 + SSL](https://admin.cenkor.cn/landing/docs-content/domain_setup.md)
+- [Cenkor Admin · 全栈容器化部署（含前端，一条命令）](https://admin.cenkor.cn/landing/docs-content/fullstack_deploy.md)
+- [文档索引](https://admin.cenkor.cn/landing/docs-content/index.md)
+- [MCP 接入指南](https://admin.cenkor.cn/landing/docs-content/mcp.md)
+- [数据库迁移：一条公开链、三条闭源支线、一个合流点](https://admin.cenkor.cn/landing/docs-content/migrations.md)
+- [Cenkor Admin · 裸机部署（systemd + 宝塔反代）](https://admin.cenkor.cn/landing/docs-content/native_deploy.md)
+- [Cenkor Admin · 宝塔 Nginx 反代与伪静态配置说明](https://admin.cenkor.cn/landing/docs-content/nginx_proxy_rewrite.md)
+- [Cenkor Mosaic · 重定位方案](https://admin.cenkor.cn/landing/docs-content/relaunch-ai-cms.md)
+- [Cenkor Platform V2 — 企业级通用后台 + CMS 改造路线图](https://admin.cenkor.cn/landing/docs-content/roadmap.md)
+- [主题模板开发](https://admin.cenkor.cn/landing/docs-content/template-guide.md)
+- [模板市场](https://admin.cenkor.cn/landing/docs-content/theme-market.md)
+- [升级指南（UPGRADE）](https://admin.cenkor.cn/landing/docs-content/upgrade.md)
+- [Cenkor Admin Platform — V2 架构文档](https://admin.cenkor.cn/landing/docs-content/architecture.md)
+- [后台管理系统完整性分析 & 与 Dash-FastAPI-Admin 对比](https://admin.cenkor.cn/landing/docs-content/admin_system_comparison.md)
+
+### 05-用户手册
+
+- [公告管理 · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/announcements_操作手册.md)
+- [云存储 · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/cloud_storage_操作手册.md)
+- [内容管理（CMS）· 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/cms_操作手册.md)
+- [用户手册总目录](https://admin.cenkor.cn/landing/docs-content/05-用户手册/index.md)
+- [链接收藏 · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/links_操作手册.md)
+- [My Todo · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/my_todo_操作手册.md)
+- [通知 · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/notification_操作手册.md)
+- [支付中心 · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/payment_操作手册.md)
+- [Quick Notes · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/quick_notes_操作手册.md)
+- [工单管理 · 操作手册](https://admin.cenkor.cn/landing/docs-content/05-用户手册/tickets_操作手册.md)
+
+### addons
+
+- [可选扩展 · 官网 CMS 对接](https://admin.cenkor.cn/landing/docs-content/addons/website_cms.md)
+
+### apps
+
+- [Cenkor Admin 应用开发规范](https://admin.cenkor.cn/landing/docs-content/apps/development_guide.md)
+- [AI 体系扩展应用 · 上架说明（cenkormes）](https://admin.cenkor.cn/landing/docs-content/apps/market_ai_extensions.md)
+
+### release
+
+- [发布记录](https://admin.cenkor.cn/landing/docs-content/release/changelog.md)
+- [当前发布产物](https://admin.cenkor.cn/landing/docs-content/release/latest.md)
+
+### template
+
+- [内容标签](https://admin.cenkor.cn/landing/docs-content/template/article.md)
+- [评论 · 表单 · 媒体 · 多语言](https://admin.cenkor.cn/landing/docs-content/template/comment.md)
+- [站点与配置](https://admin.cenkor.cn/landing/docs-content/template/config.md)
+- [自定义标签开发](https://admin.cenkor.cn/landing/docs-content/template/develop.md)
+- [模板标签总览](https://admin.cenkor.cn/landing/docs-content/template/index.md)
+- [全量速查](https://admin.cenkor.cn/landing/docs-content/template/methods.md)
+- [结构标签：分类 · 标签 · 菜单 · 友链](https://admin.cenkor.cn/landing/docs-content/template/tag.md)
+
