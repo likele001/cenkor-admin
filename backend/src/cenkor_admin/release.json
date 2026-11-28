@@ -1,5 +1,5 @@
 {
-  "version": "0.5.28",
+  "version": "0.5.29",
   "channel": "stable",
   "released_at": "2026-11-28",
   "notes_url": "https://github.com/likele001/cenkor-admin/releases",
@@ -8,5 +8,5 @@
   "core_pkg_url": "https://github.com/likele001/cenkor-admin/releases/latest",
   "upgrade_docs": "https://github.com/likele001/cenkor-admin/blob/main/docs/upgrade.md",
   "required_platform": ">=0.1.0",
-  "notes": "i18n 全量改造落地：84 文件 1652 处硬编码中文改为 t() 调用；en-US 补齐 1092 条英文翻译（908 唯一文本 / 60 命名空间），中英双侧 1819 个 key 100% 命中；修掉裸 key 覆盖命名空间的隐蔽缺陷（曾导致登录页标题显示 app.name）"
+  "notes": "站点配置按站隔离（cms_site_config 主键改 (site_id, key)，纳入 site_scope，建站自动继承主站配置）；新增域名绑定状态检测 GET /cms/sites/{id}/domain 与站点管理页域名状态面板，七态判定（unset/dns_missing/dns_www_only/ip_mismatch/dns_ok/nginx_ok/live）并生成可粘贴的 DNS/nginx/证书命令，探测改走本机 HTTP 以规避宝塔 vhost 目录 root:700 的 PermissionError；修 static_cache.site_domain 回退查询漏 site_id 导致跨站写错 canonical；改域名后立刻清 60s 缓存；新增通知投递 outbox（scheduler.tick 消费 + 退避重试）与 entry.submitted / publish.failed 钩子；迁移链自洽：monitor 迁移登记 .gitignore，notify 改挂公开 head cms_ab"
 }
