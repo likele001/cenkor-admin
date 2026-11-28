@@ -136,6 +136,8 @@ _bak-*/
 *.before.*
 *.orig
 dist.bak.*/
+dist_bak_*/
+dist_backup_*/
 
 # ===== 闭源应用迁移（2026-10-27 迁移分入子目录后新增）=====
 # 与 apps/{crm,erp,mes} 代码同源，属商业实现，绝不进入公开仓库。
@@ -204,3 +206,9 @@ frontend/landing/*
 /landing-page/
 /backend/logs/
 *.log.*
+# 站点可用性巡检（monitor，商业闭源）
+# 代码直接写在内置目录下（非 src/apps），按约定三行登记：
+backend/src/cenkor_admin/apps/monitor/
+backend/src/cenkor_admin/static/apps/monitor/
+backend/alembic/versions/core/2026*_monitor*.py
+backend/alembic/versions/2026*_monitor*.py

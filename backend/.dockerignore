@@ -1,0 +1,44 @@
+# backend/.dockerignore
+#   docker-compose.yml / docker-compose.baota.yml 使用 context: ./backend，
+#   本文件是该上下文的排除清单（根级 .dockerignore 对子目录上下文不生效）。
+#   Dockerfile.bak-* 等不参与构建。
+
+# ---- 商业闭源应用（源码外置，不入 git，禁止进镜像）----
+# backend/src/apps/ 现仅存 collect（内容采集，商业闭源）。
+# Dockerfile 的 `COPY src ./src` 会整棵拷走，必须在这里挡住。
+# 与 Dockerfile 中 `for f in src/apps/*/requirements.txt` 的容错逻辑一致：
+# 干净 checkout 本就没有该目录，判假跳过，不影响构建。
+src/apps/
+src/cenkor_admin/static/apps/erp/
+src/cenkor_admin/static/apps/crm/
+src/cenkor_admin/static/apps/mes/
+src/cenkor_admin/static/apps/workflow/
+src/cenkor_admin/static/apps/collect/
+
+# ---- 敏感文件（绝不进构建上下文）----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# ---- 本地备份 / 临时产物 ----
+.bak-*
+.stale-apps
+*.bak-*
+logs
+*.log
+
+# ---- python 缓存与测试 ----
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+.pytest_cache
+.ruff_cache
+
+# ---- 版本控制 ----
+.git
+.gitignore

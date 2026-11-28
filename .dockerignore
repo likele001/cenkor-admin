@@ -6,6 +6,17 @@
 .git
 .gitignore
 
+# ---- 商业闭源应用（源码/产物外置，不入 git，禁止进镜像）----
+# backend/src/apps/ 现仅存 collect（内容采集，商业闭源）；
+# static/apps 下 erp / crm / mes / workflow / collect 同属商业实现。
+# docker/fullstack/backend.Dockerfile 的 `COPY backend/src ./src` 会整棵拷走。
+backend/src/apps/
+backend/src/cenkor_admin/static/apps/erp/
+backend/src/cenkor_admin/static/apps/crm/
+backend/src/cenkor_admin/static/apps/mes/
+backend/src/cenkor_admin/static/apps/workflow/
+backend/src/cenkor_admin/static/apps/collect/
+
 # node / npm
 node_modules
 frontend/*/node_modules

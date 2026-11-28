@@ -73,7 +73,7 @@ fi
 info "复制核心文件到临时目录..."
 # ── 以 git 跟踪清单为源，不再靠 --exclude 逐条追赶 ──────────────────────────
 # tar 读文件系统、不读 .gitignore。过去四轮泄漏全部是同一原因：
-#   ① 闭源应用目录（erp/crm/mes/workflow）
+#   ① 闭源应用目录（erp/crm/mes/workflow/collect）
 #   ② .env.bak-*、backend/logs/hub.log(5.2M)、_rollback_bak_*/cenkor_db.sql(1.7M)
 #   ③ ext 混合目录里的闭源迁移（workflow 流程定义等）
 #   ④ deploy/baota/cenkor-backend.host.env（真实 SECRET_KEY + 数据库口令）
@@ -84,7 +84,7 @@ TRACKED_TAR="$STAGE/.payload-tracked.tar"
 (
   cd "$ROOT"
   git ls-files -z \
-    | grep -zvE '^(frontend/developer-web/|docs/domain_setup\.md|deploy/(addons|website|examples|nginx/snippets)/|docs/addons/|docker-compose\.addon-website\.yml$|verify_v11\.py$|docs/05-用户手册/(crm|erp|mes|workflow)_操作手册\.md$|www/wwwroot/|\.mimocode/)|\.bak[^/]*$' \
+    | grep -zvE '^(frontend/developer-web/|docs/domain_setup\.md|deploy/(addons|website|examples|nginx/snippets)/|docs/addons/|docker-compose\.addon-website\.yml$|verify_v11\.py$|docs/05-用户手册/(crm|erp|mes|workflow|collect)_操作手册\.md$|www/wwwroot/|\.mimocode/)|\.bak[^/]*$' \
     | tar --null -T - -cf "$TRACKED_TAR"
 )
 # 用中转文件而不是直接 `| tar -x`：多个 tar 流串进同一个 tar -x 时，tar -x 读完
@@ -105,7 +105,14 @@ ARTIFACT_TAR="$STAGE/.payload-artifacts.tar"
   for p in frontend/admin-web/dist frontend/portal-web/dist frontend/landing-web/dist frontend/landing; do
     [ -d "$p" ] && paths+=("$p")
   done
-  [ -d backend/src/cenkor_admin/static/apps ] && paths+=("backend/src/cenkor_admin/static/apps")
+  # static/apps 里混着开源内置应用与商业闭源应用（collect / erp / crm / mes / workflow
+  # 都不入 git）。黑名单 --exclude 每新增一个商业应用就漏一次，这里改成白名单：
+  # 只收集 git 跟踪的子目录，物理存在但未跟踪的一律不带走。
+  while IFS= read -r _app; do
+    [ -n "$_app" ] && [ -d "backend/src/cenkor_admin/static/apps/$_app" ] \
+      && paths+=("backend/src/cenkor_admin/static/apps/$_app")
+  done < <(git -c core.quotePath=false ls-files backend/src/cenkor_admin/static/apps \
+             | awk -F/ 'NF>=6{print $6}' | sort -u)
   if [ "${#paths[@]}" -eq 0 ]; then
     echo "✗ 打包中止：找不到任何前端构建产物（先跑 scripts/build-frontends.sh）" >&2
     exit 1
@@ -115,6 +122,7 @@ ARTIFACT_TAR="$STAGE/.payload-artifacts.tar"
     --exclude='backend/src/cenkor_admin/static/apps/crm' \
     --exclude='backend/src/cenkor_admin/static/apps/mes' \
     --exclude='backend/src/cenkor_admin/static/apps/workflow' \
+    --exclude='backend/src/cenkor_admin/static/apps/collect' \
     --exclude='frontend/landing/advantages.html' \
     --exclude='frontend/landing/ai-cms.html' \
     --exclude='frontend/landing/deploy.html' \
@@ -218,7 +226,7 @@ tar -czf "$ARCHIVE" -C "$STAGE" "$PKG_NAME"
 # tar 读的是文件系统，不看 .gitignore；闭源应用在本机物理存在，仅靠上面的
 # --exclude 列表容易漏（新增一个商业应用就会漏一次）。这里用「特征路径扫描」兜底，
 # 宁可让打包失败，也不能产出带着 ERP/CRM/MES 源码的交付包。
-FORBIDDEN_PATTERNS='backend/src/cenkor_admin/apps/(erp|crm|mes|workflow)/|backend/src/apps/|frontend/developer-web/|backend/src/cenkor_admin/static/apps/(erp|crm|mes|workflow)/|backend/alembic/versions/(erp|crm|mes)/|backend/alembic/versions/ext/20260925_0027_workflow|verify_v11\.py'
+FORBIDDEN_PATTERNS='backend/src/cenkor_admin/apps/(erp|crm|mes|workflow)/|backend/src/apps/|frontend/developer-web/|backend/src/cenkor_admin/static/apps/(erp|crm|mes|workflow|collect)/|backend/alembic/versions/(erp|crm|mes)/|backend/alembic/versions/ext/20260925_0027_workflow|verify_v11\.py|05-用户手册/(erp|crm|mes|workflow|collect)_|docs-content/apps/erp-development\.md'
 LEAKED="$(tar -tzf "$ARCHIVE" 2>/dev/null | grep -E "$FORBIDDEN_PATTERNS" | head -20 || true)"
 if [ -n "$LEAKED" ]; then
   echo "" >&2
@@ -227,11 +235,12 @@ if [ -n "$LEAKED" ]; then
   printf '%s\n' "$LEAKED" | sed 's/^/    /' >&2
   echo "" >&2
   echo "  这些目录由 .gitignore 排除（见 docs/migrations.md §13、docs/database-migrations.md §7），" >&2
-  echo "  属于商业实现，不能随核心包交付。请在 scripts/package-core.sh 的 --exclude 列表里补齐后重试。" >&2
+  echo "  属于商业实现或内部资料，不能随核心包交付。请在 scripts/package-core.sh 的 --exclude 列表
+  （或 frontend/landing-web/scripts/copy-docs.mjs 的 EXCLUDE_FILES）里补齐后重试。" >&2
   rm -rf "$STAGE" "$ARCHIVE"
   exit 1
 fi
-info "自检通过：包内无闭源资产（erp / crm / mes / workflow / src-apps / developer-web）"
+info "自检通过：包内无闭源资产（erp / crm / mes / workflow / collect / src-apps / developer-web）"
 
 # ---- 交付前自检之二：不许出现凭据文件 ----
 # .env.bak-20261007 这类历史备份带真实密钥，且从未进过 git（.gitignore 管不到它们的

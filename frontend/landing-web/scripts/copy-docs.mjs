@@ -34,7 +34,16 @@ const DIR_LABELS = {
 const ROOT_LABEL = '总览与指南'
 const EXCLUDE_DIRS = new Set(['archive', '_bak'])
 // 对外不放的内部文档（打包发版流程，纯内部用）
-const EXCLUDE_FILES = new Set(['packaging.md'])
+// 以及商业闭源模块的操作手册：erp / crm / mes / workflow / collect 均不入 git 源码，
+// 其手册属于商业实现的一部分，不能出现在对外文档中心里。
+const EXCLUDE_FILES = new Set([
+  'packaging.md',
+  '05-用户手册/erp_操作手册.md',
+  '05-用户手册/crm_操作手册.md',
+  '05-用户手册/mes_操作手册.md',
+  '05-用户手册/workflow_操作手册.md',
+  '05-用户手册/collect_操作手册.md'
+])
 
 // docs/ 之外、但应纳入文档中心的源文件（保持单一事实源，构建时同步进来，避免复制进 docs/ 产生漂移）
 // src: 仓库绝对路径；dest: docs-content/ 内的相对路径（决定侧栏分组）；transform: 可选内容改写
@@ -51,11 +60,10 @@ const EXTRA_FILES = [
       `> ⚠️ **历史快照**：本文生成于 2026-01-08，为早期架构分析。当前架构与应用数量已大幅演进，`
       + `请以 \`architecture.md\` 与各模块操作手册为准。\n\n`
       + t
-  },
-  {
-    src: path.join(REPO_ROOT, 'backend/src/cenkor_admin/apps/erp/docs/DEVELOPMENT.md'),
-    dest: 'apps/erp-development.md'
   }
+  // 注意：这里不要再登记「闭源商业应用」内部文档。
+  // 曾经登记过 backend/src/cenkor_admin/apps/erp/docs/DEVELOPMENT.md，
+  // 导致 ERP 的目录结构 / manifest 机制 / 表设计 / Phase 规划被同步到文档中心并对外发布。
 ]
 
 function walk(dir, base) {
