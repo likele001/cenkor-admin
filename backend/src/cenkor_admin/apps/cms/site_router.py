@@ -27,12 +27,24 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 
 from cenkor_admin.apps.builder.models import Page
-from cenkor_admin.apps.cms import static_cache
-from cenkor_admin.apps.cms.models import Case, Category, Entry, Media, News, Product, Site, Tag
+from cenkor_admin.apps.cms import domain_setup, static_cache
+from cenkor_admin.apps.cms.models import (
+    Case,
+    Category,
+    Entry,
+    Media,
+    News,
+    Product,
+    Site,
+    SiteConfig,
+    Tag,
+)
 from cenkor_admin.apps.forms.models import Form
+from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import DBSession
 from cenkor_admin.core.site_scope import invalidate_site_cache, site_scope_bypass
 
+settings = get_settings()
 log = structlog.get_logger(__name__)
 
 
@@ -239,6 +251,68 @@ async def list_sites(db: DBSession) -> list[SiteWithStats]:
     ]
 
 
+# ---------------------------------------------------------------- 站点配置继承
+
+
+# 哪些 key 不该被复制到新站：
+# - url.* 是「历史规则存档」，存的是老地址到新地址的映射，属于该站的历史，
+#   复制过去会让新站的 301 表凭空多出一堆不存在的旧路径。
+# - 其余（brand.* / seo.* / contact.* / web.*）都该继承，否则新站首页没有
+#   品牌名、没有 SEO 默认值，等于建了个空壳。
+_NO_COPY_PREFIXES: tuple[str, ...] = ("url.",)
+
+
+async def _copy_site_config(db: DBSession, from_site_id: int, to_site_id: int) -> int:
+    """把一个站点的配置复制给另一个站点。返回复制条数。
+
+    幂等：目标站已有的 key 不覆盖（只在目标站完全没有配置时调用，但即使
+    重复调用也不会破坏已有值）。
+    """
+    src_rows = (
+        (
+            await db.execute(
+                select(SiteConfig).where(SiteConfig.site_id == from_site_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not src_rows:
+        return 0
+
+    existing = set(
+        (
+            await db.execute(
+                select(SiteConfig.key).where(SiteConfig.site_id == to_site_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    n = 0
+    for row in src_rows:
+        if any(row.key.startswith(p) for p in _NO_COPY_PREFIXES):
+            continue
+        if row.key in existing:
+            continue
+        db.add(
+            SiteConfig(
+                site_id=to_site_id,
+                key=row.key,
+                value=row.value,
+                description=row.description,
+            )
+        )
+        n += 1
+    return n
+
+
+async def _main_site_id(db: DBSession) -> int | None:
+    """主站 = id 最小的站点。与迁移脚本的口径一致。"""
+    return (await db.execute(select(func.min(Site.id)))).scalar()
+
+
 @router.post(
     "", response_model=SiteOut, status_code=status.HTTP_201_CREATED, summary="新建站点"
 )
@@ -264,10 +338,26 @@ async def create_site(body: SiteIn, db: DBSession) -> SiteOut:
         sort=body.sort,
     )
     db.add(site)
+    await db.flush()  # 拿到 site.id，但先别提交
+
+    # 从主站复制配置作为初始值。新建的站如果没有品牌名/SEO 默认值，
+    # 后台会是一片空白，运营得手填 70 多项才能用 —— 复制一份最省事，
+    # 且之后各站独立，主站再改不影响这里。
+    copied = 0
+    main_id = await _main_site_id(db)
+    if main_id is not None and main_id != site.id:
+        copied = await _copy_site_config(db, main_id, site.id)
+
     await db.commit()
     await db.refresh(site)
     await invalidate_site_cache()
-    log.info("cms.site.created", site_id=site.id, key=site.key, domain=domain)
+    log.info(
+        "cms.site.created",
+        site_id=site.id,
+        key=site.key,
+        domain=domain,
+        config_copied=copied,
+    )
     return SiteOut.model_validate(site)
 
 
@@ -300,6 +390,10 @@ async def update_site(site_id: int, body: SiteUpdate, db: DBSession) -> SiteOut:
     await db.commit()
     await db.refresh(site)
     await invalidate_site_cache()
+    # 域名变了要立刻丢掉 site_domain() 的 60s 缓存，否则前端「保存后重新检测」
+    # 会读到旧值，看起来像没保存成功。
+    if "domain" in data:
+        static_cache.forget_domain(site_id)
     # [P2] 站点信息（域名/品牌名）会进详情页的 title 与 canonical，
     # 旧域名下的静态目录直接撤掉，新域名第一次访问时重建。
     if static_cache.cache_enabled():
@@ -335,6 +429,7 @@ async def delete_site(site_id: int, db: DBSession) -> dict[str, Any]:
     await db.delete(site)
     await db.commit()
     await invalidate_site_cache()
+    static_cache.forget_domain(site_id)
     # [P2] 站点没了，静态文件不该还活着
     if static_cache.cache_enabled() and site.domain:
         static_cache.purge_site_domain(site.domain)
@@ -401,6 +496,130 @@ class SiteFeaturesIn(BaseModel):
     auto_seo: bool | None = None
     auto_push: bool | None = None
     auto_translate: bool | None = None
+
+
+# ---------------------------------------------------------------- 域名绑定
+
+
+# nginx 与证书的落盘位置。这台机器是宝塔面板布局，路径固定；
+# 换成裸机部署时需要跟着改（或改成从 settings 读）。
+_NGINX_VHOST_DIR = settings.CMS_NGINX_VHOST_DIR
+_CERT_DIR = settings.CMS_CERT_DIR
+# 后端自己的监听端口。反代要把 host 原样传给它，否则后端认不出站点。
+_BACKEND_PORT = settings.CMS_DOMAIN_BACKEND_PORT
+
+
+def _nginx_has_server(domain: str) -> bool:
+    """nginx 里是否已有该域名的 server 块。
+
+    直接看文件存在不够：宝塔会把 site 配置写成 <域名>.conf，但约定俗成
+    不代表一定如此。这里做内容匹配，认出「某个 .conf 里 server_name 含它」。
+    """
+    import pathlib
+
+    d = domain_setup._normalize(domain)
+    if not d:
+        return False
+    p = pathlib.Path(_NGINX_VHOST_DIR)
+    # 宝塔把这些目录设成 root-only（700）时，www 用户连 stat 都会抛
+    # PermissionError。探测失败只能当作「看不到」，绝不能把 500 抛给前端。
+    try:
+        if not p.is_dir():
+            return False
+    except OSError:
+        return False
+    # 先看同名文件（最常见），省一次全目录扫描
+    try:
+        if (p / f"{d}.conf").is_file():
+            return True
+    except OSError:
+        pass
+    try:
+        for conf in p.glob("*.conf"):
+            try:
+                text = conf.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            # 只在 server_name 行里找，避免命中注释或别处的域名
+            for line in text.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if stripped.startswith("server_name"):
+                    if d in stripped.split():
+                        return True
+    except OSError:
+        return False
+    return False
+
+
+def _cert_exists(domain: str) -> bool:
+    import pathlib
+
+    d = domain_setup._normalize(domain)
+    if not d:
+        return False
+    base = pathlib.Path(_CERT_DIR) / d
+    # 同上：vhost/cert 通常是 root:root 700，www 用户 stat 直接 PermissionError。
+    # 探测不到 ≠ 证书不存在，但这里已无法分辨，只能按「探测不到」处理，
+    # 由 hint 文案引导用户自己确认（命令块里本来就有续期检查）。
+    try:
+        return (base / "fullchain.pem").is_file() and (base / "privkey.pem").is_file()
+    except OSError:
+        return False
+
+
+@router.get(
+    "/{site_id}/domain",
+    summary="域名绑定状态与下一步操作",
+)
+async def get_site_domain_status(site_id: int, db: DBSession) -> dict[str, Any]:
+    """当前域名处于哪个阶段，以及下一步该做什么。
+
+    这是方案 A 的核心：后台不再只是「存一个字符串」，而是明确告诉运营
+    「DNS 还没解析」还是「nginx 还没配」，并给出可直接粘贴的命令。
+    配置错误从静默降级变成显式可见。
+
+    域名取值与线上渲染保持同一口径（``static_cache.site_domain``）：
+    先看 ``cms_sites.domain``，为空再回退 ``cms_site_config['brand.domain']``。
+    只认前者会让主站永远显示「未绑定」—— 它线上一直是靠 brand.domain 跑的。
+    """
+    site = await _one(db, site_id)
+    effective = await static_cache.site_domain(db, site_id)
+    normalized = domain_setup._normalize(effective)
+
+    # 不传 nginx_has_server / cert_exists：让 domain_setup 自己从本机 HTTP 探测。
+    # 宝塔的 vhost/nginx 与 vhost/cert 都是 root:root 700，后端跑在 www 下读不到，
+    # 交给文件系统判断只会永远报「缺失」，不如问「本机能不能打开这个域名」。
+    info = await domain_setup.domain_status(effective)
+    # 由状态反推两个布尔量，语义明确：nginx_ok 之后（含）说明 nginx 已有该站，
+    # live 说明证书也通了。直接读 info["nginx_ok"] 会漏掉 nginx_ok/live 两种状态
+    # —— 那时 domain_status 判断已完成，不再回填这两个键。
+    st = info["status"]
+    has_server = st in ("nginx_ok", "live")
+    has_cert = st == "live"
+    info["nginx_has_server"] = has_server
+    info["cert_exists"] = has_cert
+    info["site_id"] = site.id
+    # 让运营知道这个域名是从哪读出来的：字段为空但回退命中时，
+    # 「保存域名」按钮的光标位置会让人以为没配。
+    info["domain_source"] = (
+        "site" if domain_setup._normalize(site.domain) else ("config" if normalized else None)
+    )
+    info["site_key"] = site.key
+    info["site_name"] = site.name
+    info["hint"] = domain_setup.hint_for(info["status"])
+    info["commands"] = (
+        domain_setup.build_commands(
+            normalized or "",
+            site_key=site.key,
+            backend_port=_BACKEND_PORT,
+            status=info["status"],
+        )
+        if normalized
+        else []
+    )
+    return info
 
 
 @router.get("/{site_id}/features", summary="站点自动化开关")

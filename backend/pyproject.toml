@@ -47,6 +47,7 @@ dependencies = [
     "Pillow>=10.0.0",
     "pgvector>=0.3.0",          # 向量检索（apps/cms/ai 的知识库模型用 Vector 列）
     "PyYAML>=6.0",              # codegen/builder.py 读 yaml 模板定义
+    "dnspython>=2.6.0",         # apps/cms/domain_setup.py 查 A 记录（域名绑定状态检测）
 
     # 模板引擎（用户可自定义主题，后台模板工作台在线编辑）
     "Jinja2>=3.1.6",

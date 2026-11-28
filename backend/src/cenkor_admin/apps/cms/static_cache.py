@@ -172,16 +172,22 @@ async def site_domain(db, site_id: int) -> str | None:
 
     if not domain:
         try:
+            # 必须带 site_id：SiteConfig 改复合主键后 brand.domain 每站一份，
+            # 漏掉这个条件会按主键顺序取到随便哪个站（通常 site 1）的域名，
+            # 结果是 B 站的静态文件被写成 A 站的 canonical。
             cfg = (
                 await db.execute(
-                    select(models.SiteConfig).where(models.SiteConfig.key == "brand.domain")
+                    select(models.SiteConfig).where(
+                        models.SiteConfig.site_id == site_id,
+                        models.SiteConfig.key == "brand.domain",
+                    )
                 )
             ).scalars().first()
             raw = getattr(cfg, "value", None)
             if raw:
                 domain = str(raw).strip().lower()
         except Exception:
-            logger.debug("查询 brand.domain 失败", exc_info=True)
+            logger.debug("查询 brand.domain 失败 site_id=%s", site_id, exc_info=True)
 
     with _domain_lock:
         _domain_cache[site_id] = (now + _DOMAIN_TTL, domain)
@@ -230,6 +236,16 @@ def _forget_domain(site_id: int | None = None) -> None:
             _domain_cache.clear()
         else:
             _domain_cache.pop(site_id, None)
+
+
+def forget_domain(site_id: int | None = None) -> None:
+    """让站点域名缓存立刻失效（公开接口）。
+
+    ``site_domain()`` 有 60s TTL。改了 ``cms_sites.domain`` 后如果不清，
+    后台紧接着的「保存并重新检测」会在最长 60 秒内继续读到旧域名 ——
+    用户看到保存成功但状态没变，会以为没生效。
+    """
+    _forget_domain(site_id)
 
 
 # ---------------------------------------------------------------- 写

@@ -40,6 +40,7 @@ markdown>=3.5.0
 nh3>=0.2               # markdown 输出 HTML 净化（防存储型 XSS，core/jinja_env.py）
 pgvector>=0.3.0
 PyYAML>=6.0
+dnspython>=2.6.0  # apps/cms/domain_setup.py 查 A 记录判断域名是否指向本机
 
 # 框架强绑定：代码里是顶层 import，但一直靠 fastapi / jinja2 的传递依赖装上的。
 # 显式声明，避免上游调整依赖树后静默崩（这类缺失报错位置离 import 点很远，极难查）。

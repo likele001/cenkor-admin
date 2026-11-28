@@ -192,6 +192,15 @@ class Settings(BaseSettings):
     # 落盘根目录，留空用 backend/var/htmlcache
     CMS_STATIC_CACHE_ROOT: str = ""
 
+    # ---- 域名绑定探测（多站点）----
+    # 后台「域名状态」会给运营生成可直接粘贴的 nginx / 证书命令，
+    # 这几条路径写死在代码里的话，换台机器（非宝塔目录结构）就得改源码。
+    # 默认值对齐宝塔；裸机部署时用环境变量覆盖即可。
+    CMS_NGINX_VHOST_DIR: str = "/www/server/panel/vhost/nginx"
+    CMS_CERT_DIR: str = "/www/server/panel/vhost/cert"
+    # 后端自身监听端口：生成的 nginx 反代要指到它
+    CMS_DOMAIN_BACKEND_PORT: int = 8002
+
     # ---- 主题脚本权限（模板市场第四期）----
     # 是否允许主题自带的同源脚本（assets/*.js）执行。**默认关闭**。
     #
