@@ -14,6 +14,7 @@ from sqlalchemy import Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cenkor_admin.apps.cms import (
+    ab_service,
     csp,
     models,
     permalink,
@@ -2238,6 +2239,14 @@ async def _serve_public_page(
     item = await _load_page_item(db, slug, kind)
     if not item:
         return await _html_404(request, db)
+
+    # P2-3 页面级 A/B：同一个 URL 按 cookie 分流两份内容。
+    # 分流页不能落静态缓存 —— 落下去就把某一份版本钉死成全站默认了。
+    ab_test, ab_variant = await ab_service.assign(
+        db, item["id"], request.cookies.get(ab_service.cookie_name(item["id"]))
+    )
+    if ab_test is not None:
+        item = ab_service.apply(item, ab_test, ab_variant)
     # 栏目链一次算好，canonical 和落盘路径共用：两处各算一次的话，
     # 规则一变就可能出现「页面 canonical 是 A、静态文件在 B」的对不上。
     catdir = await url_resolver.category_chain(db, item.get("category_id"))
@@ -2277,18 +2286,30 @@ async def _serve_public_page(
     )
     # P2：渲染成功就地落盘，nginx 下次直接出文件，不再进 Python。
     # 只在「请求 Host == 站点规范域名」时写，否则会把错误 canonical 写进静态文件。
-    await static_cache.record_public_page(
-        db,
-        site_id=item.get("site_id") or 1,
-        host=request_host(request),
-        url_path=page_path,
-        html=html,
-    )
-    return csp.html_response(
+    if ab_test is None:
+        await static_cache.record_public_page(
+            db,
+            site_id=item.get("site_id") or 1,
+            host=request_host(request),
+            url_path=page_path,
+            html=html,
+        )
+    resp = csp.html_response(
         html,
         # 内容更新要能反映到爬虫，5 分钟足够；再长会被 AI 索引成旧版
         headers={"Cache-Control": "public, max-age=300"},
     )
+    if ab_test is not None:
+        resp.set_cookie(
+            ab_service.cookie_name(item["id"]),
+            ab_variant,
+            max_age=ab_service.COOKIE_MAX_AGE,
+            path="/",
+            samesite="lax",
+        )
+        # 同一 URL 有两种内容，中间任何一层缓存都会让一部分人永远只看到 A
+        resp.headers["Cache-Control"] = "private, no-store"
+    return resp
 
 
 @router.get("/article/{slug}", include_in_schema=False)
@@ -2410,6 +2431,29 @@ async def _video_poster_media(db: AsyncSession, media: models.Media) -> models.M
         if cover and not cover.deleted_at:
             return cover
     raise HTTPException(404, "该视频没有封面帧")
+
+
+@router.get("/robots.txt", include_in_schema=False)
+async def robots_txt(request: Request) -> Response:
+    """按当前域名生成 robots.txt。
+
+    后台与 API 前缀对爬虫没有内容价值：放任抓取只会浪费站点配额，
+    还会把带会话的入口暴露在索引里。Sitemap 指当前域，不写死主站域名 ——
+    站群里每个站都得各自一份。
+    """
+    base = str(request.base_url).rstrip("/")
+    lines = [
+        "User-agent: *",
+        "Disallow: /admin",
+        "Disallow: /api/",
+        "Disallow: /search",
+        "Disallow: /preview/",
+        "Allow: /",
+        "",
+        f"Sitemap: {base}/sitemap.xml",
+        "",
+    ]
+    return Response("\n".join(lines), media_type="text/plain; charset=utf-8")
 
 
 @router.get("/sitemap.xml", include_in_schema=False)
