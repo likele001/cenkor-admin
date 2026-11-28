@@ -13,6 +13,54 @@
 > - 要点二
 > ```
 
+## 2026-11-28　站点配置隔离 + 域名绑定状态检测（⭐）
+
+**【多站点】**
+
+- **站点配置按站隔离**：`cms_site_config` 此前 `key` 是单列主键，`brand.name` / `seo.*` / `contact.*`
+  全站共用一份 —— A 站改品牌名会把 B 站一起改掉。现在主键为 `(site_id, key)`，纳入 `site_scope`
+  自动过滤，每个站点有自己独立的品牌、SEO、联系方式配置
+- **建站即继承**：新建站点时自动复制主站配置（排除 `url.*` 前缀，URL 规则应各自独立），
+  新站不再是空配置
+- 修 `static_cache.site_domain` 的 `brand.domain` 回退查询漏 `site_id`：隔离后会按主键顺序
+  取到别的站的域名，把 B 站静态文件写成 A 站的 canonical
+- 改域名后立刻清 60s 域名缓存，此前后台保存成功但状态最长 60 秒不刷新，看着像没生效
+
+**【域名绑定：半自动状态检测】**
+
+- 新增 `GET /cms/sites/{id}/domain`：后台不再只存一个域名字符串，而是明确告知运营
+  当前卡在哪一步，并生成可直接粘贴的命令。七态判定：
+  `unset` / `dns_missing` / `dns_www_only`（裸域没解析但 www 有，提示改填 www）/
+  `ip_mismatch`（填的 IP 不是本机）/ `dns_ok` / `nginx_ok` / `live`
+- **探测走本机 HTTP 而非读配置文件**：宝塔的 `vhost/nginx`、`vhost/cert` 是 `root:root 700`，
+  后端跑在 `www` 下 `stat` 直接 PermissionError（曾因此 500）。改为「80 通 = nginx 已配、
+  443 握手成功 = 证书已装」，同时这也最贴近「用户能不能打开」
+- 域名取值与线上渲染同口径：先 `cms_sites.domain`，为空回退 `brand.domain`。
+  只认前者会让主站永远显示「未绑定」—— 它线上一直是靠 `brand.domain` 跑的
+- 站点管理页新增域名状态面板：状态徽标、解析 IP / 本机 IP / nginx / 证书四格、
+  下一步提示、按状态生成的命令块（带一键复制），面板内可直接改绑并立即复检
+- nginx / 证书路径、后端端口抽进 settings（`CMS_NGINX_VHOST_DIR` 等），
+  非宝塔目录结构的部署改配置即可，不必改源码
+
+**【通知】**
+
+- 新增通知投递 outbox：一条事件 × 一个渠道一行，状态机 `pending/sending/sent/skipped/failed`；
+  挂 `scheduler.tick` 消费，失败按 30s/2m/10m 退避重试，3 次后置 `failed` 并留 `last_error`，
+  运维能看出「哪条没发出去、为什么」
+- 接入 `entry.submitted`（审核提交）与 `publish.failed`（发布最终失败）钩子；
+  发布只在**最终**失败时推送，还有重试机会时推「失败」只是制造噪声
+
+**【i18n】**
+
+- 站点管理页既存硬编码中文全部改走 `t()`，中英双侧补齐 `sites` 命名空间 35 条；
+  该视图现已零硬编码中文
+
+**【迁移链自洽】**
+
+- `20261127_1500_monitor` 属闭源（`apps/monitor`）却漏登记 `.gitignore`，导致公开的
+  notify 迁移挂在闭源链上 —— clone 下来 `alembic` 直接 KeyError，且公开视图出现双 head。
+  已登记忽略，notify 改挂公开 head `20261127_1700_cms_ab`
+
 ## 2026-11-28　多站点可用化 + 授权产品轴修复 + 迁移链自洽（⭐）
 
 **【多站点】**
