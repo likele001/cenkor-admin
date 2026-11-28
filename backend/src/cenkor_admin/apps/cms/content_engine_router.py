@@ -1472,6 +1472,20 @@ async def submit_entry_for_review(
         raise HTTPException(404, "Entry not found")
     if entry.status not in ("draft", "approved"):
         raise HTTPException(400, f"当前状态 {entry.status} 不能提交审核")
+
+    # 敏感词拦截放在「提交审核」而不是保存草稿：草稿阶段拦人等于不让人写字，
+    # 真正要守住的是「别把禁用词发出去」这一步。
+    from cenkor_admin.apps.cms.sensitive_service import check_text as _check_sensitive
+
+    _hit = await _check_sensitive(
+        db,
+        entry.site_id or 1,
+        f"{entry.title or ''}\n{entry.content or ''}",
+    )
+    if _hit["blocked"]:
+        _words = "、".join(h["word"] for h in _hit["hits"] if h["level"] == "block")
+        raise HTTPException(422, f"含禁用词：{_words}，请修改后再提交")
+
     old = entry.status
     entry.status = "pending_review"
     await _write_review_log(
