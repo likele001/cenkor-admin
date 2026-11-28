@@ -83,7 +83,25 @@ npm run dev:portal  # 用户中心  http://localhost:5175
 | 锁文件 | **只有根目录 `package-lock.json`**（lockfileVersion 3，含全部 workspace） |
 | 安装位置 | **仓库根**，`npm ci`（或首次 `npm install`） |
 | 依赖落点 | 提升到根 `node_modules/`；`frontend/*` 以**包名**软链（如 `cenkor-admin-web -> ../frontend/admin-web`） |
-| 禁止 | 进 `frontend/*/` 单独 `npm install` / `pnpm install`（会产生第二套 node_modules） |
+| 禁止 | 进 `frontend/*/` 单独跑 `npm install` / `npm ci` / `pnpm install`（见下方警告） |
+
+> 🔴 **为什么绝不能进子目录装 —— 实测后果（2026-11-28）**
+>
+> 在 `frontend/admin-web/` 里跑 `npm ci`，**退出码是 0，看起来完全成功**，
+> 但它会把根 `node_modules` 按「只管 admin-web」重新裁剪：
+>
+> | | 根 node_modules | 其他 workspace | 结果 |
+> |---|---|---|---|
+> | 装之前 | 184 项 | 软链与依赖齐全 | — |
+> | 子目录 `npm ci` 后 | **167 项** | `liquidjs` `markdown-it` `highlight.js` `@unhead` 等 17 项被删 | `npm run build:portal` 报 `Cannot find module 'liquidjs'` |
+>
+> 也就是说：**它不报错，却把别人要用的依赖删了**，故障出现在另一个前端上，
+> 极难联想到是刚才那次「成功」的安装造成的。修复只需回仓库根重跑 `npm ci`。
+>
+> **那 CI 为什么敢在子目录跑？** `.github/workflows/ci.yml` 的 `frontend` matrix
+> 确实是 `working-directory: frontend/<app>` + `npm ci`，但每个 matrix 项跑在
+> **各自独立的全新 runner** 上，只构建那一个 app，不存在「别人的依赖被删」的问题。
+> 本地是多个前端共用一份根 `node_modules`，所以不能照抄 CI 的写法。
 
 ```bash
 cd cenkor-admin            # 仓库根
@@ -93,8 +111,9 @@ npm run build:portal       # 构建用户中心
 bash scripts/build-frontends.sh   # 或一次性构建全部前端
 ```
 
-> `frontend/admin-web/pnpm-workspace.yaml` 是迁到 npm workspaces 之前的**历史残留**，
-> 当前流程不使用 pnpm，看到它不必理会（更不要据此改用 `pnpm install`）。
+> **本项目不用 pnpm。** 仓库里不存在任何 `pnpm-lock.yaml` 或 `pnpm-workspace.yaml`
+> （历史上 pnpm 时代的残留已于 2026-11-28 清理）。若在旧分支或本地还看到这类文件，
+> 那是过时产物，不要据此改用 `pnpm install`。
 
 **依赖环境损坏时的修复顺序**（前两步在仓库根，后两步进子目录验证）：
 

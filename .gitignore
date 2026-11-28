@@ -33,6 +33,15 @@ dist-ssr/
 .nuxt/
 .output/
 
+# 本项目用 npm workspaces：唯一锁文件是根 package-lock.json。
+# 下面这些是 pnpm/yarn 时代的残留，2026-11-28 已清理，禁止再加回来
+# （子项目的 lockfile 会让人误以为可以进子目录单独安装，实测会裁掉别的
+#  workspace 的依赖，且退出码为 0，极难排查 —— 见 docs/dev_guide.md）。
+pnpm-lock.yaml
+pnpm-workspace.yaml
+yarn.lock
+frontend/*/package-lock.json
+
 # ============ IDE / OS ============
 .vscode/
 .idea/
