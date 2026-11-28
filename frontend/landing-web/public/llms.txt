@@ -34,7 +34,7 @@
 - [Cenkor Admin · 全栈容器化部署（含前端，一条命令）](https://admin.cenkor.cn/landing/docs-content/fullstack_deploy.md)
 - [文档索引](https://admin.cenkor.cn/landing/docs-content/index.md)
 - [MCP 接入指南](https://admin.cenkor.cn/landing/docs-content/mcp.md)
-- [数据库迁移：一条公开链、三条闭源支线、一个合流点](https://admin.cenkor.cn/landing/docs-content/migrations.md)
+- [迁移事故复盘与历史（2026-08 ~ 2026-11）](https://admin.cenkor.cn/landing/docs-content/migrations.md)
 - [Cenkor Admin · 裸机部署（systemd + 宝塔反代）](https://admin.cenkor.cn/landing/docs-content/native_deploy.md)
 - [Cenkor Admin · 宝塔 Nginx 反代与伪静态配置说明](https://admin.cenkor.cn/landing/docs-content/nginx_proxy_rewrite.md)
 - [Cenkor Mosaic · 重定位方案](https://admin.cenkor.cn/landing/docs-content/relaunch-ai-cms.md)
