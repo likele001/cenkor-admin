@@ -365,6 +365,25 @@ curl -sI https://admin.cenkor.cn/llms.txt | grep -i content-type
 
 文件由 `frontend/landing-web/scripts/gen-llms-txt.mjs` 生成,数据取自 `src/config/seo.ts` + `docs-manifest.generated.ts`,输出 `public/llms.txt`,随 `vite build` 进 `dist/`,再由 `build-frontends.sh` 的 `rsync -a --delete` 同步到 `frontend/landing/`。**注意 `--delete`**:若 `dist/` 里没有这个文件,线上那份会被删,所以改了生成逻辑必须重新构建。
 
+**`docs-content/*.md` 的 MIME(2026-11-28 补)**:`llms.txt` 索引了 44 篇原始 Markdown,AI 爬虫要直接读正文。但 nginx 的 `mime.types` 里**没有 md**——不声明就退化成 `default_type` 的 `application/octet-stream`,爬虫当成二进制附件直接丢弃。
+
+```nginx
+location ^~ /landing/docs-content/ {
+    root /www/wwwroot/cenkor-admin/frontend/;
+    charset utf-8;
+    # ⚠️ 关键:charset 只对 charset_types 白名单里的类型生效,
+    #    text/markdown 不在默认清单(text/html text/xml text/plain ...)
+    #    漏这行会得到 `text/markdown`(无 charset),中文可能被按 latin-1 解码
+    charset_types text/markdown;
+    types {
+        text/markdown md markdown;
+    }
+    expires 1h;
+}
+```
+
+> 不要图省事去改 `/www/server/nginx/conf/mime.types`:宝塔升级/修复面板时会覆盖该文件,改动丢失且无告警。写在站点 vhost 里才跟仓库走。
+
 ### 4.4 dev 站版(最简)
 
 ```nginx

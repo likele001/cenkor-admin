@@ -64,6 +64,9 @@
   `frontend/landing-web/scripts/gen-llms-txt.mjs` 从 `seo.ts` + `docs-manifest` **生成**（不手写，
   避免与页面漂移），随构建进 `dist/` 再同步到 `frontend/landing/`；伪静态排除清单与 vhost
   精确 `location` 两处都必须加 `llms.txt`，只加一处仍会被 rewrite 吃掉
+- 顺手修掉文档中心的 MIME：`llms.txt` 索引的 44 篇 `docs-content/*.md` 此前返回
+  `application/octet-stream`（nginx 的 `mime.types` 没有 md），爬虫当二进制附件丢弃。
+  现在 `text/markdown; charset=utf-8`；注意 `charset` 需配 `charset_types` 才生效
 
 ## 2026-11-24　部署链路修补：三种容器化方式的 nginx 缺口
 
