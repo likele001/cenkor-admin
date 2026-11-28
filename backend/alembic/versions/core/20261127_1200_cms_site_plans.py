@@ -12,7 +12,7 @@
 `alembic upgrade heads`（down_revision 指向当前 head，链路保持单头）
 
 Revision ID: 20261127_1200_cms_site_plans
-Revises: 20261104_1200_merge_closed_cms
+Revises: 20261104_1100_cms_search_logs
 Create Date: 2026-11-27 12:00
 """
 

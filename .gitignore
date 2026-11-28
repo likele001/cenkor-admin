@@ -210,5 +210,4 @@ frontend/landing/*
 # 代码直接写在内置目录下（非 src/apps），按约定三行登记：
 backend/src/cenkor_admin/apps/monitor/
 backend/src/cenkor_admin/static/apps/monitor/
-backend/alembic/versions/core/2026*_monitor*.py
-backend/alembic/versions/2026*_monitor*.py
+backend/alembic/versions/ext/2026*_monitor*.py
