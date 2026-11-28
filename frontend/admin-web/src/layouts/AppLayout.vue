@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { pluginMenus } from '@/core/plugin'
 import NotificationBell from '@/components/NotificationBell.vue'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
+import SiteSwitcher from '@/components/SiteSwitcher.vue'
 import WsStatus from '@/components/WsStatus.vue'
 
 const router = useRouter()
@@ -369,6 +370,7 @@ async function logout() {
               </svg>
               <span class="hidden md:inline">{{ t('nav.manual', '使用手册') }}</span>
             </a>
+            <SiteSwitcher />
             <NotificationBell v-if="me" />
             <LocaleSwitcher />
             <span v-if="me" class="text-sm text-ink-500 hidden sm:inline">{{ me.nickname || me.username }}</span>

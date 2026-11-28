@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/auth'
+import { getSiteId } from '@/lib/site'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -34,6 +35,12 @@ api.interceptors.request.use((config) => {
   const auth = useAuthStore()
   if (auth.token) {
     config.headers.Authorization = `Bearer ${auth.token}`
+  }
+  // 站点上下文统一在这里注入：页面不用各自记得传，漏一处就会串站。
+  // 站点列表 / 站点增删改由后端 site_router 内部 bypass，不受影响。
+  const siteId = getSiteId()
+  if (siteId) {
+    config.headers['X-Site-Id'] = String(siteId)
   }
   return config
 })
