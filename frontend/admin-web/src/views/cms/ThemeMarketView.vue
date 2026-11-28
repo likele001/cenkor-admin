@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 模板市场 —— 站长浏览/安装第三方主题，开发者上架自己的主题。
  *
@@ -109,7 +111,7 @@ async function loadMarket() {
     marketItems.value = data.items
     marketTotal.value = data.total
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -121,7 +123,7 @@ async function loadInstalled() {
     const { data } = await api.get('/api/v1/cms/theme-market/installed')
     installedItems.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -138,7 +140,7 @@ async function loadMySubmissions() {
       (s: any) => s.dev_method === 'theme'
     )
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -150,7 +152,7 @@ async function loadDevDocs() {
     const { data } = await api.get('/api/v1/developer/docs')
     devDocs.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -162,7 +164,7 @@ async function openDoc(docId: string) {
     docContent.value = data.content
     docTitle.value = data.title
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载文档失败'
+    error.value = e?.response?.data?.detail || t("themeMarket.加载文档_5lajal")
   }
 }
 
@@ -241,8 +243,8 @@ function statusColor(s: string): string {
 <template>
   <div class="p-6">
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">模板市场</h1>
-      <p class="mt-1 text-sm text-gray-500">浏览、安装、管理主题模板</p>
+      <h1 class="text-2xl font-bold text-gray-900">{{ t("themeMarket.模板市场_dti9va") }}</h1>
+      <p class="mt-1 text-sm text-gray-500">{{ t("themeMarket.浏览_13njhr") }}</p>
     </div>
 
     <!-- Tab 导航 -->
@@ -285,14 +287,14 @@ function statusColor(s: string): string {
         <input
           v-model="marketSearch"
           @keyup.enter="loadMarket"
-          placeholder="搜索主题..."
+          :placeholder="t('themeMarket.搜索主题_1msk9u')"
           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         <button
           @click="loadMarket"
           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          搜索
+          {{ t("themeMarket.search") }}
         </button>
       </div>
 
@@ -312,13 +314,13 @@ function statusColor(s: string): string {
               v-if="item.is_free"
               class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full"
             >
-              免费
+              {{ t("themeMarket.免费_elqk") }}
             </span>
             <span
               v-else
               class="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full"
             >
-              付费
+              {{ t("themeMarket.付费_e6ox") }}
             </span>
           </div>
 
@@ -328,8 +330,8 @@ function statusColor(s: string): string {
 
           <div class="mt-3 flex items-center gap-2 text-xs text-gray-500">
             <span>v{{ item.latest_version || item.version }}</span>
-            <span v-if="item.installed" class="text-green-600">已安装</span>
-            <span v-if="item.has_update" class="text-orange-600">可更新</span>
+            <span v-if="item.installed" class="text-green-600">{{ t("themeMarket.已安装_e7owe") }}</span>
+            <span v-if="item.has_update" class="text-orange-600">{{ t("themeMarket.可更新_csne3") }}</span>
           </div>
 
           <button
@@ -347,7 +349,7 @@ function statusColor(s: string): string {
       </div>
 
       <div v-if="marketItems.length === 0" class="text-center py-12 text-gray-500">
-        暂无主题
+        {{ t("themeMarket.暂无主题_dcrhln") }}
       </div>
     </div>
 
@@ -386,17 +388,17 @@ function statusColor(s: string): string {
     <!-- ===== 我的模板 ===== -->
     <div v-if="activeTab === 'mine' && !loading">
       <div v-if="mySubmissions.length === 0" class="text-center py-12 text-gray-500">
-        还没有提交过模板
+        {{ t("themeMarket.还没有提_kr8y4x") }}
       </div>
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">名称</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">版本</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">下载</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">提交时间</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t("themeMarket.name") }}</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t("themeMarket.版本_k06c") }}</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t("themeMarket.status") }}</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t("themeMarket.download") }}</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t("themeMarket.提交时间_cx8exe") }}</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
@@ -425,7 +427,7 @@ function statusColor(s: string): string {
     <div v-if="activeTab === 'docs' && !loading">
       <div class="flex items-center justify-between mb-4">
         <p class="text-sm text-gray-600">
-          模板开发文档。灌入知识库后，AI 能回答模板开发相关问题。
+          {{ t("themeMarket.模板开发_19q89d") }}
         </p>
         <button
           @click="importDocsToKb"
@@ -487,10 +489,10 @@ function statusColor(s: string): string {
         </h2>
 
         <div v-if="!installTarget?.is_free" class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">授权码</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ t("themeMarket.授权码_f31ra") }}</label>
           <input
             v-model="licenseKey"
-            placeholder="请输入购买后获得的授权码"
+            :placeholder="t('themeMarket.请输入购_gdzc6c')"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -501,7 +503,7 @@ function statusColor(s: string): string {
             type="checkbox"
             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span class="text-sm text-gray-700">安装后立即切换为生效主题</span>
+          <span class="text-sm text-gray-700">{{ t("themeMarket.安装后立_1vr9vm") }}</span>
         </label>
 
         <div class="flex gap-3">
@@ -509,7 +511,7 @@ function statusColor(s: string): string {
             @click="showInstallDialog = false"
             class="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
-            取消
+            {{ t("themeMarket.cancel") }}
           </button>
           <button
             @click="doInstall"

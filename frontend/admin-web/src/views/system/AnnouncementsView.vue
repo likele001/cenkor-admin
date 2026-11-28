@@ -39,7 +39,7 @@ async function load() {
     items.value = data.items
     total.value = data.total
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally { loading.value = false }
 }
 
@@ -70,7 +70,7 @@ async function save() {
     showEdit.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '保存失败')
+    alert(e?.response?.data?.detail || t("aiMemory.saveFailed"))
   } finally { saving.value = false }
 }
 
@@ -80,7 +80,7 @@ async function del(item: Announcement) {
     await api.delete(`/api/v1/announcements/${item.id}`)
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '删除失败')
+    alert(e?.response?.data?.detail || t("aiMemory.删除失败_azdahk"))
   }
 }
 
@@ -97,42 +97,42 @@ onMounted(load)
   <div>
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight">公告管理</h1>
-        <p class="text-ink-500">发布和管理企业内部公告</p>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ t("announcements.公告管理_amniw3") }}</h1>
+        <p class="text-ink-500">{{ t("announcements.发布和管_u5r7h5") }}</p>
       </div>
-      <button class="btn-primary" @click="openNew">新建公告</button>
+      <button class="btn-primary" @click="openNew">{{ t("announcements.新建公告_d816w8") }}</button>
     </div>
 
     <div class="card mb-4 flex flex-wrap gap-3 items-center">
-      <input v-model="search" type="text" class="input w-full sm:w-60" placeholder="搜索标题/内容..." @keyup.enter="load" />
+      <input v-model="search" type="text" class="input w-full sm:w-60" :placeholder="t('announcements.搜索标题_1s7r2b')" @keyup.enter="load" />
       <select v-model="categoryFilter" class="input w-full sm:w-32" @change="load">
-        <option value="">全部分类</option>
-        <option value="general">通用</option>
-        <option value="system">系统</option>
-        <option value="urgent">紧急</option>
+        <option value="">{{ t("entryList.全部分类_av9kmt") }}</option>
+        <option value="general">{{ t("announcements.通用_p5ji") }}</option>
+        <option value="system">{{ t("announcements.system") }}</option>
+        <option value="urgent">{{ t("announcements.紧急_ltcu") }}</option>
       </select>
-      <button class="btn-ghost" @click="load">搜索</button>
+      <button class="btn-ghost" @click="load">{{ t("announcements.search") }}</button>
     </div>
 
-    <div v-if="loading" class="card text-ink-500">加载中...</div>
+    <div v-if="loading" class="card text-ink-500">{{ t("announcements.加载中_27k1ha") }}</div>
     <div v-else-if="error" class="card text-red-600">{{ error }}</div>
     <div v-else class="card overflow-hidden p-0">
       <div class="overflow-x-auto"><table class="w-full text-sm">
         <thead class="bg-ink-50 border-b border-ink-200">
           <tr class="text-left text-ink-500">
-            <th class="px-4 py-3 font-medium">标题</th>
-            <th class="px-4 py-3 font-medium">分类</th>
-            <th class="px-4 py-3 font-medium">优先级</th>
-            <th class="px-4 py-3 font-medium">状态</th>
-            <th class="px-4 py-3 font-medium">浏览</th>
-            <th class="px-4 py-3 font-medium">创建时间</th>
-            <th class="px-4 py-3 font-medium">内容预览</th>
-            <th class="px-4 py-3 font-medium text-right">操作</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.title") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.category") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.优先级_bzkvr") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.status") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.浏览_jck9") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.createdAt") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.内容预览_aobpug") }}</th>
+            <th class="px-4 py-3 font-medium text-right">{{ t("announcements.actions") }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="items.length === 0">
-            <td colspan="8" class="px-4 py-12 text-center text-ink-400">暂无公告</td>
+            <td colspan="8" class="px-4 py-12 text-center text-ink-400">{{ t("announcements.暂无公告_dcrnng") }}</td>
           </tr>
           <tr v-for="item in items" :key="item.id" class="border-b border-ink-100 last:border-0 hover:bg-ink-50">
             <td class="px-4 py-3 font-medium">
@@ -156,8 +156,8 @@ onMounted(load)
               </div>
             </td>
             <td class="px-4 py-3 text-right space-x-2">
-              <button class="text-sm text-ink-600 hover:text-ink-900" @click="openEdit(item)">编辑</button>
-              <button class="text-sm text-red-600 hover:underline" @click="del(item)">删除</button>
+              <button class="text-sm text-ink-600 hover:text-ink-900" @click="openEdit(item)">{{ t("announcements.edit") }}</button>
+              <button class="text-sm text-red-600 hover:underline" @click="del(item)">{{ t("announcements.delete") }}</button>
             </td>
           </tr>
         </tbody>
@@ -170,37 +170,37 @@ onMounted(load)
         <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建公告' : '编辑公告' }}</h2>
         <form @submit.prevent="save" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-1.5">标题</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t("announcements.title") }}</label>
             <input v-model="form.title" required class="input" />
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-1.5">分类</label>
+              <label class="block text-sm font-medium mb-1.5">{{ t("announcements.category") }}</label>
               <select v-model="form.category" class="input">
-                <option value="general">通用</option>
-                <option value="system">系统</option>
-                <option value="urgent">紧急</option>
+                <option value="general">{{ t("announcements.通用_p5ji") }}</option>
+                <option value="system">{{ t("announcements.system") }}</option>
+                <option value="urgent">{{ t("announcements.紧急_ltcu") }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1.5">优先级</label>
+              <label class="block text-sm font-medium mb-1.5">{{ t("announcements.优先级_bzkvr") }}</label>
               <select v-model="form.priority" class="input">
-                <option value="low">低</option>
-                <option value="normal">普通</option>
-                <option value="high">高</option>
-                <option value="urgent">紧急</option>
+                <option value="low">{{ t("announcements.低_fny") }}</option>
+                <option value="normal">{{ t("announcements.普通_i7os") }}</option>
+                <option value="high">{{ t("announcements.高_ul4") }}</option>
+                <option value="urgent">{{ t("announcements.紧急_ltcu") }}</option>
               </select>
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">摘要</label>
-            <input v-model="form.summary" class="input" placeholder="可选" />
+            <label class="block text-sm font-medium mb-1.5">{{ t("announcements.摘要_htm1") }}</label>
+            <input v-model="form.summary" class="input" :placeholder="t('announcements.可选_f2ey')" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">内容</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t("announcements.content") }}</label>
             <RichTextEditor v-model="form.content" />
             <div class="mt-3">
-              <span class="block text-xs text-ink-400 mb-1">内容预览</span>
+              <span class="block text-xs text-ink-400 mb-1">{{ t("announcements.内容预览_aobpug") }}</span>
               <div class="border border-ink-200 rounded-lg p-3 bg-ink-50 max-h-60 overflow-auto">
                 <RichTextContent :content="form.content" />
               </div>
@@ -208,15 +208,15 @@ onMounted(load)
           </div>
           <div class="flex gap-4">
             <label class="flex items-center gap-2 text-sm">
-              <input v-model="form.is_pinned" type="checkbox" class="rounded" /> 置顶
+              <input v-model="form.is_pinned" type="checkbox" class="rounded" /> {{ t("announcements.置顶_mifc") }}
             </label>
             <label class="flex items-center gap-2 text-sm">
-              <input v-model="form.is_published" type="checkbox" class="rounded" /> 发布
+              <input v-model="form.is_published" type="checkbox" class="rounded" /> {{ t("announcements.publish") }}
             </label>
           </div>
           <div class="flex gap-3 pt-2">
             <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? '保存中...' : '保存' }}</button>
-            <button type="button" @click="showEdit = false" class="btn-ghost">取消</button>
+            <button type="button" @click="showEdit = false" class="btn-ghost">{{ t("announcements.cancel") }}</button>
           </div>
         </form>
       </div>

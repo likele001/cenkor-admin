@@ -151,20 +151,42 @@ function slugify(text) {
   return `${tag}_${(h >>> 0).toString(36).slice(0, 6)}`
 }
 
+/** common.json 的顶层命名空间集合。
+ *  _extracted/*.json 的顶层键会被 Object.assign 压到与 common.json 同一层，
+ *  若某个裸 key 恰好等于这些命名空间名（如 "app" / "products"），
+ *  就会把 common.json 里的整个对象覆盖成字符串，导致该命名空间下所有子键失效。
+ *  这是 v4 apply 时实际踩到的坑：marketPricing.json 的 "app": "应用"
+ *  干掉了 app.* 全部 17 个子键，登录页标题直接退化显示 "app.name"。 */
+const RESERVED_NS = new Set()
+
+function loadReservedNamespaces() {
+  const commonPath = path.join(LOCALES_DIR, 'zh-CN', 'common.json')
+  if (!fs.existsSync(commonPath)) return
+  try {
+    const d = JSON.parse(fs.readFileSync(commonPath, 'utf8'))
+    for (const [k, v] of Object.entries(d)) {
+      if (v && typeof v === 'object') RESERVED_NS.add(k)
+    }
+  } catch {
+    /* ignore */
+  }
+}
+loadReservedNamespaces()
+
 function newKey(namespace, cnText) {
   const set = slugsByNs.get(namespace) || new Set()
   if (!slugsByNs.has(namespace)) slugsByNs.set(namespace, set)
 
   // 优先用户友好的 pySeg 名（如 loading/saveFailed），冲突时退回内容哈希
   const seg = pySeg[cnText]
-  if (seg && !set.has(seg)) {
+  if (seg && !set.has(seg) && !RESERVED_NS.has(seg)) {
     set.add(seg)
     return `${namespace}.${seg}`
   }
   // 内容哈希是确定性的：同文本必得同 slug，天然可复用
   let slug = slugify(cnText)
   let n = 2
-  while (set.has(slug)) slug = `${slugify(cnText)}_${n++}`
+  while (set.has(slug) || RESERVED_NS.has(slug)) slug = `${slugify(cnText)}_${n++}`
   set.add(slug)
   return `${namespace}.${slug}`
 }

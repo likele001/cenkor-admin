@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted, computed } from 'vue'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
@@ -89,7 +91,7 @@ async function load() {
     for (const r of defaults.value) next[r.kind] = r.pattern
     drafts.value = next
   } catch (e: any) {
-    loadError.value = e?.response?.data?.detail || '规则加载失败'
+    loadError.value = e?.response?.data?.detail || t("urlRules.规则加载_1i3sf0")
   } finally {
     loading.value = false
   }
@@ -112,7 +114,7 @@ async function preview(rule: DefaultRule) {
         pattern: drafts.value[rule.kind] ?? '',
         samples: [],
         conflicts: [],
-        message: e?.response?.data?.detail || '预览失败',
+        message: e?.response?.data?.detail || t("aiMemory.预览失败_jt50ig"),
       },
     }
   } finally {
@@ -132,7 +134,7 @@ async function save(rule: DefaultRule) {
     await load()
   } catch (e: any) {
     // 失败只提示，不重载页面：草稿要留着，用户改一版就能再试
-    saveError.value = `「${rule.label}」保存失败：${e?.response?.data?.detail || '未知错误'}`
+    saveError.value = `「${rule.label}」保存失败：${e?.response?.data?.detail || t("contentHealth.未知错误_diprg1")}`
   } finally {
     saving.value = null
   }

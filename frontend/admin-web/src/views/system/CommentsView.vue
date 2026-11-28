@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
 
@@ -19,19 +21,19 @@ async function load() {
     items.value = data.items || []
     const s = await api.get('/api/v1/comments/stats')
     stats.value = s.data.by_status || {}
-  } catch (e: any) { alert(e?.response?.data?.detail || '加载失败') } finally { loading.value = false }
+  } catch (e: any) { alert(e?.response?.data?.detail || t("dashboard.loadFailed")) } finally { loading.value = false }
 }
 async function act(c: Comment, status: string) {
   await api.patch(`/api/v1/comments/${c.id}`, { status })
   await load()
 }
 async function remove(c: Comment) {
-  if (!window.confirm('确认删除该评论？')) return
+  if (!window.confirm(t("comments.确认删除_1hy5af"))) return
   await api.delete(`/api/v1/comments/${c.id}`)
   await load()
 }
 function statusLabel(s: string) {
-  return ({ pending: '待审核', approved: '已通过', spam: '垃圾', deleted: '已删除' } as Record<string, string>)[s] || s
+  return ({ pending: t("comments.待审核_eftvg"), approved: t("comments.已通过_ego67"), spam: t("comments.垃圾_fd3v"), deleted: t("comments.已删除_e65yu") } as Record<string, string>)[s] || s
 }
 function statusColor(s: string) {
   return ({ pending: 'bg-yellow-50 text-yellow-600', approved: 'bg-green-50 text-green-600', spam: 'bg-red-50 text-red-600', deleted: 'bg-ink-50 text-ink-400' } as Record<string, string>)[s] || 'bg-ink-50'
@@ -43,25 +45,25 @@ onMounted(load)
   <div>
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
-        <h1 class="text-2xl font-semibold tracking-tight">💬 评论管理</h1>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ t("comments.text_1ct9fq") }}</h1>
         <span class="text-sm text-ink-400">M4·P3</span>
         <span v-if="stats.pending" class="text-xs px-2 py-1 bg-yellow-50 text-yellow-600 rounded">{{ stats.pending }} 条待审核</span>
       </div>
       <select v-model="statusFilter" class="input w-40" @change="load">
-        <option value="">全部状态</option>
-        <option value="pending">待审核</option>
-        <option value="approved">已通过</option>
-        <option value="spam">垃圾</option>
-        <option value="deleted">已删除</option>
+        <option value="">{{ t("entryList.全部状态_avez63") }}</option>
+        <option value="pending">{{ t("comments.待审核_eftvg") }}</option>
+        <option value="approved">{{ t("comments.已通过_ego67") }}</option>
+        <option value="spam">{{ t("comments.垃圾_fd3v") }}</option>
+        <option value="deleted">{{ t("comments.已删除_e65yu") }}</option>
       </select>
     </div>
 
     <div class="card overflow-hidden">
-      <div v-if="loading" class="text-ink-500 p-6">加载中…</div>
+      <div v-if="loading" class="text-ink-500 p-6">{{ t("apiKeys.加载中_b0k5km") }}</div>
       <table v-else class="w-full text-sm">
         <thead>
           <tr class="text-left text-ink-400 border-b">
-            <th class="p-3">内容</th><th class="p-3">作者</th><th class="p-3">状态</th><th class="p-3">时间</th><th class="p-3 text-right">操作</th>
+            <th class="p-3">{{ t("comments.content") }}</th><th class="p-3">{{ t("comments.作者_e78p") }}</th><th class="p-3">{{ t("comments.status") }}</th><th class="p-3">{{ t("comments.time") }}</th><th class="p-3 text-right">{{ t("comments.actions") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -78,14 +80,14 @@ onMounted(load)
             <td class="p-3 text-xs text-ink-400">{{ c.created_at ? new Date(c.created_at).toLocaleString() : '' }}</td>
             <td class="p-3 text-right space-x-2 whitespace-nowrap">
               <template v-if="c.status === 'pending'">
-                <button class="btn-ghost text-sm text-green-600" @click="act(c, 'approved')">通过</button>
-                <button class="btn-ghost text-sm text-red-600" @click="act(c, 'reject')">驳回</button>
+                <button class="btn-ghost text-sm text-green-600" @click="act(c, 'approved')">{{ t("comments.通过_past") }}</button>
+                <button class="btn-ghost text-sm text-red-600" @click="act(c, 'reject')">{{ t("comments.驳回_qqx7") }}</button>
               </template>
-              <button v-if="c.status === 'approved'" class="btn-ghost text-sm text-red-600" @click="act(c, 'spam')">垃圾</button>
-              <button class="btn-ghost text-sm text-ink-500" @click="remove(c)">删除</button>
+              <button v-if="c.status === 'approved'" class="btn-ghost text-sm text-red-600" @click="act(c, 'spam')">{{ t("comments.垃圾_fd3v") }}</button>
+              <button class="btn-ghost text-sm text-ink-500" @click="remove(c)">{{ t("comments.delete") }}</button>
             </td>
           </tr>
-          <tr v-if="!items.length"><td colspan="5" class="p-6 text-center text-ink-400">暂无评论</td></tr>
+          <tr v-if="!items.length"><td colspan="5" class="p-6 text-center text-ink-400">{{ t("comments.暂无评论_dd1vv8") }}</td></tr>
         </tbody>
       </table>
     </div>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * Agent 工作流编排 · 拖拽画布。
  *
@@ -236,7 +238,7 @@ async function openFlow(id: number) {
     dirty.value = false
     await loadRuns()
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '打开失败', true)
+    toast(e?.response?.data?.detail || t("workflowStudio.打开失败_cst6g1"), true)
   } finally {
     loading.value = false
   }
@@ -253,7 +255,7 @@ async function createFlow(template?: string) {
     await openFlow(data.item.id)
     toast(template ? '已按模板铺好整条内容生产链' : '已创建，右侧可以拖步骤进来')
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '创建失败', true)
+    toast(e?.response?.data?.detail || t("workflowStudio.创建失败_ar5wgj"), true)
   }
 }
 
@@ -272,7 +274,7 @@ async function saveFlow() {
     await loadFlows()
     toast('已保存')
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '保存失败', true)
+    toast(e?.response?.data?.detail || t("aiMemory.saveFailed"), true)
   } finally {
     saving.value = false
   }
@@ -284,12 +286,12 @@ async function validateFlow() {
     if (data.ok) toast(`校验通过，执行顺序：${(data.order || []).join(' → ')}`)
     else toast(`发现 ${data.problems.length} 个问题：${data.problems.join('；')}`, true)
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '校验失败', true)
+    toast(e?.response?.data?.detail || t("workflowStudio.校验失败_drw0kf"), true)
   }
 }
 
 async function deleteFlow(id: number) {
-  if (!window.confirm('删除这个工作流？执行历史也会一起没。')) return
+  if (!window.confirm(t("workflowStudio.删除这个_1opxl5"))) return
   try {
     await api.delete(`/api/v1/cms/ai/workflow/flows/${id}`)
     if (currentId.value === id) {
@@ -299,7 +301,7 @@ async function deleteFlow(id: number) {
     await loadFlows()
     toast('已删除')
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '删除失败', true)
+    toast(e?.response?.data?.detail || t("aiMemory.删除失败_azdahk"), true)
   }
 }
 
@@ -417,7 +419,7 @@ function autoLayout() {
 function insertVar(v: string) {
   const key = varTarget.value
   if (!key) {
-    toast('先在下面选中一个参数，再点变量', true)
+    toast(t("workflowStudio.先在下面_1xew0v"), true)
     return
   }
   const n = selected.value
@@ -448,7 +450,7 @@ async function triggerRun() {
     toast(`已触发，执行 #${data.run_id} 开始跑`)
     pollRun(data.run_id)
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '触发失败', true)
+    toast(e?.response?.data?.detail || t("workflowStudio.触发失败_hqv3lr"), true)
   } finally {
     running.value = false
   }
@@ -489,27 +491,27 @@ async function openRunDetail(id: number) {
     const { data } = await api.get(`/api/v1/cms/ai/workflow/runs/${id}`)
     runDetail.value = data
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '读取失败', true)
+    toast(e?.response?.data?.detail || t("workflowStudio.读取失败_i0bjbj"), true)
   }
 }
 
 async function rerun(id: number) {
   try {
     await api.post(`/api/v1/cms/ai/workflow/runs/${id}/rerun`)
-    toast('已重跑：成功的步骤直接复用产出，不重复调模型')
+    toast(t("workflowStudio.已重跑_u6bpct"))
     pollRun(id)
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '重跑失败', true)
+    toast(e?.response?.data?.detail || t("workflowStudio.重跑失败_iz8o1k"), true)
   }
 }
 
 async function cancelRun(id: number) {
   try {
     await api.post(`/api/v1/cms/ai/workflow/runs/${id}/cancel`)
-    toast('已取消')
+    toast(t("workflowStudio.已取消_e68dg"))
     await loadRuns()
   } catch (e: any) {
-    toast(e?.response?.data?.detail || '取消失败', true)
+    toast(e?.response?.data?.detail || t("workflowStudio.取消失败_b15iiu"), true)
   }
 }
 
@@ -539,25 +541,25 @@ nextTick(() => {})
   <div class="min-h-screen bg-ink-50 flex flex-col">
     <header class="bg-white border-b border-ink-200 flex-none">
       <div class="px-5 h-14 flex items-center gap-3">
-        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">← AI 驾驶舱</router-link>
-        <span class="font-semibold">Agent 工作流编排</span>
-        <span class="text-xs text-ink-400">把 AI 能力串成流水线 · 手动跑或定时跑</span>
+        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">{{ t("contentHealth.text_11m1s0") }}</router-link>
+        <span class="font-semibold">{{ t("workflowStudio.text_1fdqo5") }}</span>
+        <span class="text-xs text-ink-400">{{ t("workflowStudio.把_q7oyhk") }}</span>
         <div class="ml-auto flex items-center gap-2">
           <select
             class="text-sm rounded-lg border border-ink-200 px-2 py-1.5 max-w-56"
             :value="currentId ?? ''"
             @change="openFlow(Number(($event.target as HTMLSelectElement).value))"
           >
-            <option value="">选择工作流…</option>
+            <option value="">{{ t("workflowStudio.选择工作_sk4h24") }}</option>
             <option v-for="f in flows" :key="f.id" :value="f.id">
               {{ f.name }}（{{ f.node_count ?? 0 }} 步）
             </option>
           </select>
           <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="createFlow('content_chain')">
-            按模板新建
+            {{ t("workflowStudio.按模板新_19w384") }}
           </button>
           <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="createFlow()">
-            空白新建
+            {{ t("workflowStudio.空白新建_fxywgd") }}
           </button>
         </div>
       </div>
@@ -574,8 +576,8 @@ nextTick(() => {})
       <!-- 左：步骤面板 -->
       <aside class="w-60 bg-white border-r border-ink-200 overflow-y-auto flex-none">
         <div class="px-4 py-3 border-b border-ink-100">
-          <h3 class="text-sm font-semibold">可用步骤</h3>
-          <p class="text-[11px] text-ink-400 mt-0.5">点一下加到画布</p>
+          <h3 class="text-sm font-semibold">{{ t("workflowStudio.可用步骤_b2surc") }}</h3>
+          <p class="text-[11px] text-ink-400 mt-0.5">{{ t("workflowStudio.点一下加_zrgny4") }}</p>
         </div>
         <div v-for="(list, gname) in groups" :key="gname" class="px-3 pt-3">
           <div class="text-[11px] text-ink-400 px-1 mb-1.5">{{ gname }}</div>
@@ -591,43 +593,43 @@ nextTick(() => {})
         </div>
 
         <div v-if="currentId" class="px-3 py-4 border-t border-ink-100 mt-3">
-          <h3 class="text-sm font-semibold mb-2">运行输入</h3>
+          <h3 class="text-sm font-semibold mb-2">{{ t("workflowStudio.运行输入_ipnh66") }}</h3>
           <div v-for="i in graph.inputs" :key="i.key" class="mb-2">
             <div class="text-[11px] text-ink-500">{{ i.label }}<span v-if="i.required" class="text-red-500">*</span></div>
             <div class="text-[11px] text-ink-400 truncate">{{ i.key }}</div>
           </div>
-          <p v-if="!graph.inputs.length" class="text-[11px] text-ink-400">没有输入项，节点里直接写死参数即可。</p>
+          <p v-if="!graph.inputs.length" class="text-[11px] text-ink-400">{{ t("workflowStudio.没有输入_1wjwdz") }}</p>
         </div>
       </aside>
 
       <!-- 中：画布 -->
       <main class="flex-1 overflow-auto relative">
         <div v-if="!currentId" class="h-full flex items-center justify-center text-ink-400 text-sm">
-          左侧选一个工作流，或新建一个
+          {{ t("workflowStudio.左侧选一_um8ewm") }}
         </div>
         <div v-else class="p-5">
           <div class="bg-white border border-ink-200 rounded-xl mb-4 p-3">
             <div class="flex items-center gap-3 flex-wrap">
-              <input v-model="flowName" class="text-sm rounded-lg border border-ink-200 px-3 py-1.5 w-56" placeholder="工作流名称" />
-              <input v-model="flowDesc" class="text-sm rounded-lg border border-ink-200 px-3 py-1.5 w-72" placeholder="一句话说明这条流水线干什么" />
+              <input v-model="flowName" class="text-sm rounded-lg border border-ink-200 px-3 py-1.5 w-56" :placeholder="t('workflowStudio.工作流名_mfpogd')" />
+              <input v-model="flowDesc" class="text-sm rounded-lg border border-ink-200 px-3 py-1.5 w-72" :placeholder="t('workflowStudio.一句话说_nopzgo')" />
               <select v-model="triggerType" class="text-sm rounded-lg border border-ink-200 px-2 py-1.5">
-                <option value="manual">手动触发</option>
-                <option value="schedule">定时触发</option>
+                <option value="manual">{{ t("workflowStudio.手动触发_cr2yaw") }}</option>
+                <option value="schedule">{{ t("workflowStudio.定时触发_bziybr") }}</option>
               </select>
               <input
                 v-if="triggerType === 'schedule'"
                 v-model="cron"
                 class="text-sm rounded-lg border border-ink-200 px-3 py-1.5 w-44"
-                placeholder="cron，如 0 8 * * 1"
+                :placeholder="t('workflowStudio.text_f3ja35')"
               />
-              <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="autoLayout">自动排列</button>
-              <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="validateFlow">校验</button>
+              <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="autoLayout">{{ t("workflowStudio.自动排列_gqha2r") }}</button>
+              <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="validateFlow">{{ t("workflowStudio.校验_ik5n") }}</button>
               <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" :disabled="saving" @click="saveFlow">
                 {{ saving ? '保存中…' : dirty ? '保存*' : '已保存' }}
               </button>
-              <button class="btn-primary" @click="openRun">运行</button>
+              <button class="btn-primary" @click="openRun">{{ t("workflowStudio.运行_p7jw") }}</button>
               <button class="ml-auto px-3 py-1.5 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50" @click="deleteFlow(currentId)">
-                删除
+                {{ t("workflowStudio.delete") }}
               </button>
             </div>
           </div>
@@ -679,7 +681,7 @@ nextTick(() => {})
                 <span class="text-[11px] text-ink-400 truncate flex-1">{{ n.type }}</span>
                 <span
                   class="w-2.5 h-2.5 rounded-full bg-ink-300 hover:bg-indigo-500 cursor-crosshair flex-none"
-                  title="拖到另一个节点上建立连线"
+                  :title="t('workflowStudio.拖到另一_2m73j')"
                   @mousedown="startLink(n, $event)"
                 />
               </div>
@@ -690,8 +692,8 @@ nextTick(() => {})
 
             <div v-if="!graph.nodes.length" class="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div class="text-center text-ink-400 text-sm">
-                <p>从左侧点一个步骤开始搭</p>
-                <p class="text-xs mt-1">节点的圆点拖到另一个节点上 = 先后关系</p>
+                <p>{{ t("workflowStudio.从左侧点_1kidif") }}</p>
+                <p class="text-xs mt-1">{{ t("workflowStudio.节点的圆_1ku065") }}</p>
               </div>
             </div>
           </div>
@@ -723,19 +725,19 @@ nextTick(() => {})
             :class="rightTab === 'params' ? 'border-indigo-500 text-ink-900 font-medium' : 'border-transparent text-ink-400'"
             @click="rightTab = 'params'"
           >
-            参数
+            {{ t("workflowStudio.参数_esxa") }}
           </button>
           <button
             class="flex-1 px-3 py-2.5 text-sm border-b-2"
             :class="rightTab === 'runs' ? 'border-indigo-500 text-ink-900 font-medium' : 'border-transparent text-ink-400'"
             @click="rightTab = 'runs'"
           >
-            执行记录
+            {{ t("workflowStudio.执行记录_czg1m2") }}
           </button>
         </div>
 
         <div v-if="rightTab === 'params'" class="p-4">
-          <div v-if="!selected" class="text-sm text-ink-400">在画布上点一个节点</div>
+          <div v-if="!selected" class="text-sm text-ink-400">{{ t("workflowStudio.在画布上_1vjzx7") }}</div>
           <div v-else>
             <div class="flex items-center gap-2 mb-1">
               <span class="text-sm font-semibold">{{ selected.title || selectedSpec?.title }}</span>
@@ -744,7 +746,7 @@ nextTick(() => {})
             <p class="text-[11px] text-ink-400 mb-3">{{ selectedSpec?.desc }}</p>
 
             <div class="mb-3">
-              <label class="text-[11px] text-ink-500">节点标题</label>
+              <label class="text-[11px] text-ink-500">{{ t("workflowStudio.节点标题_gxm0q0") }}</label>
               <input
                 v-model="selected.title"
                 class="w-full text-sm rounded-lg border border-ink-200 px-2.5 py-1.5 mt-1"
@@ -760,7 +762,7 @@ nextTick(() => {})
                   class="ml-auto text-[11px] text-indigo-500 hover:text-indigo-700"
                   @click="varTarget = f.key; showVars = !showVars"
                 >
-                  引用变量
+                  {{ t("workflowStudio.引用变量_chb5d6") }}
                 </button>
               </label>
               <textarea
@@ -817,7 +819,7 @@ nextTick(() => {})
             </div>
 
             <div class="mb-3">
-              <label class="text-[11px] text-ink-500">失败重试次数</label>
+              <label class="text-[11px] text-ink-500">{{ t("workflowStudio.失败重试_gq6u5n") }}</label>
               <input
                 v-model.number="selected.retries"
                 type="number"
@@ -827,7 +829,7 @@ nextTick(() => {})
                 @input="dirty = true"
               />
               <p v-if="selectedSpec && !selectedSpec.retryable" class="text-[11px] text-amber-600 mt-1">
-                这步有副作用（会写库/会发布），重试会造重复数据，所以不重试。
+                {{ t("workflowStudio.这步有副_c9m2co") }}
               </p>
             </div>
 
@@ -835,13 +837,13 @@ nextTick(() => {})
               class="px-3 py-1.5 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
               @click="removeNode(selected.id)"
             >
-              删除节点
+              {{ t("workflowStudio.删除节点_azk5vf") }}
             </button>
           </div>
         </div>
 
         <div v-else class="p-4">
-          <div v-if="!runs.length" class="text-sm text-ink-400">还没有执行记录</div>
+          <div v-if="!runs.length" class="text-sm text-ink-400">{{ t("workflowStudio.还没有执_wsy7pm") }}</div>
           <div v-for="r in runs" :key="r.id" class="mb-2 border border-ink-200 rounded-lg p-2.5">
             <div class="flex items-center gap-2">
               <span class="text-xs px-1.5 py-0.5 rounded border" :class="STATUS_STYLE[r.status] || STATUS_STYLE.pending">
@@ -854,14 +856,14 @@ nextTick(() => {})
               {{ r.error || JSON.stringify(r.input).slice(0, 80) }}
             </div>
             <div class="flex gap-2 mt-2">
-              <button class="text-[11px] text-indigo-600 hover:underline" @click="openRunDetail(r.id)">详情</button>
-              <button class="text-[11px] text-ink-500 hover:underline" @click="rerun(r.id)">重跑</button>
+              <button class="text-[11px] text-indigo-600 hover:underline" @click="openRunDetail(r.id)">{{ t("workflowStudio.detail") }}</button>
+              <button class="text-[11px] text-ink-500 hover:underline" @click="rerun(r.id)">{{ t("workflowStudio.重跑_pktg") }}</button>
               <button
                 v-if="r.status === 'running' || r.status === 'pending'"
                 class="text-[11px] text-ink-500 hover:underline"
                 @click="cancelRun(r.id)"
               >
-                取消
+                {{ t("workflowStudio.cancel") }}
               </button>
             </div>
           </div>
@@ -878,7 +880,7 @@ nextTick(() => {})
               </div>
               <p v-if="s.error" class="text-[11px] text-red-600 mt-1 break-all">{{ s.error }}</p>
               <details v-else-if="Object.keys(s.output || {}).length" class="mt-1">
-                <summary class="text-[11px] text-ink-400 cursor-pointer">看输出</summary>
+                <summary class="text-[11px] text-ink-400 cursor-pointer">{{ t("workflowStudio.看输出_i4kya") }}</summary>
                 <pre class="text-[10px] bg-ink-50 rounded p-2 mt-1 overflow-x-auto whitespace-pre-wrap break-all">{{
                   JSON.stringify(s.output, null, 1).slice(0, 1200)
                 }}</pre>
@@ -892,9 +894,9 @@ nextTick(() => {})
     <!-- 运行弹窗 -->
     <div v-if="showRun" class="fixed inset-0 bg-black/30 flex items-center justify-center z-50" @click.self="showRun = false">
       <div class="bg-white rounded-2xl shadow-xl w-[520px] max-w-[92vw] p-6">
-        <h3 class="font-semibold mb-1">运行这条流水线</h3>
+        <h3 class="font-semibold mb-1">{{ t("workflowStudio.运行这条_jlqijs") }}</h3>
         <p class="text-xs text-ink-400 mb-4">
-          一条完整链路大约 1~3 分钟（4~5 次模型调用）。执行期间可以关掉页面，跑完在「执行记录」里看。
+          {{ t("workflowStudio.一条完整_kd76r6") }}
         </p>
         <div v-for="i in graph.inputs" :key="i.key" class="mb-3">
           <label class="text-[11px] text-ink-500">{{ i.label }}<span v-if="i.required" class="text-red-500">*</span></label>
@@ -904,9 +906,9 @@ nextTick(() => {})
             :placeholder="i.help"
           />
         </div>
-        <p v-if="!graph.inputs.length" class="text-sm text-ink-400 mb-4">这条流水线没有输入项，直接跑。</p>
+        <p v-if="!graph.inputs.length" class="text-sm text-ink-400 mb-4">{{ t("workflowStudio.这条流水_gx5hv") }}</p>
         <div class="flex justify-end gap-2 mt-5">
-          <button class="px-4 py-2 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="showRun = false">取消</button>
+          <button class="px-4 py-2 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="showRun = false">{{ t("workflowStudio.cancel") }}</button>
           <button class="btn-primary" :disabled="running" @click="triggerRun">
             {{ running ? '触发中…' : '开始运行' }}
           </button>

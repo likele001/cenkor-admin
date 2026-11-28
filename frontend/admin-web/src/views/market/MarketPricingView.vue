@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 应用市场 · 商品与扣点（平台侧全量视图）。
  * GET /api/v1/store/market/pricing        全量商品 + 归属 + 生效扣点 + 销量
@@ -102,7 +104,7 @@ async function save() {
     return
   }
   if (meta.value.owner === 'developer' && !meta.value.developer_id) {
-    formError.value = '请选择归属开发者'
+    formError.value = t("marketPricing.请选择归_3y4m29")
     return
   }
 
@@ -133,34 +135,34 @@ async function save() {
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-ink-200">
         <div>
-          <h2 class="font-semibold">商品与扣点</h2>
+          <h2 class="font-semibold">{{ t("marketPricing.商品与扣_1obbh9") }}</h2>
           <p class="text-xs text-ink-500 mt-1">
             共 {{ total }} 个商品 · 全局默认扣点 {{ bpToPercent(defaultFeeBp) }}%
           </p>
         </div>
-        <input v-model="keyword" class="input !w-56" placeholder="搜索 app_key" />
+        <input v-model="keyword" class="input !w-56" :placeholder="t('marketPricing.搜索_mamtnr')" />
       </div>
 
-      <div v-if="loading" class="p-6 text-ink-500 text-sm">加载中…</div>
+      <div v-if="loading" class="p-6 text-ink-500 text-sm">{{ t("apiKeys.加载中_b0k5km") }}</div>
       <div v-else-if="error" class="p-8 text-center">
         <p class="text-red-600 mb-4 text-sm">{{ error }}</p>
-        <button class="btn-primary" @click="load">重新加载</button>
+        <button class="btn-primary" @click="load">{{ t("marketDevelopers.重新加载_itbyqo") }}</button>
       </div>
       <div v-else-if="items.length === 0" class="p-10 text-center text-ink-500 text-sm">
-        还没有配置定价的商品
+        {{ t("marketPricing.还没有配_wvhsox") }}
       </div>
 
       <table v-else class="w-full text-sm">
         <thead class="text-left text-ink-500 border-b border-ink-200">
           <tr>
-            <th class="px-3 py-2 font-normal">应用</th>
-            <th class="px-3 py-2 font-normal">归属</th>
-            <th class="px-3 py-2 font-normal">模式</th>
-            <th class="px-3 py-2 font-normal text-right">售价</th>
-            <th class="px-3 py-2 font-normal text-right">生效扣点</th>
-            <th class="px-3 py-2 font-normal text-right">销量</th>
-            <th class="px-3 py-2 font-normal text-right">成交额</th>
-            <th class="px-3 py-2 font-normal text-right">操作</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketPricing.应用_gqac") }}</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketPricing.归属_gpxo") }}</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketPricing.模式_ikni") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketPricing.售价_ex6x") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketPricing.生效扣点_f74adb") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketPricing.销量_q573") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketPricing.成交额_eramh") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketPricing.actions") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -181,14 +183,14 @@ async function save() {
               </div>
             </td>
             <td class="px-3 py-3 text-right">
-              <div v-if="r.model === 'free'">免费</div>
+              <div v-if="r.model === 'free'">{{ t("marketPricing.免费_elqk") }}</div>
               <template v-else>
                 <div class="flex items-center justify-end gap-1.5 flex-wrap">
-                  <span>¥{{ r.unit_price }}<span v-if="r.model === 'seat'" class="text-xs text-ink-400">/席位</span></span>
+                  <span>¥{{ r.unit_price }}<span v-if="r.model === 'seat'" class="text-xs text-ink-400">{{ t("marketPricing.text_hf73") }}</span></span>
                   <span
                     v-if="r.is_discounted"
                     class="text-xs text-ink-400 line-through"
-                    title="原价（划线价，仅展示不参与结算）"
+                    :title="t('marketPricing.原价_1rm6if')"
                   >¥{{ r.model === 'seat' ? r.seat_list_price : r.list_price }}</span>
                   <span
                     v-if="r.discount_label"
@@ -206,13 +208,13 @@ async function save() {
             </td>
             <td class="px-3 py-3 text-right">
               {{ r.effective_fee_percent }}%
-              <div v-if="r.fee_overridden" class="text-xs text-amber-600">已覆盖</div>
-              <div v-else class="text-xs text-ink-400">默认</div>
+              <div v-if="r.fee_overridden" class="text-xs text-amber-600">{{ t("marketPricing.已覆盖_efeyq") }}</div>
+              <div v-else class="text-xs text-ink-400">{{ t("marketPricing.默认_rs98") }}</div>
             </td>
             <td class="px-3 py-3 text-right">{{ r.order_count }}</td>
             <td class="px-3 py-3 text-right">¥{{ centsToYuan(r.paid_cents) }}</td>
             <td class="px-3 py-3 text-right">
-              <button class="text-xs text-blue-600 hover:text-blue-800" @click="openEdit(r)">编辑</button>
+              <button class="text-xs text-blue-600 hover:text-blue-800" @click="openEdit(r)">{{ t("marketPricing.edit") }}</button>
             </td>
           </tr>
         </tbody>
@@ -221,9 +223,9 @@ async function save() {
       <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 text-sm">
         <span class="text-ink-500">共 {{ total }} 条</span>
         <div class="flex items-center gap-2">
-          <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">上一页</button>
+          <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">{{ t("marketPricing.上一页_btlof") }}</button>
           <span class="text-ink-500">{{ page }} / {{ totalPages }}</span>
-          <button class="btn-outline !py-1 !px-3" :disabled="page >= totalPages" @click="page++">下一页</button>
+          <button class="btn-outline !py-1 !px-3" :disabled="page >= totalPages" @click="page++">{{ t("marketPricing.下一页_btmf4") }}</button>
         </div>
       </div>
     </div>
@@ -233,7 +235,7 @@ async function save() {
       <div class="bg-white rounded-2xl w-full max-w-2xl my-8 shadow-xl">
         <div class="px-5 py-4 border-b border-ink-200 flex items-center justify-between">
           <div>
-            <h3 class="font-semibold">编辑商品</h3>
+            <h3 class="font-semibold">{{ t("marketPricing.编辑商品_gmhqye") }}</h3>
             <p class="text-xs text-ink-500 mt-0.5">{{ current?.app_name }} · <code>{{ current?.app_key }}</code></p>
           </div>
           <button class="text-ink-400 hover:text-ink-900" @click="showEdit = false">✕</button>
@@ -242,29 +244,29 @@ async function save() {
         <div class="px-5 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
           <!-- 归属 -->
           <div class="rounded-xl border border-ink-200 p-3 space-y-3">
-            <div class="text-xs font-medium text-ink-600">商品归属（决定收入归谁）</div>
+            <div class="text-xs font-medium text-ink-600">{{ t("marketPricing.商品归属_nbia2r") }}</div>
             <div class="flex gap-4 text-sm">
               <label class="inline-flex items-center gap-2 cursor-pointer">
                 <input v-model="meta.owner" type="radio" value="platform" />
-                <span>平台自营（收入全额归平台）</span>
+                <span>{{ t("marketPricing.平台自营_nyaefi") }}</span>
               </label>
               <label class="inline-flex items-center gap-2 cursor-pointer">
                 <input v-model="meta.owner" type="radio" value="developer" />
-                <span>归属开发者</span>
+                <span>{{ t("marketPricing.归属开发_tldpc8") }}</span>
               </label>
             </div>
             <select v-if="meta.owner === 'developer'" v-model.number="meta.developer_id" class="input">
-              <option :value="0">请选择开发者…</option>
+              <option :value="0">{{ t("marketPricing.请选择开_w4um89") }}</option>
               <option v-for="d in devOptions" :key="d.id" :value="d.id">
                 {{ d.display_name }}（#{{ d.id }}{{ d.email ? ' · ' + d.email : '' }}）
               </option>
             </select>
-            <p class="text-xs text-ink-400">改归属只影响之后的新订单，历史订单分账已快照。</p>
+            <p class="text-xs text-ink-400">{{ t("marketPricing.改归属只_1qhivr") }}</p>
           </div>
 
           <!-- 扣点 -->
           <div class="rounded-xl border border-ink-200 p-3 space-y-3">
-            <div class="text-xs font-medium text-ink-600">单应用扣点</div>
+            <div class="text-xs font-medium text-ink-600">{{ t("marketPricing.单应用扣_1i4dsw") }}</div>
             <div class="flex gap-4 text-sm">
               <label class="inline-flex items-center gap-2 cursor-pointer">
                 <input v-model="meta.fee_mode" type="radio" value="default" />
@@ -272,7 +274,7 @@ async function save() {
               </label>
               <label class="inline-flex items-center gap-2 cursor-pointer">
                 <input v-model="meta.fee_mode" type="radio" value="override" />
-                <span>单独设置</span>
+                <span>{{ t("marketPricing.单独设置_azw3c7") }}</span>
               </label>
             </div>
             <div v-if="meta.fee_mode === 'override'" class="flex items-center gap-2">
@@ -280,7 +282,7 @@ async function save() {
               <span class="text-sm text-ink-500">%</span>
             </div>
             <p v-if="meta.owner === 'platform'" class="text-xs text-amber-600">
-              平台自营商品不抽成，扣点恒为 0。
+              {{ t("marketPricing.平台自营_17p7b2") }}
             </p>
           </div>
 
@@ -291,7 +293,7 @@ async function save() {
         </div>
 
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
-          <button class="btn-ghost" @click="showEdit = false">取消</button>
+          <button class="btn-ghost" @click="showEdit = false">{{ t("marketPricing.cancel") }}</button>
           <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存' }}</button>
         </div>
       </div>

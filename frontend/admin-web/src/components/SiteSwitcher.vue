@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
 import { getSiteId, setSiteId } from '@/lib/site'
@@ -37,7 +39,7 @@ onMounted(load)
 </script>
 
 <template>
-  <label v-if="sites.length" class="inline-flex items-center gap-1.5 shrink-0" title="切换当前站点">
+  <label v-if="sites.length" class="inline-flex items-center gap-1.5 shrink-0" :title="t('siteSwitcher.切换当前_17ycpz')">
     <svg class="w-4 h-4 text-ink-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4" />
     </svg>
@@ -51,11 +53,11 @@ onMounted(load)
     v-if="sites.length"
     to="/cms/sites"
     class="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-sm text-ink-500 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 shrink-0"
-    title="管理站点"
+    :title="t('siteSwitcher.管理站点_g2xyrp')"
   >
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
     </svg>
-    <span class="hidden md:inline">站点</span>
+    <span class="hidden md:inline">{{ t("siteSwitcher.站点_liio") }}</span>
   </router-link>
 </template>

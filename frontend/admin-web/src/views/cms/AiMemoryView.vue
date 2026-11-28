@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * AI 记忆页。
  *
@@ -126,7 +128,7 @@ async function load() {
     stats.value = data.stats
     scopes.value = data.scopes ?? []
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '加载失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -140,7 +142,7 @@ async function loadPreview() {
     })
     preview.value = data
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '预览失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.预览失败_jt50ig")
   } finally {
     previewBusy.value = false
   }
@@ -171,7 +173,7 @@ function openEditor(it?: MemoryItem, scope?: string) {
 
 async function saveMemory() {
   if (!draft.value.content.trim()) {
-    errorMsg.value = '内容不能为空'
+    errorMsg.value = t("aiMemory.内容不能_lhkgdg")
     return
   }
   busy.value = 'save'
@@ -192,7 +194,7 @@ async function saveMemory() {
     await load()
     await loadPreview()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '保存失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.saveFailed")
   } finally {
     busy.value = ''
   }
@@ -206,7 +208,7 @@ async function setStatus(it: MemoryItem, status: string) {
     await load()
     await loadPreview()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '操作失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.操作失败_d1rj43")
   } finally {
     busy.value = ''
   }
@@ -219,7 +221,7 @@ async function toggleEnabled(it: MemoryItem) {
     await load()
     await loadPreview()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '操作失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.操作失败_d1rj43")
   } finally {
     busy.value = ''
   }
@@ -230,11 +232,11 @@ async function removeMemory(it: MemoryItem) {
   busy.value = `d-${it.id}`
   try {
     await api.delete(`/api/v1/cms/ai/memory/${it.id}`)
-    okMsg.value = '已删除'
+    okMsg.value = t("aiMemory.已删除_e65yu")
     await load()
     await loadPreview()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '删除失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.删除失败_azdahk")
   } finally {
     busy.value = ''
   }
@@ -250,7 +252,7 @@ async function approveAll() {
     await load()
     await loadPreview()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '操作失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.操作失败_d1rj43")
   } finally {
     busy.value = ''
   }
@@ -267,7 +269,7 @@ async function distill() {
       { params: { sample: 12 }, timeout: 300_000 },
     )
     if (!data.ok) {
-      errorMsg.value = data.reason || '样本不足'
+      errorMsg.value = data.reason || t("aiMemory.样本不足_dkp9sr")
     } else if (!data.created) {
       okMsg.value = `已分析 ${data.sample} 篇，没有新的可提炼项（已有建议未处理）`
     } else {
@@ -275,7 +277,7 @@ async function distill() {
     }
     await load()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '提炼失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.提炼失败_d25yww")
   } finally {
     busy.value = ''
   }
@@ -296,7 +298,7 @@ async function rebuildDigests() {
     await load()
     if (digestOpen.value) await loadDigests()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '重建失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.重建失败_isdokh")
   } finally {
     busy.value = ''
   }
@@ -365,7 +367,7 @@ async function loadSessions() {
     sessions.value = data.items ?? []
     sessionStats.value = data.stats ?? null
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '会话加载失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.会话加载_1nc33u")
   }
 }
 
@@ -376,7 +378,7 @@ async function openSession(id: number) {
     sessionDetail.value = data
     noteText.value = ''
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '会话详情加载失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.会话详情_1tienb")
   } finally {
     sessionBusy.value = ''
   }
@@ -400,7 +402,7 @@ async function addNote() {
     okMsg.value = '备注已写入，下次 AI 处理这篇会带上'
     await loadSessions()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '备注写入失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.备注写入_4ij135")
   } finally {
     sessionBusy.value = ''
   }
@@ -421,15 +423,15 @@ async function removeTurn(t: TurnItem) {
 }
 
 async function removeSession(s: SessionItem) {
-  if (!confirm(`删除「${s.title || '未命名'}」的整条会话？时间线将全部清空。`)) return
+  if (!confirm(`删除「${s.title || t("aiMemory.未命名_fitay")}」的整条会话？时间线将全部清空。`)) return
   sessionBusy.value = `sess-${s.id}`
   try {
     await api.delete(`/api/v1/cms/ai/sessions/${s.id}`)
     if (sessionDetail.value?.id === s.id) sessionDetail.value = null
     await loadSessions()
-    okMsg.value = '会话已删除'
+    okMsg.value = t("aiMemory.会话已删_177230")
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || '删除失败'
+    errorMsg.value = e?.response?.data?.detail || t("aiMemory.删除失败_azdahk")
   } finally {
     sessionBusy.value = ''
   }

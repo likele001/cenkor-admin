@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 内容体检页。
  *
@@ -187,7 +189,7 @@ async function load() {
     })
     report.value = data
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '体检失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("contentHealth.体检失败_afyt29")
   } finally {
     loading.value = false
   }
@@ -233,9 +235,9 @@ async function exportReport(fmt: 'html' | 'md') {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-    exportMsg.value = fmt === 'html' ? 'HTML 报告已下载，可直接发客户或打印成 PDF' : 'Markdown 报告已下载'
+    exportMsg.value = fmt === 'html' ? t("contentHealth.text_11t59o") : 'Markdown 报告已下载'
   } catch (e: any) {
-    exportMsg.value = `导出失败：${e?.response?.data?.detail || e?.message || '未知错误'}`
+    exportMsg.value = `导出失败：${e?.response?.data?.detail || e?.message || t("contentHealth.未知错误_diprg1")}`
   } finally {
     exporting.value = ''
   }
@@ -252,7 +254,7 @@ async function previewReport() {
     // 新窗口自己持有 blob URL，等它加载完再回收
     setTimeout(() => URL.revokeObjectURL(url), 60000)
   } catch (e: any) {
-    exportMsg.value = `预览失败：${e?.response?.data?.detail || e?.message || '未知错误'}`
+    exportMsg.value = `预览失败：${e?.response?.data?.detail || e?.message || t("contentHealth.未知错误_diprg1")}`
   } finally {
     exporting.value = ''
   }
@@ -297,9 +299,9 @@ onMounted(load)
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">← AI 驾驶舱</router-link>
-        <span class="font-semibold">内容体检</span>
-        <span class="text-xs text-ink-400">结构 · SEO · 效果 三个维度</span>
+        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">{{ t("contentHealth.text_11m1s0") }}</router-link>
+        <span class="font-semibold">{{ t("contentHealth.内容体检_anz34x") }}</span>
+        <span class="text-xs text-ink-400">{{ t("contentHealth.结构_1uywg1") }}</span>
       </div>
     </header>
 
@@ -311,7 +313,7 @@ onMounted(load)
       <!-- 参数 + 刷新 + 导出 -->
       <div class="card mb-6 flex flex-wrap items-end gap-4">
         <label class="text-sm text-ink-600">
-          陈旧阈值(天)
+          {{ t("contentHealth.陈旧阈值_4yarth") }}
           <input
             v-model.number="staleDays"
             type="number"
@@ -321,7 +323,7 @@ onMounted(load)
           />
         </label>
         <label class="text-sm text-ink-600">
-          过薄阈值(字)
+          {{ t("contentHealth.过薄阈值_1wf3no") }}
           <input
             v-model.number="thinChars"
             type="number"
@@ -332,7 +334,7 @@ onMounted(load)
         </label>
         <label class="text-sm text-ink-600 flex items-center gap-2">
           <input v-model="includeDrafts" type="checkbox" class="rounded border-ink-300" />
-          连同草稿一起体检
+          {{ t("contentHealth.连同草稿_1kdz0u") }}
         </label>
 
         <div class="ml-auto flex items-center gap-2">
@@ -340,7 +342,7 @@ onMounted(load)
             class="px-3 py-2 text-sm rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-50"
             :disabled="!!exporting || !report"
             @click="previewReport"
-          >预览报告</button>
+          >{{ t("contentHealth.预览报告_jt6b61") }}</button>
           <button
             class="px-3 py-2 text-sm rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-50"
             :disabled="!!exporting || !report"
@@ -364,7 +366,7 @@ onMounted(load)
       <!-- 总览：总分 + 三个维度 -->
       <div v-if="report" class="grid gap-4 md:grid-cols-5 mb-6">
         <div class="card md:col-span-2">
-          <p class="text-xs text-ink-400 mb-1">站点健康分</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("contentHealth.站点健康_1wpbql") }}</p>
           <div class="flex items-end gap-3">
             <span class="text-5xl font-semibold leading-none" :class="scoreColor">{{ report.score }}</span>
             <span
@@ -386,7 +388,7 @@ onMounted(load)
         >
           <p class="text-xs text-ink-400 mb-1 flex items-center justify-between">
             <span>{{ d.label }}</span>
-            <span v-if="!d.enabled" class="text-[10px] px-1.5 py-0.5 rounded bg-ink-100 text-ink-400">未启用</span>
+            <span v-if="!d.enabled" class="text-[10px] px-1.5 py-0.5 rounded bg-ink-100 text-ink-400">{{ t("contentHealth.未启用_fixz7") }}</span>
           </p>
           <p class="text-3xl font-semibold leading-none" :class="d.enabled ? scoreTone(d.score) : 'text-ink-300'">
             {{ d.enabled ? d.score : '—' }}
@@ -407,8 +409,8 @@ onMounted(load)
       <!-- 行动清单 -->
       <div v-if="report && actions.length" class="card mb-6">
         <div class="flex items-center justify-between mb-1">
-          <h2 class="font-semibold">先改这几件</h2>
-          <span class="text-xs text-ink-400">按「命中篇数 × 单条扣分」排序</span>
+          <h2 class="font-semibold">{{ t("contentHealth.先改这几_1b1pp2") }}</h2>
+          <span class="text-xs text-ink-400">{{ t("contentHealth.按_11jzn6") }}</span>
         </div>
         <ol class="mt-3 space-y-3">
           <li v-for="(a, i) in actions" :key="a.check" class="flex items-start gap-3">
@@ -434,7 +436,7 @@ onMounted(load)
 
       <!-- 检查项命中分布（按维度分组） -->
       <div v-if="report" class="card mb-6">
-        <p class="text-xs text-ink-400 mb-3">检查项命中分布</p>
+        <p class="text-xs text-ink-400 mb-3">{{ t("contentHealth.检查项命_30pgxt") }}</p>
         <div class="space-y-3">
           <div v-for="g in checksByDimension" :key="g.key">
             <p class="text-[11px] text-ink-400 mb-1.5">{{ g.label }}</p>
@@ -454,15 +456,15 @@ onMounted(load)
           </div>
         </div>
         <p v-if="!activeChecks.length" class="mt-3 text-xs text-emerald-600">
-          本次体检没有发现任何问题项。
+          {{ t("contentHealth.本次体检_1o3imm") }}
         </p>
       </div>
 
       <!-- 问题清单 -->
       <div v-if="report" class="card">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold">待处理条目</h2>
-          <span class="text-xs text-ink-400">按分数升序，最需要修的在前</span>
+          <h2 class="font-semibold">{{ t("contentHealth.待处理条_u1dho4") }}</h2>
+          <span class="text-xs text-ink-400">{{ t("contentHealth.按分数升_ekmymj") }}</span>
         </div>
 
         <p
@@ -472,7 +474,7 @@ onMounted(load)
         >{{ recheckMsg }}</p>
 
         <div v-if="!report.entries.length" class="py-16 text-center text-sm text-ink-400">
-          没有需要处理的条目。
+          {{ t("contentHealth.没有需要_131qzl") }}
         </div>
 
         <ul v-else class="divide-y divide-ink-100">
@@ -544,7 +546,7 @@ onMounted(load)
                 <button
                   class="px-2.5 py-1 text-xs rounded-lg bg-ink-900 text-white hover:bg-ink-800"
                   @click="openEntry(item.entry_id)"
-                >去修</button>
+                >{{ t("contentHealth.去修_eoib") }}</button>
               </div>
             </div>
           </li>

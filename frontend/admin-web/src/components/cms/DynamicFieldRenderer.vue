@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, ref } from 'vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import MediaPicker from './MediaPicker.vue'
@@ -101,41 +103,41 @@ const fieldIcon = computed(() => {
 // 字段类型描述
 const fieldTypeDesc = computed(() => {
   const map: Record<string, string> = {
-    text: '文本',
-    longtext: '长文本',
-    richtext: '富文本',
+    text: t("dynamicFieldRenderer.文本_hu2t"),
+    longtext: t("dynamicFieldRenderer.长文本_me4hw"),
+    richtext: t("dynamicFieldRenderer.富文本_dxvm9"),
     markdown: 'Markdown',
-    number: '数字',
-    boolean: '布尔值',
-    date: '日期',
-    datetime: '日期时间',
-    url: '链接',
-    email: '邮箱',
-    phone: '电话',
-    image: '单图',
-    images: '多图',
-    file: '文件',
-    files: '多文件',
-    select: '单选',
-    multiselect: '多选',
-    color: '颜色',
+    number: t("dynamicFieldRenderer.数字_hr6v"),
+    boolean: t("dynamicFieldRenderer.布尔值_e7tnv"),
+    date: t("dynamicFieldRenderer.date"),
+    datetime: t("dynamicFieldRenderer.日期时间_da9tzs"),
+    url: t("dynamicFieldRenderer.link"),
+    email: t("dynamicFieldRenderer.邮箱_padf"),
+    phone: t("dynamicFieldRenderer.电话_kpc8"),
+    image: t("dynamicFieldRenderer.单图_engp"),
+    images: t("dynamicFieldRenderer.多图_fmsk"),
+    file: t("dynamicFieldRenderer.file"),
+    files: t("dynamicFieldRenderer.多文件_djj6x"),
+    select: t("dynamicFieldRenderer.单选_eyqc"),
+    multiselect: t("dynamicFieldRenderer.多选_fy27"),
+    color: t("dynamicFieldRenderer.颜色_qo9i"),
     json: 'JSON',
-    repeater: '重复组',
-    relation: '关联',
+    repeater: t("dynamicFieldRenderer.重复组_lsnac"),
+    relation: t("dynamicFieldRenderer.关联_ek3l"),
   }
   return map[props.definition.field_type] || '文本'
 })
 
 const placeholder = computed(() => {
   const map: Record<string, string> = {
-    text: '请输入文本...',
-    longtext: '请输入内容...',
+    text: t("dynamicFieldRenderer.请输入文_9tt24g"),
+    longtext: t("dynamicFieldRenderer.请输入内_16nec1"),
     richtext: '支持 HTML 格式...',
     markdown: '支持 Markdown 语法...',
-    number: '请输入数字',
+    number: t("dynamicFieldRenderer.请输入数_1whvny"),
     url: 'https://example.com',
     email: 'name@example.com',
-    phone: '请输入手机号',
+    phone: t("dynamicFieldRenderer.请输入手_1rhly0"),
     json: '{\n  "key": "value"\n}',
   }
   return map[props.definition.field_type] || ''
@@ -162,7 +164,7 @@ function onFileUpload(type: 'image' | 'file') {
       const { data } = await api.post('/api/v1/cms/media/upload', formData)
       fieldValue.value = data.url
     } catch (e: any) {
-      uploadError.value = e?.response?.data?.detail || '上传失败'
+      uploadError.value = e?.response?.data?.detail || t("knowledgeBase.上传失败_a6dm22")
     } finally {
       uploading.value = false
     }
@@ -191,7 +193,7 @@ function onMultiFileUpload(type: 'images' | 'files') {
       }
       fieldValue.value = urls
     } catch (e: any) {
-      uploadError.value = e?.response?.data?.detail || '上传失败'
+      uploadError.value = e?.response?.data?.detail || t("knowledgeBase.上传失败_a6dm22")
     } finally {
       uploading.value = false
     }
@@ -262,13 +264,13 @@ function onImageError(e: Event) {
 
     <!-- richtext -->
     <div v-else-if="definition.field_type === 'richtext'" class="field-input-wrapper">
-      <div class="rich-text-toolbar">HTML 编辑器</div>
+      <div class="rich-text-toolbar">{{ t("dynamicFieldRenderer.text_7w43vc") }}</div>
       <RichTextEditor v-model="fieldValue" :disabled="disabled" :placeholder="placeholder" />
     </div>
 
     <!-- markdown -->
     <div v-else-if="definition.field_type === 'markdown'" class="field-input-wrapper">
-      <div class="rich-text-toolbar">Markdown 编辑器</div>
+      <div class="rich-text-toolbar">{{ t("dynamicFieldRenderer.text_1mmj3s") }}</div>
       <textarea v-model="fieldValue" class="field-textarea field-code" :placeholder="placeholder" :disabled="disabled"
         rows="6"></textarea>
     </div>
@@ -323,7 +325,7 @@ function onImageError(e: Event) {
           :disabled="disabled" />
       </div>
       <a v-if="fieldValue" :href="fieldValue" target="_blank" class="preview-link">
-        🔗 在新窗口打开链接
+        {{ t("dynamicFieldRenderer.text_j98clq") }}
       </a>
     </div>
 
@@ -355,24 +357,24 @@ function onImageError(e: Event) {
               {{ uploading ? '⏳' : '🔄' }} 替换
             </button>
             <button type="button" class="action-btn pick" :disabled="disabled || uploading" @click="openMediaPicker(false)">
-              📚 从媒体库选择
+              {{ t("dynamicFieldRenderer.text_if8faf") }}
             </button>
             <button type="button" class="action-btn delete" @click="fieldValue = ''">
-              🗑️ 删除
+              {{ t("dynamicFieldRenderer.text_1ao16i") }}
             </button>
           </div>
         </div>
-        <input v-model="fieldValue" type="url" class="field-input image-url-input" placeholder="图片 URL" :disabled="disabled" />
+        <input v-model="fieldValue" type="url" class="field-input image-url-input" :placeholder="t('dynamicFieldRenderer.图片_1gca85')" :disabled="disabled" />
       </div>
       <div v-else>
         <div class="upload-zone" @click="!disabled && onFileUpload('image')" :class="{ disabled, uploading }">
           <div class="upload-icon">🖼️</div>
           <div class="upload-text">{{ uploading ? '上传中...' : '点击上传图片' }}</div>
-          <div class="upload-hint">支持 JPG、PNG、GIF、WebP 格式</div>
+          <div class="upload-hint">{{ t("dynamicFieldRenderer.支持_jnarqs") }}</div>
         </div>
         <div class="media-picker-trigger">
           <button type="button" class="picker-link" :disabled="disabled || uploading" @click="openMediaPicker(false)">
-            📚 或从媒体库选择
+            {{ t("dynamicFieldRenderer.text_10s86a") }}
           </button>
         </div>
       </div>
@@ -387,7 +389,7 @@ function onImageError(e: Event) {
           <div class="image-overlay">
             <button type="button" class="overlay-btn" @click="removeImage(i)">🗑️</button>
           </div>
-          <input :value="url" type="url" class="image-url-input" placeholder="图片 URL"
+          <input :value="url" type="url" class="image-url-input" :placeholder="t('dynamicFieldRenderer.图片_1gca85')"
             @input="updateImageUrl(i, ($event.target as HTMLInputElement).value)" />
         </div>
         <div class="upload-zone add-more" @click="!disabled && onMultiFileUpload('images')"
@@ -398,7 +400,7 @@ function onImageError(e: Event) {
       </div>
       <div class="media-picker-trigger">
         <button type="button" class="picker-link" :disabled="disabled || uploading" @click="openMediaPicker(true)">
-          📚 从媒体库选择
+          {{ t("dynamicFieldRenderer.text_if8faf") }}
         </button>
       </div>
       <p v-if="uploadError" class="error-text">{{ uploadError }}</p>
@@ -414,7 +416,7 @@ function onImageError(e: Event) {
             @click="onFileUpload('file')">{{ uploading ? '⏳' : '🔄' }}</button>
           <button type="button" class="action-btn delete" @click="fieldValue = ''">🗑️</button>
         </div>
-        <input v-model="fieldValue" type="url" class="field-input" placeholder="文件 URL" :disabled="disabled" />
+        <input v-model="fieldValue" type="url" class="field-input" :placeholder="t('dynamicFieldRenderer.文件_16c8r9')" :disabled="disabled" />
       </div>
       <div v-else class="upload-zone file-zone" @click="!disabled && onFileUpload('file')" :class="{ disabled, uploading }">
         <div class="upload-icon">📎</div>
@@ -428,7 +430,7 @@ function onImageError(e: Event) {
       <div class="file-list">
         <div v-for="(url, i) in urlList" :key="i" class="file-card">
           <span class="file-icon">📄</span>
-          <input :value="url" type="url" class="field-input flex-1" placeholder="文件 URL"
+          <input :value="url" type="url" class="field-input flex-1" :placeholder="t('dynamicFieldRenderer.文件_16c8r9')"
             @input="($event: Event) => { const arr = [...urlList]; arr[i] = ($event.target as HTMLInputElement).value; fieldValue = arr }" />
           <button type="button" class="action-btn delete" @click="($event: Event) => { const arr = [...urlList]; arr.splice(i, 1); fieldValue = arr }">🗑️</button>
         </div>
@@ -453,7 +455,7 @@ function onImageError(e: Event) {
         <span class="select-arrow">▼</span>
       </div>
       <p v-if="!definition.field_options?.length" class="warning-text">
-        ⚠️ 请先在字段定义中添加选项
+        {{ t("dynamicFieldRenderer.text_7s33gv") }}
       </p>
     </div>
 
@@ -470,7 +472,7 @@ function onImageError(e: Event) {
         </label>
       </div>
       <p v-if="!definition.field_options?.length" class="warning-text">
-        ⚠️ 请先在字段定义中添加选项
+        {{ t("dynamicFieldRenderer.text_7s33gv") }}
       </p>
     </div>
 
@@ -508,7 +510,7 @@ function onImageError(e: Event) {
         <div v-for="(_, i) in repeaterRows" :key="i" class="repeater-item">
           <div class="repeater-header">
             <span class="repeater-number">#{{ i + 1 }}</span>
-            <button type="button" class="action-btn delete" @click="removeRepeaterRow(i)">🗑️ 删除</button>
+            <button type="button" class="action-btn delete" @click="removeRepeaterRow(i)">{{ t("dynamicFieldRenderer.text_1ao16i") }}</button>
           </div>
           <textarea :value="JSON.stringify(repeaterRows[i], null, 2)" class="field-textarea field-code"
             :disabled="disabled" rows="4"
@@ -516,7 +518,7 @@ function onImageError(e: Event) {
         </div>
         <button type="button" class="add-repeater-btn" :disabled="disabled" @click="addRepeaterRow">
           <span class="btn-icon">➕</span>
-          <span>添加行</span>
+          <span>{{ t("dynamicFieldRenderer.添加行_giq5j") }}</span>
         </button>
       </div>
     </div>
@@ -525,9 +527,9 @@ function onImageError(e: Event) {
     <div v-else-if="definition.field_type === 'relation'" class="field-input-wrapper">
       <div class="relation-input">
         <span class="relation-icon">🔗</span>
-        <input v-model="fieldValue" type="number" class="field-input relation-field" placeholder="关联内容 ID"
+        <input v-model="fieldValue" type="number" class="field-input relation-field" :placeholder="t('dynamicFieldRenderer.关联内容_ha2s7a')"
           :disabled="disabled" />
-        <span class="relation-hint">输入关联内容的 ID</span>
+        <span class="relation-hint">{{ t("dynamicFieldRenderer.输入关联_e4kfjy") }}</span>
       </div>
     </div>
 

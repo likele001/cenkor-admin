@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { ref } from 'vue'
@@ -25,7 +27,7 @@ async function download() {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    alert('导出失败：' + (e as any)?.message)
+    alert(t("csvExportButton.导出失败_f82r0o") + (e as any)?.message)
   } finally {
     loading.value = false
   }

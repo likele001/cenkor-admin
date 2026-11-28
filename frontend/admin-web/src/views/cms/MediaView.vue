@@ -37,7 +37,7 @@ async function load() {
     })
     media.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -53,9 +53,9 @@ async function uploadFile(file: File) {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     await load()
-    console.log('t("media.上传成功")', data)
+    console.log(t("media.上传成功"), data)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("media.上传失败")'
+    error.value = e?.response?.data?.detail || t("media.上传失败")
   } finally {
     uploading.value = false
   }
@@ -99,7 +99,7 @@ async function del(m: MediaItem) {
     selected.value = null
     await load()
   } catch (e: any) {
-    alert('t("usersList.删除失败_1kc17l")' + (e?.response?.data?.detail || e.message))
+    alert(t("usersList.删除失败_1kc17l") + (e?.response?.data?.detail || e.message))
   }
 }
 

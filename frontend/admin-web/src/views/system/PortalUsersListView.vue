@@ -50,7 +50,7 @@ async function load() {
     total.value = usersRes.data.total
     stats.value = statsRes.data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally { loading.value = false }
 }
 
@@ -66,7 +66,7 @@ async function create() {
     showCreate.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("portalUsersList.创建失败")')
+    alert(e?.response?.data?.detail || t("portalUsersList.创建失败"))
   } finally { saving.value = false }
 }
 
@@ -78,16 +78,16 @@ function openReset(user: PortalUser) {
 
 async function doReset() {
   if (!resetTarget.value) return
-  if (newPassword.value.length < 8) { alert('t("portalUsersList.密码至少_nlidtq")'); return }
+  if (newPassword.value.length < 8) { alert(t("portalUsersList.密码至少_nlidtq")); return }
   saving.value = true
   try {
     await api.post(`/api/v1/portal-admin/users/${resetTarget.value.id}/reset-password`, {
       new_password: newPassword.value,
     })
     showReset.value = false
-    alert('t("usersList.密码已重_j7r1zs")')
+    alert(t("usersList.密码已重_j7r1zs"))
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("portalUsersList.重置失败")')
+    alert(e?.response?.data?.detail || t("portalUsersList.重置失败"))
   } finally { saving.value = false }
 }
 
@@ -97,7 +97,7 @@ async function changeStatus(user: PortalUser, newStatus: string) {
     await api.patch(`/api/v1/portal-admin/users/${user.id}`, { status: newStatus })
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("entryList.操作失败")')
+    alert(e?.response?.data?.detail || t("entryList.操作失败"))
   }
 }
 
@@ -107,7 +107,7 @@ async function deleteUser(user: PortalUser) {
     await api.delete(`/api/v1/portal-admin/users/${user.id}`)
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("categories.删除失败")')
+    alert(e?.response?.data?.detail || t("categories.删除失败"))
   }
 }
 
@@ -229,7 +229,7 @@ import { computed } from 'vue'
     <div v-if="totalPages > 1" class="mt-4 flex items-center justify-center gap-2 text-sm">
       <button class="btn-ghost" :disabled="page <= 1" @click="page--; load()">{{ t('portalUsersList.上一页_btlof') }}</button>
       <span>{{ page }} / {{ totalPages }}</span>
-      <button class="btn-ghost" :disabled="page >= totalPages" @click="page++; load()">下一页</button>
+      <button class="btn-ghost" :disabled="page >= totalPages" @click="page++; load()">{{ t("portalUsersList.下一页_btmf4_2") }}</button>
     </div>
 
     <!-- Create Modal -->

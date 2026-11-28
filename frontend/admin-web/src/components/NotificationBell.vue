@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
 
@@ -135,23 +137,23 @@ onBeforeUnmount(() => {
         class="absolute right-0 mt-2 w-full sm:w-96 max-h-[70vh] overflow-hidden flex flex-col rounded-xl border border-ink-200 bg-white shadow-lg z-50"
       >
         <div class="flex items-center justify-between px-4 py-3 border-b border-ink-200">
-          <h3 class="font-semibold text-sm">通知</h3>
+          <h3 class="font-semibold text-sm">{{ t("notificationBell.通知_p62z") }}</h3>
           <button
             v-if="unread > 0"
             type="button"
             class="text-xs text-brand-600 hover:underline"
             @click="markAll"
           >
-            全部标为已读
+            {{ t("notificationBell.全部标为_5ole70") }}
           </button>
         </div>
 
         <div class="flex-1 overflow-y-auto">
-          <div v-if="loading" class="p-6 text-center text-ink-400 text-sm">加载中…</div>
+          <div v-if="loading" class="p-6 text-center text-ink-400 text-sm">{{ t("notificationBell.加载中_b0k5km") }}</div>
           <div v-else-if="error" class="p-4 text-sm text-red-600">{{ error }}</div>
           <div v-else-if="items.length === 0" class="p-8 text-center text-ink-400 text-sm">
             <div class="text-3xl mb-2">🔔</div>
-            暂无通知
+            {{ t("notifications.暂无通知_dd2ii1") }}
           </div>
           <ul v-else class="divide-y divide-ink-100">
             <li
@@ -179,14 +181,14 @@ onBeforeUnmount(() => {
                     class="text-[10px] text-brand-600 hover:underline"
                     @click="markOne(n)"
                   >
-                    已读
+                    {{ t("notificationBell.已读_gqx5") }}
                   </button>
                   <button
                     type="button"
                     class="text-[10px] text-ink-400 hover:text-red-600"
                     @click="remove(n)"
                   >
-                    删除
+                    {{ t("notificationBell.delete") }}
                   </button>
                 </div>
               </div>

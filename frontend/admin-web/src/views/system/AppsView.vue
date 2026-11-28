@@ -777,7 +777,7 @@ function categoryLabel(c: string): string {
         :disabled="uploading"
         @click="zipInput?.click()"
       >{{ uploading ? '安装中…' : '上传安装包（.zip）' }}</button>
-      <span class="text-xs text-ink-400">离线安装：上传从官方门户「我的应用」下载的授权包</span>
+      <span class="text-xs text-ink-400">{{ t("apps.离线安装_10kaur") }}</span>
     </div>
 
     <div v-if="activeTab === 'store'" class="mb-4 flex gap-2">
@@ -1051,22 +1051,22 @@ function categoryLabel(c: string): string {
           </template>
           <button v-else-if="app.status === 'approved' && isPlatform(app)" class="btn-primary text-sm" :disabled="acting === `install-${app.id}`" @click="installSubmission(app.id)">{{ t('apps.install') }}</button>
           <template v-else-if="app.status === 'approved' && isStandalone(app)">
-            <span class="text-sm text-ink-500">已通过 · 独立应用，交付整包私有化部署</span>
-            <button class="btn-primary text-sm" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id)">上架</button>
-            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+            <span class="text-sm text-ink-500">{{ t("apps.已通过_tvgntw") }}</span>
+            <button class="btn-primary text-sm" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id)">{{ t("apps.上架_ducs") }}</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">{{ t("apps.审核材料_bztjk0") }}</button>
           </template>
           <template v-else-if="app.status === 'approved'">
             <span class="text-sm text-blue-600">已通过 · 产品扩展，需在 {{ productLabel(app.product) || '对应产品' }} 实例安装</span>
-            <button class="btn-primary text-sm" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id)">上架</button>
-            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+            <button class="btn-primary text-sm" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id)">{{ t("apps.上架_ducs") }}</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">{{ t("apps.审核材料_bztjk0") }}</button>
           </template>
           <template v-else-if="app.status === 'published'">
-            <button class="btn-ghost text-sm text-red-600" :disabled="acting === `yank-${app.id}`" @click="yankSubmission(app.id)">撤回上架</button>
-            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+            <button class="btn-ghost text-sm text-red-600" :disabled="acting === `yank-${app.id}`" @click="yankSubmission(app.id)">{{ t("apps.撤回上架_d22u5i") }}</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">{{ t("apps.审核材料_bztjk0") }}</button>
           </template>
           <template v-else-if="app.status === 'yanked'">
-            <button class="btn-ghost text-sm text-green-600" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id, true)">重新上架</button>
-            <button class="btn-ghost text-sm" @click="openBundle(app.id)">审核材料</button>
+            <button class="btn-ghost text-sm text-green-600" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id, true)">{{ t("apps.重新上架_itaysv") }}</button>
+            <button class="btn-ghost text-sm" @click="openBundle(app.id)">{{ t("apps.审核材料_bztjk0") }}</button>
           </template>
           <span v-else-if="app.status === 'installed'" class="text-sm text-green-600">{{ t('apps.status_installed') }}</span>
         </div>
@@ -1076,10 +1076,10 @@ function categoryLabel(c: string): string {
     <div v-if="showBundle" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showBundle = false">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-auto p-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="font-semibold">审核材料</h3>
-          <button class="btn-ghost text-sm" @click="showBundle = false">关闭</button>
+          <h3 class="font-semibold">{{ t("apps.审核材料_bztjk0") }}</h3>
+          <button class="btn-ghost text-sm" @click="showBundle = false">{{ t("apps.close") }}</button>
         </div>
-        <p v-if="bundleLoading" class="text-sm text-ink-500">加载中…</p>
+        <p v-if="bundleLoading" class="text-sm text-ink-500">{{ t("apps.加载中_b0k5km") }}</p>
         <p v-else-if="bundle?.error" class="text-sm text-red-600">{{ bundle.error }}</p>
         <div v-else-if="bundle" class="space-y-4 text-sm">
           <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-ink-600">
@@ -1100,18 +1100,18 @@ function categoryLabel(c: string): string {
             <p class="font-medium mb-1">权限清单（{{ (bundle.permissions || []).length }}）</p>
             <ul class="text-ink-600 space-y-0.5">
               <li v-for="p in bundle.permissions" :key="p.code"><code class="text-xs">{{ p.code }}</code> · {{ p.name }}</li>
-              <li v-if="!(bundle.permissions || []).length" class="text-ink-400">无</li>
+              <li v-if="!(bundle.permissions || []).length" class="text-ink-400">{{ t("apps.无_k4g") }}</li>
             </ul>
           </div>
           <div>
-            <p class="font-medium mb-1">数据策略</p>
+            <p class="font-medium mb-1">{{ t("apps.数据策略_d7r499") }}</p>
             <p class="text-ink-600">保留策略：{{ bundle.data?.retention || 'keep' }}；自有表：{{ (bundle.data?.tables || []).filter((t: any) => t.mode === 'own').map((t: any) => t.name).join(', ') || '无' }}</p>
           </div>
           <div>
-            <p class="font-medium mb-1">迁移静态扫描</p>
+            <p class="font-medium mb-1">{{ t("apps.迁移静态_kye8rq") }}</p>
             <p class="text-ink-600">文件：{{ (bundle.scan?.migrations || []).join(', ') || '无' }}</p>
             <p v-if="(bundle.scan?.blocked || []).length" class="text-red-600">阻断项：{{ (bundle.scan.blocked || []).join('；') }}</p>
-            <p v-else class="text-green-700">未发现破坏性 DDL</p>
+            <p v-else class="text-green-700">{{ t("apps.未发现破_qqnrgv") }}</p>
             <p v-if="(bundle.scan?.dirty_files || []).length" class="text-amber-700">脏文件：{{ (bundle.scan.dirty_files || []).join(', ') }}</p>
           </div>
           <div>
@@ -1127,9 +1127,9 @@ function categoryLabel(c: string): string {
       <!-- 绑定状态 -->
       <div class="card">
         <div v-if="!cloudStatus.bound">
-          <h3 class="font-semibold mb-1">连接 Cenkor 账号</h3>
+          <h3 class="font-semibold mb-1">{{ t("apps.连接_7fjy9i") }}</h3>
           <p class="text-sm text-ink-600 mb-3">
-            浏览目录与安装<strong>不需要绑定</strong>；绑定官方账号后，可自动匹配本账号已购的付费应用，省去手填授权码。
+            {{ t("apps.浏览目录_dayf1m") }}<strong>{{ t("apps.不需要绑_14oato") }}</strong>；绑定官方账号后，可自动匹配本账号已购的付费应用，省去手填授权码。
             购买请前往
             <a
               :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps'"
@@ -1139,7 +1139,7 @@ function categoryLabel(c: string): string {
           </p>
 
           <div v-if="bindCode" class="rounded border border-ink-200 bg-ink-50 p-3 mb-3">
-            <p class="text-sm text-ink-600 mb-1">请在浏览器中打开下面的地址，输入绑定码完成确认：</p>
+            <p class="text-sm text-ink-600 mb-1">{{ t("apps.请在浏览_wq2wzp") }}</p>
             <p class="text-xl font-mono font-semibold tracking-widest mb-1">{{ bindCode.user_code }}</p>
             <a
               :href="bindCode.verification_uri_complete || bindCode.verification_uri"
@@ -1151,28 +1151,28 @@ function categoryLabel(c: string): string {
             </p>
           </div>
 
-          <button class="btn-primary text-sm" @click="startBind">连接 Cenkor 账号</button>
+          <button class="btn-primary text-sm" @click="startBind">{{ t("apps.连接_7fjy9i") }}</button>
         </div>
 
         <div v-else class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <h3 class="font-semibold mb-1">已连接 Cenkor 账号</h3>
+            <h3 class="font-semibold mb-1">{{ t("apps.已连接_c7l4q0") }}</h3>
             <p class="text-sm text-ink-600">
-              账号：<code class="bg-ink-50 px-1 rounded">{{ cloudStatus.account || '—' }}</code>
+              {{ t("apps.账号_l3ycp") }}<code class="bg-ink-50 px-1 rounded">{{ cloudStatus.account || '—' }}</code>
               <span class="mx-2 text-ink-300">|</span>
-              官方云：<code class="bg-ink-50 px-1 rounded break-all">{{ cloudStatus.hub || '—' }}</code>
+              {{ t("apps.官方云_bz79my") }}<code class="bg-ink-50 px-1 rounded break-all">{{ cloudStatus.hub || '—' }}</code>
             </p>
           </div>
-          <button class="btn-ghost text-sm text-red-600 shrink-0" @click="unbind">解绑</button>
+          <button class="btn-ghost text-sm text-red-600 shrink-0" @click="unbind">{{ t("apps.解绑_o5e6") }}</button>
         </div>
       </div>
 
       <div v-if="cloudError" class="card text-red-600">{{ cloudError }}</div>
 
       <div v-if="cloudLoaded && !cloudError && cloudApps.length === 0" class="card text-ink-500 text-center py-12">
-        官方应用市场暂无可用应用
+        {{ t("apps.官方应用_15t2wo") }}
       </div>
-      <div v-else-if="!cloudLoaded && !cloudError" class="card text-ink-500">加载中…</div>
+      <div v-else-if="!cloudLoaded && !cloudError" class="card text-ink-500">{{ t("apps.加载中_b0k5km") }}</div>
 
       <div v-for="app in cloudApps" :key="app.app_key" class="card">
         <div class="flex items-start gap-3">
@@ -1184,11 +1184,11 @@ function categoryLabel(c: string): string {
               <span
                 v-if="app.is_free"
                 class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-600"
-              >免费</span>
+              >{{ t("apps.免费_elqk") }}</span>
               <span
                 v-if="purchaseOf(app.app_key)"
                 class="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700"
-              >已购</span>
+              >{{ t("apps.已购_gr5n") }}</span>
               <span
                 v-if="app.installed"
                 class="text-xs px-2 py-0.5 rounded-full"
@@ -1225,7 +1225,7 @@ function categoryLabel(c: string): string {
             :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps/' + app.app_key"
             target="_blank"
             class="btn-ghost text-sm"
-          >去官方门户购买</a>
+          >{{ t("apps.去官方门_wffury") }}</a>
           <button
             class="btn-ghost text-sm"
             @click="expanded = expanded === app.app_key ? null : app.app_key"
@@ -1234,23 +1234,23 @@ function categoryLabel(c: string): string {
 
         <div v-if="expanded === app.app_key" class="mt-3 pt-3 border-t space-y-2 text-sm">
           <div class="flex flex-wrap gap-4 text-xs text-ink-500">
-            <span>分类：<code class="bg-ink-50 px-1 rounded">{{ app.category }}</code></span>
+            <span>{{ t("apps.分类_cn2x1") }}<code class="bg-ink-50 px-1 rounded">{{ app.category }}</code></span>
             <span>作者：{{ app.author }}</span>
             <span v-if="app.installed_version">
-              已装版本：<code class="bg-ink-50 px-1 rounded">{{ app.installed_version }}</code>
+              {{ t("apps.已装版本_twdw3n") }}<code class="bg-ink-50 px-1 rounded">{{ app.installed_version }}</code>
             </span>
           </div>
           <div v-if="purchaseOf(app.app_key)" class="text-xs text-ink-500">
-            授权码：<code class="bg-ink-50 px-1 rounded">{{ purchaseOf(app.app_key)?.license_key }}</code>
+            {{ t("apps.授权码_cznwvo") }}<code class="bg-ink-50 px-1 rounded">{{ purchaseOf(app.app_key)?.license_key }}</code>
             <span class="ml-2">
               {{ purchaseOf(app.app_key)?.permanent ? '永久有效' : '有效期至 ' + purchaseOf(app.app_key)?.expires_at }}
             </span>
           </div>
           <p v-else-if="app.is_free" class="text-xs text-ink-400">
-            免费应用，无需授权码，点「一键安装」即可。
+            {{ t("apps.免费应用_vfng2w") }}
           </p>
           <p v-else-if="app.has_local_code" class="text-xs text-ink-400">
-            本实例已自带该应用代码，点「一键安装」直接启用。
+            {{ t("apps.本实例已_1t90tb") }}
           </p>
           <p v-else class="text-xs text-ink-400">
             付费应用：到官方门户购买后拿到授权码，回来点「填授权码安装」；

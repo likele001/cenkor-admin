@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/lib/api'
@@ -125,7 +127,7 @@ function addField() {
   if (!spec.value) return
   spec.value.fields.push({
     field_key: `field_${spec.value.fields.length + 1}`,
-    label: '新字段',
+    label: t("aiBuilder.新字段_fcbn2"),
     field_type: 'text',
     required: false,
     default_value: null,
@@ -142,7 +144,7 @@ function removeField(i: number) {
 
 function onTypeChange(f: FieldSpec) {
   if (f.field_type === 'select' || f.field_type === 'multiselect') {
-    if (!f.options?.choices?.length) f.options = { choices: ['选项一', '选项二'] }
+    if (!f.options?.choices?.length) f.options = { choices: ['选项一', t("aiBuilder.选项二_ltuyk")] }
   } else if (f.options) {
     f.options = null
   }

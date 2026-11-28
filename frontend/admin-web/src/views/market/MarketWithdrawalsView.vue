@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 应用市场 · 提现审核与打款。
  * GET  /api/v1/store/market/withdrawals               提现单列表
@@ -119,39 +121,39 @@ async function submitPay() {
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-ink-200">
         <div>
-          <h2 class="font-semibold">提现审核与打款</h2>
+          <h2 class="font-semibold">{{ t("marketWithdrawals.提现审核_1b04zc") }}</h2>
           <p class="text-xs text-ink-500 mt-1">
             审核通过后线下打款，再回填凭证；驳回则金额退回开发者可提现余额。共 {{ total }} 单
           </p>
         </div>
         <select v-model="statusFilter" class="input !w-36">
-          <option value="">全部状态</option>
-          <option value="pending">待审核</option>
-          <option value="approved">待打款</option>
-          <option value="paid">已打款</option>
-          <option value="rejected">已驳回</option>
+          <option value="">{{ t("entryList.全部状态_avez63") }}</option>
+          <option value="pending">{{ t("marketWithdrawals.待审核_eftvg") }}</option>
+          <option value="approved">{{ t("marketWithdrawals.待打款_egzgw") }}</option>
+          <option value="paid">{{ t("marketWithdrawals.已打款_e8on1") }}</option>
+          <option value="rejected">{{ t("marketWithdrawals.已驳回_ei4al") }}</option>
         </select>
       </div>
 
-      <div v-if="loading" class="p-6 text-ink-500 text-sm">加载中…</div>
+      <div v-if="loading" class="p-6 text-ink-500 text-sm">{{ t("apiKeys.加载中_b0k5km") }}</div>
       <div v-else-if="error" class="p-8 text-center">
         <p class="text-red-600 mb-4 text-sm">{{ error }}</p>
-        <button class="btn-primary" @click="load">重新加载</button>
+        <button class="btn-primary" @click="load">{{ t("marketDevelopers.重新加载_itbyqo") }}</button>
       </div>
-      <div v-else-if="items.length === 0" class="p-10 text-center text-ink-500 text-sm">没有符合条件的提现单</div>
+      <div v-else-if="items.length === 0" class="p-10 text-center text-ink-500 text-sm">{{ t("marketWithdrawals.没有符合_a3clsg") }}</div>
 
       <table v-else class="w-full text-sm">
         <thead class="text-left text-ink-500 border-b border-ink-200">
           <tr>
-            <th class="px-3 py-2 font-normal">单号</th>
-            <th class="px-3 py-2 font-normal">开发者</th>
-            <th class="px-3 py-2 font-normal text-right">申请金额</th>
-            <th class="px-3 py-2 font-normal text-right">手续费</th>
-            <th class="px-3 py-2 font-normal text-right">应到账</th>
-            <th class="px-3 py-2 font-normal">收款账户</th>
-            <th class="px-3 py-2 font-normal">状态</th>
-            <th class="px-3 py-2 font-normal">时间</th>
-            <th class="px-3 py-2 font-normal text-right">操作</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketWithdrawals.单号_emv6") }}</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketWithdrawals.开发者_ebw44") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketWithdrawals.申请金额_fddbm8") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketWithdrawals.手续费_f0nsn") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketWithdrawals.应到账_e9gne") }}</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketWithdrawals.收款账户_d7y7bt") }}</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketWithdrawals.status") }}</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketWithdrawals.time") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketWithdrawals.actions") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -187,17 +189,17 @@ async function submitPay() {
                   <button
                     class="text-xs text-emerald-600 hover:text-emerald-800 disabled:opacity-50"
                     :disabled="acting === w.id" @click="approve(w)"
-                  >通过</button>
+                  >{{ t("marketWithdrawals.通过_past") }}</button>
                   <button
                     class="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
                     :disabled="acting === w.id" @click="openReject(w)"
-                  >驳回</button>
+                  >{{ t("marketWithdrawals.驳回_qqx7") }}</button>
                 </template>
                 <button
                   v-else-if="w.status === 'approved'"
                   class="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
                   :disabled="acting === w.id" @click="openPay(w)"
-                >标记已打款</button>
+                >{{ t("marketWithdrawals.标记已打_1xlqzk") }}</button>
                 <span v-else class="text-xs text-ink-400">—</span>
               </div>
             </td>
@@ -208,9 +210,9 @@ async function submitPay() {
       <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 text-sm">
         <span class="text-ink-500">共 {{ total }} 条</span>
         <div class="flex items-center gap-2">
-          <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">上一页</button>
+          <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">{{ t("marketWithdrawals.上一页_btlof") }}</button>
           <span class="text-ink-500">{{ page }} / {{ totalPages }}</span>
-          <button class="btn-outline !py-1 !px-3" :disabled="page >= totalPages" @click="page++">下一页</button>
+          <button class="btn-outline !py-1 !px-3" :disabled="page >= totalPages" @click="page++">{{ t("marketWithdrawals.下一页_btmf4") }}</button>
         </div>
       </div>
     </div>
@@ -219,7 +221,7 @@ async function submitPay() {
     <div v-if="showReject" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showReject = false">
       <div class="bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div class="px-5 py-4 border-b border-ink-200 flex items-center justify-between">
-          <h3 class="font-semibold">驳回提现</h3>
+          <h3 class="font-semibold">{{ t("marketWithdrawals.驳回提现_juia5n") }}</h3>
           <button class="text-ink-400 hover:text-ink-900" @click="showReject = false">✕</button>
         </div>
         <div class="px-5 py-4 space-y-3">
@@ -227,13 +229,13 @@ async function submitPay() {
             {{ current?.developer_name }} 申请 ¥{{ current?.amount }}，驳回后金额退回其可提现余额。
           </div>
           <div>
-            <label class="block text-xs text-ink-500 mb-1">驳回理由</label>
-            <textarea v-model="rejectRemark" rows="3" class="input" placeholder="如：收款信息与实名不符，请修改后重新提交"></textarea>
+            <label class="block text-xs text-ink-500 mb-1">{{ t("marketWithdrawals.驳回理由_jul1py") }}</label>
+            <textarea v-model="rejectRemark" rows="3" class="input" :placeholder="t('marketWithdrawals.如_dw41l3')"></textarea>
           </div>
           <p v-if="formError" class="text-sm text-red-600">{{ formError }}</p>
         </div>
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
-          <button class="btn-ghost" @click="showReject = false">取消</button>
+          <button class="btn-ghost" @click="showReject = false">{{ t("marketWithdrawals.cancel") }}</button>
           <button class="btn-primary !bg-red-600 hover:!bg-red-700" :disabled="!!acting" @click="submitReject">
             {{ acting ? '提交中…' : '确认驳回' }}
           </button>
@@ -245,30 +247,30 @@ async function submitPay() {
     <div v-if="showPay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showPay = false">
       <div class="bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div class="px-5 py-4 border-b border-ink-200 flex items-center justify-between">
-          <h3 class="font-semibold">标记已打款</h3>
+          <h3 class="font-semibold">{{ t("marketWithdrawals.标记已打_1xlqzk") }}</h3>
           <button class="text-ink-400 hover:text-ink-900" @click="showPay = false">✕</button>
         </div>
         <div class="px-5 py-4 space-y-3">
           <div class="rounded-xl bg-ink-50 border border-ink-200 p-3 text-xs text-ink-600 space-y-1">
             <div>开发者：{{ current?.developer_name }}</div>
-            <div>应到账：<strong>¥{{ current?.actual }}</strong>（申请 ¥{{ current?.amount }}，手续费 ¥{{ current?.fee }}）</div>
+            <div>{{ t("marketWithdrawals.应到账_ca6qj4") }}<strong>¥{{ current?.actual }}</strong>（申请 ¥{{ current?.amount }}，手续费 ¥{{ current?.fee }}）</div>
             <div>
               收款：{{ ACCOUNT_LABEL[current?.account_type] }} {{ current?.account_no }}
               {{ current?.account_name }}
             </div>
           </div>
           <div>
-            <label class="block text-xs text-ink-500 mb-1">打款凭证（转账单号 / 流水号）</label>
-            <input v-model="payVoucher" class="input" placeholder="如：支付宝流水 2026092300123" />
+            <label class="block text-xs text-ink-500 mb-1">{{ t("marketWithdrawals.打款凭证_1u74zh") }}</label>
+            <input v-model="payVoucher" class="input" :placeholder="t('marketWithdrawals.如_8olvp1')" />
           </div>
           <div>
-            <label class="block text-xs text-ink-500 mb-1">备注（可选）</label>
+            <label class="block text-xs text-ink-500 mb-1">{{ t("quality.备注_qeo808") }}</label>
             <input v-model="payRemark" class="input" />
           </div>
           <p v-if="formError" class="text-sm text-red-600">{{ formError }}</p>
         </div>
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
-          <button class="btn-ghost" @click="showPay = false">取消</button>
+          <button class="btn-ghost" @click="showPay = false">{{ t("marketWithdrawals.cancel") }}</button>
           <button class="btn-primary" :disabled="!!acting" @click="submitPay">{{ acting ? '提交中…' : '确认已打款' }}</button>
         </div>
       </div>

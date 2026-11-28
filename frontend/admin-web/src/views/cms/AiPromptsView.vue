@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 提示词管理 · 改措辞不用发版
  *
@@ -66,7 +68,7 @@ async function loadList() {
 }
 
 async function selectKey(key: string) {
-  if (dirty.value && !window.confirm('当前修改尚未保存，切换后将丢失。继续？')) return
+  if (dirty.value && !window.confirm(t("aiPrompts.当前修改_upzx6d"))) return
   selected.value = key
   diffText.value = ''
   error.value = ''
@@ -82,7 +84,7 @@ async function save() {
     return
   }
   if (!detail.value || !draft.value.trim()) {
-    error.value = '提示词不能为空'
+    error.value = t("aiPrompts.提示词不_1f9uzh")
     return
   }
   if (!window.confirm('保存后立即生效，之后所有 AI 调用都会用新提示词。确认？')) return
@@ -98,7 +100,7 @@ async function save() {
     await loadList()
     await selectKey(detail.value.key)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail ?? '保存失败'
+    error.value = e?.response?.data?.detail ?? t("aiMemory.saveFailed")
   } finally {
     busy.value = false
     setTimeout(() => (toast.value = ''), 2500)
@@ -120,7 +122,7 @@ async function activate(version: number) {
     await loadList()
     await selectKey(detail.value.key)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail ?? '切换失败'
+    error.value = e?.response?.data?.detail ?? t("aiPrompts.切换失败_argd5b")
   } finally {
     busy.value = false
     setTimeout(() => (toast.value = ''), 2500)
@@ -133,16 +135,16 @@ async function resetDefault() {
     return
   }
   if (!detail.value) return
-  if (!window.confirm('恢复出厂默认？会存为一个新版本并启用，历史版本不丢，随时可以再切回来。')) return
+  if (!window.confirm(t("aiPrompts.恢复出厂_kxjex4"))) return
   busy.value = true
   error.value = ''
   try {
     await api.post(`/api/v1/cms/ai/prompts/${detail.value.key}/reset`)
-    toast.value = '已恢复出厂默认'
+    toast.value = t("aiPrompts.已恢复出_bycak1")
     await loadList()
     await selectKey(detail.value.key)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail ?? '恢复失败'
+    error.value = e?.response?.data?.detail ?? t("aiPrompts.恢复失败_cj4gn3")
   } finally {
     busy.value = false
     setTimeout(() => (toast.value = ''), 2500)
@@ -173,7 +175,7 @@ onMounted(async () => {
     await loadList()
     if (list.value.length) await selectKey(list.value[0].key)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail ?? '加载失败'
+    error.value = e?.response?.data?.detail ?? t("dashboard.loadFailed")
   }
 })
 </script>
@@ -183,10 +185,10 @@ onMounted(async () => {
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/cms/ai-settings" class="text-sm text-ink-500 hover:text-ink-900">
-          ← AI 设置
+          {{ t("aiBatch.text_1b1crm") }}
         </router-link>
-        <span class="font-semibold">提示词管理</span>
-        <span class="text-xs text-ink-400">改措辞不用发版，可回滚</span>
+        <span class="font-semibold">{{ t("aiPrompts.提示词管_1ezhgm") }}</span>
+        <span class="text-xs text-ink-400">{{ t("aiPrompts.改措辞不_1qy9ix") }}</span>
       </div>
     </header>
 
@@ -224,7 +226,7 @@ onMounted(async () => {
                 v-if="item.differs_from_default"
                 class="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700"
               >
-                已改动
+                {{ t("aiPrompts.已改动_e91j5") }}
               </span>
             </div>
           </button>
@@ -236,7 +238,7 @@ onMounted(async () => {
             v-if="!canManage"
             class="text-xs rounded-lg border border-amber-200 bg-amber-50 text-amber-800 px-3 py-2"
           >
-            你当前是只读权限（缺 <span class="font-mono">cms:ai:manage</span>），可以查看历史版本但不能修改或切换。需要调整请联系超级管理员。
+            {{ t("aiBatch.你当前是_19u1ul") }} <span class="font-mono">cms:ai:manage</span>{{ t("aiPrompts.text_1wjiqm") }}
           </div>
           <div class="card">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -251,7 +253,7 @@ onMounted(async () => {
                 v-if="dirty"
                 class="text-xs px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-200"
               >
-                有未保存的修改
+                {{ t("aiPrompts.有未保存_72i1o3") }}
               </span>
             </div>
 
@@ -267,7 +269,7 @@ onMounted(async () => {
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <input
                 v-model="note"
-                placeholder="本次改动说明（选填，便于以后回滚时辨认）"
+                :placeholder="t('aiPrompts.本次改动_zfyyqz')"
                 class="flex-1 min-w-[220px] text-sm rounded-lg border border-ink-200 px-3 py-2 focus:outline-none focus:border-ink-900"
               />
               <button
@@ -275,33 +277,33 @@ onMounted(async () => {
                 :disabled="!dirty"
                 @click="resetDraft"
               >
-                放弃修改
+                {{ t("aiPrompts.放弃修改_d60f9s") }}
               </button>
               <button
                 class="px-3 py-2 text-sm rounded-lg border border-ink-200 text-ink-600 hover:border-ink-400 disabled:opacity-40"
                 :disabled="busy || !canManage"
                 @click="resetDefault"
               >
-                恢复出厂
+                {{ t("aiPrompts.恢复出厂_cj2x2r") }}
               </button>
               <button
                 class="px-4 py-2 text-sm rounded-lg bg-ink-900 text-white font-medium disabled:opacity-40"
                 :disabled="!dirty || busy || !canManage"
                 @click="save"
               >
-                保存并启用
+                {{ t("aiPrompts.保存并启_1421ql") }}
               </button>
             </div>
             <p class="mt-2 text-xs text-ink-400">
-              提示词直接决定 AI 产出质量。保存后立即生效，若效果变差可在下方切回上一版。
+              {{ t("aiPrompts.提示词直_1j60s0") }}
             </p>
           </div>
 
           <!-- 版本历史 -->
           <div class="card">
-            <h3 class="text-sm font-semibold text-ink-900 mb-3">版本历史</h3>
+            <h3 class="text-sm font-semibold text-ink-900 mb-3">{{ t("aiPrompts.版本历史_eufd3k") }}</h3>
             <div v-if="!detail.versions.length" class="text-sm text-ink-400">
-              还没有版本记录，当前用的是代码里的出厂默认。
+              {{ t("aiPrompts.还没有版_jpj9wi") }}
             </div>
             <ul v-else class="divide-y divide-ink-100">
               <li
@@ -314,7 +316,7 @@ onMounted(async () => {
                   v-if="v.is_active"
                   class="text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700"
                 >
-                  生效中
+                  {{ t("aiPrompts.生效中_hn8ec") }}
                 </span>
                 <span class="text-xs text-ink-500 flex-1 min-w-[160px] truncate">
                   {{ v.note || '（无说明）' }}
@@ -326,14 +328,14 @@ onMounted(async () => {
                   :disabled="busy || !canManage"
                   @click="activate(v.version)"
                 >
-                  切到此版
+                  {{ t("aiPrompts.切到此版_ap0n59") }}
                 </button>
                 <button
                   v-if="!v.is_active && activeVer"
                   class="text-xs px-2 py-1 rounded border border-ink-200 text-ink-600 hover:border-ink-900"
                   @click="showDiff(v.version)"
                 >
-                  对比
+                  {{ t("aiPrompts.对比_g8hn") }}
                 </button>
               </li>
             </ul>
@@ -346,7 +348,7 @@ onMounted(async () => {
                 v{{ diffFrom }} → v{{ activeVer?.version }} 的差异
               </h3>
               <button class="text-xs text-ink-500 hover:text-ink-900" @click="diffText = ''">
-                关闭
+                {{ t("aiPrompts.close") }}
               </button>
             </div>
             <pre class="text-[12px] leading-relaxed font-mono bg-ink-50 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap"><template v-for="(line, i) in diffText.split('\n')" :key="i"><span
@@ -361,7 +363,7 @@ onMounted(async () => {
           </div>
         </section>
 
-        <div v-else class="text-sm text-ink-400">请选择左侧的提示词</div>
+        <div v-else class="text-sm text-ink-400">{{ t("aiPrompts.请选择左_19f68i") }}</div>
       </div>
     </main>
   </div>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 应用市场 · 开发者与分账余额。
  * GET  /api/v1/store/market/developers         列表（含钱包三池）
@@ -72,8 +74,8 @@ async function submitAdjust() {
   if (!current.value) return
   const f = form.value
   const amount = Math.abs(Math.round(parseFloat(f.amount_yuan || '0') * 100))
-  if (!amount) { formError.value = '请输入调整金额'; return }
-  if (!f.remark.trim()) { formError.value = '必须填写调整备注'; return }
+  if (!amount) { formError.value = t("marketDevelopers.请输入调_1jlc9k"); return }
+  if (!f.remark.trim()) { formError.value = t("marketDevelopers.必须填写_h5hwae"); return }
 
   saving.value = true
   formError.value = ''
@@ -98,30 +100,30 @@ async function submitAdjust() {
     <div class="card">
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-ink-200">
         <div>
-          <h2 class="font-semibold">开发者与分账余额</h2>
+          <h2 class="font-semibold">{{ t("marketDevelopers.开发者与_ld2yym") }}</h2>
           <p class="text-xs text-ink-500 mt-1">共 {{ total }} 位开发者 · 余额由账本流水累计，可在此做人工补偿或扣罚</p>
         </div>
-        <input v-model="keyword" class="input !w-56" placeholder="搜索开发者名称" />
+        <input v-model="keyword" class="input !w-56" :placeholder="t('marketDevelopers.搜索开发_196ri8')" />
       </div>
 
-      <div v-if="loading" class="p-6 text-ink-500 text-sm">加载中…</div>
+      <div v-if="loading" class="p-6 text-ink-500 text-sm">{{ t("apiKeys.加载中_b0k5km") }}</div>
       <div v-else-if="error" class="p-8 text-center">
         <p class="text-red-600 mb-4 text-sm">{{ error }}</p>
-        <button class="btn-primary" @click="load">重新加载</button>
+        <button class="btn-primary" @click="load">{{ t("marketDevelopers.重新加载_itbyqo") }}</button>
       </div>
-      <div v-else-if="items.length === 0" class="p-10 text-center text-ink-500 text-sm">暂无开发者</div>
+      <div v-else-if="items.length === 0" class="p-10 text-center text-ink-500 text-sm">{{ t("marketDevelopers.暂无开发_1mw9b7") }}</div>
 
       <table v-else class="w-full text-sm">
         <thead class="text-left text-ink-500 border-b border-ink-200">
           <tr>
-            <th class="px-3 py-2 font-normal">开发者</th>
-            <th class="px-3 py-2 font-normal">状态</th>
-            <th class="px-3 py-2 font-normal text-right">应用数</th>
-            <th class="px-3 py-2 font-normal text-right">可提现</th>
-            <th class="px-3 py-2 font-normal text-right">待结算</th>
-            <th class="px-3 py-2 font-normal text-right">提现中</th>
-            <th class="px-3 py-2 font-normal text-right">累计收入</th>
-            <th class="px-3 py-2 font-normal text-right">操作</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketDevelopers.开发者_ebw44") }}</th>
+            <th class="px-3 py-2 font-normal">{{ t("marketDevelopers.status") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketDevelopers.应用数_ef6xo") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketDevelopers.可提现_cs6xb") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketDevelopers.待结算_elx7t") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketDevelopers.提现中_f6ez1") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketDevelopers.累计收入_gdcptt") }}</th>
+            <th class="px-3 py-2 font-normal text-right">{{ t("marketDevelopers.actions") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -145,7 +147,7 @@ async function submitAdjust() {
             <td class="px-3 py-3 text-right text-ink-500">¥{{ d.wallet?.frozen ?? '0.00' }}</td>
             <td class="px-3 py-3 text-right">¥{{ d.wallet?.total_income ?? '0.00' }}</td>
             <td class="px-3 py-3 text-right">
-              <button class="text-xs text-blue-600 hover:text-blue-800" @click="openAdjust(d)">调整余额</button>
+              <button class="text-xs text-blue-600 hover:text-blue-800" @click="openAdjust(d)">{{ t("marketDevelopers.调整余额_i2zxf9") }}</button>
             </td>
           </tr>
         </tbody>
@@ -154,9 +156,9 @@ async function submitAdjust() {
       <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 text-sm">
         <span class="text-ink-500">共 {{ total }} 条</span>
         <div class="flex items-center gap-2">
-          <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">上一页</button>
+          <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">{{ t("marketDevelopers.上一页_btlof") }}</button>
           <span class="text-ink-500">{{ page }} / {{ totalPages }}</span>
-          <button class="btn-outline !py-1 !px-3" :disabled="page >= totalPages" @click="page++">下一页</button>
+          <button class="btn-outline !py-1 !px-3" :disabled="page >= totalPages" @click="page++">{{ t("marketDevelopers.下一页_btmf4") }}</button>
         </div>
       </div>
     </div>
@@ -166,7 +168,7 @@ async function submitAdjust() {
       <div class="bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div class="px-5 py-4 border-b border-ink-200 flex items-center justify-between">
           <div>
-            <h3 class="font-semibold">调整余额</h3>
+            <h3 class="font-semibold">{{ t("marketDevelopers.调整余额_i2zxf9") }}</h3>
             <p class="text-xs text-ink-500 mt-0.5">{{ current?.display_name }} · #{{ current?.id }}</p>
           </div>
           <button class="text-ink-400 hover:text-ink-900" @click="showAdjust = false">✕</button>
@@ -179,42 +181,42 @@ async function submitAdjust() {
           </div>
 
           <div>
-            <label class="block text-xs text-ink-500 mb-1">方向</label>
+            <label class="block text-xs text-ink-500 mb-1">{{ t("marketDevelopers.方向_hri0") }}</label>
             <div class="flex gap-4 text-sm">
               <label class="inline-flex items-center gap-2 cursor-pointer">
-                <input v-model="form.direction" type="radio" value="add" /><span>增加（补偿发放）</span>
+                <input v-model="form.direction" type="radio" value="add" /><span>{{ t("marketDevelopers.增加_cdoqcc") }}</span>
               </label>
               <label class="inline-flex items-center gap-2 cursor-pointer">
-                <input v-model="form.direction" type="radio" value="sub" /><span>扣减（扣罚）</span>
+                <input v-model="form.direction" type="radio" value="sub" /><span>{{ t("marketDevelopers.扣减_1oiuic") }}</span>
               </label>
             </div>
           </div>
 
           <div>
-            <label class="block text-xs text-ink-500 mb-1">金额（元）</label>
+            <label class="block text-xs text-ink-500 mb-1">{{ t("marketDevelopers.金额_m6u08y") }}</label>
             <input v-model="form.amount_yuan" type="number" min="0" step="0.01" class="input" placeholder="0.00" />
           </div>
 
           <div>
-            <label class="block text-xs text-ink-500 mb-1">资金池</label>
+            <label class="block text-xs text-ink-500 mb-1">{{ t("marketDevelopers.资金池_leacz") }}</label>
             <select v-model="form.pool" class="input">
-              <option value="available">可提现</option>
-              <option value="pending">待结算</option>
-              <option value="frozen">提现冻结</option>
+              <option value="available">{{ t("marketDevelopers.可提现_cs6xb") }}</option>
+              <option value="pending">{{ t("marketDevelopers.待结算_elx7t") }}</option>
+              <option value="frozen">{{ t("marketDevelopers.提现冻结_d2k6zc") }}</option>
             </select>
             <p class="text-xs text-ink-400 mt-1">{{ POOL_HINT[form.pool] }}，调整会计入资金流水</p>
           </div>
 
           <div>
-            <label class="block text-xs text-ink-500 mb-1">备注（必填）</label>
-            <textarea v-model="form.remark" rows="2" class="input" placeholder="如：618 活动补偿 / 违规扣罚"></textarea>
+            <label class="block text-xs text-ink-500 mb-1">{{ t("marketDevelopers.备注_qg567w") }}</label>
+            <textarea v-model="form.remark" rows="2" class="input" :placeholder="t('marketDevelopers.如_1o4ekt')"></textarea>
           </div>
 
           <p v-if="formError" class="text-sm text-red-600">{{ formError }}</p>
         </div>
 
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
-          <button class="btn-ghost" @click="showAdjust = false">取消</button>
+          <button class="btn-ghost" @click="showAdjust = false">{{ t("marketDevelopers.cancel") }}</button>
           <button class="btn-primary" :disabled="saving" @click="submitAdjust">{{ saving ? '提交中…' : '确认调整' }}</button>
         </div>
       </div>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 问答自测页（内部用）。
  *
@@ -87,7 +89,7 @@ async function submit(q?: string) {
     )
     result.value = data as AskResult
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '提问失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("qaSearch.提问失败_d7m3le")
   } finally {
     window.clearInterval(timer)
     elapsed.value = Math.round((Date.now() - t0) / 1000)
@@ -110,9 +112,9 @@ function jumpByIndex(i: number) {
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-4xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">← AI 驾驶舱</router-link>
-        <span class="font-semibold">问答自测</span>
-        <span class="text-xs text-ink-400">访客这么问，我们答得上来吗</span>
+        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">{{ t("contentHealth.text_11m1s0") }}</router-link>
+        <span class="font-semibold">{{ t("qaSearch.问答自测_jfguo7") }}</span>
+        <span class="text-xs text-ink-400">{{ t("qaSearch.访客这么_jpr7la") }}</span>
       </div>
     </header>
 
@@ -121,7 +123,7 @@ function jumpByIndex(i: number) {
         <div class="flex gap-2">
           <input
             v-model="question"
-            placeholder="输入一个访客可能问的问题…"
+            :placeholder="t('qaSearch.输入一个_1dpi6n')"
             class="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm focus:outline-none focus:border-ink-400"
             @keydown.enter="submit()"
           />
@@ -146,7 +148,7 @@ function jumpByIndex(i: number) {
 
         <p class="mt-3 text-xs text-ink-400 leading-relaxed">
           只检索已发布内容。查不到会明确返回「站内暂无相关内容」——这是设计，不是故障。
-          回答里的每个 <span class="text-ink-600">[n]</span> 都能点回原文核对。
+          回答里的每个 <span class="text-ink-600">[n]</span> {{ t("qaSearch.都能点回_hrop90") }}
         </p>
       </div>
 
@@ -157,7 +159,7 @@ function jumpByIndex(i: number) {
       <template v-if="result">
         <div class="card mb-4">
           <div class="flex items-center gap-2 mb-3">
-            <span class="text-xs text-ink-400">问</span>
+            <span class="text-xs text-ink-400">{{ t("qaSearch.问_tm6") }}</span>
             <span class="text-sm font-medium text-ink-900">{{ result.question }}</span>
           </div>
 
@@ -165,10 +167,10 @@ function jumpByIndex(i: number) {
             v-if="result.no_answer"
             class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3"
           >
-            <p class="text-sm text-amber-800 font-medium">站内暂无相关内容</p>
+            <p class="text-sm text-amber-800 font-medium">{{ t("qaSearch.站内暂无_v9iwop") }}</p>
             <p v-if="result.reason" class="mt-1 text-xs text-amber-700">{{ result.reason }}</p>
             <p class="mt-2 text-xs text-amber-600">
-              这就是正确答案。要么补一篇对应内容，要么这个提问本身不是我们的战场。
+              {{ t("qaSearch.这就是正_1cdbke") }}
             </p>
           </div>
 
@@ -188,13 +190,13 @@ function jumpByIndex(i: number) {
 
           <div class="mt-3 pt-3 border-t border-ink-100 flex flex-wrap gap-3 text-xs text-ink-400">
             <span>{{ elapsed }}s</span>
-            <span v-if="!result.llm_used">未调用模型（检索降级）</span>
+            <span v-if="!result.llm_used">{{ t("qaSearch.未调用模_1decdz") }}</span>
             <span>{{ result.citations.length }} 条出处</span>
           </div>
         </div>
 
         <div v-if="result.citations.length" class="card mb-4">
-          <p class="text-xs text-ink-400 mb-2">出处</p>
+          <p class="text-xs text-ink-400 mb-2">{{ t("qaSearch.出处_efka") }}</p>
           <ul class="space-y-2">
             <li
               v-for="c in result.citations"
@@ -216,7 +218,7 @@ function jumpByIndex(i: number) {
         </div>
 
         <div v-if="result.followups.length" class="card">
-          <p class="text-xs text-ink-400 mb-2">访客可能接着问</p>
+          <p class="text-xs text-ink-400 mb-2">{{ t("qaSearch.访客可能_1dh7jw") }}</p>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="f in result.followups"
@@ -229,7 +231,7 @@ function jumpByIndex(i: number) {
       </template>
 
       <div v-else-if="loading" class="card text-sm text-ink-500">
-        正在检索站内内容并作答，通常 10~40 秒。
+        {{ t("qaSearch.正在检索_57f176") }}
       </div>
     </main>
   </div>

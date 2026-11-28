@@ -72,7 +72,7 @@ async function load() {
         typeof item.value === 'string' ? item.value : JSON.stringify(item.value, null, 2)
     }
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -105,7 +105,7 @@ async function save(item: SiteConfigItem) {
       if (savedKey.value === item.key) savedKey.value = null
     }, 3000)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.saveFailed")
   } finally {
     saving.value = null
   }
@@ -123,19 +123,19 @@ onMounted(load)
     <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
     <div v-else>
       <div class="flex flex-wrap items-center gap-3 mb-5">
-        <label for="site-config-search" class="text-sm font-medium">搜索配置项</label>
+        <label for="site-config-search" class="text-sm font-medium">{{ t("siteConfig.搜索配置_1gnu74") }}</label>
         <input
           id="site-config-search"
           v-model="search"
           class="input max-w-md"
           type="search"
-          placeholder="输入 key 或说明，如 hero、主标题、邮箱"
+          :placeholder="t('siteConfig.输入_g7nwvq')"
         />
         <span class="text-sm text-ink-400">共 {{ totalMatched }} 项</span>
       </div>
 
       <div v-if="items.length === 0" class="card text-center text-ink-400 py-12">{{ t('siteConfig.暂无配置_1n3u3j') }}</div>
-      <div v-else-if="totalMatched === 0" class="card text-center text-ink-400 py-12">没有匹配的配置项，换个关键词试试。</div>
+      <div v-else-if="totalMatched === 0" class="card text-center text-ink-400 py-12">{{ t("siteConfig.没有匹配_1j1qem") }}</div>
 
       <section v-for="g in groups" :key="g.id" class="mb-8">
         <h2 class="text-lg font-semibold mb-1">
@@ -161,7 +161,7 @@ onMounted(load)
               >
                 {{ saving === item.key ? '保存中…' : '保存' }}
               </button>
-              <span v-if="savedKey === item.key" class="text-sm text-emerald-600" role="status">已保存，官网将自动同步</span>
+              <span v-if="savedKey === item.key" class="text-sm text-emerald-600" role="status">{{ t("siteConfig.已保存_1a46re") }}</span>
             </div>
           </div>
         </div>

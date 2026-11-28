@@ -71,7 +71,7 @@ async function loadAnnouncements() {
     announcements.value = items
     if (items.length) await toggleAnn(items[0], true)
   } catch (e: any) {
-    annError.value = e?.message || '加载失败'
+    annError.value = e?.message || t("dashboard.loadFailed")
   } finally {
     annLoading.value = false
   }
@@ -191,35 +191,35 @@ onMounted(() => {
           发现新版本 {{ release.latest }}（当前 {{ release.current }}）
         </div>
         <div class="mt-0.5 text-xs text-amber-700">
-          建议升级到最新版以获取错误修复与新功能。
+          {{ t("dashboard.建议升级_e49h5x") }}
           <span v-if="release.released_at" class="opacity-70">· 发布于 {{ release.released_at }}</span>
         </div>
         <div class="mt-2 flex items-center gap-3 text-xs">
-          <a v-if="release.upgrade_docs" :href="release.upgrade_docs" target="_blank" rel="noopener" class="text-accent hover:underline">查看升级方式</a>
-          <a v-if="release.notes_url" :href="release.notes_url" target="_blank" rel="noopener" class="text-accent hover:underline">更新日志</a>
+          <a v-if="release.upgrade_docs" :href="release.upgrade_docs" target="_blank" rel="noopener" class="text-accent hover:underline">{{ t("dashboard.查看升级_1ytcfb") }}</a>
+          <a v-if="release.notes_url" :href="release.notes_url" target="_blank" rel="noopener" class="text-accent hover:underline">{{ t("dashboard.更新日志_dev07i") }}</a>
         </div>
       </div>
-      <button type="button" class="text-xs text-amber-600 hover:text-amber-900 shrink-0" @click="dismissRelease">暂不提醒</button>
+      <button type="button" class="text-xs text-amber-600 hover:text-amber-900 shrink-0" @click="dismissRelease">{{ t("dashboard.暂不提醒_d9dhvx") }}</button>
     </div>
 
     <!-- 系统更新日志 -->
     <section class="mt-6 card">
       <div class="flex items-center justify-between mb-3">
         <h2 class="font-semibold flex items-center gap-2">
-          <span>📌</span><span>系统更新日志</span>
+          <span>📌</span><span>{{ t("dashboard.系统更新_vgymtu") }}</span>
         </h2>
-        <router-link :to="{ name: 'announcements' }" class="text-sm text-accent hover:underline">查看全部</router-link>
+        <router-link :to="{ name: 'announcements' }" class="text-sm text-accent hover:underline">{{ t("dashboard.查看全部_dll6ti") }}</router-link>
       </div>
-      <div v-if="annLoading" class="text-ink-400 text-sm py-2">加载中…</div>
+      <div v-if="annLoading" class="text-ink-400 text-sm py-2">{{ t("dashboard.加载中_b0k5km") }}</div>
       <div v-else-if="annError" class="text-red-600 text-sm py-2">{{ annError }}</div>
       <ul v-else-if="announcements.length" class="space-y-3">
         <li v-for="a in announcements" :key="a.id" class="border border-ink-200 rounded-lg p-3">
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <span v-if="a.is_pinned" class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">置顶</span>
+                <span v-if="a.is_pinned" class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">{{ t("dashboard.置顶_mifc") }}</span>
                 <span v-if="a.category" class="text-xs bg-ink-100 text-ink-600 px-1.5 py-0.5 rounded">{{ a.category }}</span>
-                <span v-if="a.priority === 'high'" class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">重要</span>
+                <span v-if="a.priority === 'high'" class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{{ t("dashboard.重要_pjys") }}</span>
                 <span class="font-medium break-words">{{ a.title }}</span>
               </div>
               <p v-if="a.summary" class="mt-1 text-sm text-ink-500 break-words">{{ a.summary }}</p>
@@ -234,7 +234,7 @@ onMounted(() => {
           </div>
         </li>
       </ul>
-      <div v-else class="text-ink-400 text-sm py-2">暂无更新日志</div>
+      <div v-else class="text-ink-400 text-sm py-2">{{ t("dashboard.暂无更新_1f2tmj") }}</div>
     </section>
 
     <div v-if="loading" class="mt-8 text-ink-400">{{ t('app.loading') }}</div>

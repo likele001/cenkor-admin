@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 知识库管理。
  *
@@ -126,7 +128,7 @@ async function loadDocs() {
     docs.value = data.items
     total.value = data.total
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '加载失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -167,7 +169,7 @@ async function doUpload(file: File) {
     okMsg.value = data.message || '已入库'
     await refresh()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '上传失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("knowledgeBase.上传失败_a6dm22")
   } finally {
     uploading.value = false
     if (fileInput.value) fileInput.value.value = ''
@@ -187,7 +189,7 @@ function onDrop(e: DragEvent) {
 
 async function doPaste() {
   if (!pasteTitle.value.trim() || !pasteText.value.trim()) {
-    errorMsg.value = '标题和正文都要填'
+    errorMsg.value = t("knowledgeBase.标题和正_1kuc3m")
     return
   }
   uploading.value = true
@@ -204,7 +206,7 @@ async function doPaste() {
     pasteText.value = ''
     await refresh()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '入库失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("knowledgeBase.入库失败_anvkgy")
   } finally {
     uploading.value = false
   }
@@ -229,7 +231,7 @@ async function openDetail(doc: KbDoc) {
     detailChunks.value = data.chunks
     detailText.value = data.text_preview
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '加载详情失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("knowledgeBase.加载详情_aeelhs")
   } finally {
     detailLoading.value = false
   }
@@ -243,7 +245,7 @@ async function reindex(doc: KbDoc, force = false) {
     okMsg.value = data.queued ? '已加入重建队列' : data.message || '正在索引中'
     await refresh()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '重建失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("aiMemory.重建失败_isdokh")
   }
 }
 
@@ -251,11 +253,11 @@ async function removeDoc(doc: KbDoc) {
   if (!window.confirm(`删除《${doc.title}》？删除后 AI 不再引用这份资料。`)) return
   try {
     await api.delete(`/api/v1/cms/ai/kb/docs/${doc.id}`)
-    okMsg.value = '已删除'
+    okMsg.value = t("knowledgeBase.已删除_e65yu")
     if (detailDoc.value?.id === doc.id) detailOpen.value = false
     await refresh()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '删除失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("aiMemory.删除失败_azdahk")
   }
 }
 
@@ -278,7 +280,7 @@ async function runSearch() {
     threshold.value = data.threshold
     effectiveCount.value = data.effective_count
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '检索失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("knowledgeBase.检索失败_dqefw6")
     hits.value = []
   } finally {
     searching.value = false
@@ -307,9 +309,9 @@ onUnmounted(() => {
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">← AI 驾驶舱</router-link>
-        <span class="font-semibold">知识库</span>
-        <span class="text-xs text-ink-400">产品手册 · FAQ · 历史方案 —— 让 AI 有据可依</span>
+        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">{{ t("contentHealth.text_11m1s0") }}</router-link>
+        <span class="font-semibold">{{ t("knowledgeBase.知识库_i8hte") }}</span>
+        <span class="text-xs text-ink-400">{{ t("knowledgeBase.产品手册_19cdys") }}</span>
       </div>
     </header>
 
@@ -324,7 +326,7 @@ onUnmounted(() => {
       <!-- 概览 -->
       <div v-if="stats" class="grid gap-4 md:grid-cols-4 mb-6">
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">文档</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.文档_hubg") }}</p>
           <p class="text-3xl font-semibold leading-none">{{ stats.docs }}</p>
           <p class="mt-2 text-[11px] text-ink-400">
             就绪 {{ stats.ready_docs }}
@@ -335,17 +337,17 @@ onUnmounted(() => {
           </p>
         </div>
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">可检索分片</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.可检索分_1lsc4e") }}</p>
           <p class="text-3xl font-semibold leading-none">{{ stats.indexed_chunks }}</p>
           <p class="mt-2 text-[11px] text-ink-400">共切出 {{ stats.chunks }} 段</p>
         </div>
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">语料字数</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.语料字数_i2oeh1") }}</p>
           <p class="text-3xl font-semibold leading-none">{{ stats.chars.toLocaleString() }}</p>
-          <p class="mt-2 text-[11px] text-ink-400">抽取后的纯文本量</p>
+          <p class="mt-2 text-[11px] text-ink-400">{{ t("knowledgeBase.抽取后的_1v84jy") }}</p>
         </div>
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">向量模型</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.向量模型_b7l2aw") }}</p>
           <p class="text-sm font-medium leading-tight mt-1 truncate" :title="stats.embed_model">
             {{ stats.embed_model || '未建立索引' }}
           </p>
@@ -360,23 +362,23 @@ onUnmounted(() => {
             class="px-3 py-1.5 text-sm rounded-lg border"
             :class="activeTab === 'upload' ? 'bg-ink-900 text-white border-ink-900' : 'border-ink-200 hover:bg-ink-50'"
             @click="activeTab = 'upload'"
-          >上传文件</button>
+          >{{ t("knowledgeBase.上传文件_a6fdb9") }}</button>
           <button
             class="px-3 py-1.5 text-sm rounded-lg border"
             :class="activeTab === 'paste' ? 'bg-ink-900 text-white border-ink-900' : 'border-ink-200 hover:bg-ink-50'"
             @click="activeTab = 'paste'"
-          >粘贴文本</button>
+          >{{ t("knowledgeBase.粘贴文本_gawrvl") }}</button>
           <span class="text-xs text-ink-400 ml-auto">
-            支持 PDF / Word / Excel / 图片 / 视频 / 文本，单文件 ≤ 20MB
+            {{ t("knowledgeBase.支持_tx6w68") }}
           </span>
         </div>
 
         <div v-if="activeTab === 'upload'" class="flex flex-wrap items-end gap-3">
           <label class="text-sm text-ink-600">
-            分类
+            {{ t("knowledgeBase.category") }}
             <input
               v-model="uploadCategory"
-              placeholder="如：产品手册"
+              :placeholder="t('knowledgeBase.如_1trnkk')"
               class="ml-2 w-40 px-2 py-1.5 border border-ink-200 rounded-lg text-sm"
             />
           </label>
@@ -391,7 +393,7 @@ onUnmounted(() => {
             <p class="text-sm text-ink-600">
               {{ uploading ? '正在抽取文本…' : '把文件拖到这里，或点击选择' }}
             </p>
-            <p class="mt-1 text-xs text-ink-400">扫描件 PDF 无法提取文字，会直接报错说明原因</p>
+            <p class="mt-1 text-xs text-ink-400">{{ t("knowledgeBase.扫描件_y821yt") }}</p>
           </div>
           <input ref="fileInput" type="file" class="hidden" @change="onPick" />
         </div>
@@ -400,19 +402,19 @@ onUnmounted(() => {
           <div class="flex flex-wrap gap-3">
             <input
               v-model="pasteTitle"
-              placeholder="文档标题（如：MES 排产规则说明）"
+              :placeholder="t('knowledgeBase.文档标题_1dlf7a')"
               class="flex-1 min-w-[240px] px-3 py-2 border border-ink-200 rounded-lg text-sm"
             />
             <input
               v-model="pasteCategory"
-              placeholder="分类（如：产品手册）"
+              :placeholder="t('knowledgeBase.分类_1qj10o')"
               class="w-48 px-3 py-2 border border-ink-200 rounded-lg text-sm"
             />
           </div>
           <textarea
             v-model="pasteText"
             rows="7"
-            placeholder="粘贴正文。支持 markdown，用 # 标题分节能让切片更准 —— 每节会被切独立分片，检索命中更精确。"
+            :placeholder="t('knowledgeBase.粘贴正文_gjbne2')"
             class="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono leading-relaxed"
           />
           <div class="flex items-center gap-3">
@@ -429,13 +431,13 @@ onUnmounted(() => {
       <!-- 检索测试 -->
       <div class="card mb-6">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold">检索测试</h2>
-          <span class="text-xs text-ink-400">问一句，看会召回哪几段 —— 知识库到底有没有用，这里最直接</span>
+          <h2 class="font-semibold">{{ t("knowledgeBase.检索测试_dqhuq4") }}</h2>
+          <span class="text-xs text-ink-400">{{ t("knowledgeBase.问一句_1ym9x3") }}</span>
         </div>
         <div class="flex gap-3">
           <input
             v-model="searchQ"
-            placeholder="如：客户交期倒排怎么算？"
+            :placeholder="t('knowledgeBase.如_1miumm')"
             class="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm"
             @keyup.enter="runSearch"
           />
@@ -455,7 +457,7 @@ onUnmounted(() => {
             （门槛 {{ threshold }}，未达标的只展示、不会用于 AI 生成）
           </p>
           <div v-if="!hits.length" class="py-6 text-center text-sm text-ink-400">
-            没有召回任何内容 —— 检查知识库是否已建立索引。
+            {{ t("knowledgeBase.没有召回_b1d9l4") }}
           </div>
           <ul v-else class="space-y-2">
             <li
@@ -471,7 +473,7 @@ onUnmounted(() => {
                 >{{ h.score.toFixed(3) }}</span>
                 <span class="text-sm font-medium">{{ h.doc_title }}</span>
                 <span class="text-xs text-ink-400">{{ h.heading_path }}</span>
-                <span v-if="!h.passed" class="text-[11px] text-ink-400">（低于门槛）</span>
+                <span v-if="!h.passed" class="text-[11px] text-ink-400">{{ t("knowledgeBase.text_1e7aus") }}</span>
               </div>
               <p class="mt-1 text-xs text-ink-600 leading-relaxed line-clamp-3">{{ h.text }}</p>
             </li>
@@ -482,10 +484,10 @@ onUnmounted(() => {
       <!-- 文档列表 -->
       <div class="card">
         <div class="flex flex-wrap items-center gap-3 mb-4">
-          <h2 class="font-semibold">文档</h2>
+          <h2 class="font-semibold">{{ t("knowledgeBase.文档_hubg") }}</h2>
           <input
             v-model="q"
-            placeholder="搜索标题/文件名"
+            :placeholder="t('knowledgeBase.搜索标题_1cphp1')"
             class="w-56 px-3 py-1.5 border border-ink-200 rounded-lg text-sm"
             @keyup.enter="page = 1; refresh()"
           />
@@ -494,7 +496,7 @@ onUnmounted(() => {
             class="px-2 py-1.5 border border-ink-200 rounded-lg text-sm"
             @change="page = 1; refresh()"
           >
-            <option value="">全部分类</option>
+            <option value="">{{ t("entryList.全部分类_av9kmt") }}</option>
             <option v-for="c in stats?.categories || []" :key="c.name" :value="c.name">
               {{ c.name }}（{{ c.count }}）
             </option>
@@ -504,16 +506,16 @@ onUnmounted(() => {
             class="px-2 py-1.5 border border-ink-200 rounded-lg text-sm"
             @change="page = 1; refresh()"
           >
-            <option value="">全部状态</option>
-            <option value="pending">排队中</option>
-            <option value="indexing">索引中</option>
-            <option value="ready">已就绪</option>
-            <option value="failed">失败</option>
+            <option value="">{{ t("entryList.全部状态_avez63") }}</option>
+            <option value="pending">{{ t("knowledgeBase.排队中_fazuo") }}</option>
+            <option value="indexing">{{ t("knowledgeBase.索引中_isfa2") }}</option>
+            <option value="ready">{{ t("knowledgeBase.已就绪_e7qyz") }}</option>
+            <option value="failed">{{ t("knowledgeBase.failed") }}</option>
           </select>
           <button
             class="px-3 py-1.5 text-xs rounded-lg border border-ink-200 hover:bg-ink-50"
             @click="refresh"
-          >刷新</button>
+          >{{ t("knowledgeBase.刷新_ejix") }}</button>
           <span v-if="pendingCount" class="text-xs text-sky-600">
             {{ pendingCount }} 份处理中，每 4 秒自动刷新
           </span>
@@ -521,22 +523,22 @@ onUnmounted(() => {
         </div>
 
         <div v-if="loading && !docs.length" class="py-16 text-center text-sm text-ink-400">
-          加载中…
+          {{ t("apiKeys.加载中_b0k5km") }}
         </div>
         <div v-else-if="!docs.length" class="py-16 text-center text-sm text-ink-400">
-          还没有任何资料。上传一份产品手册或 FAQ，AI 起草时就能引用它。
+          {{ t("knowledgeBase.还没有任_1jwg96") }}
         </div>
 
         <table v-else class="w-full text-sm">
           <thead>
             <tr class="text-xs text-ink-400 border-b border-ink-100">
-              <th class="text-left font-normal py-2">标题</th>
-              <th class="text-left font-normal py-2 w-24">分类</th>
-              <th class="text-left font-normal py-2 w-28">状态</th>
-              <th class="text-right font-normal py-2 w-20">分片</th>
-              <th class="text-right font-normal py-2 w-20 pr-4">字数</th>
-              <th class="text-left font-normal py-2 w-40">时间</th>
-              <th class="text-right font-normal py-2 w-40">操作</th>
+              <th class="text-left font-normal py-2">{{ t("knowledgeBase.title") }}</th>
+              <th class="text-left font-normal py-2 w-24">{{ t("knowledgeBase.category") }}</th>
+              <th class="text-left font-normal py-2 w-28">{{ t("knowledgeBase.status") }}</th>
+              <th class="text-right font-normal py-2 w-20">{{ t("knowledgeBase.分片_eku9") }}</th>
+              <th class="text-right font-normal py-2 w-20 pr-4">{{ t("knowledgeBase.字数_g3cp") }}</th>
+              <th class="text-left font-normal py-2 w-40">{{ t("knowledgeBase.time") }}</th>
+              <th class="text-right font-normal py-2 w-40">{{ t("knowledgeBase.actions") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -567,15 +569,15 @@ onUnmounted(() => {
                 <button
                   class="px-2 py-1 text-xs rounded border border-ink-200 hover:bg-ink-50"
                   @click="openDetail(d)"
-                >分片</button>
+                >{{ t("knowledgeBase.分片_eku9") }}</button>
                 <button
                   class="ml-1.5 px-2 py-1 text-xs rounded border border-ink-200 hover:bg-ink-50"
                   @click="reindex(d)"
-                >重建</button>
+                >{{ t("knowledgeBase.重建_pbkd") }}</button>
                 <button
                   class="ml-1.5 px-2 py-1 text-xs rounded border border-red-200 text-red-600 hover:bg-red-50"
                   @click="removeDoc(d)"
-                >删除</button>
+                >{{ t("knowledgeBase.delete") }}</button>
               </td>
             </tr>
           </tbody>
@@ -586,13 +588,13 @@ onUnmounted(() => {
             class="px-3 py-1.5 text-xs rounded-lg border border-ink-200 disabled:opacity-40"
             :disabled="page <= 1"
             @click="page--; refresh()"
-          >上一页</button>
+          >{{ t("knowledgeBase.上一页_btlof") }}</button>
           <span class="text-xs text-ink-400">{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
           <button
             class="px-3 py-1.5 text-xs rounded-lg border border-ink-200 disabled:opacity-40"
             :disabled="page >= Math.ceil(total / pageSize)"
             @click="page++; refresh()"
-          >下一页</button>
+          >{{ t("knowledgeBase.下一页_btmf4") }}</button>
         </div>
       </div>
     </main>
@@ -611,11 +613,11 @@ onUnmounted(() => {
             </p>
           </div>
           <button class="ml-auto text-sm text-ink-500 hover:text-ink-900" @click="detailOpen = false">
-            关闭
+            {{ t("knowledgeBase.close") }}
           </button>
         </div>
 
-        <div v-if="detailLoading" class="p-5 text-sm text-ink-400">加载中…</div>
+        <div v-if="detailLoading" class="p-5 text-sm text-ink-400">{{ t("apiKeys.加载中_b0k5km") }}</div>
         <div v-else class="p-5 space-y-5">
           <p
             v-if="detailDoc?.error"
@@ -629,7 +631,7 @@ onUnmounted(() => {
           <section>
             <h3 class="text-sm font-semibold mb-2">检索分片（{{ detailChunks.length }}）</h3>
             <p class="text-xs text-ink-400 mb-3">
-              AI 真正读到的是这些片段，不是整篇文档。分片过碎会丢上下文，过长会稀释语义。
+              {{ t("knowledgeBase.text_uksm75") }}
             </p>
             <ul class="space-y-2">
               <li
@@ -652,7 +654,7 @@ onUnmounted(() => {
           </section>
 
           <section v-if="detailText">
-            <h3 class="text-sm font-semibold mb-2">抽取文本（前 4000 字）</h3>
+            <h3 class="text-sm font-semibold mb-2">{{ t("knowledgeBase.抽取文本_192fl2") }}</h3>
             <pre class="text-xs text-ink-600 bg-ink-50 rounded-lg p-3 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">{{ detailText }}</pre>
           </section>
         </div>

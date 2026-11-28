@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/lib/api'
@@ -21,7 +23,7 @@ async function search() {
   } catch { items.value = [] } finally { loading.value = false }
 }
 function statusLabel(s: string) {
-  return ({ draft: '草稿', published: '已发布', archived: '归档', pending_review: '待审核', approved: '已通过' } as Record<string, string>)[s] || s
+  return ({ draft: t("searchResults.draft"), published: t("searchResults.published"), archived: t("searchResults.归档_gsb5"), pending_review: t("searchResults.待审核_eftvg"), approved: t("searchResults.已通过_ego67") } as Record<string, string>)[s] || s
 }
 watch(ctFilter, search)
 watch(() => route.query.q, v => { q.value = String(v || ''); search() })
@@ -31,26 +33,26 @@ onMounted(search)
 <template>
   <div>
     <div class="flex items-center gap-3 mb-6">
-      <h1 class="text-2xl font-semibold tracking-tight">🔍 内容搜索</h1>
-      <input v-model="q" class="input flex-1 max-w-md" placeholder="关键词：标题 / 正文 / 自定义字段…" @keyup.enter="search" />
+      <h1 class="text-2xl font-semibold tracking-tight">{{ t("searchResults.text_g5wlxm") }}</h1>
+      <input v-model="q" class="input flex-1 max-w-md" :placeholder="t('searchResults.关键词_zi5ft0')" @keyup.enter="search" />
       <select v-model="ctFilter" class="input w-36">
-        <option value="">全部类型</option>
-        <option value="article">文章</option>
-        <option value="news">新闻</option>
-        <option value="product">产品</option>
-        <option value="case">案例</option>
+        <option value="">{{ t("entryList.全部类型_avglbk") }}</option>
+        <option value="article">{{ t("searchResults.文章_hxyx") }}</option>
+        <option value="news">{{ t("searchResults.news") }}</option>
+        <option value="product">{{ t("searchResults.产品_dud6") }}</option>
+        <option value="case">{{ t("searchResults.cases") }}</option>
       </select>
-      <button class="btn-primary" @click="search">搜索</button>
+      <button class="btn-primary" @click="search">{{ t("searchResults.search") }}</button>
     </div>
 
     <div class="card overflow-hidden">
-      <div v-if="loading" class="text-ink-500 p-6">搜索中…</div>
+      <div v-if="loading" class="text-ink-500 p-6">{{ t("searchResults.搜索中_d59ehr") }}</div>
       <template v-else>
         <div class="text-sm text-ink-400 px-3 pt-3">共 {{ total }} 条结果</div>
         <table class="w-full text-sm">
           <thead>
             <tr class="text-left text-ink-400 border-b">
-              <th class="p-3">标题</th><th class="p-3">Slug</th><th class="p-3">状态</th><th class="p-3">更新时间</th>
+              <th class="p-3">{{ t("searchResults.title") }}</th><th class="p-3">Slug</th><th class="p-3">{{ t("searchResults.status") }}</th><th class="p-3">{{ t("entryList.更新时间_devbay") }}</th>
             </tr>
           </thead>
           <tbody>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 export interface FieldGroup { id: number; key: string; label: string; sort: number; icon: string | null }
 
 const props = defineProps<{
@@ -22,7 +24,7 @@ function selectGroup(groupId: number | null) {
       :class="modelValue === null ? 'border-blue-500 text-blue-600' : 'border-transparent text-ink-500 hover:text-ink-700'"
       @click="selectGroup(null)"
     >
-      全部
+      {{ t("fieldGroupTabs.all") }}
     </button>
     <button
       v-for="g in groups"

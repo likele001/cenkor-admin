@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * AI 落地页 / 官网子站。
  *
@@ -97,7 +99,7 @@ function fmtTime(s?: string | null) {
 
 async function generate() {
   if (!brief.value.trim()) {
-    errorMsg.value = '先写一句需求'
+    errorMsg.value = t("landingStudio.先写一句_nv929k")
     return
   }
   drafting.value = true
@@ -128,7 +130,7 @@ async function generate() {
       data.kb_used ? `，参考了 ${data.kb_used} 段企业资料` : ''
     }${data.dropped?.length ? `；丢弃了 ${data.dropped.length} 个不支持的区块（${data.dropped.join('、')}）` : ''}`
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '生成失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("aiWorkbench.生成失败_f6lwo5")
   } finally {
     drafting.value = false
     if (timer) window.clearInterval(timer)
@@ -156,7 +158,7 @@ async function saveDraft() {
     previewTitle.value = first.title
     await loadRows()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '保存失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("aiMemory.saveFailed")
   } finally {
     saving.value = false
   }
@@ -168,7 +170,7 @@ async function loadRows() {
     const { data } = await api.get('/api/v1/cms/ai/landing/pages')
     rows.value = data.items || []
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '列表加载失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("landingStudio.列表加载_1gvdsg")
   } finally {
     loading.value = false
   }
@@ -190,7 +192,7 @@ async function togglePublish(row: PageRow) {
       : '已下线'
     await loadRows()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '操作失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("aiMemory.操作失败_d1rj43")
   }
 }
 
@@ -198,11 +200,11 @@ async function removeRow(row: PageRow) {
   if (!window.confirm(`删除页面 ${row.title}？发布中的链接会立即失效。`)) return
   try {
     await api.delete(`/api/v1/cms/ai/landing/pages/${row.id}`)
-    okMsg.value = '已删除'
+    okMsg.value = t("landingStudio.已删除_e65yu")
     if (previewUrl.value.includes(row.url)) previewUrl.value = ''
     await loadRows()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '删除失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("aiMemory.删除失败_azdahk")
   }
 }
 
@@ -221,9 +223,9 @@ onUnmounted(() => {
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">← AI 驾驶舱</router-link>
-        <span class="font-semibold">落地页工坊</span>
-        <span class="text-xs text-ink-400">一句话生成可投放的落地页 / 官网子站 · 表单直接进 CRM 线索池</span>
+        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">{{ t("contentHealth.text_11m1s0") }}</router-link>
+        <span class="font-semibold">{{ t("landingStudio.落地页工_vgmx8n") }}</span>
+        <span class="text-xs text-ink-400">{{ t("landingStudio.一句话生_kbjkwl") }}</span>
       </div>
     </header>
 
@@ -238,14 +240,14 @@ onUnmounted(() => {
       <!-- 生成区 -->
       <div class="card mb-6">
         <div class="flex items-center gap-3 mb-3">
-          <h2 class="font-semibold">① 一句话说清楚要什么</h2>
-          <span class="text-xs text-ink-400">写得具体一点：卖给谁、解决什么、目标是留资还是演示</span>
+          <h2 class="font-semibold">{{ t("landingStudio.text_46xd08") }}</h2>
+          <span class="text-xs text-ink-400">{{ t("landingStudio.写得具体_hfoc2n") }}</span>
         </div>
         <textarea
           v-model="brief"
           rows="3"
           class="w-full text-sm rounded-xl border border-ink-200 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-ink-300"
-          placeholder="例：给长三角中小制造企业做一个「MES 上线 30 天见效」的方案落地页，主打排产与追溯，目标是收集留资"
+          :placeholder="t('landingStudio.例_1ivlhn')"
         />
 
         <div class="mt-4 flex flex-wrap items-center gap-4">
@@ -254,41 +256,41 @@ onUnmounted(() => {
               class="px-3 py-1.5 text-sm rounded-lg border"
               :class="mode === 'page' ? 'bg-ink-900 text-white border-ink-900' : 'border-ink-200 hover:bg-ink-50'"
               @click="mode = 'page'"
-            >单页落地页</button>
+            >{{ t("landingStudio.单页落地_1phcns") }}</button>
             <button
               class="px-3 py-1.5 text-sm rounded-lg border"
               :class="mode === 'site' ? 'bg-ink-900 text-white border-ink-900' : 'border-ink-200 hover:bg-ink-50'"
               @click="mode = 'site'"
-            >官网子站（4 页）</button>
+            >{{ t("landingStudio.官网子站_1xery0") }}</button>
           </div>
           <input
             v-model="brand"
             class="text-sm rounded-lg border border-ink-200 px-3 py-1.5 w-48"
-            placeholder="品牌名（可留空）"
+            :placeholder="t('landingStudio.品牌名_3oknq7')"
           />
           <select v-model="goal" class="text-sm rounded-lg border border-ink-200 px-2 py-1.5">
-            <option>获取线索</option>
-            <option>预约演示</option>
-            <option>活动报名</option>
-            <option>产品发布</option>
+            <option>{{ t("landingStudio.获取线索_gyypvm") }}</option>
+            <option>{{ t("landingStudio.预约演示_jrlxag") }}</option>
+            <option>{{ t("landingStudio.活动报名_e4k591") }}</option>
+            <option>{{ t("landingStudio.产品发布_a9ydak") }}</option>
           </select>
           <label class="text-sm text-ink-600 flex items-center gap-1.5">
             <input v-model="useKb" type="checkbox" />
-            参考知识库资料
+            {{ t("landingStudio.参考知识_24aaau") }}
           </label>
           <button class="btn-primary ml-auto" :disabled="drafting" @click="generate">
             {{ drafting ? `生成中 ${elapsed}s…` : '生成' }}
           </button>
         </div>
         <p class="mt-2 text-[11px] text-ink-400">
-          单页约 50 秒；子站 4 页并行生成，通常 1~3 分钟。生成期间请勿关闭页面。
+          {{ t("landingStudio.单页约_140688") }}
         </p>
       </div>
 
       <!-- 草稿结果 -->
       <div v-if="draft" class="card mb-6">
         <div class="flex items-center gap-3 mb-4">
-          <h2 class="font-semibold">② 检查内容，再保存</h2>
+          <h2 class="font-semibold">{{ t("landingStudio.text_qqvi7o") }}</h2>
           <span class="text-xs text-ink-400">
             表单「{{ draft.form?.title }}」共 {{ draft.form?.fields?.length || 0 }} 个字段，提交即进 CRM 线索
           </span>
@@ -327,27 +329,27 @@ onUnmounted(() => {
           </div>
           <div class="space-y-3">
             <div>
-              <p class="text-xs text-ink-400 mb-1">SEO 标题</p>
+              <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.text_14em2i") }}</p>
               <p class="text-sm">{{ currentPage.seo?.title || '（空）' }}</p>
             </div>
             <div>
-              <p class="text-xs text-ink-400 mb-1">描述</p>
+              <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.description") }}</p>
               <p class="text-xs text-ink-600">{{ currentPage.seo?.description || '（空）' }}</p>
             </div>
             <div>
-              <p class="text-xs text-ink-400 mb-1">关键词</p>
+              <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.关键词_cnmdu") }}</p>
               <p class="text-xs text-ink-600">{{ currentPage.seo?.keywords || '（空）' }}</p>
             </div>
             <div v-if="mode === 'page'">
-              <p class="text-xs text-ink-400 mb-1">访问路径</p>
+              <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.访问路径_i96gg4") }}</p>
               <div class="flex items-center gap-1">
                 <span class="text-xs text-ink-400">/lp/</span>
                 <input v-model="pageKey" class="text-xs rounded border border-ink-200 px-2 py-1 w-40" />
               </div>
             </div>
             <div v-else>
-              <p class="text-xs text-ink-400 mb-1">子站标识</p>
-              <input v-model="siteKey" class="text-xs rounded border border-ink-200 px-2 py-1 w-40" placeholder="如 cenkor" />
+              <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.子站标识_c14dt4") }}</p>
+              <input v-model="siteKey" class="text-xs rounded border border-ink-200 px-2 py-1 w-40" :placeholder="t('landingStudio.如_nfa59c')" />
               <p class="text-[11px] text-ink-400 mt-1">发布后：/lp/{{ siteKey || 'site' }}/home</p>
             </div>
             <button class="btn-primary w-full" :disabled="saving || saved" @click="saveDraft">
@@ -360,9 +362,9 @@ onUnmounted(() => {
       <!-- 预览 -->
       <div v-if="previewUrl" class="card mb-6">
         <div class="flex items-center gap-3 mb-3">
-          <h2 class="font-semibold">③ 预览（与线上同一套渲染）</h2>
-          <a :href="previewUrl" target="_blank" class="text-xs text-accent-dark hover:underline">新窗口打开</a>
-          <button class="ml-auto text-xs text-ink-400 hover:text-ink-900" @click="previewUrl = ''">收起</button>
+          <h2 class="font-semibold">{{ t("landingStudio.text_1kpxn7") }}</h2>
+          <a :href="previewUrl" target="_blank" class="text-xs text-accent-dark hover:underline">{{ t("landingStudio.新窗口打_1m9aaq") }}</a>
+          <button class="ml-auto text-xs text-ink-400 hover:text-ink-900" @click="previewUrl = ''">{{ t("landingStudio.收起_hzpd") }}</button>
         </div>
         <iframe :src="previewUrl" :title="previewTitle" class="w-full h-[720px] rounded-xl border border-ink-200 bg-white" />
       </div>
@@ -370,25 +372,25 @@ onUnmounted(() => {
       <!-- 页面列表 -->
       <div class="card">
         <div class="flex items-center gap-3 mb-4">
-          <h2 class="font-semibold">已生成的页面</h2>
-          <span class="text-xs text-ink-400">发布后对外地址 /lp/…；表单提交数即留资线索数</span>
-          <button class="ml-auto text-sm text-ink-500 hover:text-ink-900" @click="loadRows">刷新</button>
+          <h2 class="font-semibold">{{ t("landingStudio.已生成的_1uq619") }}</h2>
+          <span class="text-xs text-ink-400">{{ t("landingStudio.发布后对_1jr1ny") }}</span>
+          <button class="ml-auto text-sm text-ink-500 hover:text-ink-900" @click="loadRows">{{ t("landingStudio.刷新_ejix") }}</button>
         </div>
 
-        <div v-if="loading && !rows.length" class="py-12 text-center text-sm text-ink-400">加载中…</div>
+        <div v-if="loading && !rows.length" class="py-12 text-center text-sm text-ink-400">{{ t("apiKeys.加载中_b0k5km") }}</div>
         <div v-else-if="!rows.length" class="py-12 text-center text-sm text-ink-400">
-          还没有页面。上面写一句话就能生成。
+          {{ t("landingStudio.还没有页_1lffnu") }}
         </div>
         <table v-else class="w-full text-sm">
           <thead>
             <tr class="text-xs text-ink-400 border-b border-ink-100">
-              <th class="text-left font-normal py-2">标题</th>
-              <th class="text-left font-normal py-2 w-24">类型</th>
-              <th class="text-left font-normal py-2 w-24">状态</th>
-              <th class="text-right font-normal py-2 w-20 pr-4">区块</th>
-              <th class="text-right font-normal py-2 w-20 pr-4">留资</th>
-              <th class="text-left font-normal py-2 w-40">更新时间</th>
-              <th class="text-right font-normal py-2 w-56">操作</th>
+              <th class="text-left font-normal py-2">{{ t("landingStudio.title") }}</th>
+              <th class="text-left font-normal py-2 w-24">{{ t("landingStudio.type") }}</th>
+              <th class="text-left font-normal py-2 w-24">{{ t("landingStudio.status") }}</th>
+              <th class="text-right font-normal py-2 w-20 pr-4">{{ t("landingStudio.区块_emvx") }}</th>
+              <th class="text-right font-normal py-2 w-20 pr-4">{{ t("landingStudio.留资_kqh7") }}</th>
+              <th class="text-left font-normal py-2 w-40">{{ t("entryList.更新时间_devbay") }}</th>
+              <th class="text-right font-normal py-2 w-56">{{ t("landingStudio.actions") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -415,13 +417,13 @@ onUnmounted(() => {
               </td>
               <td class="py-2.5 text-xs text-ink-400 tabular-nums">{{ fmtTime(r.updated_at) }}</td>
               <td class="py-2.5 text-right whitespace-nowrap">
-                <button class="px-2 py-1 text-xs rounded border border-ink-200 hover:bg-ink-50" @click="preview(r)">预览</button>
+                <button class="px-2 py-1 text-xs rounded border border-ink-200 hover:bg-ink-50" @click="preview(r)">{{ t("landingStudio.预览_qp50") }}</button>
                 <button
                   class="ml-1.5 px-2 py-1 text-xs rounded border"
                   :class="r.status === 'published' ? 'border-ink-200 hover:bg-ink-50' : 'border-accent text-accent-dark hover:bg-ink-50'"
                   @click="togglePublish(r)"
                 >{{ r.status === 'published' ? '下线' : '发布' }}</button>
-                <button class="ml-1.5 px-2 py-1 text-xs rounded border border-red-200 text-red-600 hover:bg-red-50" @click="removeRow(r)">删除</button>
+                <button class="ml-1.5 px-2 py-1 text-xs rounded border border-red-200 text-red-600 hover:bg-red-50" @click="removeRow(r)">{{ t("landingStudio.delete") }}</button>
               </td>
             </tr>
           </tbody>

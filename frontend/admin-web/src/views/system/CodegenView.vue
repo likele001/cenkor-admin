@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, reactive, computed, onMounted } from 'vue'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
@@ -277,12 +279,12 @@ async function errText(e: any): Promise<string> {
   if (d instanceof Blob) {
     try {
       const j = JSON.parse(await d.text())
-      return j.detail || '请求失败'
+      return j.detail || t("codegen.请求失败_i3trb3")
     } catch {
-      return '请求失败'
+      return t("codegen.请求失败_i3trb3")
     }
   }
-  return d?.detail || e?.message || '请求失败'
+  return d?.detail || e?.message || t("codegen.请求失败_i3trb3")
 }
 
 async function loadMeta() {
@@ -317,7 +319,7 @@ async function loadSample() {
     yamlText.value = data.yaml
     preview.value = data
     mode.value = 'visual'
-    ok.value = '已载入样例 spec。'
+    ok.value = t("codegen.已载入样_6h5jn9")
   } catch (e: any) {
     error.value = await errText(e)
   } finally {
@@ -413,7 +415,7 @@ async function applyYaml() {
     yamlText.value = data.yaml
     preview.value = data
     mode.value = 'visual'
-    ok.value = '已按 YAML 回填可视化表单。'
+    ok.value = t("codegen.已按_96t9f7")
   } catch (e: any) {
     error.value = await errText(e)
   } finally {

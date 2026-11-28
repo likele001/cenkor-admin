@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * AI 质量台：抽样质检 + 模型 A/B。
  *
@@ -151,7 +153,7 @@ async function loadStats() {
     const { data } = await api.get('/api/v1/cms/ai/quality/stats', { params: { weeks: 12 } })
     stats.value = data as Stats
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '加载统计失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("quality.加载统计_8xj443")
   }
 }
 
@@ -186,10 +188,10 @@ async function draw() {
       draft: { overall: 0, verdict: 'pass', note: '', extras: {} },
     }))
     if (!items.length) {
-      flash.value = '没有可抽的 AI 产出（可能都已评过，或区间内没有 AI 生成的内容）'
+      flash.value = t("quality.没有可抽_hgj9ta")
     }
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '抽样失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("quality.抽样失败_cw1ga6")
   } finally {
     loading.value = false
   }
@@ -219,7 +221,7 @@ async function submit(row: Row) {
     flash.value = '已记录一条质检'
     await loadStats()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '提交失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("quality.提交失败_cx66zs")
   } finally {
     busy.value = ''
   }
@@ -227,15 +229,15 @@ async function submit(row: Row) {
 
 async function runAb() {
   if (!abForm.value.topic.trim()) {
-    errorMsg.value = '先写一个主题'
+    errorMsg.value = t("quality.先写一个_nu2pmg")
     return
   }
   if (!abForm.value.model_a || !abForm.value.model_b) {
-    errorMsg.value = '两个模型都要选'
+    errorMsg.value = t("quality.两个模型_1x9kla")
     return
   }
   if (abForm.value.model_a === abForm.value.model_b) {
-    errorMsg.value = '两个模型相同，没有对比意义'
+    errorMsg.value = t("quality.两个模型_krcpfp")
     return
   }
   busy.value = 'ab'
@@ -251,7 +253,7 @@ async function runAb() {
     )
     abRun.value = data as AbRun
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || 'A/B 生成失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("quality.text_1h5ck0")
   } finally {
     busy.value = ''
   }
@@ -269,7 +271,7 @@ async function submitAb() {
     flash.value = '已记录盲评结论'
     await loadStats()
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '提交失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("quality.提交失败_cx66zs")
   } finally {
     busy.value = ''
   }
@@ -308,9 +310,9 @@ onMounted(async () => {
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">← AI 驾驶舱</router-link>
-        <span class="font-semibold">AI 质量台</span>
-        <span class="text-xs text-ink-400">抽样质检 · 质量曲线 · 模型 A/B</span>
+        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">{{ t("contentHealth.text_11m1s0") }}</router-link>
+        <span class="font-semibold">{{ t("quality.text_wi0f8x") }}</span>
+        <span class="text-xs text-ink-400">{{ t("quality.抽样质检_y3454s") }}</span>
       </div>
     </header>
 
@@ -325,7 +327,7 @@ onMounted(async () => {
       <!-- 总览 -->
       <div class="grid gap-4 md:grid-cols-4 mb-6">
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">质检覆盖率</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("quality.质检覆盖_1whlof") }}</p>
           <p class="text-3xl font-semibold leading-none">
             {{ stats?.coverage.percent ?? 0 }}<span class="text-lg">%</span>
           </p>
@@ -334,14 +336,14 @@ onMounted(async () => {
           </p>
         </div>
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">本周均分</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("quality.本周均分_dd92sb") }}</p>
           <p class="text-3xl font-semibold leading-none">
             {{ avgScore }}<span class="text-lg text-ink-400">/5</span>
           </p>
           <p class="mt-2 text-xs text-ink-400">本周 {{ lastPoint?.count ?? 0 }} 条评价</p>
         </div>
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">判定分布</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("quality.判定分布_aqsdgz") }}</p>
           <div class="flex flex-wrap gap-1.5 mt-1">
             <span
               v-for="v in verdictRows"
@@ -349,18 +351,18 @@ onMounted(async () => {
               class="px-2 py-0.5 text-xs rounded-lg border"
               :class="v.cls"
             >{{ v.label }} {{ v.cnt }}</span>
-            <span v-if="!verdictRows.length" class="text-xs text-ink-400">还没有评价</span>
+            <span v-if="!verdictRows.length" class="text-xs text-ink-400">{{ t("quality.还没有评_8bfms3") }}</span>
           </div>
         </div>
         <div class="card">
-          <p class="text-xs text-ink-400 mb-1">A/B 战绩</p>
+          <p class="text-xs text-ink-400 mb-1">{{ t("quality.text_vjfy4d") }}</p>
           <div v-if="stats?.ab.length" class="space-y-1">
             <div v-for="a in stats?.ab" :key="a.model" class="flex items-center justify-between text-xs gap-2">
               <span class="truncate text-ink-600">{{ a.model }}</span>
               <span class="text-ink-900 font-medium whitespace-nowrap">{{ a.wins }}胜 {{ a.losses }}负 {{ a.ties }}平</span>
             </div>
           </div>
-          <p v-else class="text-xs text-ink-400">还没有判定过</p>
+          <p v-else class="text-xs text-ink-400">{{ t("quality.还没有判_18irj8") }}</p>
         </div>
       </div>
 
@@ -379,17 +381,17 @@ onMounted(async () => {
               <span class="text-[10px] text-ink-400">{{ w.week.slice(5) }}</span>
             </div>
           </div>
-          <p v-else class="text-sm text-ink-400 py-10 text-center">还没有质检数据，先从下面抽几条打个分</p>
+          <p v-else class="text-sm text-ink-400 py-10 text-center">{{ t("quality.还没有质_1yejk1") }}</p>
         </div>
 
         <div class="card">
-          <p class="text-xs text-ink-400 mb-3">按模型对比</p>
+          <p class="text-xs text-ink-400 mb-3">{{ t("quality.按模型对_19tpit") }}</p>
           <table v-if="stats?.by_model.length" class="w-full text-xs">
             <thead class="text-ink-400">
               <tr>
-                <th class="text-left font-normal pb-2">模型</th>
-                <th class="text-right font-normal pb-2">均分</th>
-                <th class="text-right font-normal pb-2">条数</th>
+                <th class="text-left font-normal pb-2">{{ t("quality.模型_ij62") }}</th>
+                <th class="text-right font-normal pb-2">{{ t("quality.均分_fan3") }}</th>
+                <th class="text-right font-normal pb-2">{{ t("quality.条数_i52n") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -400,7 +402,7 @@ onMounted(async () => {
               </tr>
             </tbody>
           </table>
-          <p v-else class="text-xs text-ink-400">暂无数据</p>
+          <p v-else class="text-xs text-ink-400">{{ t("quality.暂无数据_dcv57g") }}</p>
         </div>
       </div>
 
@@ -410,19 +412,19 @@ onMounted(async () => {
           class="px-4 py-2 text-sm rounded-lg border"
           :class="tab === TAB_SAMPLE ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-600 border-ink-200'"
           @click="tab = TAB_SAMPLE"
-        >抽样质检</button>
+        >{{ t("quality.抽样质检_cwa3aq") }}</button>
         <button
           class="px-4 py-2 text-sm rounded-lg border"
           :class="tab === TAB_AB ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-600 border-ink-200'"
           @click="tab = TAB_AB"
-        >模型 A/B</button>
+        >{{ t("quality.模型_1teenv") }}</button>
       </div>
 
       <!-- 抽样 -->
       <section v-if="tab === TAB_SAMPLE">
         <div class="card mb-4 flex flex-wrap items-end gap-4">
           <label class="text-sm text-ink-600">
-            抽几条
+            {{ t("quality.抽几条_ev4zi") }}
             <input v-model.number="sampleSize" type="number" min="1" max="20"
               class="ml-2 w-16 px-2 py-1 border border-ink-200 rounded-lg text-sm" />
           </label>
@@ -447,7 +449,7 @@ onMounted(async () => {
 
             <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
               <div class="flex items-center gap-2">
-                <span class="text-xs text-ink-500">整体</span>
+                <span class="text-xs text-ink-500">{{ t("quality.整体_howv") }}</span>
                 <button v-for="n in 5" :key="n" type="button"
                   class="w-8 h-8 rounded-lg border text-sm"
                   :class="row.draft.overall >= n ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-500 border-ink-200'"
@@ -467,7 +469,7 @@ onMounted(async () => {
                 class="px-3 py-1 text-xs rounded-lg border"
                 :class="row.draft.verdict === key ? verdictClass[key] : 'bg-white text-ink-500 border-ink-200'"
                 @click="row.draft.verdict = key">{{ verdictLabels[key] }}</button>
-              <input v-model="row.draft.note" placeholder="备注（可选）：哪里不好、该怎么改"
+              <input v-model="row.draft.note" :placeholder="t('quality.备注_1vh26n')"
                 class="flex-1 min-w-[12rem] px-3 py-1.5 text-sm border border-ink-200 rounded-lg" />
               <button
                 class="px-4 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -476,25 +478,25 @@ onMounted(async () => {
             </div>
           </article>
         </div>
-        <p v-else class="card text-sm text-ink-400 text-center py-12">点「换一批」抽几条 AI 产出开始打分</p>
+        <p v-else class="card text-sm text-ink-400 text-center py-12">{{ t("quality.点_eocev6") }}</p>
       </section>
 
       <!-- A/B -->
       <section v-else>
         <div class="card mb-4">
           <p class="text-xs text-ink-400 mb-3">
-            同一主题、同一参数生成两版，左右随机排序。提交结论后才会揭晓哪边是哪个模型。
+            {{ t("quality.同一主题_1pdp43") }}
           </p>
-          <textarea v-model="abForm.topic" rows="2" placeholder="例如：取向硅钢铁损的影响因素与选型建议"
+          <textarea v-model="abForm.topic" rows="2" :placeholder="t('quality.例如_aodud9')"
             class="w-full px-3 py-2 text-sm border border-ink-200 rounded-lg mb-3"></textarea>
           <div class="flex flex-wrap items-end gap-4">
             <label class="text-sm text-ink-600">
-              模型 ①
+              {{ t("quality.模型_dqpwlm") }}
               <input v-model="abForm.model_a" list="ab-models"
                 class="ml-2 w-56 px-2 py-1.5 border border-ink-200 rounded-lg text-sm" />
             </label>
             <label class="text-sm text-ink-600">
-              模型 ②
+              {{ t("quality.模型_dqpwln") }}
               <input v-model="abForm.model_b" list="ab-models"
                 class="ml-2 w-56 px-2 py-1.5 border border-ink-200 rounded-lg text-sm" />
             </label>
@@ -502,7 +504,7 @@ onMounted(async () => {
               <option v-for="m in models" :key="m" :value="m" />
             </datalist>
             <label class="text-sm text-ink-600">
-              预算
+              {{ t("quality.预算_qmc3") }}
               <input v-model.number="abForm.max_tokens" type="number" min="500" max="16000" step="500"
                 class="ml-2 w-24 px-2 py-1.5 border border-ink-200 rounded-lg text-sm" />
             </label>
@@ -512,7 +514,7 @@ onMounted(async () => {
             >{{ busy === 'ab' ? '两个模型在写…（约 1 分钟）' : '生成两版对比' }}</button>
           </div>
           <p class="mt-2 text-xs text-ink-400">
-            提示：推理模型的思考过程与正文共享预算，预算太小会出现「正文为空」——那不是模型不行，是钱没给够。
+            {{ t("quality.提示_126a5t") }}
           </p>
         </div>
 
@@ -520,11 +522,11 @@ onMounted(async () => {
           <article class="card">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium">
-                左侧
+                {{ t("quality.左侧_gept") }}
                 <span v-if="abReveal" class="ml-2 text-xs text-ink-400">
                   {{ abReveal.left }}
                   <span v-if="abReveal.won === abReveal.left"
-                        class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">胜</span>
+                        class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">{{ t("quality.胜_pgc") }}</span>
                 </span>
               </span>
               <span class="text-xs text-ink-400">{{ abRun.left.chars }} 字 · {{ (abRun.left.ms / 1000).toFixed(1) }}s</span>
@@ -538,11 +540,11 @@ onMounted(async () => {
           <article class="card">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium">
-                右侧
+                {{ t("quality.右侧_epsk") }}
                 <span v-if="abReveal" class="ml-2 text-xs text-ink-400">
                   {{ abReveal.right }}
                   <span v-if="abReveal.won === abReveal.right"
-                        class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">胜</span>
+                        class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">{{ t("quality.胜_pgc") }}</span>
                 </span>
               </span>
               <span class="text-xs text-ink-400">{{ abRun.right.chars }} 字 · {{ (abRun.right.ms / 1000).toFixed(1) }}s</span>
@@ -557,26 +559,26 @@ onMounted(async () => {
 
         <div v-if="abRun" class="card mt-4 flex flex-wrap items-center gap-3">
           <template v-if="abRun.reviewable && !abReveal">
-            <span class="text-sm text-ink-600">哪一版更好？</span>
+            <span class="text-sm text-ink-600">{{ t("quality.哪一版更_slc6ys") }}</span>
             <button type="button" class="px-3 py-1.5 text-sm rounded-lg border"
               :class="abWinner === 'left' ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-600 border-ink-200'"
-              @click="abWinner = 'left'">左侧更好</button>
+              @click="abWinner = 'left'">{{ t("quality.左侧更好_c6iuyy") }}</button>
             <button type="button" class="px-3 py-1.5 text-sm rounded-lg border"
               :class="abWinner === 'right' ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-600 border-ink-200'"
-              @click="abWinner = 'right'">右侧更好</button>
+              @click="abWinner = 'right'">{{ t("quality.右侧更好_axcjdp") }}</button>
             <button type="button" class="px-3 py-1.5 text-sm rounded-lg border"
               :class="abWinner === 'tie' ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-600 border-ink-200'"
-              @click="abWinner = 'tie'">差不多</button>
-            <input v-model="abNote" placeholder="备注（可选）"
+              @click="abWinner = 'tie'">{{ t("quality.差不多_e51y3") }}</button>
+            <input v-model="abNote" :placeholder="t('quality.备注_qeo808')"
               class="flex-1 min-w-[10rem] px-3 py-1.5 text-sm border border-ink-200 rounded-lg" />
             <button class="px-4 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-              :disabled="busy === 'ab-review'" @click="submitAb">提交并揭晓</button>
+              :disabled="busy === 'ab-review'" @click="submitAb">{{ t("quality.提交并揭_19fd31") }}</button>
           </template>
           <p v-else-if="abReveal" class="text-sm text-ink-700">
-            已揭晓：胜出的是 <span class="font-medium">{{ abReveal.won }}</span>
+            {{ t("quality.已揭晓_1rhuns") }} <span class="font-medium">{{ abReveal.won }}</span>
           </p>
           <p v-else class="text-sm text-amber-700">
-            这一轮有一侧没写出来，无法评价。把预算调大或换个模型重跑。
+            {{ t("quality.这一轮有_tl1rlp") }}
           </p>
         </div>
       </section>

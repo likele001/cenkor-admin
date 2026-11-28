@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 字段级 AI 改写弹层（编辑页内嵌）
  *
@@ -122,10 +124,10 @@ function plainOf(html: string): string {
 function errText(e: any): string {
   if (e?.response?.status === 503) {
     aiUnavailable.value = true
-    return e.response?.data?.detail || 'AI 未配置'
+    return e.response?.data?.detail || t("aiWorkbench.text_wcg8s3")
   }
   if (e?.response?.status === 404) {
-    return 'AI 改写接口不可用，确认后端已重启到最新版本'
+    return t("aiRewriteDialog.text_1j0euc")
   }
   const d = e?.response?.data?.detail
   if (Array.isArray(d)) return d.map((x: any) => x.msg || JSON.stringify(x)).join('; ')
@@ -141,11 +143,11 @@ async function run(nextAction?: string) {
   ran.value = true
 
   if (!src) {
-    errorMsg.value = '这里还没有内容可改'
+    errorMsg.value = t("aiRewriteDialog.这里还没_1ajibc")
     return
   }
   if (needInstruction.value && !instruction.value.trim()) {
-    errorMsg.value = '自定义改写需要先写清楚要求'
+    errorMsg.value = t("aiRewriteDialog.自定义改_1balvp")
     return
   }
 
@@ -153,9 +155,9 @@ async function run(nextAction?: string) {
   try {
     if (props.html) {
       const parsed = splitHtml(src)
-      if (!parsed) throw new Error('无法解析富文本内容')
+      if (!parsed) throw new Error(t("aiRewriteDialog.无法解析_gx72w3"))
       if (!parsed.items.length) {
-        errorMsg.value = '这段正文还没有可改写的文字'
+        errorMsg.value = t("aiRewriteDialog.这段正文_8gu805")
         return
       }
       originalPlain.value = plainOf(src)
@@ -259,14 +261,14 @@ watch(
           <input
             v-model="instruction"
             class="input text-xs"
-            placeholder="想要什么效果？例如：改成小红书口吻、突出性价比、控制在 60 字以内"
+            :placeholder="t('aiRewriteDialog.想要什么_y5lkeh')"
             @keyup.enter="run()"
           />
         </div>
 
         <p v-if="aiUnavailable" class="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          AI 尚未配置。
-          <router-link to="/cms/ai-settings" class="font-medium underline">去 AI 设置绑定服务商与密钥 →</router-link>
+          {{ t("aiRewriteDialog.text_1uf9iq") }}
+          <router-link to="/cms/ai-settings" class="font-medium underline">{{ t("aiRewriteDialog.去_1kv3c3") }}</router-link>
         </p>
         <p v-else-if="errorMsg" class="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {{ errorMsg }}
@@ -274,7 +276,7 @@ watch(
       </div>
 
       <div class="flex-1 overflow-auto px-5 py-4">
-        <div v-if="busy" class="py-16 text-center text-sm text-ink-400">正在改写…</div>
+        <div v-if="busy" class="py-16 text-center text-sm text-ink-400">{{ t("aiRewriteDialog.正在改写_53y8gx") }}</div>
 
         <div v-else-if="!result" class="py-16 text-center text-xs text-ink-400">
           {{ ran ? '上面选个动作试试' : '选择一个改写动作' }}
@@ -283,18 +285,18 @@ watch(
         <div v-else :class="html ? 'space-y-4' : 'grid grid-cols-1 md:grid-cols-2 gap-4'">
           <section v-if="html" class="border border-ink-200 rounded-lg overflow-hidden">
             <div class="px-3 py-1.5 bg-ink-50 border-b border-ink-200 text-xs font-medium text-ink-600">
-              改写结果
+              {{ t("aiRewriteDialog.改写结果_d46hm1") }}
             </div>
             <div class="px-3 py-2 text-sm text-ink-800 leading-relaxed prose-sm" v-html="result"></div>
           </section>
 
           <template v-else>
             <section class="border border-ink-200 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-ink-50 border-b border-ink-200 text-xs font-medium text-ink-600">改写结果</div>
+              <div class="px-3 py-1.5 bg-ink-50 border-b border-ink-200 text-xs font-medium text-ink-600">{{ t("aiRewriteDialog.改写结果_d46hm1") }}</div>
               <div class="px-3 py-2 text-sm text-ink-800 leading-relaxed whitespace-pre-wrap break-words">{{ resultPlain }}</div>
             </section>
             <section class="border border-ink-200 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-ink-50 border-b border-ink-200 text-xs font-medium text-ink-500">修改前</div>
+              <div class="px-3 py-1.5 bg-ink-50 border-b border-ink-200 text-xs font-medium text-ink-500">{{ t("aiRewriteDialog.修改前_c74wy") }}</div>
               <div class="px-3 py-2 text-sm text-ink-500 leading-relaxed whitespace-pre-wrap break-words">
                 {{ originalPlain }}
               </div>
@@ -320,7 +322,7 @@ watch(
           v-if="result && !busy && unchanged"
           class="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"
         >
-          模型这次没有做出改动——可能是这段内容太短，或它认为无需调整。换个动作、补一句要求，或点「再来一次」。
+          {{ t("aiRewriteDialog.模型这次_1x7ov9") }}
         </p>
       </div>
 
@@ -329,9 +331,9 @@ watch(
           class="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
           :disabled="!canApply"
           @click="apply"
-        >应用到当前字段</button>
-        <button class="btn-ghost" @click="close">取消</button>
-        <span class="ml-auto text-xs text-ink-400">应用只改表单，保存后才落库</span>
+        >{{ t("aiRewriteDialog.应用到当_1gem01") }}</button>
+        <button class="btn-ghost" @click="close">{{ t("aiRewriteDialog.cancel") }}</button>
+        <span class="ml-auto text-xs text-ink-400">{{ t("aiRewriteDialog.应用只改_q5ble4") }}</span>
       </footer>
     </div>
   </div>

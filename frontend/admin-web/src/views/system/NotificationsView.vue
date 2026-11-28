@@ -35,7 +35,7 @@ async function load() {
     items.value = data.items
     total.value = data.total
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally { loading.value = false }
 }
 
@@ -65,7 +65,7 @@ async function send() {
     sendForm.value = { title: '', body: '', type: 'system', link: '' }
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '发送失败')
+    alert(e?.response?.data?.detail || t("notifications.发送失败_b643fo"))
   } finally { sending.value = false }
 }
 
@@ -79,20 +79,20 @@ onMounted(load)
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl font-semibold tracking-tight">{{ t('nav.notifications') }}</h1>
-        <p class="text-ink-500">查看系统通知和消息</p>
+        <p class="text-ink-500">{{ t("notifications.查看系统_nfi3i6") }}</p>
       </div>
       <div class="flex gap-2">
         <button class="btn-ghost text-sm" @click="unreadOnly = !unreadOnly; load()">
           {{ unreadOnly ? '查看全部' : '只看未读' }}
         </button>
-        <button class="btn-ghost text-sm" @click="markAllRead">全部已读</button>
-        <button class="btn-primary text-sm" @click="showSend = true">发送通知</button>
+        <button class="btn-ghost text-sm" @click="markAllRead">{{ t("notifications.全部已读_avbop5") }}</button>
+        <button class="btn-primary text-sm" @click="showSend = true">{{ t("notifications.发送通知_b6dbh7") }}</button>
       </div>
     </div>
 
-    <div v-if="loading" class="card text-ink-500">加载中...</div>
+    <div v-if="loading" class="card text-ink-500">{{ t("announcements.加载中_27k1ha") }}</div>
     <div v-else-if="error" class="card text-red-600">{{ error }}</div>
-    <div v-else-if="items.length === 0" class="card text-ink-500 text-center py-12">暂无通知</div>
+    <div v-else-if="items.length === 0" class="card text-ink-500 text-center py-12">{{ t("notifications.暂无通知_dd2ii1") }}</div>
     <div v-else class="space-y-2">
       <div v-for="n in items" :key="n.id" class="card flex items-start gap-3" :class="{ 'opacity-60': n.read }">
         <div class="flex-1 min-w-0">
@@ -104,49 +104,49 @@ onMounted(load)
           <p class="text-sm text-ink-600">{{ n.body }}</p>
           <div class="flex items-center gap-3 mt-1">
             <span class="text-xs text-ink-400">{{ n.created_at?.slice(0, 16) }}</span>
-            <span v-if="n.link" class="text-xs text-blue-500 hover:underline cursor-pointer" @click="$router.push(n.link!)">查看</span>
+            <span v-if="n.link" class="text-xs text-blue-500 hover:underline cursor-pointer" @click="$router.push(n.link!)">{{ t("notifications.查看_ibpi") }}</span>
           </div>
         </div>
         <div class="flex gap-1 shrink-0">
-          <button v-if="!n.read" class="text-xs text-ink-500 hover:text-ink-700" @click="markRead(n.id)">已读</button>
-          <button class="text-xs text-red-500 hover:text-red-700" @click="del(n.id)">删除</button>
+          <button v-if="!n.read" class="text-xs text-ink-500 hover:text-ink-700" @click="markRead(n.id)">{{ t("notifications.已读_gqx5") }}</button>
+          <button class="text-xs text-red-500 hover:text-red-700" @click="del(n.id)">{{ t("notifications.delete") }}</button>
         </div>
       </div>
     </div>
 
     <div v-if="totalPages > 1" class="mt-4 flex items-center justify-center gap-2 text-sm">
-      <button class="btn-ghost" :disabled="page <= 1" @click="page--; load()">上一页</button>
+      <button class="btn-ghost" :disabled="page <= 1" @click="page--; load()">{{ t("notifications.上一页_btlof") }}</button>
       <span>{{ page }} / {{ totalPages }}</span>
-      <button class="btn-ghost" :disabled="page >= totalPages" @click="page++; load()">下一页</button>
+      <button class="btn-ghost" :disabled="page >= totalPages" @click="page++; load()">{{ t("notifications.下一页_btmf4") }}</button>
     </div>
 
     <!-- Send Notification Modal -->
     <div v-if="showSend" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showSend = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">发送系统通知</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ t("notifications.发送系统_d0fhcv") }}</h2>
         <div class="space-y-3">
           <div>
-            <label class="block text-sm font-medium mb-1">类型</label>
+            <label class="block text-sm font-medium mb-1">{{ t("notifications.type") }}</label>
             <select v-model="sendForm.type" class="input">
-              <option value="system">系统通知</option>
-              <option value="task">任务通知</option>
+              <option value="system">{{ t("notifications.系统通知_garqz3") }}</option>
+              <option value="task">{{ t("notifications.任务通知_abf72p") }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">标题</label>
-            <input v-model="sendForm.title" class="input" placeholder="通知标题" />
+            <label class="block text-sm font-medium mb-1">{{ t("notifications.title") }}</label>
+            <input v-model="sendForm.title" class="input" :placeholder="t('notifications.通知标题_iodwho')" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">内容</label>
-            <RichTextEditor v-model="sendForm.body" placeholder="通知内容（可选）" />
+            <label class="block text-sm font-medium mb-1">{{ t("notifications.content") }}</label>
+            <RichTextEditor v-model="sendForm.body" :placeholder="t('notifications.通知内容_bw7qw6')" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">链接</label>
-            <input v-model="sendForm.link" class="input" placeholder="/system/notifications（可选）" />
+            <label class="block text-sm font-medium mb-1">{{ t("notifications.link") }}</label>
+            <input v-model="sendForm.link" class="input" :placeholder="t('notifications.text_1m9n0q')" />
           </div>
         </div>
         <div class="flex justify-end gap-2 mt-6">
-          <button class="btn-ghost" @click="showSend = false">取消</button>
+          <button class="btn-ghost" @click="showSend = false">{{ t("notifications.cancel") }}</button>
           <button class="btn-primary" :disabled="sending || !sendForm.title" @click="send">
             {{ sending ? '发送中...' : '发送给所有人' }}
           </button>

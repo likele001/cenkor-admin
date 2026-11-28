@@ -52,7 +52,7 @@ async function load() {
     users.value = u.data.items
     roles.value = r.data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("usersList.loadFailed")'
+    error.value = e?.response?.data?.detail || t("usersList.loadFailed")
   } finally {
     loading.value = false
   }
@@ -82,7 +82,7 @@ async function save() {
     showDialog.value = false
     await load()
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("usersList.saveFailed")'
+    error.value = e?.response?.data?.detail || t("usersList.saveFailed")
   } finally {
     saving.value = false
   }
@@ -94,18 +94,18 @@ async function del(u: UserItem) {
     await api.delete(`/api/v1/auth/users/${u.id}`)
     await load()
   } catch (e: any) {
-    alert('t("usersList.删除失败_1kc17l")' + (e?.response?.data?.detail || e.message))
+    alert(t("usersList.删除失败_1kc17l") + (e?.response?.data?.detail || e.message))
   }
 }
 
 async function resetPwd(u: UserItem) {
   const np = prompt(`重置「${u.username}」的密码（至少 8 字符）：`)
-  if (!np || np.length < 8) return alert('t("usersList.密码至少_l7s2vy")')
+  if (!np || np.length < 8) return alert(t("usersList.密码至少_l7s2vy"))
   try {
     await api.post(`/api/v1/auth/users/${u.id}/change-password`, { new_password: np })
-    alert('t("usersList.密码已重_j7r1zs")')
+    alert(t("usersList.密码已重_j7r1zs"))
   } catch (e: any) {
-    alert('t("usersList.失败_drpmu")' + (e?.response?.data?.detail || e.message))
+    alert(t("usersList.失败_drpmu") + (e?.response?.data?.detail || e.message))
   }
 }
 

@@ -25,7 +25,7 @@ async function load() {
     const { data } = await api.get('/api/v1/system/tasks')
     items.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -52,7 +52,7 @@ async function saveCron(task: Task) {
     editingCron.value = null
     await load()
   } catch (e: any) {
-    alert('t("tasks.保存失败_141keb")' + (e?.response?.data?.detail || e.message))
+    alert(t("tasks.保存失败_141keb") + (e?.response?.data?.detail || e.message))
   }
 }
 
@@ -65,7 +65,7 @@ async function runNow(task: Task) {
       alert(`触发失败：${data.reason ?? 'unknown'}（dev 环境无 Celery worker 是正常的）`)
     }
   } catch (e: any) {
-    alert('t("tasks.触发失败_1gx14a")' + (e?.response?.data?.detail || e.message))
+    alert(t("tasks.触发失败_1gx14a") + (e?.response?.data?.detail || e.message))
   }
 }
 

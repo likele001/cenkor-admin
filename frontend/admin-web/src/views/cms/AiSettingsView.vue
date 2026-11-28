@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
 
@@ -136,7 +138,7 @@ async function loadAll() {
   try {
     await Promise.all([loadCapabilities(), loadProviders(), loadOverview()])
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || e.message || '加载失败'
+    error.value = e?.response?.data?.detail || e.message || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -179,11 +181,11 @@ function closeCapEditor() {
 
 async function saveCapability(cap: Capability) {
   if (!capDraft.value.provider_id) {
-    alert('请先选择服务商')
+    alert(t("aiSettings.请先选择_1p0ydj"))
     return
   }
   if (!capDraft.value.model.trim()) {
-    alert('请填写模型名')
+    alert(t("aiSettings.请填写模_1oz70f"))
     return
   }
   capSaving.value = true
@@ -197,7 +199,7 @@ async function saveCapability(cap: Capability) {
     closeCapEditor()
     await loadAll()
   } catch (e: any) {
-    alert('保存失败：' + (e?.response?.data?.detail || e.message))
+    alert(t("settings.保存失败_141keb") + (e?.response?.data?.detail || e.message))
   } finally {
     capSaving.value = false
   }
@@ -209,7 +211,7 @@ async function unbindCapability(cap: Capability) {
     await api.delete(`/api/v1/cms/ai/capabilities/${cap.key}`)
     await loadAll()
   } catch (e: any) {
-    alert('解绑失败：' + (e?.response?.data?.detail || e.message))
+    alert(t("aiSettings.解绑失败_1mamm4") + (e?.response?.data?.detail || e.message))
   }
 }
 
@@ -361,7 +363,7 @@ async function saveProvider() {
     showForm.value = false
     await loadAll()
   } catch (e: any) {
-    alert('保存失败：' + (e?.response?.data?.detail || e.message))
+    alert(t("settings.保存失败_141keb") + (e?.response?.data?.detail || e.message))
   } finally {
     formSaving.value = false
   }
@@ -373,7 +375,7 @@ async function removeProvider(p: Provider) {
     await api.delete(`/api/v1/cms/ai/providers/${p.id}`)
     await loadAll()
   } catch (e: any) {
-    alert('删除失败：' + (e?.response?.data?.detail || e.message))
+    alert(t("apiKeys.删除失败_1kc17l") + (e?.response?.data?.detail || e.message))
   }
 }
 
@@ -413,20 +415,20 @@ onMounted(loadAll)
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← Dashboard</router-link>
-        <span class="font-semibold">AI 设置</span>
-        <span class="text-xs text-ink-400">服务商 · 能力绑定 · 连通性</span>
+        <span class="font-semibold">{{ t("aiSettings.text_11qd7s") }}</span>
+        <span class="text-xs text-ink-400">{{ t("aiSettings.服务商_1atu7d") }}</span>
         <div class="ml-auto flex items-center gap-4">
           <router-link
             to="/cms/ai-batch"
             class="text-sm text-ink-600 hover:text-ink-900 underline underline-offset-4"
           >
-            批量生产
+            {{ t("aiBatch.批量生产_d11rha") }}
           </router-link>
           <router-link
             to="/cms/ai-prompts"
             class="text-sm text-ink-600 hover:text-ink-900 underline underline-offset-4"
           >
-            提示词管理
+            {{ t("aiPrompts.提示词管_1ezhgm") }}
           </router-link>
         </div>
       </div>
@@ -437,9 +439,9 @@ onMounted(loadAll)
       <div class="card mb-6">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 class="text-base font-semibold text-ink-900">AI 能力状态</h2>
+            <h2 class="text-base font-semibold text-ink-900">{{ t("aiSettings.text_bafum9") }}</h2>
             <p class="mt-1 text-sm text-ink-500">
-              已就绪
+              {{ t("aiSettings.已就绪_e7qyz") }}
               <span class="font-semibold text-ink-900">{{ readyCount }}</span> / {{ capabilities.length }} 项能力
               · 服务商 {{ overview?.providers?.total ?? 0 }} 个（启用 {{ overview?.providers?.enabled ?? 0 }}）
             </p>
@@ -456,7 +458,7 @@ onMounted(loadAll)
         </div>
 
         <p v-if="overview?.env_fallback?.AI_ENABLED && overview?.env_fallback?.has_key" class="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          检测到 <code class="font-mono">.env</code> 里配置了 AI 密钥。未在下方绑定的能力会自动回退到环境变量；<b>一旦绑定就以后台配置为准</b>。
+          {{ t("aiSettings.检测到_fvdvp") }} <code class="font-mono">.env</code> {{ t("aiSettings.里配置了_p1yqf3") }}<b>{{ t("aiSettings.一旦绑定_1mfwm4") }}</b>。
         </p>
         <p v-if="overview?.registry_error" class="mt-3 text-xs text-red-600">
           配置加载异常：{{ overview.registry_error }}
@@ -470,19 +472,19 @@ onMounted(loadAll)
           :class="tab === 'capabilities' ? 'bg-white text-ink-900 shadow-sm border border-ink-200' : 'text-ink-500 hover:text-ink-900'"
           @click="tab = 'capabilities'"
         >
-          能力绑定
+          {{ t("aiSettings.能力绑定_gmed9j") }}
         </button>
         <button
           class="px-4 py-2 text-sm rounded-lg font-medium transition-colors"
           :class="tab === 'providers' ? 'bg-white text-ink-900 shadow-sm border border-ink-200' : 'text-ink-500 hover:text-ink-900'"
           @click="tab = 'providers'"
         >
-          服务商
+          {{ t("aiSettings.服务商_fhwnm") }}
           <span class="ml-1 text-xs text-ink-400">{{ providers.length }}</span>
         </button>
       </div>
 
-      <div v-if="loading" class="card text-ink-500">加载中…</div>
+      <div v-if="loading" class="card text-ink-500">{{ t("apiKeys.加载中_b0k5km") }}</div>
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
 
       <!-- ================= 能力绑定 ================= -->
@@ -498,7 +500,7 @@ onMounted(loadAll)
               <div class="flex items-center gap-2 flex-wrap">
                 <h3 class="font-semibold text-ink-900">{{ cap.label }}</h3>
                 <code class="text-xs px-1.5 py-0.5 rounded bg-ink-100 text-ink-500 font-mono">{{ cap.key }}</code>
-                <span v-if="!cap.wired" class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-500">未接入调用链</span>
+                <span v-if="!cap.wired" class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-500">{{ t("aiSettings.未接入调_1cb4ib") }}</span>
                 <span
                   v-else-if="cap.effective"
                   class="text-xs px-2 py-0.5 rounded-full"
@@ -506,16 +508,16 @@ onMounted(loadAll)
                 >
                   {{ cap.effective.source === 'db' ? '后台配置' : '环境变量' }}
                 </span>
-                <span v-else class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-500">未配置</span>
+                <span v-else class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-500">{{ t("aiSettings.未配置_fte97") }}</span>
               </div>
               <p class="mt-1 text-sm text-ink-500">{{ cap.hint }}</p>
               <p v-if="cap.effective" class="mt-2 text-xs text-ink-600">
-                生效中：<b>{{ cap.effective.provider_name }}</b> · <code class="font-mono">{{ cap.effective.model }}</code>
+                {{ t("aiSettings.生效中_f71mqe") }}<b>{{ cap.effective.provider_name }}</b> · <code class="font-mono">{{ cap.effective.model }}</code>
                 <span v-if="Object.keys(cap.effective.params || {}).length" class="text-ink-400">
                   （{{ Object.entries(cap.effective.params).map(([k, v]) => `${PARAM_LABELS[k] || k}=${v}`).join('，') }}）
                 </span>
               </p>
-              <p v-else class="mt-2 text-xs text-ink-400">尚未绑定服务商与模型</p>
+              <p v-else class="mt-2 text-xs text-ink-400">{{ t("aiSettings.尚未绑定_1sz2tv") }}</p>
             </div>
 
             <div class="flex items-center gap-2 shrink-0">
@@ -526,7 +528,7 @@ onMounted(loadAll)
                 {{ editingCap === cap.key ? '收起' : cap.effective ? '改绑' : '配置' }}
               </button>
               <button v-if="cap.binding" class="text-xs text-red-600 hover:underline px-1" @click="unbindCapability(cap)">
-                解绑
+                {{ t("aiSettings.解绑_o5e6") }}
               </button>
             </div>
           </div>
@@ -549,20 +551,20 @@ onMounted(loadAll)
           <div v-if="editingCap === cap.key" class="mt-4 pt-4 border-t border-ink-200 space-y-3">
             <div class="grid gap-3 sm:grid-cols-2">
               <div>
-                <label class="block text-sm font-medium mb-1">服务商</label>
+                <label class="block text-sm font-medium mb-1">{{ t("aiSettings.服务商_fhwnm") }}</label>
                 <select v-model.number="capDraft.provider_id" class="input">
-                  <option :value="null" disabled>请选择</option>
+                  <option :value="null" disabled>{{ t("aiSettings.请选择_l72nr") }}</option>
                   <option v-for="p in enabledOptions" :key="p.id" :value="p.id">
                     {{ p.name }}{{ p.has_api_key ? '' : '（未填密钥）' }}
                   </option>
                 </select>
                 <p v-if="!enabledOptions.length" class="mt-1 text-xs text-amber-600">
-                  还没有可用的服务商，请先到「服务商」标签页添加。
+                  {{ t("aiSettings.还没有可_h1x7rg") }}
                 </p>
               </div>
               <div>
-                <label class="block text-sm font-medium mb-1">模型名</label>
-                <input v-model="capDraft.model" class="input font-mono" placeholder="如 qwen-plus / text-embedding-v3" />
+                <label class="block text-sm font-medium mb-1">{{ t("aiSettings.模型名_fyytf") }}</label>
+                <input v-model="capDraft.model" class="input font-mono" :placeholder="t('aiSettings.如_1j4fd8')" />
               </div>
             </div>
 
@@ -575,7 +577,7 @@ onMounted(loadAll)
                   </span>
                 </label>
                 <select v-if="spec.enum.length" v-model="capDraft.params[spec.key]" class="input">
-                  <option value="">默认</option>
+                  <option value="">{{ t("aiSettings.默认_rs98") }}</option>
                   <option v-for="opt in spec.enum" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
                 <input
@@ -586,9 +588,9 @@ onMounted(loadAll)
                   :min="spec.min ?? undefined"
                   :max="spec.max ?? undefined"
                   class="input"
-                  placeholder="默认"
+                  :placeholder="t('aiSettings.默认_rs98')"
                 />
-                <input v-else v-model="capDraft.params[spec.key]" class="input" placeholder="默认" />
+                <input v-else v-model="capDraft.params[spec.key]" class="input" :placeholder="t('aiSettings.默认_rs98')" />
               </div>
             </div>
 
@@ -596,8 +598,8 @@ onMounted(loadAll)
               <button class="btn-primary text-sm" :disabled="capSaving" @click="saveCapability(cap)">
                 {{ capSaving ? '保存中…' : '保存绑定' }}
               </button>
-              <button class="btn-ghost text-sm" @click="closeCapEditor">取消</button>
-              <span class="text-xs text-ink-400">参数留空即用服务商默认值</span>
+              <button class="btn-ghost text-sm" @click="closeCapEditor">{{ t("aiSettings.cancel") }}</button>
+              <span class="text-xs text-ink-400">{{ t("aiSettings.参数留空_jram8y") }}</span>
             </div>
           </div>
         </div>
@@ -607,7 +609,7 @@ onMounted(loadAll)
       <div v-else class="space-y-4">
         <div class="flex items-center justify-between">
           <p class="text-sm text-ink-500">
-            一家服务商 = 一个接口地址 + 一把密钥。密钥加密存储，接口只回传末四位。
+            {{ t("aiSettings.一家服务_31mprz") }}
           </p>
           <button class="btn-primary text-sm" @click="showForm ? (showForm = false) : openCreate()">
             {{ showForm ? '取消' : '+ 添加服务商' }}
@@ -619,7 +621,7 @@ onMounted(loadAll)
           <h3 class="font-semibold">{{ editingProvider ? `编辑：${editingProvider.name}` : '添加服务商' }}</h3>
 
           <div v-if="!editingProvider && presets.length" class="flex flex-wrap gap-2">
-            <span class="text-xs text-ink-500 self-center">快速填充：</span>
+            <span class="text-xs text-ink-500 self-center">{{ t("aiSettings.快速填充_12fjle") }}</span>
             <button
               v-for="p in presets"
               :key="p.slug"
@@ -634,27 +636,27 @@ onMounted(loadAll)
 
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
-              <label class="block text-sm font-medium mb-1">显示名称</label>
-              <input v-model="form.name" class="input" placeholder="如 通义千问" required />
+              <label class="block text-sm font-medium mb-1">{{ t("aiSettings.显示名称_deexj3") }}</label>
+              <input v-model="form.name" class="input" :placeholder="t('aiSettings.如_fzxqw')" required />
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">
-                标识 slug
-                <span class="text-xs text-ink-400 font-normal">（唯一，创建后不可改）</span>
+                {{ t("aiSettings.标识_zgva8c") }}
+                <span class="text-xs text-ink-400 font-normal">{{ t("aiSettings.text_1q57j9") }}</span>
               </label>
               <input v-model="form.slug" class="input font-mono" :disabled="!!editingProvider" placeholder="dashscope" />
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1">接口地址 base_url</label>
+            <label class="block text-sm font-medium mb-1">{{ t("aiSettings.接口地址_17z8bj") }}</label>
             <input v-model="form.base_url" class="input font-mono" placeholder="https://api.example.com/v1" required />
-            <p class="mt-1 text-xs text-ink-400">填到 <code>/v1</code> 为止，不要带 <code>/chat/completions</code></p>
+            <p class="mt-1 text-xs text-ink-400">{{ t("aiSettings.填到_fhnp") }} <code>/v1</code> {{ t("aiSettings.为止_1ouy1d") }} <code>/chat/completions</code></p>
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-1">
-              API 密钥
+              {{ t("aiSettings.text_w1oo79") }}
               <span v-if="editingProvider" class="text-xs text-ink-400 font-normal">
                 （当前 {{ editingProvider.api_key_hint || '未配置' }}，留空表示不修改）
               </span>
@@ -670,62 +672,62 @@ onMounted(loadAll)
 
           <div class="grid gap-3 sm:grid-cols-3">
             <div>
-              <label class="block text-sm font-medium mb-1">协议</label>
+              <label class="block text-sm font-medium mb-1">{{ t("aiSettings.协议_exq7") }}</label>
               <select v-model="form.kind" class="input">
                 <option v-for="k in PROVIDER_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1">超时（秒）</label>
+              <label class="block text-sm font-medium mb-1">{{ t("aiSettings.超时_1y1biz") }}</label>
               <input v-model.number="form.timeout_seconds" type="number" min="5" max="600" class="input" />
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1">失败重试</label>
+              <label class="block text-sm font-medium mb-1">{{ t("aiSettings.失败重试_bud8zg") }}</label>
               <input v-model.number="form.max_retries" type="number" min="0" max="5" class="input" />
             </div>
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-1">
-              自定义请求头
-              <span class="text-xs text-ink-400 font-normal">（可选，每行 <code>Key: Value</code>）</span>
+              {{ t("aiSettings.自定义请_1qfb71") }}
+              <span class="text-xs text-ink-400 font-normal">{{ t("aiSettings.text_5ygo4n") }} <code>Key: Value</code>）</span>
             </label>
             <textarea v-model="form.extra_headers_text" rows="2" class="input font-mono" placeholder="X-Api-Version: 2024-01-01"></textarea>
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1">备注</label>
-            <input v-model="form.remark" class="input" placeholder="用途说明，便于团队协作" />
+            <label class="block text-sm font-medium mb-1">{{ t("aiSettings.备注_fqo1") }}</label>
+            <input v-model="form.remark" class="input" :placeholder="t('aiSettings.用途说明_v0ocv3')" />
           </div>
 
           <label class="flex items-center gap-2 text-sm">
             <input v-model="form.enabled" type="checkbox" class="rounded border-ink-300" />
-            启用
+            {{ t("aiSettings.enable") }}
           </label>
 
           <div class="flex items-center gap-2 pt-1">
             <button type="submit" class="btn-primary text-sm" :disabled="formSaving">
               {{ formSaving ? '保存中…' : '保存' }}
             </button>
-            <button type="button" class="btn-ghost text-sm" @click="showForm = false">取消</button>
+            <button type="button" class="btn-ghost text-sm" @click="showForm = false">{{ t("aiSettings.cancel") }}</button>
           </div>
         </form>
 
         <!-- 列表 -->
         <div v-if="!providers.length" class="card text-center text-ink-400 py-12">
-          还没有添加服务商。点右上角「+ 添加服务商」，或从预设一键填充。
+          {{ t("aiSettings.还没有添_1q4xg4") }}
         </div>
         <div v-else class="card p-0 overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead class="bg-ink-50 border-b border-ink-200">
                 <tr class="text-left text-ink-500">
-                  <th class="px-4 py-3 font-medium">服务商</th>
-                  <th class="px-4 py-3 font-medium">接口地址</th>
-                  <th class="px-4 py-3 font-medium">密钥</th>
-                  <th class="px-4 py-3 font-medium">绑定能力</th>
-                  <th class="px-4 py-3 font-medium">状态</th>
-                  <th class="px-4 py-3 font-medium text-right">操作</th>
+                  <th class="px-4 py-3 font-medium">{{ t("aiSettings.服务商_fhwnm") }}</th>
+                  <th class="px-4 py-3 font-medium">{{ t("aiSettings.接口地址_cx5rhq") }}</th>
+                  <th class="px-4 py-3 font-medium">{{ t("aiSettings.密钥_gfbz") }}</th>
+                  <th class="px-4 py-3 font-medium">{{ t("aiSettings.绑定能力_gdv3s7") }}</th>
+                  <th class="px-4 py-3 font-medium">{{ t("aiSettings.status") }}</th>
+                  <th class="px-4 py-3 font-medium text-right">{{ t("aiSettings.actions") }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -739,7 +741,7 @@ onMounted(loadAll)
                   </td>
                   <td class="px-4 py-3">
                     <code v-if="p.has_api_key" class="text-xs font-mono text-ink-500">{{ p.api_key_hint }}</code>
-                    <span v-else class="text-xs text-amber-600">未配置</span>
+                    <span v-else class="text-xs text-amber-600">{{ t("aiSettings.未配置_fte97") }}</span>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
@@ -769,8 +771,8 @@ onMounted(loadAll)
                     <button class="text-xs text-ink-700 hover:underline mr-2" :disabled="testingProvider === p.id" @click="testProvider(p)">
                       {{ testingProvider === p.id ? '测试中…' : '测试' }}
                     </button>
-                    <button class="text-xs text-ink-700 hover:underline mr-2" @click="openEdit(p)">编辑</button>
-                    <button class="text-xs text-red-600 hover:underline" @click="removeProvider(p)">删除</button>
+                    <button class="text-xs text-ink-700 hover:underline mr-2" @click="openEdit(p)">{{ t("aiSettings.edit") }}</button>
+                    <button class="text-xs text-red-600 hover:underline" @click="removeProvider(p)">{{ t("aiSettings.delete") }}</button>
                   </td>
                 </tr>
               </tbody>
@@ -779,7 +781,7 @@ onMounted(loadAll)
         </div>
 
         <p class="text-xs text-ink-400">
-          提示：删除服务商前需先解除其绑定的能力（防止误删导致线上能力突然不可用）。
+          {{ t("aiSettings.提示_kxl16j") }}
         </p>
       </div>
     </main>

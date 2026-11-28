@@ -24,19 +24,19 @@ const defaultTemplates: Record<string, string> = {
   product: `{% for p in entries %}
 ## {{ p.title }}
 {{ p.content.tagline | default: '' }}
-**价格**: {{ p.custom_fields.price | format_price | default: 't("templatePreview.面议")' }}
+**价格**: {{ p.custom_fields.price | format_price | default: t("templatePreview.面议") }}
 {% if p.content.features %}- 特性: {{ p.content.features | join: ', ' }}
 {% endif %}
 ---
 {% endfor %}`,
   case: `{% for c in entries %}
-- **{{ c.title }}** ({{ c.content.industry | default: 't("templatePreview.通用")' }})
+- **{{ c.title }}** ({{ c.content.industry | default: t("templatePreview.通用") }})
   {{ c.content.desc | default: '' }}
 {% endfor %}`,
   news: `{% for n in entries %}
 # {{ n.title }}
 {{ n.content.excerpt | default: '' }}
-发布日期: {{ n.published_at | date: '%Y-%m-%d' | default: 't("productEdit.草稿_n02e")' }}
+发布日期: {{ n.published_at | date: '%Y-%m-%d' | default: t("productEdit.草稿_n02e") }}
 {% endfor %}`,
 }
 
@@ -64,11 +64,11 @@ async function render() {
   error.value = ''
   try {
     const entries = await loadEntries()
-    const data = { entries, name: form.value.name || 't("templatePreview.示例")', now: new Date().toISOString() }
+    const data = { entries, name: form.value.name || t("templatePreview.示例"), now: new Date().toISOString() }
     const r = await api.post('/api/v1/cms/templates/render', { template: template.value, data })
     rendered.value = r.data.rendered
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("templatePreview.渲染失败")'
+    error.value = e?.response?.data?.detail || t("templatePreview.渲染失败")
     rendered.value = ''
   }
 }
@@ -90,7 +90,7 @@ function insertSnippet(snippet: string) {
 }
 
 const templateSnippets = [
-  { label: 't("templatePreview.变量")', text: '{{ variable_name }}' },
+  { label: t("templatePreview.变量"), text: '{{ variable_name }}' },
   { label: 'if', text: '{% if condition %}...{% endif %}' },
   { label: 'for', text: '{% for item in collection %}{{ item }}{% endfor %}' },
   { label: 'upcase', text: ' | upcase' },

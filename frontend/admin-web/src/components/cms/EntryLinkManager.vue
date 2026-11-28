@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 内链管理：分析建议 → 保存待审 → 审核（通过/拒绝）→ 标记已插入 → 删除
  *
@@ -195,7 +197,7 @@ async function removeLink(link: SavedLink) {
   errMsg.value = ''
   try {
     await api.delete(`/api/v1/cms/ai/internal-links/${link.id}`)
-    tip.value = '已删除'
+    tip.value = t("entryLinkManager.已删除_e65yu")
     await loadSaved()
   } catch (e: any) {
     errMsg.value = errText(e)
@@ -206,7 +208,7 @@ async function removeLink(link: SavedLink) {
 
 function insert(anchorText: string, url: string, title: string, key: string) {
   if (!url) {
-    errMsg.value = '拿不到目标地址，无法插入'
+    errMsg.value = t("entryLinkManager.拿不到目_fg4g5l")
     return
   }
   emit('apply-link', { anchorText, url, title })
@@ -231,18 +233,18 @@ watch(
 <template>
   <div class="space-y-2">
     <div class="flex items-center justify-between">
-      <span class="text-xs font-medium text-ink-700">内链管理</span>
+      <span class="text-xs font-medium text-ink-700">{{ t("entryLinkManager.内链管理_awknz2") }}</span>
       <button
         class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
         :disabled="!canOperate"
-        title="用向量召回候选，再由模型精选该不该链"
+        :title="t('entryLinkManager.用向量召_a9w5zy')"
         @click="analyze"
       >
         {{ busy === 'analyze' ? '分析中…' : '分析建议' }}
       </button>
     </div>
 
-    <p v-if="!entryId" class="text-xs text-ink-400">先保存一次，再管内链</p>
+    <p v-if="!entryId" class="text-xs text-ink-400">{{ t("entryLinkManager.先保存一_1vzmh7") }}</p>
 
     <template v-else>
       <!-- 状态统计兼筛选 -->
@@ -282,7 +284,7 @@ watch(
         >
           <div class="text-xs text-ink-800 font-medium truncate">《{{ s.title }}》</div>
           <div class="text-xs text-ink-500 mt-0.5">
-            锚文本：<span class="text-violet-700">{{ s.anchor_text }}</span>
+            {{ t("entryLinkManager.锚文本_j8es4b") }}<span class="text-violet-700">{{ s.anchor_text }}</span>
           </div>
           <div v-if="s.reason" class="text-xs text-ink-500 mt-1 leading-relaxed">{{ s.reason }}</div>
           <div class="flex gap-1 mt-1.5">
@@ -319,7 +321,7 @@ watch(
                 《{{ l.target_title || `#${l.target_entry_id}` }}》
               </div>
               <div class="text-xs text-ink-500 mt-0.5">
-                锚文本：<span class="text-ink-700">{{ l.anchor_text }}</span>
+                {{ t("entryLinkManager.锚文本_j8es4b") }}<span class="text-ink-700">{{ l.anchor_text }}</span>
               </div>
             </div>
             <span
@@ -342,34 +344,34 @@ watch(
               class="btn-ghost text-xs px-2 py-0.5 disabled:text-ink-300"
               :disabled="!canOperate"
               @click="review(l, 'approved')"
-            >通过</button>
+            >{{ t("entryLinkManager.通过_past") }}</button>
             <button
               v-if="l.status !== 'inserted'"
               class="btn-ghost text-xs px-2 py-0.5 disabled:text-ink-300"
               :disabled="!canOperate"
               @click="review(l, 'inserted')"
-            >标记已插入</button>
+            >{{ t("entryLinkManager.标记已插_1xlr3m") }}</button>
             <button
               v-if="l.status !== 'rejected'"
               class="btn-ghost text-xs px-2 py-0.5 text-ink-500 disabled:text-ink-300"
               :disabled="!canOperate"
               @click="review(l, 'rejected')"
-            >拒绝</button>
+            >{{ t("entryLinkManager.拒绝_hi6j") }}</button>
             <button
               class="btn-ghost text-xs px-2 py-0.5 text-red-600 disabled:text-ink-300"
               :disabled="!canOperate"
               @click="removeLink(l)"
-            >删除</button>
+            >{{ t("entryLinkManager.delete") }}</button>
           </div>
         </div>
       </div>
 
-      <p v-else-if="saved.length" class="text-xs text-ink-400">该状态下没有内链</p>
+      <p v-else-if="saved.length" class="text-xs text-ink-400">{{ t("entryLinkManager.该状态下_19d3m9") }}</p>
       <p v-else-if="!suggestions.length && !busy" class="text-xs text-ink-400">
-        还没有内链。点「分析建议」找出该互链的内容，保存后可审核管理。
+        {{ t("entryLinkManager.还没有内_1clvkr") }}
       </p>
       <p v-if="suggestions.length" class="text-xs text-ink-400">
-        插入会追加到正文「相关阅读」段落，位置保存后仍可调整
+        {{ t("entryLinkManager.插入会追_1h3fli") }}
       </p>
     </template>
   </div>

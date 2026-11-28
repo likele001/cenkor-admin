@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 内容效果看板。
  *
@@ -144,7 +146,7 @@ async function load() {
     deadContent.value = ins.data.dead_content || []
     topics.value = ins.data.topics || []
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }

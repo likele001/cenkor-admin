@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 编辑页侧栏 AI 面板：摘要 / SEO / 翻译 / 内链建议 / 多渠道再分发
  *
@@ -158,15 +160,15 @@ const vidRunning = computed(
 const vidStatusText = computed(() => {
   switch (videoJob.value?.status) {
     case 'queued':
-      return '已提交，服务商排队中'
+      return t("entryAiPanel.已提交_4dz1o4")
     case 'running':
-      return '生成中，通常 1~3 分钟'
+      return t("entryAiPanel.生成中_194djy")
     case 'succeeded':
-      return '已完成，可以挂到文章上'
+      return t("entryAiPanel.已完成_u4e3dj")
     case 'failed':
-      return '生成失败'
+      return t("aiWorkbench.生成失败_f6lwo5")
     case 'canceled':
-      return '已取消'
+      return t("entryAiPanel.已取消_e68dg")
     default:
       return ''
   }
@@ -178,10 +180,10 @@ const canEntryOp = computed(() => !!props.entryId && !busy.value)
 function errText(e: any): string {
   if (e?.response?.status === 503) {
     aiUnavailable.value = true
-    return e.response?.data?.detail || 'AI 未配置'
+    return e.response?.data?.detail || t("aiWorkbench.text_wcg8s3")
   }
   if (e?.response?.status === 404) {
-    return 'AI 接口不可用，确认后端已重启到最新版本'
+    return t("entryAiPanel.text_1eb9uw")
   }
   const d = e?.response?.data?.detail
   if (Array.isArray(d)) return d.map((x: any) => x.msg || JSON.stringify(x)).join('; ')
@@ -332,7 +334,7 @@ async function makeVideo() {
   // 图生视频的首帧就取刚生成的那张配图 —— 不让人再上传一次，
   // 也不让后端凭空猜用哪张，链路最短且意图明确
   if (vidMode.value === 'i2v' && !illustration.value) {
-    errorMsg.value = '图生视频需要先在上面生成一张配图当首帧'
+    errorMsg.value = t("entryAiPanel.图生视频_q0kcf1")
     return
   }
   busy.value = 'video'
@@ -353,7 +355,7 @@ async function makeVideo() {
     )
     videoJob.value = data as VideoJob
     if (videoJob.value.status === 'failed') {
-      errorMsg.value = videoJob.value.error || '提交失败'
+      errorMsg.value = videoJob.value.error || t("quality.提交失败_cx66zs")
     } else {
       startVidPoll()
     }
@@ -377,7 +379,7 @@ function startVidPoll() {
       if (!['queued', 'running'].includes(videoJob.value.status)) {
         stopVidPoll()
         if (videoJob.value.status === 'failed') {
-          errorMsg.value = videoJob.value.error || '生成失败'
+          errorMsg.value = videoJob.value.error || t("aiWorkbench.生成失败_f6lwo5")
         }
       }
     } catch {
@@ -430,7 +432,7 @@ async function copyRedist() {
 function applySummary() {
   if (!summary.value) return
   emit('apply-summary', summary.value)
-  notice.value = '已填入摘要字段，保存后生效'
+  notice.value = t("entryAiPanel.已填入摘_eyq403")
   summary.value = ''
 }
 
@@ -438,7 +440,7 @@ function applySlug() {
   const v = String(seo.value?.title || '').trim()
   if (!v) return
   emit('apply-slug', slugify(v))
-  notice.value = '已按 SEO 标题填入 slug，可再手工调整'
+  notice.value = t("entryAiPanel.已按_1qjzpl")
 }
 
 /** 中文标题也能转出可用 slug：保留字母数字，其余压成连字符 */

@@ -84,7 +84,7 @@ async function load() {
     form.value.seoDescription = wcf.seo_description || form.value.seoDescription || ''
     form.value.seoKeywords = wcf.seo_keywords || form.value.seoKeywords || ''
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -108,14 +108,14 @@ async function save() {
     const payload = toProductPayload({ ...form.value, custom_fields: wcf })
     if (isNew) {
       const { data } = await api.post('/api/v1/cms/products', payload)
-      success.value = 't("productEdit.已创建")'
+      success.value = t("productEdit.已创建")
       setTimeout(() => router.push(`/cms/products/${data.id}`), 600)
     } else {
       await api.patch(`/api/v1/cms/products/${route.params.id}`, payload)
-      success.value = 't("productEdit.已保存")'
+      success.value = t("productEdit.已保存")
     }
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.saveFailed")
   } finally {
     saving.value = false
   }
@@ -240,19 +240,19 @@ onMounted(load)
         <!-- SEO -->
         <div class="card space-y-4">
           <h2 class="font-semibold text-lg">SEO</h2>
-          <p class="text-sm text-ink-500">官网产品详情页的 title / description / keywords。保存后写入自定义字段，并自动同步到 www.cenkor.cn。</p>
+          <p class="text-sm text-ink-500">{{ t("productEdit.官网产品_17hd1z") }}</p>
           <div class="grid sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2">
-              <label class="block text-sm font-medium mb-1.5">Meta 标题（title）</label>
-              <input v-model="form.seoTitle" class="input" placeholder="辰科MES · 中小加工厂生产管理系统" />
+              <label class="block text-sm font-medium mb-1.5">{{ t("caseEdit.text_yql8tp") }}</label>
+              <input v-model="form.seoTitle" class="input" :placeholder="t('productEdit.辰科_1css3s')" />
             </div>
             <div class="sm:col-span-2">
-              <label class="block text-sm font-medium mb-1.5">Meta 描述（description）</label>
-              <textarea v-model="form.seoDescription" rows="2" class="input" placeholder="源码交付·私有部署·数据不出厂。扫码报工/计件工资/CRM/AI。"></textarea>
+              <label class="block text-sm font-medium mb-1.5">{{ t("caseEdit.text_m48vg9") }}</label>
+              <textarea v-model="form.seoDescription" rows="2" class="input" :placeholder="t('productEdit.源码交付_v007zd')"></textarea>
             </div>
             <div class="sm:col-span-2">
-              <label class="block text-sm font-medium mb-1.5">Meta 关键词（keywords，逗号分隔）</label>
-              <input v-model="form.seoKeywords" class="input" placeholder="MES系统,生产管理系统,扫码报工,计件工资,加工厂管理软件" />
+              <label class="block text-sm font-medium mb-1.5">{{ t("caseEdit.text_12jxmu") }}</label>
+              <input v-model="form.seoKeywords" class="input" :placeholder="t('productEdit.text_gdyyux')" />
             </div>
           </div>
         </div>

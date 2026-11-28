@@ -50,7 +50,7 @@ async function load() {
     roles.value = r.data.items
     permissions.value = p.data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -76,7 +76,7 @@ async function openEdit(r: Role) {
     }
     showDialog.value = true
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("roles.加载角色失败")'
+    error.value = e?.response?.data?.detail || t("roles.加载角色失败")
   }
 }
 
@@ -92,7 +92,7 @@ async function save() {
     showDialog.value = false
     await load()
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.saveFailed")
   } finally {
     saving.value = false
   }
@@ -104,7 +104,7 @@ async function del(r: Role) {
     await api.delete(`/api/v1/rbac/roles/${r.id}`)
     await load()
   } catch (e: any) {
-    alert('t("usersList.删除失败_1kc17l")' + (e?.response?.data?.detail || e.message))
+    alert(t("usersList.删除失败_1kc17l") + (e?.response?.data?.detail || e.message))
   }
 }
 
@@ -112,7 +112,7 @@ async function del(r: Role) {
 const groupedPerms = () => {
   const groups: Record<string, Permission[]> = {}
   for (const p of permissions.value) {
-    const prefix = p.code.split(':')[0] || 't("roles.其他")'
+    const prefix = p.code.split(':')[0] || t("roles.其他")
     if (!groups[prefix]) groups[prefix] = []
     groups[prefix].push(p)
   }

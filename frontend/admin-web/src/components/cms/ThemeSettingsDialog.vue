@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 主题配置弹窗 —— 表单不是写死的，是 theme.json 的 settings 声明长出来的。
  *
@@ -99,7 +101,7 @@ async function load() {
     data.value = res
     draft.value = { ...res.values }
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '读取主题配置失败'
+    error.value = e?.response?.data?.detail || t("themeSettingsDialog.读取主题_9xdhot")
   } finally {
     loading.value = false
   }
@@ -163,7 +165,7 @@ async function save() {
     emit('saved', props.theme)
     emit('close')
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '保存失败'
+    error.value = e?.response?.data?.detail || t("aiMemory.saveFailed")
   } finally {
     saving.value = false
   }
@@ -200,14 +202,14 @@ function close() {
 
       <!-- 内容 -->
       <div class="min-h-0 flex-1 overflow-auto px-5 py-4">
-        <div v-if="loading" class="py-12 text-center text-sm text-ink-400">读取中…</div>
+        <div v-if="loading" class="py-12 text-center text-sm text-ink-400">{{ t("themeSettingsDialog.读取中_i092c4") }}</div>
 
         <div v-else-if="error && !data" class="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</div>
 
         <div v-else-if="data && !data.supports_settings" class="py-10 text-center text-sm text-ink-500">
-          <p>这个主题没有声明可配置项。</p>
+          <p>{{ t("themeSettingsDialog.这个主题_12cc03") }}</p>
           <p class="mt-2 text-xs text-ink-400">
-            作者可以在 <code class="rounded bg-ink-50 px-1">theme.json</code> 的
+            {{ t("themeSettingsDialog.作者可以_16o2t6") }} <code class="rounded bg-ink-50 px-1">theme.json</code> {{ t("themeSettingsDialog.的_nes") }}
             <code class="rounded bg-ink-50 px-1">settings</code> 里声明主色、字号这类选项，
             声明之后这里会自动出现表单。
           </p>
@@ -230,7 +232,7 @@ function close() {
                     <span
                       v-if="diffFromDefault(item.key)"
                       class="h-1.5 w-1.5 rounded-full bg-amber-500"
-                      title="已从默认值改动"
+                      :title="t('themeSettingsDialog.已从默认_89l04j')"
                     />
                   </label>
                   <p v-if="item.help" class="mt-0.5 text-xs text-ink-400">{{ item.help }}</p>
@@ -322,10 +324,10 @@ function close() {
                   <button
                     class="text-[11px] text-ink-400 hover:text-ink-700 disabled:opacity-30"
                     :disabled="!isChanged(item.key)"
-                    title="恢复此项的默认值"
+                    :title="t('themeSettingsDialog.恢复此项_1kzkib')"
                     @click="resetOne(item.key)"
                   >
-                    默认
+                    {{ t("themeSettingsDialog.默认_rs98") }}
                   </button>
                 </div>
               </div>
@@ -344,12 +346,12 @@ function close() {
           :disabled="saving"
           @click="resetAll"
         >
-          全部恢复默认
+          {{ t("themeSettingsDialog.全部恢复_4rrwxj") }}
         </button>
         <span class="ml-auto text-xs text-ink-400">
           {{ hasDirty ? `${dirtyKeys.length} 项待保存` : '改动保存后前台刷新即生效' }}
         </span>
-        <button class="btn-ghost text-sm" :disabled="saving" @click="close">取消</button>
+        <button class="btn-ghost text-sm" :disabled="saving" @click="close">{{ t("themeSettingsDialog.cancel") }}</button>
         <button class="btn-primary text-sm" :disabled="saving || !hasDirty" @click="save">
           {{ saving ? '保存中…' : '保存' }}
         </button>

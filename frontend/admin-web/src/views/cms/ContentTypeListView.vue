@@ -37,7 +37,7 @@ async function load() {
     const { data } = await api.get('/api/v1/cms/content-types')
     contentTypes.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -78,7 +78,7 @@ async function save() {
     showModal.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("caseEdit.saveFailed")')
+    alert(e?.response?.data?.detail || t("caseEdit.saveFailed"))
   } finally {
     saving.value = false
   }
@@ -90,7 +90,7 @@ async function remove(ct: ContentType) {
     await api.delete(`/api/v1/cms/content-types/${ct.id}`)
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("categories.删除失败")')
+    alert(e?.response?.data?.detail || t("categories.删除失败"))
   }
 }
 
@@ -120,7 +120,7 @@ onMounted(load)
             <div class="flex flex-wrap gap-1 mt-2">
               <span v-if="ct.supports_category" class="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{{ t('entryList.分类_emut') }}</span>
               <span v-if="ct.supports_tags" class="text-xs px-1.5 py-0.5 bg-green-50 text-green-600 rounded">{{ t('productsList.标签_idef') }}</span>
-              <span v-if="ct.translatable" class="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">🌐 多语言</span>
+              <span v-if="ct.translatable" class="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">{{ t("contentTypeList.text_jeoarl") }}</span>
               <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_definitions?.length || 0 }} 字段</span>
               <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_groups?.length || 0 }} 分组</span>
             </div>
@@ -166,7 +166,7 @@ onMounted(load)
             </label>
             <label class="flex items-center gap-2">
               <input type="checkbox" v-model="form.translatable" />
-              <span class="text-sm">🌐 多语言</span>
+              <span class="text-sm">{{ t("contentTypeList.text_jeoarl") }}</span>
             </label>
           </div>
         </div>

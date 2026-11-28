@@ -127,7 +127,7 @@ async function save() {
     showModal.value = false
     await loadCategories()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("caseEdit.saveFailed")')
+    alert(e?.response?.data?.detail || t("caseEdit.saveFailed"))
   } finally { saving.value = false }
 }
 
@@ -141,7 +141,7 @@ async function remove(cat: Category) {
     await api.delete(`/api/v1/cms/categories/${cat.id}`)
     await loadCategories()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("categories.删除失败")')
+    alert(e?.response?.data?.detail || t("categories.删除失败"))
   }
 }
 

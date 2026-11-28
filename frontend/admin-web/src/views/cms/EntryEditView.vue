@@ -477,7 +477,7 @@ async function save() {
     }
     await router.push({ name: 'cms-entries' })
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.saveFailed")
   } finally { saving.value = false }
 }
 

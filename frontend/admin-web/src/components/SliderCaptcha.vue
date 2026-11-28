@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const emit = defineEmits<{ 'update:verified': [boolean] }>()
@@ -63,7 +65,7 @@ function drawBackground() {
   drawPuzzle(ctx, puzzleX, puzzleY, '#94a3b8', 'destination-over')
 
   // 缺口（用目标颜色填充一块凸起区域）
-  // 简化：仅画"放置区"提示
+  // 简化：仅画t("sliderCaptcha.放置区_ffz9m")提示
   ctx.fillStyle = 'rgba(148, 163, 184, 0.15)'
   ctx.fillRect(puzzleX - 1, puzzleY - 1, puzzleSize + 2, puzzleSize + 2)
 
@@ -130,7 +132,7 @@ function onPointerUp() {
     verifiedToken.value = generateToken()
     emit('update:verified', true)
   } else {
-    errorMsg.value = '位置不匹配，请重试'
+    errorMsg.value = t("sliderCaptcha.位置不匹_q01xwz")
     setTimeout(() => {
       sliderX.value = 0
       errorMsg.value = ''
@@ -184,9 +186,9 @@ defineExpose({ token: () => verifiedToken.value, verified: () => verified.value,
         <span v-else>→</span>
       </div>
       <div class="absolute inset-0 flex items-center justify-center text-sm text-ink-500 pointer-events-none">
-        <span v-if="verified" class="text-emerald-600 font-medium">验证通过</span>
+        <span v-if="verified" class="text-emerald-600 font-medium">{{ t("sliderCaptcha.验证通过_k2wswy") }}</span>
         <span v-else-if="errorMsg" class="text-red-600 font-medium">{{ errorMsg }}</span>
-        <span v-else>拖动滑块完成拼图</span>
+        <span v-else>{{ t("sliderCaptcha.拖动滑块_14t50l") }}</span>
       </div>
     </div>
     <button
@@ -195,7 +197,7 @@ defineExpose({ token: () => verifiedToken.value, verified: () => verified.value,
       class="text-xs text-ink-500 hover:text-ink-900"
       @click="refresh"
     >
-      换一张
+      {{ t("sliderCaptcha.换一张_extz6") }}
     </button>
   </div>
 </template>

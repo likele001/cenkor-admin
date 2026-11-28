@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 全局「应用未授权」提示条。
  *
@@ -62,11 +64,11 @@ onUnmounted(() => {
           to="/system/apps"
           class="mt-1.5 inline-block text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
           @click="dismiss"
-        >去应用管理填写授权码 →</RouterLink>
+        >{{ t("licenseRequiredBanner.去应用管_1i2oxv") }}</RouterLink>
       </div>
       <button
         class="ml-1 shrink-0 rounded p-0.5 text-amber-700/70 hover:text-amber-900"
-        aria-label="关闭"
+        :aria-label="t('licenseRequiredBanner.close')"
         @click="dismiss"
       >✕</button>
     </div>

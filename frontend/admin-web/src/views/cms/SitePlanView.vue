@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 
@@ -42,7 +44,7 @@ async function loadList() {
 async function draft() {
   error.value = ''
   notice.value = ''
-  if (form.brief.trim().length < 2) { error.value = '先把站点需求写清楚，至少一句话'; return }
+  if (form.brief.trim().length < 2) { error.value = t("sitePlan.先把站点_1g0yzd"); return }
   loading.value = true
   plan.value = null
   diff.value = null
@@ -58,14 +60,14 @@ async function draft() {
     plan.value = data.plan
     warnings.value = data.warnings || []
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '生成失败'
+    error.value = e?.response?.data?.detail || t("aiWorkbench.生成失败_f6lwo5")
   } finally {
     loading.value = false
   }
 }
 
 async function importKeywords() {
-  if (!keywordFile.value) { error.value = '先选一个 CSV 文件'; return }
+  if (!keywordFile.value) { error.value = t("sitePlan.先选一个_1ew1jh"); return }
   error.value = ''
   loading.value = true
   const fd = new FormData()
@@ -83,7 +85,7 @@ async function importKeywords() {
     result.value = null
     notice.value = `识别 ${data.stats.valid} 行关键词，拆出 ${data.stats.categories} 个栏目，丢弃 ${data.stats.dropped} 行`
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '关键词包解析失败'
+    error.value = e?.response?.data?.detail || t("sitePlan.关键词包_1ktiow")
   } finally {
     loading.value = false
   }
@@ -106,7 +108,7 @@ async function savePlan() {
     notice.value = `方案已保存（#${data.plan.id}），确认后才能执行`
     await loadList()
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '保存失败'
+    error.value = e?.response?.data?.detail || t("aiMemory.saveFailed")
   } finally {
     loading.value = false
   }
@@ -119,7 +121,7 @@ async function confirmPlan() {
     status.value = data.plan.status
     notice.value = '已确认，可以先预览差异'
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '确认失败'
+    error.value = e?.response?.data?.detail || t("sitePlan.确认失败_frpz7u")
   }
 }
 
@@ -130,7 +132,7 @@ async function dryRun() {
     const { data } = await api.post(`/api/v1/cms/site-plans/${savedId.value}/dry-run`)
     diff.value = data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '预览失败'
+    error.value = e?.response?.data?.detail || t("aiMemory.预览失败_jt50ig")
   }
 }
 
@@ -146,7 +148,7 @@ async function applyPlan() {
     notice.value = '已执行：栏目已建，选题已进批量队列'
     await loadList()
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '执行失败'
+    error.value = e?.response?.data?.detail || t("sitePlan.执行失败_cz7pg9")
   } finally {
     loading.value = false
   }
@@ -158,25 +160,25 @@ onMounted(loadList)
 <template>
   <div class="space-y-4">
     <div>
-      <h1 class="text-lg font-semibold text-ink-900">建站编排</h1>
-      <p class="text-sm text-ink-500 mt-1">一句话说清要做什么站，生成栏目树与首批选题；确认后才动数据库。</p>
+      <h1 class="text-lg font-semibold text-ink-900">{{ t("sitePlan.建站编排_chv0rf") }}</h1>
+      <p class="text-sm text-ink-500 mt-1">{{ t("sitePlan.一句话说_kconoh") }}</p>
     </div>
 
     <div v-if="error" class="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{{ error }}</div>
     <div v-if="notice" class="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2">{{ notice }}</div>
 
     <div class="rounded-lg border border-ink-200 bg-white p-4 space-y-3">
-      <label class="block text-sm text-ink-600">站点需求
-        <textarea v-model="form.brief" rows="3" class="input mt-1 text-sm w-full" placeholder="例如：液压设备官网，主打山东工厂客户，需要产品、案例、技术文章"></textarea>
+      <label class="block text-sm text-ink-600">{{ t("sitePlan.站点需求_fz1mbm") }}
+        <textarea v-model="form.brief" rows="3" class="input mt-1 text-sm w-full" :placeholder="t('sitePlan.例如_1enkkm')"></textarea>
       </label>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <label class="block text-sm text-ink-600">关键词（逗号分隔）
-          <input v-model="form.keywords" class="input mt-1 text-sm" placeholder="液压油缸, 液压泵站" />
+        <label class="block text-sm text-ink-600">{{ t("sitePlan.关键词_18rkkz") }}
+          <input v-model="form.keywords" class="input mt-1 text-sm" :placeholder="t('sitePlan.液压油缸_c5a1jd')" />
         </label>
-        <label class="block text-sm text-ink-600">栏目数
+        <label class="block text-sm text-ink-600">{{ t("sitePlan.栏目数_fthg1") }}
           <input v-model.number="form.category_count" type="number" min="1" max="12" class="input mt-1 text-sm" />
         </label>
-        <label class="block text-sm text-ink-600">选题数
+        <label class="block text-sm text-ink-600">{{ t("sitePlan.选题数_lu081") }}
           <input v-model.number="form.article_count" type="number" min="1" max="60" class="input mt-1 text-sm" />
         </label>
       </div>
@@ -187,7 +189,7 @@ onMounted(loadList)
           class="text-xs text-ink-500 file:mr-2 file:rounded file:border file:border-ink-200 file:bg-ink-50 file:px-2 file:py-1"
           @change="(e: any) => (keywordFile = e.target.files?.[0] || null)"
         />
-        <button class="btn text-sm" :disabled="loading || !keywordFile" @click="importKeywords">导入关键词包</button>
+        <button class="btn text-sm" :disabled="loading || !keywordFile" @click="importKeywords">{{ t("sitePlan.导入关键_16j98y") }}</button>
         <button class="btn btn-primary text-sm" :disabled="loading" @click="draft">{{ loading ? '生成中…' : '生成方案' }}</button>
       </div>
     </div>
@@ -205,7 +207,7 @@ onMounted(loadList)
 
     <div v-if="plan" class="rounded-lg border border-ink-200 bg-white p-4 space-y-4">
       <div>
-        <h2 class="font-semibold text-ink-900">方案预览</h2>
+        <h2 class="font-semibold text-ink-900">{{ t("sitePlan.方案预览_d9wdyr") }}</h2>
         <p class="text-sm text-ink-500 mt-1">{{ plan.summary || '（无摘要）' }}</p>
       </div>
 
@@ -242,17 +244,17 @@ onMounted(loadList)
       </div>
 
       <div class="flex flex-wrap justify-end gap-2">
-        <button class="btn text-sm" :disabled="loading" @click="savePlan">保存方案</button>
-        <button class="btn text-sm" :disabled="!savedId || status !== 'draft'" @click="confirmPlan">确认</button>
-        <button class="btn text-sm" :disabled="!savedId || status !== 'confirmed'" @click="dryRun">预览差异</button>
-        <button class="btn btn-primary text-sm" :disabled="!savedId || status !== 'confirmed' || loading" @click="applyPlan">执行</button>
+        <button class="btn text-sm" :disabled="loading" @click="savePlan">{{ t("sitePlan.保存方案_agi5u2") }}</button>
+        <button class="btn text-sm" :disabled="!savedId || status !== 'draft'" @click="confirmPlan">{{ t("sitePlan.confirm") }}</button>
+        <button class="btn text-sm" :disabled="!savedId || status !== 'confirmed'" @click="dryRun">{{ t("sitePlan.预览差异_jt5kew") }}</button>
+        <button class="btn btn-primary text-sm" :disabled="!savedId || status !== 'confirmed' || loading" @click="applyPlan">{{ t("sitePlan.执行_hhhh") }}</button>
       </div>
       <p v-if="savedId" class="text-xs text-ink-400 text-right">方案 #{{ savedId }} · 状态 {{ status }}</p>
     </div>
 
     <div class="rounded-lg border border-ink-200 bg-white">
-      <div class="px-4 py-3 border-b border-ink-100 text-sm font-medium text-ink-700">历史方案</div>
-      <div v-if="!plans.length" class="px-4 py-6 text-center text-sm text-ink-400">还没有方案</div>
+      <div class="px-4 py-3 border-b border-ink-100 text-sm font-medium text-ink-700">{{ t("sitePlan.历史方案_aw1g4b") }}</div>
+      <div v-if="!plans.length" class="px-4 py-6 text-center text-sm text-ink-400">{{ t("sitePlan.还没有方_8b9atr") }}</div>
       <ul v-else class="divide-y divide-ink-100">
         <li v-for="p in plans" :key="p.id" class="px-4 py-3 text-sm flex items-center justify-between gap-3">
           <div class="min-w-0">

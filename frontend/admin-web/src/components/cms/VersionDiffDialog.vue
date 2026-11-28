@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 版本对比弹层（M1·P0 版本控制的续篇）
  *
@@ -88,13 +90,13 @@ const statLine = computed(() => {
   if (s.added) parts.push(`新增 ${s.added} 段`)
   if (s.removed) parts.push(`删除 ${s.removed} 段`)
   if (s.fields_changed) parts.push(`${s.fields_changed} 个字段`)
-  return parts.length ? parts.join(' · ') : '两版内容一致'
+  return parts.length ? parts.join(' · ') : t("versionDiffDialog.两版内容_1jks0a")
 })
 
 async function load() {
   if (!canCompare.value || fromVersion.value == null || toVersion.value == null) return
   if (fromVersion.value === toVersion.value) {
-    error.value = '请选择两个不同的版本'
+    error.value = t("versionDiffDialog.请选择两_vyytn0")
     data.value = null
     return
   }
@@ -197,7 +199,7 @@ function fmtTime(s?: string | null) {
     <div class="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[88vh] flex flex-col">
       <!-- 头部 -->
       <div class="flex items-center justify-between gap-3 px-5 py-3 border-b">
-        <h3 class="font-medium text-sm">版本对比</h3>
+        <h3 class="font-medium text-sm">{{ t("versionDiffDialog.版本对比_eugxjz") }}</h3>
         <div class="flex items-center gap-2 text-xs">
           <template v-if="canCompare">
             <select v-model.number="fromVersion" class="input py-1 text-xs w-28" @change="load">
@@ -218,7 +220,7 @@ function fmtTime(s?: string | null) {
 
       <!-- 摘要 -->
       <div v-if="canCompare" class="px-5 py-2 border-b bg-ink-50/50 text-xs text-ink-600">
-        <template v-if="loading">加载中…</template>
+        <template v-if="loading">{{ t("apiKeys.加载中_b0k5km") }}</template>
         <template v-else-if="error">
           <span class="text-red-600">{{ error }}</span>
         </template>
@@ -233,7 +235,7 @@ function fmtTime(s?: string | null) {
 
       <!-- 版本不足 -->
       <div v-if="!canCompare" class="flex-1 flex items-center justify-center text-xs text-ink-400 p-10">
-        该条目只有 1 个版本快照，没有可比对的上一版。再保存一次就会出现对比。
+        {{ t("versionDiffDialog.该条目只_2o4f7r") }}
       </div>
 
       <template v-else>
@@ -244,24 +246,24 @@ function fmtTime(s?: string | null) {
             :class="tab === 'text' ? 'bg-white border border-b-white -mb-px text-ink-800' : 'text-ink-400 hover:text-ink-600'"
             @click="tab = 'text'"
           >
-            正文对比
+            {{ t("versionDiffDialog.正文对比_dyx9j3") }}
           </button>
           <button
             class="px-3 py-1.5 rounded-t"
             :class="tab === 'fields' ? 'bg-white border border-b-white -mb-px text-ink-800' : 'text-ink-400 hover:text-ink-600'"
             @click="tab = 'fields'"
           >
-            字段变化
+            {{ t("versionDiffDialog.字段变化_byx9to") }}
             <span v-if="data?.fields?.length" class="ml-1 text-amber-600">{{ data.fields.length }}</span>
           </button>
         </div>
 
         <!-- 正文对比 -->
         <div v-if="tab === 'text'" class="flex-1 overflow-auto">
-          <div v-if="loading" class="p-8 text-center text-xs text-ink-400">加载中…</div>
+          <div v-if="loading" class="p-8 text-center text-xs text-ink-400">{{ t("apiKeys.加载中_b0k5km") }}</div>
           <div v-else-if="!data" class="p-8 text-center text-xs text-ink-400">{{ error || '暂无数据' }}</div>
           <div v-else-if="!data.text.rows.length" class="p-8 text-center text-xs text-ink-400">
-            两版正文都为空
+            {{ t("versionDiffDialog.两版正文_1drg9a") }}
           </div>
           <div v-else>
             <div class="grid grid-cols-2 sticky top-0 bg-ink-50 border-b text-[11px] text-ink-500 z-10">
@@ -289,10 +291,10 @@ function fmtTime(s?: string | null) {
 
         <!-- 字段变化 -->
         <div v-else class="flex-1 overflow-auto p-4 space-y-3">
-          <div v-if="loading" class="text-center text-xs text-ink-400 py-8">加载中…</div>
+          <div v-if="loading" class="text-center text-xs text-ink-400 py-8">{{ t("apiKeys.加载中_b0k5km") }}</div>
           <div v-else-if="!data" class="text-center text-xs text-ink-400 py-8">{{ error || '暂无数据' }}</div>
           <div v-else-if="!data.fields.length" class="text-center text-xs text-ink-400 py-8">
-            两个版本的字段完全一致
+            {{ t("versionDiffDialog.两个版本_4cs7ag") }}
           </div>
           <template v-else>
           <div v-for="f in data.fields" :key="f.field" class="border rounded p-3">

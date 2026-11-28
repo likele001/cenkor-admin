@@ -46,7 +46,7 @@ async function load() {
     entries.value = listRes.data.items
     stats.value = statsRes.data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }

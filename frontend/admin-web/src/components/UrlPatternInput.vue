@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 // URL 伪静态规则输入组件（对齐老 CMS 体验）：
 // 1. 变量 chip 点击即插入到光标位置（不用手抄 {xxx}）
 // 2. 预设规则下拉（选择即填入）
@@ -135,10 +137,10 @@ const requiredHint = computed(() =>
         <select
           class="input w-24 text-sm h-full cursor-pointer bg-white"
           value=""
-          title="选择常用规则模板"
+          :title="t('urlPatternInput.选择常用_52widf')"
           @change="onPresetChange"
         >
-          <option value="" disabled>选择 ▾</option>
+          <option value="" disabled>{{ t("urlPatternInput.选择_iki3dq") }}</option>
           <option v-for="(p, i) in presets" :key="p.pattern" :value="i">{{ p.label }}</option>
         </select>
       </div>
@@ -146,7 +148,7 @@ const requiredHint = computed(() =>
 
     <!-- 变量 chips：点击插入到光标位置 -->
     <div class="mt-2 flex flex-wrap gap-1.5 items-center">
-      <span class="text-xs text-ink-400">点变量插入：</span>
+      <span class="text-xs text-ink-400">{{ t("urlPatternInput.点变量插_gkwvnb") }}</span>
       <button
         v-for="v in vars"
         :key="v.name"
@@ -165,13 +167,13 @@ const requiredHint = computed(() =>
       ⚠️ 变量重复出现：{{ dupVars.map(n => '{' + n + '}').join(' ') }}，同一变量用两次会让地址产生歧义
     </p>
     <p v-else-if="adjacentVars" class="text-xs text-red-600 mt-1.5">
-      ⚠️ 相邻变量之间要加分隔符（/ - _ 等），比如 <code>{'{catdir}/{slug}'}</code>，直接连写 <code>{'{catdir}{slug}'}</code> 无法反解
+      {{ t("urlPatternInput.text_buclle") }} <code>{'{catdir}/{slug}'}</code>{{ t("urlPatternInput.text_i80r5k") }} <code>{'{catdir}{slug}'}</code> {{ t("urlPatternInput.无法反解_daxlkb") }}
     </p>
     <p v-else-if="unknownVars.length" class="text-xs text-amber-600 mt-1.5">
       ⚠️ 不认识的变量：{{ unknownVars.map(n => '{' + n + '}').join(' ') }}，请检查是否拼写有误
     </p>
     <p v-else-if="exampleUrl && showExample" class="text-xs text-ink-500 mt-1.5">
-      示例：<code class="text-green-700">{{ exampleUrl }}</code>
+      {{ t("urlPatternInput.示例_i65k9") }}<code class="text-green-700">{{ exampleUrl }}</code>
     </p>
     <slot />
   </div>

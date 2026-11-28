@@ -86,7 +86,7 @@ async function save() {
     showModal.value = false
     await loadTags()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("caseEdit.saveFailed")')
+    alert(e?.response?.data?.detail || t("caseEdit.saveFailed"))
   } finally { saving.value = false }
 }
 
@@ -96,7 +96,7 @@ async function remove(tag: Tag) {
     await api.delete(`/api/v1/cms/tags/${tag.id}`)
     await loadTags()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("categories.删除失败")')
+    alert(e?.response?.data?.detail || t("categories.删除失败"))
   }
 }
 
@@ -158,7 +158,7 @@ onMounted(async () => {
             <input v-model="form.slug" class="input" placeholder="tag-slug" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">标签页地址规则（可选）</label>
+            <label class="block text-sm font-medium mb-1">{{ t("tags.标签页地_ul7b8q") }}</label>
             <UrlPatternInput
               v-model="form.url_pattern"
               :vars="TAG_RULE_VARS"
@@ -166,7 +166,7 @@ onMounted(async () => {
               placeholder="留空 = 用站点默认，例如 tag/{slug}/"
             />
             <p class="text-xs text-ink-500 mt-1">
-              决定这个「标签页」自己的地址。标签页对 SEO 最友好，建议用短 slug。
+              {{ t("tags.决定这个_l1h4u2") }}
             </p>
           </div>
           <div>

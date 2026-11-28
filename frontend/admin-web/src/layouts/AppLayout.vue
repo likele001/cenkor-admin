@@ -352,7 +352,7 @@ async function logout() {
           <div class="hidden sm:block w-56 mr-2">
             <input
               class="input text-sm py-1.5"
-              placeholder="搜索内容…"
+              :placeholder="t('appLayout.搜索内容_1geb5a')"
               @keyup.enter="(e: any) => { const v = (e.target.value || '').trim(); if (v) router.push({ name: 'cms-search', query: { q: v } }); }"
             />
           </div>

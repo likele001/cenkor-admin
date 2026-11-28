@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '@/lib/api'
 
@@ -112,7 +114,7 @@ async function load() {
     data.value = d
     error.value = ''
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || e?.message || '加载失败'
+    error.value = e?.response?.data?.detail || e?.message || t("dashboard.loadFailed")
   } finally {
     loading.value = false
     schedulePoll()
@@ -139,7 +141,7 @@ async function rebuildVectors() {
     if (processed === 0) {
       vectorMsg.value = scanned
         ? `扫描 ${scanned} 条但没处理成功任何一条，检查嵌入模型配置`
-        : '没有需要补建的条目'
+        : t("aiHome.没有需要_yx3xbn")
     } else if (calls === 0) {
       vectorMsg.value = `检查了 ${processed} 条，向量都是最新的，无需重建`
     } else if (created > 0) {
@@ -149,7 +151,7 @@ async function rebuildVectors() {
     }
     await load()
   } catch (e: any) {
-    vectorMsg.value = e?.response?.data?.detail || e?.message || '补建失败'
+    vectorMsg.value = e?.response?.data?.detail || e?.message || t("aiHome.补建失败_hlo45l")
   } finally {
     vectorBusy.value = false
   }

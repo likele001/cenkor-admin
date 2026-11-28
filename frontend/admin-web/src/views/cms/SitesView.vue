@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/lib/api'
@@ -56,7 +58,7 @@ async function openFeatures(s: Site) {
     features.value = data.features
     featLabels.value = data.labels
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '开关加载失败'
+    error.value = e?.response?.data?.detail || t("sites.开关加载_1h8g81")
     featOpen.value = false
   }
 }
@@ -72,7 +74,7 @@ async function saveFeatures() {
     notice.value = '自动化开关已保存，下一次调度就按新设置走'
   } catch (e: any) {
     const detail = e?.response?.data?.detail
-    error.value = typeof detail === 'string' ? detail : '保存失败'
+    error.value = typeof detail === 'string' ? detail : t("aiMemory.saveFailed")
   } finally {
     featSaving.value = false
   }
@@ -85,7 +87,7 @@ async function load() {
     const { data } = await api.get<Site[]>('/api/v1/cms/sites')
     sites.value = data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '站点列表加载失败'
+    error.value = e?.response?.data?.detail || t("sites.站点列表_4gx3s2")
   } finally {
     loading.value = false
   }
@@ -111,7 +113,7 @@ function openEdit(s: Site) {
 
 async function save() {
   error.value = ''
-  if (!form.name.trim()) { error.value = '站点名称不能为空'; return }
+  if (!form.name.trim()) { error.value = t("sites.站点名称_16vr6z"); return }
   if (!editingId.value && !form.key.trim()) { error.value = '站点标识不能为空'; return }
   saving.value = true
   try {
@@ -123,7 +125,7 @@ async function save() {
     }
     if (editingId.value) {
       await api.put(`/api/v1/cms/sites/${editingId.value}`, payload)
-      notice.value = '已保存'
+      notice.value = t("sites.已保存_e5ggd")
     } else {
       payload.key = form.key.trim()
       await api.post('/api/v1/cms/sites', payload)
@@ -133,7 +135,7 @@ async function save() {
     await load()
   } catch (e: any) {
     const detail = e?.response?.data?.detail
-    error.value = typeof detail === 'string' ? detail : JSON.stringify(detail || '保存失败')
+    error.value = typeof detail === 'string' ? detail : JSON.stringify(detail || t("aiMemory.saveFailed"))
   } finally {
     saving.value = false
   }
@@ -150,7 +152,7 @@ async function remove(s: Site) {
     await load()
   } catch (e: any) {
     const detail = e?.response?.data?.detail
-    error.value = typeof detail === 'string' ? detail : '删除失败：站点内还有内容，请先清理'
+    error.value = typeof detail === 'string' ? detail : t("sites.删除失败_1kshs5")
   }
 }
 
@@ -167,10 +169,10 @@ onMounted(load)
   <div class="space-y-4">
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <div>
-        <h1 class="text-lg font-semibold text-ink-900">站点管理</h1>
-        <p class="text-sm text-ink-500 mt-1">一个后台管多个站点：切换后所有内容操作都只落在当前站点。</p>
+        <h1 class="text-lg font-semibold text-ink-900">{{ t("sites.站点管理_fyx091") }}</h1>
+        <p class="text-sm text-ink-500 mt-1">{{ t("sites.一个后台_1qc9om") }}</p>
       </div>
-      <button class="btn btn-primary text-sm" @click="openCreate">新建站点</button>
+      <button class="btn btn-primary text-sm" @click="openCreate">{{ t("sites.新建站点_d88e6i") }}</button>
     </div>
 
     <div v-if="error" class="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{{ error }}</div>
@@ -180,25 +182,25 @@ onMounted(load)
       <table class="w-full text-sm">
         <thead class="bg-ink-50 text-ink-600">
           <tr>
-            <th class="text-left px-3 py-2 font-medium">站点</th>
-            <th class="text-left px-3 py-2 font-medium">域名</th>
-            <th class="text-left px-3 py-2 font-medium">类型 / 模式</th>
-            <th class="text-right px-3 py-2 font-medium">条目</th>
-            <th class="text-right px-3 py-2 font-medium">栏目</th>
-            <th class="text-right px-3 py-2 font-medium">页面</th>
-            <th class="text-right px-3 py-2 font-medium">媒体</th>
-            <th class="text-left px-3 py-2 font-medium">状态</th>
-            <th class="text-right px-3 py-2 font-medium">操作</th>
+            <th class="text-left px-3 py-2 font-medium">{{ t("sites.站点_liio") }}</th>
+            <th class="text-left px-3 py-2 font-medium">{{ t("sites.域名_feoe") }}</th>
+            <th class="text-left px-3 py-2 font-medium">{{ t("sites.类型_nbcklr") }}</th>
+            <th class="text-right px-3 py-2 font-medium">{{ t("sites.条目_i8j1") }}</th>
+            <th class="text-right px-3 py-2 font-medium">{{ t("sites.栏目_icov") }}</th>
+            <th class="text-right px-3 py-2 font-medium">{{ t("sites.页面_qrgt") }}</th>
+            <th class="text-right px-3 py-2 font-medium">{{ t("sites.媒体_fu9t") }}</th>
+            <th class="text-left px-3 py-2 font-medium">{{ t("sites.status") }}</th>
+            <th class="text-right px-3 py-2 font-medium">{{ t("sites.actions") }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading"><td class="px-3 py-6 text-center text-ink-400" colspan="9">加载中…</td></tr>
-          <tr v-else-if="!sites.length"><td class="px-3 py-6 text-center text-ink-400" colspan="9">还没有站点</td></tr>
+          <tr v-if="loading"><td class="px-3 py-6 text-center text-ink-400" colspan="9">{{ t("apiKeys.加载中_b0k5km") }}</td></tr>
+          <tr v-else-if="!sites.length"><td class="px-3 py-6 text-center text-ink-400" colspan="9">{{ t("sites.还没有站_8bcxuo") }}</td></tr>
           <tr v-for="s in sites" :key="s.id" class="border-t border-ink-100">
             <td class="px-3 py-2">
               <div class="flex items-center gap-2">
                 <span class="font-medium text-ink-900">{{ s.name }}</span>
-                <span v-if="currentId === s.id" class="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">当前</span>
+                <span v-if="currentId === s.id" class="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">{{ t("sites.当前_gnyy") }}</span>
               </div>
               <div class="font-mono text-[11px] text-ink-400">{{ s.key }} · #{{ s.id }}</div>
             </td>
@@ -212,10 +214,10 @@ onMounted(load)
               <span class="text-[11px] px-1.5 py-0.5 rounded" :class="s.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-100 text-ink-500'">{{ s.status }}</span>
             </td>
             <td class="px-3 py-2 text-right whitespace-nowrap space-x-2">
-              <button class="text-sky-600 hover:underline" @click="enter(s)">进入</button>
-              <button class="text-ink-600 hover:underline" @click="openFeatures(s)">开关</button>
-              <button class="text-ink-600 hover:underline" @click="openEdit(s)">编辑</button>
-              <button class="text-red-600 hover:underline" @click="remove(s)">删除</button>
+              <button class="text-sky-600 hover:underline" @click="enter(s)">{{ t("sites.进入_owyy") }}</button>
+              <button class="text-ink-600 hover:underline" @click="openFeatures(s)">{{ t("sites.开关_gltf") }}</button>
+              <button class="text-ink-600 hover:underline" @click="openEdit(s)">{{ t("sites.edit") }}</button>
+              <button class="text-red-600 hover:underline" @click="remove(s)">{{ t("sites.delete") }}</button>
             </td>
           </tr>
         </tbody>
@@ -226,27 +228,27 @@ onMounted(load)
       <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-5 space-y-3">
         <h2 class="font-semibold text-ink-900">{{ editingId ? '编辑站点' : '新建站点' }}</h2>
         <div class="space-y-2">
-          <label class="block text-sm text-ink-600">站点标识 <span class="text-red-500">*</span>
-            <input v-model="form.key" class="input mt-1 text-sm" :disabled="!!editingId" placeholder="例如 hydraulic-shandong" />
+          <label class="block text-sm text-ink-600">{{ t("sites.站点标识_fytswv") }} <span class="text-red-500">*</span>
+            <input v-model="form.key" class="input mt-1 text-sm" :disabled="!!editingId" :placeholder="t('sites.例如_100usp')" />
           </label>
-          <label class="block text-sm text-ink-600">站点名称 <span class="text-red-500">*</span>
-            <input v-model="form.name" class="input mt-1 text-sm" placeholder="例如 山东液压官网" />
+          <label class="block text-sm text-ink-600">{{ t("sites.站点名称_fyqb2b") }} <span class="text-red-500">*</span>
+            <input v-model="form.name" class="input mt-1 text-sm" :placeholder="t('sites.例如_10j0on')" />
           </label>
-          <label class="block text-sm text-ink-600">绑定域名
-            <input v-model="form.domain" class="input mt-1 text-sm" placeholder="例如 www.example.com（可留空）" />
+          <label class="block text-sm text-ink-600">{{ t("sites.绑定域名_gdo4af") }}
+            <input v-model="form.domain" class="input mt-1 text-sm" :placeholder="t('sites.例如_1697yh')" />
           </label>
           <div class="grid grid-cols-2 gap-2">
-            <label class="block text-sm text-ink-600">语言
+            <label class="block text-sm text-ink-600">{{ t("sites.语言_ok37") }}
               <input v-model="form.locale" class="input mt-1 text-sm" placeholder="zh-CN" />
             </label>
-            <label class="block text-sm text-ink-600">排序
+            <label class="block text-sm text-ink-600">{{ t("sites.排序_hge5") }}
               <input v-model.number="form.sort" type="number" class="input mt-1 text-sm" />
             </label>
           </div>
         </div>
-        <p class="text-xs text-ink-400">类型、内容模式、SEO 默认值等建站后再到「站点配置」里调。</p>
+        <p class="text-xs text-ink-400">{{ t("sites.类型_p0upab") }}</p>
         <div class="flex justify-end gap-2 pt-1">
-          <button class="btn text-sm" @click="showForm = false">取消</button>
+          <button class="btn text-sm" @click="showForm = false">{{ t("sites.cancel") }}</button>
           <button class="btn btn-primary text-sm" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存' }}</button>
         </div>
       </div>
@@ -255,7 +257,7 @@ onMounted(load)
     <div v-if="featOpen" class="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4" @click.self="featOpen = false">
       <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-5 space-y-3">
         <h2 class="font-semibold text-ink-900">自动化开关 · {{ featSite?.name }}</h2>
-        <p class="text-xs text-ink-400">关掉哪个，哪条自动化链路就停住，其余照常；手动操作永远不受影响。</p>
+        <p class="text-xs text-ink-400">{{ t("sites.关掉哪个_86xii1") }}</p>
         <div class="space-y-2">
           <label
             v-for="(_val, key) in features"
@@ -267,7 +269,7 @@ onMounted(load)
           </label>
         </div>
         <div class="flex justify-end gap-2 pt-1">
-          <button class="btn text-sm" @click="featOpen = false">取消</button>
+          <button class="btn text-sm" @click="featOpen = false">{{ t("sites.cancel") }}</button>
           <button class="btn btn-primary text-sm" :disabled="featSaving" @click="saveFeatures">{{ featSaving ? '保存中…' : '保存' }}</button>
         </div>
       </div>

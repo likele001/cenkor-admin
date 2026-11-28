@@ -31,7 +31,7 @@ async function load() {
     })
     news.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -43,7 +43,7 @@ async function del(n: NewsItem) {
     await api.delete(`/api/v1/cms/news/${n.id}`)
     await load()
   } catch (e: any) {
-    alert('t("usersList.删除失败_1kc17l")' + (e?.response?.data?.detail || e.message))
+    alert(t("usersList.删除失败_1kc17l") + (e?.response?.data?.detail || e.message))
   }
 }
 

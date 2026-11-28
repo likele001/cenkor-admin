@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * AI 批量生产 · 一次起草 N 篇
  *
@@ -282,10 +284,10 @@ onUnmounted(() => {
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/cms/ai-settings" class="text-sm text-ink-500 hover:text-ink-900">
-          ← AI 设置
+          {{ t("aiBatch.text_1b1crm") }}
         </router-link>
-        <span class="font-semibold">批量生产</span>
-        <span class="text-xs text-ink-400">一次起草 N 篇，全部落成草稿</span>
+        <span class="font-semibold">{{ t("aiBatch.批量生产_d11rha") }}</span>
+        <span class="text-xs text-ink-400">{{ t("aiBatch.一次起草_iqqg31") }}</span>
       </div>
     </header>
 
@@ -303,19 +305,19 @@ onUnmounted(() => {
       <!-- 统计 -->
       <div v-if="stats" class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div class="card !py-3">
-          <div class="text-xs text-ink-400">历史批次</div>
+          <div class="text-xs text-ink-400">{{ t("aiBatch.历史批次_aw0ws4") }}</div>
           <div class="mt-1 text-xl font-semibold text-ink-900">{{ stats.jobs }}</div>
         </div>
         <div class="card !py-3">
-          <div class="text-xs text-ink-400">累计选题</div>
+          <div class="text-xs text-ink-400">{{ t("aiBatch.累计选题_gdke4h") }}</div>
           <div class="mt-1 text-xl font-semibold text-ink-900">{{ stats.topics }}</div>
         </div>
         <div class="card !py-3">
-          <div class="text-xs text-ink-400">已产出草稿</div>
+          <div class="text-xs text-ink-400">{{ t("aiBatch.已产出草_mfvmuz") }}</div>
           <div class="mt-1 text-xl font-semibold text-emerald-700">{{ stats.succeeded }}</div>
         </div>
         <div class="card !py-3">
-          <div class="text-xs text-ink-400">正在跑</div>
+          <div class="text-xs text-ink-400">{{ t("aiBatch.正在跑_g5umk") }}</div>
           <div class="mt-1 text-xl font-semibold" :class="stats.running ? 'text-blue-700' : 'text-ink-900'">
             {{ stats.running }}
           </div>
@@ -326,19 +328,19 @@ onUnmounted(() => {
         <!-- 左：批次列表 -->
         <aside class="card !p-0 overflow-hidden">
           <div class="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
-            <span class="text-sm font-semibold text-ink-900">批次</span>
+            <span class="text-sm font-semibold text-ink-900">{{ t("aiBatch.批次_hc5k") }}</span>
             <button
               class="text-xs px-2 py-1 rounded border border-ink-200 text-ink-600 hover:border-ink-900 disabled:opacity-40"
               :disabled="!canManage"
               @click="showForm = true"
             >
-              + 新建
+              {{ t("aiBatch.text_19xlr") }}
             </button>
           </div>
 
-          <div v-if="loading" class="p-4 text-sm text-ink-400">加载中…</div>
+          <div v-if="loading" class="p-4 text-sm text-ink-400">{{ t("apiKeys.加载中_b0k5km") }}</div>
           <div v-else-if="!jobs.length" class="p-4 text-sm text-ink-400">
-            还没有批次。点「新建」，粘贴一批选题就能开始。
+            {{ t("aiBatch.还没有批_1e4jee") }}
           </div>
           <ul v-else class="divide-y divide-ink-100 max-h-[62vh] overflow-y-auto">
             <li v-for="j in jobs" :key="j.id">
@@ -378,15 +380,15 @@ onUnmounted(() => {
           <!-- 新建表单 -->
           <div v-if="showForm" class="card">
             <div class="flex items-center justify-between mb-3">
-              <h2 class="text-base font-semibold text-ink-900">新建批次</h2>
+              <h2 class="text-base font-semibold text-ink-900">{{ t("aiBatch.新建批次_d847te") }}</h2>
               <button class="text-xs text-ink-500 hover:text-ink-900" @click="showForm = false">
-                收起
+                {{ t("aiBatch.收起_hzpd") }}
               </button>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
               <label class="block">
-                <span class="text-xs text-ink-500">内容类型</span>
+                <span class="text-xs text-ink-500">{{ t("apps.内容类型_ao6o90") }}</span>
                 <select
                   v-model.number="formCtId"
                   class="mt-1 w-full text-sm rounded-lg border border-ink-200 px-3 py-2 focus:outline-none focus:border-ink-900"
@@ -397,62 +399,62 @@ onUnmounted(() => {
                 </select>
               </label>
               <label class="block">
-                <span class="text-xs text-ink-500">批次名称（选填）</span>
+                <span class="text-xs text-ink-500">{{ t("aiBatch.批次名称_1vchx1") }}</span>
                 <input
                   v-model="formName"
-                  placeholder="默认用「类型 · 时间」"
+                  :placeholder="t('aiBatch.默认用_tfpd0m')"
                   class="mt-1 w-full text-sm rounded-lg border border-ink-200 px-3 py-2 focus:outline-none focus:border-ink-900"
                 />
               </label>
               <label class="block">
-                <span class="text-xs text-ink-500">并发数</span>
+                <span class="text-xs text-ink-500">{{ t("aiBatch.并发数_e8wj9") }}</span>
                 <select
                   v-model.number="formConcurrency"
                   class="mt-1 w-full text-sm rounded-lg border border-ink-200 px-3 py-2 focus:outline-none focus:border-ink-900"
                 >
-                  <option :value="1">1（稳，推荐）</option>
+                  <option :value="1">{{ t("aiBatch.text_zs806p") }}</option>
                   <option :value="2">2</option>
                   <option :value="3">3</option>
-                  <option :value="4">4（快，易被限流）</option>
+                  <option :value="4">{{ t("aiBatch.text_1h0003") }}</option>
                 </select>
               </label>
             </div>
 
             <label class="block mt-3">
               <span class="text-xs text-ink-500">
-                选题 / 素材 · 一行一条（空行自动忽略，重复自动去重）
+                {{ t("aiBatch.选题_1adkpv") }}
               </span>
               <textarea
                 v-model="formTopics"
                 rows="9"
                 spellcheck="false"
-                placeholder="春季新品上市：主打轻量便携，面向通勤人群&#10;老客户回访：设备保养的 5 个关键点&#10;行业观察：2026 年内容营销的三个变化"
+                :placeholder="t('aiBatch.春季新品_1dp6lb')"
                 class="mt-1 w-full font-mono text-[13px] leading-relaxed rounded-lg border border-ink-200 px-3 py-2.5 focus:outline-none focus:border-ink-900 resize-y"
               ></textarea>
             </label>
 
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <span class="text-xs text-ink-400">
-                有效 <span class="font-semibold text-ink-900">{{ topicsParsed.length }}</span> 条
-                <span v-if="topicsParsed.length > 200" class="text-red-600">（超过 200，会被拒）</span>
+                {{ t("aiBatch.有效_i2xr") }} <span class="font-semibold text-ink-900">{{ topicsParsed.length }}</span> {{ t("aiBatch.条_kf5") }}
+                <span v-if="topicsParsed.length > 200" class="text-red-600">{{ t("aiBatch.text_1c590r") }}</span>
               </span>
               <div class="flex-1"></div>
               <button
                 class="px-3 py-2 text-sm rounded-lg border border-ink-200 text-ink-600 hover:border-ink-400"
                 @click="formTopics = ''; formName = ''"
               >
-                清空
+                {{ t("aiBatch.清空_jdw5") }}
               </button>
               <button
                 class="px-4 py-2 text-sm rounded-lg bg-ink-900 text-white font-medium disabled:opacity-40"
                 :disabled="busy || !topicsParsed.length || !canManage"
                 @click="createJob"
               >
-                创建批次
+                {{ t("aiBatch.创建批次_ar7akn") }}
               </button>
             </div>
             <p class="mt-2 text-xs text-ink-400">
-              创建后需要点「开始」才会真正跑。AI 产出一律是草稿，不会自动发布。
+              {{ t("aiBatch.创建后需_1v2bde") }}
             </p>
           </div>
 
@@ -493,7 +495,7 @@ onUnmounted(() => {
                     :disabled="busy || !canManage"
                     @click="act('pause', '已暂停，跑完当前这篇就停')"
                   >
-                    暂停
+                    {{ t("aiBatch.暂停_hvkq") }}
                   </button>
                   <button
                     v-if="detail.failed > 0 && detail.status !== 'running'"
@@ -509,7 +511,7 @@ onUnmounted(() => {
                     :disabled="busy || !canManage"
                     @click="act('cancel', '已取消', '取消后未跑的条目会标记为已跳过，且无法恢复。继续？')"
                   >
-                    取消
+                    {{ t("aiBatch.cancel") }}
                   </button>
                   <button
                     v-if="detail.status !== 'running'"
@@ -517,7 +519,7 @@ onUnmounted(() => {
                     :disabled="busy || !canManage"
                     @click="removeJob"
                   >
-                    删除
+                    {{ t("aiBatch.delete") }}
                   </button>
                 </div>
               </div>
@@ -551,16 +553,16 @@ onUnmounted(() => {
                 执行器报错：{{ detail.last_error }}
               </p>
               <p v-if="!canManage" class="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-                你当前是只读权限（缺 <span class="font-mono">cms:ai:manage</span>），可以看进度但不能操作。
+                {{ t("aiBatch.你当前是_19u1ul") }} <span class="font-mono">cms:ai:manage</span>{{ t("aiBatch.text_1gjmcm") }}
               </p>
             </div>
 
             <!-- 逐篇 -->
             <div class="card !p-0 overflow-hidden">
               <div class="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
-                <span class="text-sm font-semibold text-ink-900">逐篇状态</span>
+                <span class="text-sm font-semibold text-ink-900">{{ t("aiBatch.逐篇状态_iothxe") }}</span>
                 <span v-if="detail.status === 'running'" class="text-[11px] text-blue-600">
-                  每 2 秒自动刷新
+                  {{ t("aiBatch.每_1wdi0o") }}
                 </span>
               </div>
               <ul class="divide-y divide-ink-100 max-h-[55vh] overflow-y-auto">
@@ -597,7 +599,7 @@ onUnmounted(() => {
                     target="_blank"
                     class="text-[11px] text-ink-500 hover:text-ink-900 shrink-0 pt-0.5"
                   >
-                    打开草稿 →
+                    {{ t("aiBatch.打开草稿_hysuqd") }}
                   </a>
                 </li>
               </ul>
@@ -605,7 +607,7 @@ onUnmounted(() => {
           </div>
 
           <div v-else-if="!showForm" class="card text-sm text-ink-400">
-            左侧选一个批次看详情，或点「新建」开一批。
+            {{ t("aiBatch.左侧选一_8donlr") }}
           </div>
         </section>
       </div>

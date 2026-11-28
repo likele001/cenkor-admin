@@ -35,7 +35,7 @@ onMounted(async () => {
       seoKeywords: (data as any).seo_keywords || '',
     })
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -53,7 +53,7 @@ async function save() {
     }
     setTimeout(() => router.push('/cms/news'), 500)
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.saveFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.saveFailed")
   } finally {
     saving.value = false
   }
@@ -106,18 +106,18 @@ async function save() {
         <!-- SEO -->
         <div class="space-y-4 pt-4 border-t border-ink-200">
           <h2 class="font-semibold text-lg">SEO</h2>
-          <p class="text-sm text-ink-500">覆盖站点默认 meta，留空则使用站点全局配置。</p>
+          <p class="text-sm text-ink-500">{{ t("caseEdit.覆盖站点_xt4zpn") }}</p>
           <div>
-            <label class="block text-sm font-medium mb-1.5">Meta 标题（title）</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t("caseEdit.text_yql8tp") }}</label>
             <input v-model="form.seoTitle" class="input" :placeholder="form.title" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">Meta 描述（description）</label>
-            <textarea v-model="form.seoDescription" rows="2" class="input" placeholder="文章摘要 + 关键词"></textarea>
+            <label class="block text-sm font-medium mb-1.5">{{ t("caseEdit.text_m48vg9") }}</label>
+            <textarea v-model="form.seoDescription" rows="2" class="input" :placeholder="t('newsEdit.文章摘要_1seaya')"></textarea>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">Meta 关键词（keywords，逗号分隔）</label>
-            <input v-model="form.seoKeywords" class="input" placeholder="新闻,行业动态,产品发布" />
+            <label class="block text-sm font-medium mb-1.5">{{ t("caseEdit.text_12jxmu") }}</label>
+            <input v-model="form.seoKeywords" class="input" :placeholder="t('newsEdit.新闻_uefci8')" />
           </div>
         </div>
 

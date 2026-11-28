@@ -32,7 +32,7 @@ async function load() {
     const { data } = await api.get('/api/v1/api-keys')
     items.value = data.items
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -49,7 +49,7 @@ async function create() {
     form.value = { name: '', scopes: '', expires_days: '' }
     await load()
   } catch (e: any) {
-    alert('t("apiKeys.创建失败_1d9o4p")' + (e?.response?.data?.detail || e.message))
+    alert(t("apiKeys.创建失败_1d9o4p") + (e?.response?.data?.detail || e.message))
   } finally {
     creating.value = false
   }
@@ -61,7 +61,7 @@ async function revoke(k: ApiKey) {
     await api.post(`/api/v1/api-keys/${k.id}/revoke`)
     await load()
   } catch (e: any) {
-    alert('t("apiKeys.撤销失败_1liumu")' + (e?.response?.data?.detail || e.message))
+    alert(t("apiKeys.撤销失败_1liumu") + (e?.response?.data?.detail || e.message))
   }
 }
 
@@ -71,7 +71,7 @@ async function destroy(k: ApiKey) {
     await api.delete(`/api/v1/api-keys/${k.id}`)
     await load()
   } catch (e: any) {
-    alert('t("usersList.删除失败_1kc17l")' + (e?.response?.data?.detail || e.message))
+    alert(t("usersList.删除失败_1kc17l") + (e?.response?.data?.detail || e.message))
   }
 }
 
@@ -82,7 +82,7 @@ async function copyToken() {
     copied.value = true
     setTimeout(() => (copied.value = false), 2000)
   } catch {
-    alert('t("apiKeys.复制失败_1xgj2m")')
+    alert(t("apiKeys.复制失败_1xgj2m"))
   }
 }
 

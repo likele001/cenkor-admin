@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted } from 'vue'
 import { api } from '@/lib/api'
 
@@ -19,7 +21,7 @@ async function load() {
     const { data } = await api.get('/api/v1/cms/languages')
     items.value = data.items || []
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '加载失败')
+    alert(e?.response?.data?.detail || t("dashboard.loadFailed"))
   } finally {
     loading.value = false
   }
@@ -56,7 +58,7 @@ async function save() {
     showModal.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '保存失败')
+    alert(e?.response?.data?.detail || t("aiMemory.saveFailed"))
   }
 }
 
@@ -73,23 +75,23 @@ onMounted(load)
   <div>
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-2">
-        <h1 class="text-2xl font-semibold tracking-tight">🌐 语言管理</h1>
-        <span class="text-sm text-ink-400">内容多语言 i18n（M1·P0）</span>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ t("languages.text_13sgpm") }}</h1>
+        <span class="text-sm text-ink-400">{{ t("languages.内容多语_vu37kp") }}</span>
       </div>
-      <button class="btn-primary" @click="openCreate">新增语言</button>
+      <button class="btn-primary" @click="openCreate">{{ t("languages.新增语言_d7dwkh") }}</button>
     </div>
 
     <div class="card overflow-hidden">
-      <div v-if="loading" class="text-ink-500 p-6">加载中…</div>
+      <div v-if="loading" class="text-ink-500 p-6">{{ t("apiKeys.加载中_b0k5km") }}</div>
       <table v-else class="w-full text-sm">
         <thead>
           <tr class="text-left text-ink-400 border-b">
-            <th class="p-3">语言</th>
-            <th class="p-3">代码</th>
-            <th class="p-3">默认</th>
-            <th class="p-3">启用</th>
-            <th class="p-3">排序</th>
-            <th class="p-3 text-right">操作</th>
+            <th class="p-3">{{ t("languages.语言_ok37") }}</th>
+            <th class="p-3">{{ t("languages.代码_e2ri") }}</th>
+            <th class="p-3">{{ t("languages.默认_rs98") }}</th>
+            <th class="p-3">{{ t("languages.enable") }}</th>
+            <th class="p-3">{{ t("languages.排序_hge5") }}</th>
+            <th class="p-3 text-right">{{ t("languages.actions") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -97,7 +99,7 @@ onMounted(load)
             <td class="p-3 font-medium">{{ l.flag || '🌍' }} {{ l.name }}</td>
             <td class="p-3"><code class="text-ink-400">{{ l.code }}</code></td>
             <td class="p-3">
-              <span v-if="l.is_default" class="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">默认</span>
+              <span v-if="l.is_default" class="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{{ t("languages.默认_rs98") }}</span>
               <span v-else class="text-ink-300">—</span>
             </td>
             <td class="p-3">
@@ -105,12 +107,12 @@ onMounted(load)
             </td>
             <td class="p-3 text-ink-400">{{ l.sort }}</td>
             <td class="p-3 text-right space-x-2">
-              <button class="btn-ghost text-sm" @click="openEdit(l)">编辑</button>
-              <button v-if="!l.is_default" class="btn-ghost text-sm text-red-600" @click="remove(l)">删除</button>
+              <button class="btn-ghost text-sm" @click="openEdit(l)">{{ t("languages.edit") }}</button>
+              <button v-if="!l.is_default" class="btn-ghost text-sm text-red-600" @click="remove(l)">{{ t("languages.delete") }}</button>
             </td>
           </tr>
           <tr v-if="!items.length">
-            <td colspan="6" class="p-6 text-center text-ink-400">暂无语言，点击「新增语言」添加（示例：zh-CN / en-US）</td>
+            <td colspan="6" class="p-6 text-center text-ink-400">{{ t("languages.暂无语言_98twxd") }}</td>
           </tr>
         </tbody>
       </table>
@@ -122,35 +124,35 @@ onMounted(load)
         <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑语言' : '新增语言' }}</h2>
         <div class="space-y-3">
           <div v-if="!editing">
-            <label class="block text-sm font-medium mb-1">代码</label>
-            <input v-model="form.code" class="input" placeholder="如 en-US / ja-JP" />
+            <label class="block text-sm font-medium mb-1">{{ t("languages.代码_e2ri") }}</label>
+            <input v-model="form.code" class="input" :placeholder="t('languages.如_1nmqez')" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">名称</label>
-            <input v-model="form.name" class="input" placeholder="如 English / 日本語" />
+            <label class="block text-sm font-medium mb-1">{{ t("languages.name") }}</label>
+            <input v-model="form.name" class="input" :placeholder="t('languages.如_1rw6yw')" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">旗帜 emoji</label>
+            <label class="block text-sm font-medium mb-1">{{ t("languages.旗帜_19jcdq") }}</label>
             <input v-model="form.flag" class="input" placeholder="🇺🇸" />
           </div>
           <div class="flex gap-4">
             <label class="flex items-center gap-2">
               <input type="checkbox" v-model="form.is_default" />
-              <span class="text-sm">设为默认语言</span>
+              <span class="text-sm">{{ t("languages.设为默认_4102bf") }}</span>
             </label>
             <label class="flex items-center gap-2">
               <input type="checkbox" v-model="form.enabled" />
-              <span class="text-sm">启用</span>
+              <span class="text-sm">{{ t("languages.enable") }}</span>
             </label>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">排序</label>
+            <label class="block text-sm font-medium mb-1">{{ t("languages.排序_hge5") }}</label>
             <input v-model.number="form.sort" type="number" class="input" />
           </div>
         </div>
         <div class="flex justify-end gap-2 mt-6">
-          <button class="btn-ghost" @click="showModal = false">取消</button>
-          <button class="btn-primary" @click="save">保存</button>
+          <button class="btn-ghost" @click="showModal = false">{{ t("languages.cancel") }}</button>
+          <button class="btn-primary" @click="save">{{ t("languages.保存_e32z") }}</button>
         </div>
       </div>
     </div>

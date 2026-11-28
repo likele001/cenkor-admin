@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/lib/api'
@@ -116,7 +118,7 @@ const canEntryAction = computed(() => !!entryId.value && !busy.value)
 function errText(e: any): string {
   if (e?.response?.status === 503) {
     aiUnavailable.value = true
-    return e.response?.data?.detail || 'AI 未配置'
+    return e.response?.data?.detail || t("aiWorkbench.text_wcg8s3")
   }
   const d = e?.response?.data?.detail
   if (Array.isArray(d)) return d.map((x: any) => x.msg || JSON.stringify(x)).join('; ')
@@ -183,7 +185,7 @@ function handleStreamEvent(event: string, data: any) {
     draft.value = data as Draft
     streaming.value = null
   } else if (event === 'error') {
-    errorMsg.value = data.detail || '生成失败'
+    errorMsg.value = data.detail || t("aiWorkbench.生成失败_f6lwo5")
     streaming.value = null
   }
 }
@@ -297,7 +299,7 @@ async function doDraft() {
       }
     }
   } catch (e: any) {
-    if (e?.name !== 'AbortError') errorMsg.value = e?.message || '生成失败'
+    if (e?.name !== 'AbortError') errorMsg.value = e?.message || t("aiWorkbench.生成失败_f6lwo5")
   } finally {
     streaming.value = null
     busy.value = false

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 分发渠道配置。
  *
@@ -92,7 +94,7 @@ function setDraft(c: Channel, key: string, value: string) {
 
 function statusText(s: string) {
   return (
-    { success: '成功', failed: '失败', pending: '待执行', running: '执行中', skipped: '已跳过' }[s] || s
+    { success: t("publishChannels.success"), failed: t("publishChannels.failed"), pending: t("publishChannels.待执行_eh5oq"), running: t("publishChannels.执行中_f2hhk"), skipped: t("publishChannels.已跳过_egazq") }[s] || s
   )
 }
 
@@ -116,7 +118,7 @@ async function load() {
     setup.value = st.data || {}
     jobs.value = jb.data.items || []
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '加载失败'
+    error.value = e instanceof Error ? e.message : t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -136,7 +138,7 @@ async function save(c: Channel) {
     Object.assign(c, data)
     delete editing.value[c.key]
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '保存失败'
+    error.value = e instanceof Error ? e.message : t("aiMemory.saveFailed")
   } finally {
     saving.value = null
   }
@@ -148,7 +150,7 @@ async function test(c: Channel) {
     const { data } = await api.post(`/api/v1/cms/ai/publish/channels/${c.key}/test`)
     testResult.value[c.key] = { ok: !!data.ok, detail: data.detail || '' }
   } catch (e: unknown) {
-    testResult.value[c.key] = { ok: false, detail: e instanceof Error ? e.message : '测试失败' }
+    testResult.value[c.key] = { ok: false, detail: e instanceof Error ? e.message : t("publishChannels.测试失败_ed6jy6") }
   } finally {
     testing.value = null
   }
@@ -171,12 +173,12 @@ onMounted(load)
   <div class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-lg font-medium text-ink-900">分发渠道</h1>
+        <h1 class="text-lg font-medium text-ink-900">{{ t("publishChannels.分发渠道_ap981q") }}</h1>
         <p class="mt-1 text-[13px] text-ink-500">
-          内容审核通过后往哪些出口发。每个渠道独立执行、独立重试，一个失败不影响其他。
+          {{ t("publishChannels.内容审核_19qejk") }}
         </p>
       </div>
-      <button class="btn btn-ghost" :disabled="loading" @click="runPending">执行待处理任务</button>
+      <button class="btn btn-ghost" :disabled="loading" @click="runPending">{{ t("publishChannels.执行待处_u23cdk") }}</button>
     </div>
 
     <div v-if="error" class="card border-red-200 bg-red-50 text-[13px] text-red-700">{{ error }}</div>
@@ -193,7 +195,7 @@ onMounted(load)
               >
                 {{ c.enabled ? '已启用' : '未启用' }}
               </span>
-              <span v-if="c.is_default" class="rounded bg-ink-900 px-1.5 py-0.5 text-[11px] text-white">默认</span>
+              <span v-if="c.is_default" class="rounded bg-ink-900 px-1.5 py-0.5 text-[11px] text-white">{{ t("publishChannels.默认_rs98") }}</span>
             </div>
             <div class="mt-1 text-[12px] text-ink-400">标识 {{ c.key }} · 类型 {{ c.type }}</div>
           </div>
@@ -242,11 +244,11 @@ onMounted(load)
         </div>
 
         <div v-if="openSetup === c.key && setup[c.type]" class="rounded-lg bg-ink-50 p-3 text-[12px] leading-relaxed text-ink-600">
-          <div class="mb-1 font-medium text-ink-800">需要准备</div>
+          <div class="mb-1 font-medium text-ink-800">{{ t("publishChannels.需要准备_jm698i") }}</div>
           <ul class="mb-2 list-disc pl-4">
             <li v-for="(n, i) in setup[c.type].need" :key="i">{{ n }}</li>
           </ul>
-          <div class="mb-1 font-medium text-ink-800">步骤</div>
+          <div class="mb-1 font-medium text-ink-800">{{ t("publishChannels.步骤_j467") }}</div>
           <ol class="list-decimal pl-4">
             <li v-for="(s, i) in setup[c.type].steps" :key="i" class="mb-0.5">{{ s }}</li>
           </ol>
@@ -256,21 +258,21 @@ onMounted(load)
 
     <div class="card">
       <div class="mb-3 flex items-center justify-between">
-        <div class="text-[14px] font-medium text-ink-900">最近发布任务</div>
-        <button class="text-[12px] text-ink-500 hover:text-ink-900" @click="load">刷新</button>
+        <div class="text-[14px] font-medium text-ink-900">{{ t("publishChannels.最近发布_1n6o8i") }}</div>
+        <button class="text-[12px] text-ink-500 hover:text-ink-900" @click="load">{{ t("publishChannels.刷新_ejix") }}</button>
       </div>
       <div v-if="!jobs.length" class="py-6 text-center text-[13px] text-ink-400">
-        还没有发布记录。在内容编辑页点「发布」后会出现在这里。
+        {{ t("publishChannels.还没有发_1pgrrk") }}
       </div>
       <div v-else class="overflow-x-auto">
         <table class="w-full text-[13px]">
           <thead>
             <tr class="border-b border-ink-100 text-left text-[12px] text-ink-500">
-              <th class="py-2 pr-3 font-normal">条目</th>
-              <th class="px-2 py-2 font-normal">渠道</th>
-              <th class="px-2 py-2 font-normal">状态</th>
-              <th class="px-2 py-2 text-right font-normal">尝试</th>
-              <th class="px-2 py-2 font-normal">结果 / 原因</th>
+              <th class="py-2 pr-3 font-normal">{{ t("publishChannels.条目_i8j1") }}</th>
+              <th class="px-2 py-2 font-normal">{{ t("publishChannels.渠道_jiur") }}</th>
+              <th class="px-2 py-2 font-normal">{{ t("publishChannels.status") }}</th>
+              <th class="px-2 py-2 text-right font-normal">{{ t("publishChannels.尝试_gfo8") }}</th>
+              <th class="px-2 py-2 font-normal">{{ t("publishChannels.结果_1fnmce") }}</th>
             </tr>
           </thead>
           <tbody>

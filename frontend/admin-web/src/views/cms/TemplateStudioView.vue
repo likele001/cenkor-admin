@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
@@ -110,7 +112,7 @@ async function loadCtxApi() {
     const { data } = await api.get(`${BASE}/context-api`)
     ctxApi.value = data
   } catch (e: any) {
-    flash('err', errText(e, '标签列表加载失败'))
+    flash('err', errText(e, t("templateStudio.标签列表_1ez6qn")))
   } finally {
     loadingTags.value = false
   }
@@ -140,10 +142,10 @@ const filteredTags = computed<TagItem[]>(() => {
 const tagGroups = computed<[string, TagItem[]][]>(() => {
   const list = filteredTags.value
   if (tagTab.value !== 'api') return [['', list]]
-  const order = ['内容', '结构', '站点', '其他']
+  const order = ['内容', t("templateStudio.结构_m51t"), t("templateStudio.站点_liio"), t("templateStudio.其他_eae8")]
   const map = new Map<string, TagItem[]>()
   for (const it of list) {
-    const k = it.group || '其他'
+    const k = it.group || t("templateStudio.其他_eae8")
     if (!map.has(k)) map.set(k, [])
     map.get(k)!.push(it)
   }
@@ -153,7 +155,7 @@ const tagGroups = computed<[string, TagItem[]][]>(() => {
 // $0 是光标落点标记：for 骨架插进去后光标停在循环体，不用再手动跳
 function insertTag(item: TagItem) {
   if (!view) {
-    flash('err', '先在左侧选一个模板文件')
+    flash('err', t("templateStudio.先在左侧_1acoh1"))
     return
   }
   const raw = item.insert || ''
@@ -177,11 +179,11 @@ const groups = computed(() => {
   const pageLevel = ['layout.html', 'list.html', 'detail.html', 'page.html', '404.html']
   const buckets = new Map<string, FileItem[]>()
   for (const f of files.value) {
-    const dir = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : (pageLevel.includes(f.path) ? '页面模板' : '其他')
+    const dir = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : (pageLevel.includes(f.path) ? t("templateStudio.页面模板_juxtxn") : t("templateStudio.其他_eae8"))
     if (!buckets.has(dir)) buckets.set(dir, [])
     buckets.get(dir)!.push(f)
   }
-  const order = ['页面模板', 'partials', 'macros', 'assets', '其他']
+  const order = ['页面模板', 'partials', 'macros', 'assets', t("templateStudio.其他_eae8")]
   return [...buckets.entries()].sort((a, b) => {
     const ia = order.indexOf(a[0]); const ib = order.indexOf(b[0])
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
@@ -343,7 +345,7 @@ async function runPreview() {
     if (data.ok) previewHtml.value = data.html
     else previewHtml.value = `<pre style="padding:24px;color:#b91c1c;font:13px/1.6 monospace;white-space:pre-wrap">${escapeHtml(data.error || '渲染失败')}</pre>`
   } catch (e: any) {
-    previewHtml.value = `<pre style="padding:24px;color:#b91c1c;font:13px/1.6 monospace;white-space:pre-wrap">${escapeHtml(errText(e, '预览请求失败'))}</pre>`
+    previewHtml.value = `<pre style="padding:24px;color:#b91c1c;font:13px/1.6 monospace;white-space:pre-wrap">${escapeHtml(errText(e, t("templateStudio.预览请求_6uu1qb")))}</pre>`
   } finally {
     previewing.value = false
   }
@@ -380,7 +382,7 @@ async function save() {
       syntaxError.value = { message: d.error.message, line: d.error.line }
       markLine(d.error.line, d.error.message)
     }
-    flash('err', errText(e, '保存失败'))
+    flash('err', errText(e, t("aiMemory.saveFailed")))
   } finally {
     saving.value = false
   }
@@ -389,7 +391,7 @@ async function save() {
 async function revert() {
   if (!currentPath.value) return
   if (sourceKind.value !== 'db') {
-    flash('err', '这个文件本来就没有覆盖，无需还原')
+    flash('err', t("templateStudio.这个文件_1yrdao"))
     return
   }
   if (!window.confirm(`确定放弃对 ${currentPath.value} 的修改，回落到内置版本？`)) return
@@ -397,26 +399,26 @@ async function revert() {
     await api.delete(`${BASE}/file`, { params: { theme: currentTheme.value, path: currentPath.value } })
     await loadFiles()
     await loadFile(currentPath.value)
-    flash('ok', '已回落到内置版本')
+    flash('ok', t("templateStudio.已回落到_1310od"))
     schedulePreview(100)
   } catch (e: any) {
-    flash('err', errText(e, '还原失败'))
+    flash('err', errText(e, t("templateStudio.还原失败_ihtwkb")))
   }
 }
 
 async function openDiff() {
   if (!currentPath.value) return
   if (sourceKind.value !== 'db') {
-    flash('err', '没有覆盖版本，无差异可看')
+    flash('err', t("templateStudio.没有覆盖_1s8inc"))
     return
   }
   try {
     const { data } = await api.get(`${BASE}/diff`, { params: { theme: currentTheme.value, path: currentPath.value } })
-    diffText.value = data.diff || '（与内置版本一致）'
+    diffText.value = data.diff || t("templateStudio.text_omnkhu")
     diffStat.value = { added: data.added, removed: data.removed }
     showDiff.value = true
   } catch (e: any) {
-    flash('err', errText(e, '读取差异失败'))
+    flash('err', errText(e, t("templateStudio.读取差异_1agslu")))
   }
 }
 
@@ -435,7 +437,7 @@ function diffLines() {
 
 async function switchTheme(name: string, el?: HTMLSelectElement) {
   if (name === currentTheme.value) return
-  if (dirty.value && !window.confirm('当前改动未保存，切换主题会丢弃，继续？')) {
+  if (dirty.value && !window.confirm(t("templateStudio.当前改动_1rzh19"))) {
     if (el) el.value = currentTheme.value
     return
   }
@@ -460,7 +462,7 @@ async function createTheme() {
     await loadThemes()
     await switchTheme(name)
   } catch (e: any) {
-    flash('err', errText(e, '创建主题失败'))
+    flash('err', errText(e, t("templateStudio.创建主题_ybk500")))
   }
 }
 
@@ -470,7 +472,7 @@ async function activateTheme() {
     await loadThemes()
     flash('ok', `站点已切换到主题「${currentTheme.value}」`)
   } catch (e: any) {
-    flash('err', errText(e, '切换生效主题失败'))
+    flash('err', errText(e, t("templateStudio.切换生效_1n97j8")))
   }
 }
 
@@ -482,7 +484,7 @@ async function deleteTheme() {
     await loadThemes()
     await switchTheme(activeTheme.value)
   } catch (e: any) {
-    flash('err', errText(e, '删除主题失败'))
+    flash('err', errText(e, t("templateStudio.删除主题_149hgi")))
   }
 }
 
@@ -497,9 +499,9 @@ async function exportTheme() {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-    flash('ok', '主题包已导出')
+    flash('ok', t("templateStudio.主题包已_3dia6g"))
   } catch (e: any) {
-    flash('err', errText(e, '导出失败'))
+    flash('err', errText(e, t("templateStudio.导出失败_by46j6")))
   }
 }
 
@@ -518,7 +520,7 @@ async function doImport(ev: Event) {
     if (data.theme !== currentTheme.value) await switchTheme(data.theme)
     else await loadFiles()
   } catch (e: any) {
-    flash('err', errText(e, '导入失败'))
+    flash('err', errText(e, t("templateStudio.导入失败_by141p")))
   } finally {
     input.value = ''
   }

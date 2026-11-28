@@ -36,7 +36,7 @@ async function load() {
     items.value = data.items
     total.value = data.total
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally { loading.value = false }
 }
 
@@ -63,7 +63,7 @@ async function save() {
     showEdit.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '保存失败')
+    alert(e?.response?.data?.detail || t("aiMemory.saveFailed"))
   } finally { saving.value = false }
 }
 
@@ -73,7 +73,7 @@ async function del(item: Ticket) {
     await api.delete(`/api/v1/tickets/${item.id}`)
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '删除失败')
+    alert(e?.response?.data?.detail || t("aiMemory.删除失败_azdahk"))
   }
 }
 
@@ -92,42 +92,42 @@ onMounted(load)
   <div>
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight">工单管理</h1>
-        <p class="text-ink-500">内部工单与任务追踪</p>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ t("tickets.工单管理_c75ac5") }}</h1>
+        <p class="text-ink-500">{{ t("tickets.内部工单_629o8e") }}</p>
       </div>
-      <button class="btn-primary" @click="openNew">新建工单</button>
+      <button class="btn-primary" @click="openNew">{{ t("tickets.新建工单_d83b2y") }}</button>
     </div>
 
     <div class="card mb-4 flex flex-wrap gap-3 items-center">
-      <input v-model="search" type="text" class="input w-full sm:w-60" placeholder="搜索标题..." @keyup.enter="load" />
+      <input v-model="search" type="text" class="input w-full sm:w-60" :placeholder="t('tickets.搜索标题_hlhggn')" @keyup.enter="load" />
       <select v-model="statusFilter" class="input w-full sm:w-32" @change="load">
-        <option value="">全部状态</option>
-        <option value="open">待处理</option>
-        <option value="in_progress">处理中</option>
-        <option value="resolved">已解决</option>
-        <option value="closed">已关闭</option>
+        <option value="">{{ t("entryList.全部状态_avez63") }}</option>
+        <option value="open">{{ t("tickets.待处理_efg7b") }}</option>
+        <option value="in_progress">{{ t("tickets.处理中_dljhn") }}</option>
+        <option value="resolved">{{ t("tickets.已解决_ef9uq") }}</option>
+        <option value="closed">{{ t("tickets.已关闭_e61qk") }}</option>
       </select>
-      <button class="btn-ghost" @click="load">搜索</button>
+      <button class="btn-ghost" @click="load">{{ t("tickets.search") }}</button>
     </div>
 
-    <div v-if="loading" class="card text-ink-500">加载中...</div>
+    <div v-if="loading" class="card text-ink-500">{{ t("announcements.加载中_27k1ha") }}</div>
     <div v-else-if="error" class="card text-red-600">{{ error }}</div>
     <div v-else class="card overflow-hidden p-0">
       <div class="overflow-x-auto"><table class="w-full text-sm">
         <thead class="bg-ink-50 border-b border-ink-200">
           <tr class="text-left text-ink-500">
             <th class="px-4 py-3 font-medium">ID</th>
-            <th class="px-4 py-3 font-medium">标题</th>
-            <th class="px-4 py-3 font-medium">分类</th>
-            <th class="px-4 py-3 font-medium">优先级</th>
-            <th class="px-4 py-3 font-medium">状态</th>
-            <th class="px-4 py-3 font-medium">创建时间</th>
-            <th class="px-4 py-3 font-medium text-right">操作</th>
+            <th class="px-4 py-3 font-medium">{{ t("tickets.title") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("tickets.category") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("tickets.优先级_bzkvr") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("tickets.status") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("announcements.createdAt") }}</th>
+            <th class="px-4 py-3 font-medium text-right">{{ t("tickets.actions") }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="items.length === 0">
-            <td colspan="7" class="px-4 py-12 text-center text-ink-400">暂无工单</td>
+            <td colspan="7" class="px-4 py-12 text-center text-ink-400">{{ t("tickets.暂无工单_dctru6") }}</td>
           </tr>
           <tr v-for="item in items" :key="item.id" class="border-b border-ink-100 last:border-0 hover:bg-ink-50">
             <td class="px-4 py-3 text-ink-500">#{{ item.id }}</td>
@@ -141,8 +141,8 @@ onMounted(load)
             </td>
             <td class="px-4 py-3 text-ink-500 text-xs">{{ item.created_at?.slice(0, 10) }}</td>
             <td class="px-4 py-3 text-right space-x-2">
-              <button class="text-sm text-ink-600 hover:text-ink-900" @click="openEdit(item)">编辑</button>
-              <button class="text-sm text-red-600 hover:underline" @click="del(item)">删除</button>
+              <button class="text-sm text-ink-600 hover:text-ink-900" @click="openEdit(item)">{{ t("tickets.edit") }}</button>
+              <button class="text-sm text-red-600 hover:underline" @click="del(item)">{{ t("tickets.delete") }}</button>
             </td>
           </tr>
         </tbody>
@@ -155,45 +155,45 @@ onMounted(load)
         <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建工单' : '编辑工单' }}</h2>
         <form @submit.prevent="save" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-1.5">标题</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t("tickets.title") }}</label>
             <input v-model="form.title" required class="input" />
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label class="block text-sm font-medium mb-1.5">状态</label>
+              <label class="block text-sm font-medium mb-1.5">{{ t("tickets.status") }}</label>
               <select v-model="form.status" class="input">
-                <option value="open">待处理</option>
-                <option value="in_progress">处理中</option>
-                <option value="resolved">已解决</option>
-                <option value="closed">已关闭</option>
+                <option value="open">{{ t("tickets.待处理_efg7b") }}</option>
+                <option value="in_progress">{{ t("tickets.处理中_dljhn") }}</option>
+                <option value="resolved">{{ t("tickets.已解决_ef9uq") }}</option>
+                <option value="closed">{{ t("tickets.已关闭_e61qk") }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1.5">优先级</label>
+              <label class="block text-sm font-medium mb-1.5">{{ t("tickets.优先级_bzkvr") }}</label>
               <select v-model="form.priority" class="input">
-                <option value="low">低</option>
-                <option value="normal">普通</option>
-                <option value="high">高</option>
-                <option value="urgent">紧急</option>
+                <option value="low">{{ t("tickets.低_fny") }}</option>
+                <option value="normal">{{ t("tickets.普通_i7os") }}</option>
+                <option value="high">{{ t("tickets.高_ul4") }}</option>
+                <option value="urgent">{{ t("tickets.紧急_ltcu") }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1.5">分类</label>
+              <label class="block text-sm font-medium mb-1.5">{{ t("tickets.category") }}</label>
               <select v-model="form.category" class="input">
-                <option value="general">通用</option>
-                <option value="bug">缺陷</option>
-                <option value="feature">需求</option>
-                <option value="support">支持</option>
+                <option value="general">{{ t("tickets.通用_p5ji") }}</option>
+                <option value="bug">{{ t("tickets.缺陷_mgsd") }}</option>
+                <option value="feature">{{ t("tickets.需求_qa0y") }}</option>
+                <option value="support">{{ t("tickets.支持_hr5e") }}</option>
               </select>
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">描述</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t("tickets.description") }}</label>
             <RichTextEditor v-model="form.description" />
           </div>
           <div class="flex gap-3 pt-2">
             <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? '保存中...' : '保存' }}</button>
-            <button type="button" @click="showEdit = false" class="btn-ghost">取消</button>
+            <button type="button" @click="showEdit = false" class="btn-ghost">{{ t("tickets.cancel") }}</button>
           </div>
         </form>
       </div>

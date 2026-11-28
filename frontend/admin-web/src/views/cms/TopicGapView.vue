@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 选题 Gap 分析页。
  *
@@ -115,7 +117,7 @@ async function analyze() {
     intentView.value = INTENTS.map((r) => ({ ...r, count: d[r.key] || 0 }))
     totalGaps.value = (data as GapReport)?.gaps?.length || 0
   } catch (e: any) {
-    errorMsg.value = e?.response?.data?.detail || e?.message || '分析失败'
+    errorMsg.value = e?.response?.data?.detail || e?.message || t("topicGap.分析失败_as1rku")
   } finally {
     window.clearInterval(timer)
     elapsed.value = Math.round((Date.now() - t0) / 1000)
@@ -138,7 +140,7 @@ async function loadTerms() {
     terms.value = data.items || []
     termSummary.value = data.summary || null
   } catch (e: any) {
-    termError.value = e?.response?.data?.detail || e?.message || '加载搜索词失败'
+    termError.value = e?.response?.data?.detail || e?.message || t("topicGap.加载搜索_sjn6vy")
   } finally {
     termLoading.value = false
   }

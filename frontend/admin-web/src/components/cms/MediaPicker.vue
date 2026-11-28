@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted, watch } from 'vue'
 import { api } from '@/lib/api'
 
@@ -42,7 +44,7 @@ async function load() {
     })
     media.value = (data.items || []).filter((m: MediaItem) => m.mime.startsWith('image/'))
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载媒体库失败'
+    error.value = e?.response?.data?.detail || t("mediaPicker.加载媒体_1kbf7g")
   } finally {
     loading.value = false
   }
@@ -98,7 +100,7 @@ async function handleFileUpload(e: Event) {
       else selected.value = new Set([item.id])
     }
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '上传失败'
+    error.value = e?.response?.data?.detail || t("knowledgeBase.上传失败_a6dm22")
   } finally {
     uploading.value = false
     if (fileInput.value) fileInput.value.value = ''
@@ -139,7 +141,7 @@ watch(() => props.visible, (v) => {
             v-model="search"
             type="text"
             class="mp-search"
-            placeholder="搜索文件名..."
+            :placeholder="t('mediaPicker.搜索文件_106n2f')"
             @keyup.enter="load"
           />
           <button
@@ -161,8 +163,8 @@ watch(() => props.visible, (v) => {
         </div>
 
         <div v-if="error" class="mp-error">⚠️ {{ error }}</div>
-        <div v-if="loading" class="mp-loading">加载中...</div>
-        <div v-else-if="media.length === 0" class="mp-empty">暂无图片，请上传或搜索其他关键词</div>
+        <div v-if="loading" class="mp-loading">{{ t("announcements.加载中_27k1ha") }}</div>
+        <div v-else-if="media.length === 0" class="mp-empty">{{ t("mediaPicker.暂无图片_1cu0xd") }}</div>
         <div v-else class="mp-grid">
           <div
             v-for="m in media"
@@ -185,9 +187,9 @@ watch(() => props.visible, (v) => {
         <div class="mp-footer">
           <span class="mp-count">已选 {{ selected.size }} 张</span>
           <div class="mp-actions">
-            <button type="button" class="mp-btn cancel" @click="emit('close')">取消</button>
+            <button type="button" class="mp-btn cancel" @click="emit('close')">{{ t("mediaPicker.cancel") }}</button>
             <button type="button" class="mp-btn confirm" :disabled="selected.size === 0" @click="confirm">
-              确定
+              {{ t("mediaPicker.ok") }}
             </button>
           </div>
         </div>

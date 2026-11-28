@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, computed, onMounted } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { api } from '@/lib/api'
@@ -172,17 +174,17 @@ onMounted(loadPages)
     <div v-if="!editorOpen">
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-2">
-          <h1 class="text-2xl font-semibold tracking-tight">🧩 页面构建器</h1>
-          <span class="text-sm text-ink-400">M3·P2 · 可视化拖拽</span>
+          <h1 class="text-2xl font-semibold tracking-tight">{{ t("builderPages.text_1u620l") }}</h1>
+          <span class="text-sm text-ink-400">{{ t("builderPages.text_1r5h0s") }}</span>
         </div>
-        <button class="btn-primary" @click="openCreate">新建页面</button>
+        <button class="btn-primary" @click="openCreate">{{ t("builderPages.新建页面_d8dn4n") }}</button>
       </div>
 
       <div class="card overflow-hidden">
         <table class="w-full text-sm">
           <thead>
             <tr class="text-left text-ink-400 border-b">
-              <th class="p-3">页面</th><th class="p-3">Key</th><th class="p-3">区块数</th><th class="p-3">状态</th><th class="p-3 text-right">操作</th>
+              <th class="p-3">{{ t("builderPages.页面_qrgt") }}</th><th class="p-3">Key</th><th class="p-3">{{ t("builderPages.区块数_cm9ir") }}</th><th class="p-3">{{ t("builderPages.status") }}</th><th class="p-3 text-right">{{ t("builderPages.actions") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -194,13 +196,13 @@ onMounted(loadPages)
                 <span :class="p.status === 'published' ? 'text-green-600' : 'text-ink-400'">{{ p.status === 'published' ? '已发布' : '草稿' }}</span>
               </td>
               <td class="p-3 text-right space-x-2 whitespace-nowrap">
-                <a v-if="p.status === 'published'" :href="`/api/v1/public/pages/${p.key}/render`" target="_blank" class="btn-ghost text-sm">预览</a>
-                <button v-if="p.status !== 'published'" class="btn-ghost text-sm text-green-600" @click="publish(p)">发布</button>
-                <button class="btn-ghost text-sm" @click="openEdit(p)">编辑</button>
-                <button class="btn-ghost text-sm text-red-600" @click="remove(p)">删除</button>
+                <a v-if="p.status === 'published'" :href="`/api/v1/public/pages/${p.key}/render`" target="_blank" class="btn-ghost text-sm">{{ t("builderPages.预览_qp50") }}</a>
+                <button v-if="p.status !== 'published'" class="btn-ghost text-sm text-green-600" @click="publish(p)">{{ t("builderPages.publish") }}</button>
+                <button class="btn-ghost text-sm" @click="openEdit(p)">{{ t("builderPages.edit") }}</button>
+                <button class="btn-ghost text-sm text-red-600" @click="remove(p)">{{ t("builderPages.delete") }}</button>
               </td>
             </tr>
-            <tr v-if="!pages.length"><td colspan="5" class="p-6 text-center text-ink-400">暂无页面</td></tr>
+            <tr v-if="!pages.length"><td colspan="5" class="p-6 text-center text-ink-400">{{ t("builderPages.暂无页面_dd43vv") }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -210,21 +212,21 @@ onMounted(loadPages)
     <div v-else class="editor-modal">
       <div class="editor-head">
         <div class="flex items-center gap-3">
-          <button class="btn-ghost text-sm" @click="editorOpen = false">← 返回</button>
+          <button class="btn-ghost text-sm" @click="editorOpen = false">{{ t("entryEdit.text_1aztzu") }}</button>
           <div>
             <input v-if="!editing" v-model="formKey" class="input input-sm w-32 font-mono" placeholder="key" />
-            <input v-model="formTitle" class="input input-sm w-56" placeholder="页面标题" />
+            <input v-model="formTitle" class="input input-sm w-56" :placeholder="t('builderPages.页面标题_juxqri')" />
           </div>
           <span class="text-xs text-ink-400">{{ editing ? '编辑：' + editing.key : '新建页面' }}</span>
         </div>
-        <button class="btn-primary" @click="save">💾 保存</button>
+        <button class="btn-primary" @click="save">{{ t("builderPages.text_kyvypm") }}</button>
       </div>
 
       <div class="editor-body">
         <!-- 左：组件库 -->
         <aside class="panel palette">
-          <div class="panel-title">组件库</div>
-          <p class="panel-hint">拖到画布，或点击添加</p>
+          <div class="panel-title">{{ t("builderPages.组件库_iydr5") }}</div>
+          <p class="panel-hint">{{ t("builderPages.拖到画布_1qegmu") }}</p>
           <VueDraggable
             :model-value="PALETTE"
             :group="{ name: 'builder', pull: 'clone', put: false }"
@@ -242,7 +244,7 @@ onMounted(loadPages)
         <!-- 中：画布 -->
         <main class="panel canvas" @click.self="selectedId = null">
           <div class="panel-title">
-            画布
+            {{ t("builderPages.画布_kgfc") }}
             <span class="text-xs text-ink-400">（{{ blocks.length }} 个区块）</span>
           </div>
           <VueDraggable
@@ -261,72 +263,72 @@ onMounted(loadPages)
               @click="selectBlock(b.__id)"
             >
               <div class="block-bar">
-                <span class="drag-handle" title="拖拽排序">⠿</span>
+                <span class="drag-handle" :title="t('builderPages.拖拽排序_cvrd5w')">⠿</span>
                 <span class="block-type">{{ BLOCK_LABEL[b.type] }}</span>
                 <span class="block-actions">
-                  <button class="mini" @click.stop="duplicateBlock(b.__id)">复制</button>
-                  <button class="mini danger" @click.stop="removeBlock(b.__id)">删除</button>
+                  <button class="mini" @click.stop="duplicateBlock(b.__id)">{{ t("builderPages.copy") }}</button>
+                  <button class="mini danger" @click.stop="removeBlock(b.__id)">{{ t("builderPages.delete") }}</button>
                 </span>
               </div>
               <div class="block-preview" v-html="previewHtml(b)"></div>
             </div>
           </VueDraggable>
           <div v-if="!blocks.length" class="canvas-empty">
-            从左侧拖入或点击组件，开始搭建页面
+            {{ t("builderPages.从左侧拖_1bdayd") }}
           </div>
         </main>
 
         <!-- 右：属性面板 -->
         <aside class="panel prop">
-          <div class="panel-title">属性</div>
+          <div class="panel-title">{{ t("builderPages.属性_g8ll") }}</div>
           <div v-if="selected" class="prop-form">
             <div class="prop-head">编辑 · {{ BLOCK_LABEL[selected.type] }}</div>
 
             <template v-if="selected.type === 'hero'">
-              <label class="field-label">主标题</label>
+              <label class="field-label">{{ t("builderPages.主标题_bz1f0") }}</label>
               <input v-model="selected.data.title" class="input" />
-              <label class="field-label">副标题</label>
+              <label class="field-label">{{ t("builderPages.副标题_cl7a8") }}</label>
               <input v-model="selected.data.subtitle" class="input" />
             </template>
 
             <template v-else-if="selected.type === 'heading'">
-              <label class="field-label">标题文字</label>
+              <label class="field-label">{{ t("builderPages.标题文字_dr6xup") }}</label>
               <input v-model="selected.data.text" class="input" />
-              <label class="field-label">级别</label>
+              <label class="field-label">{{ t("builderPages.级别_lzs4") }}</label>
               <select v-model.number="selected.data.level" class="input">
                 <option v-for="n in 6" :key="n" :value="n">H{{ n }}</option>
               </select>
             </template>
 
             <template v-else-if="selected.type === 'text'">
-              <label class="field-label">正文</label>
+              <label class="field-label">{{ t("builderPages.正文_itms") }}</label>
               <textarea v-model="selected.data.text" rows="6" class="input"></textarea>
             </template>
 
             <template v-else-if="selected.type === 'image'">
-              <label class="field-label">图片地址 (src)</label>
+              <label class="field-label">{{ t("builderPages.图片地址_nznuue") }}</label>
               <input v-model="selected.data.src" class="input" placeholder="https://..." />
-              <label class="field-label">替代文本 (alt)</label>
+              <label class="field-label">{{ t("builderPages.替代文本_yacv1t") }}</label>
               <input v-model="selected.data.alt" class="input" />
             </template>
 
             <template v-else-if="selected.type === 'list'">
-              <label class="field-label">列表项</label>
+              <label class="field-label">{{ t("builderPages.列表项_cowa0") }}</label>
               <div v-for="(it, i) in selected.data.items" :key="i" class="flex gap-2 mb-2">
                 <input v-model="selected.data.items[i]" class="input" />
                 <button class="mini danger" @click="selected.data.items.splice(i, 1)">×</button>
               </div>
-              <button class="btn-ghost text-sm" @click="selected.data.items.push('新条目')">+ 添加条目</button>
+              <button class="btn-ghost text-sm" @click="selected.data.items.push('新条目')">{{ t("builderPages.text_z2iqmf") }}</button>
             </template>
 
             <template v-else-if="selected.type === 'html'">
-              <label class="field-label">自定义 HTML</label>
+              <label class="field-label">{{ t("builderPages.自定义_1c4nwu") }}</label>
               <textarea v-model="selected.data.html" rows="8" class="input font-mono text-xs"></textarea>
             </template>
 
-            <button class="btn-ghost text-red-600 text-sm mt-4" @click="removeBlock(selected.__id)">删除此区块</button>
+            <button class="btn-ghost text-red-600 text-sm mt-4" @click="removeBlock(selected.__id)">{{ t("builderPages.删除此区_1keeei") }}</button>
           </div>
-          <div v-else class="prop-empty">在画布中点击一个区块以编辑属性</div>
+          <div v-else class="prop-empty">{{ t("builderPages.在画布中_148rna") }}</div>
         </aside>
       </div>
     </div>

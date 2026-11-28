@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 系统 → 登录方式
  *
@@ -68,7 +70,7 @@ async function load() {
       secrets.value[p.key] = ''
     }
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '加载失败')
+    alert(e?.response?.data?.detail || t("dashboard.loadFailed"))
   } finally {
     loading.value = false
   }
@@ -85,7 +87,7 @@ async function saveSettings() {
     await load()
     alert('已保存')
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '保存失败')
+    alert(e?.response?.data?.detail || t("aiMemory.saveFailed"))
   } finally {
     saving.value = ''
   }
@@ -106,7 +108,7 @@ async function saveProvider(p: ProviderItem) {
     secrets.value[p.key] = ''
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '保存失败')
+    alert(e?.response?.data?.detail || t("aiMemory.saveFailed"))
   } finally {
     saving.value = ''
   }
@@ -134,35 +136,35 @@ onMounted(load)
   <div>
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-2">
-        <h1 class="text-2xl font-semibold tracking-tight">🔐 登录方式</h1>
-        <span class="text-sm text-ink-400">第三方登录 · 可插拔渠道</span>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ t("systemSso.text_m9ec3h") }}</h1>
+        <span class="text-sm text-ink-400">{{ t("systemSso.第三方登_1nhlps") }}</span>
       </div>
-      <button class="btn-ghost text-sm" :disabled="loading" @click="load">刷新</button>
+      <button class="btn-ghost text-sm" :disabled="loading" @click="load">{{ t("systemSso.刷新_ejix") }}</button>
     </div>
 
     <!-- 回调域名：五个渠道共用一套拼装规则 -->
     <div class="card p-5 mb-5">
       <div class="flex items-start justify-between mb-4">
         <div>
-          <h2 class="font-medium">回调域名</h2>
+          <h2 class="font-medium">{{ t("systemSso.回调域名_bjd703") }}</h2>
           <p class="text-sm text-ink-400 mt-1">
-            填一次即可，各渠道的回调地址按
+            {{ t("systemSso.填一次即_mumtxf") }}
             <code class="text-xs bg-ink-50 px-1 rounded">{{ baseUrl }}/api/v1/public/sso/{渠道}/callback</code>
-            自动生成。微信和抖音强制 HTTPS 且需备案。
+            {{ t("systemSso.自动生成_1k6bk3") }}
           </p>
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <label class="block">
-          <span class="text-xs text-ink-400">后端域名（回调基址）</span>
+          <span class="text-xs text-ink-400">{{ t("systemSso.后端域名_1wj08d") }}</span>
           <input v-model="baseUrl" class="input mt-1" placeholder="https://www.example.com" />
         </label>
         <label class="block">
-          <span class="text-xs text-ink-400">前台站点地址</span>
+          <span class="text-xs text-ink-400">{{ t("systemSso.前台站点_kap0ib") }}</span>
           <input v-model="portalFrontend" class="input mt-1" placeholder="https://www.example.com" />
         </label>
         <label class="block">
-          <span class="text-xs text-ink-400">后台站点地址</span>
+          <span class="text-xs text-ink-400">{{ t("systemSso.后台站点_jsl5ma") }}</span>
           <input v-model="adminFrontend" class="input mt-1" placeholder="https://admin.example.com" />
         </label>
       </div>
@@ -196,11 +198,11 @@ onMounted(load)
                 <span
                   v-if="p.configured"
                   class="text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-700"
-                >已配置</span>
+                >{{ t("systemSso.已配置_egsab") }}</span>
                 <span
                   v-else
                   class="text-[11px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-400"
-                >未配置</span>
+                >{{ t("systemSso.未配置_fte97") }}</span>
                 <span
                   v-if="p.supports_pkce"
                   class="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700"
@@ -211,14 +213,14 @@ onMounted(load)
           </div>
           <label class="flex items-center gap-2 shrink-0 cursor-pointer">
             <input v-model="p.enabled" type="checkbox" class="w-4 h-4" />
-            <span class="text-sm">启用</span>
+            <span class="text-sm">{{ t("systemSso.enable") }}</span>
           </label>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
           <label class="block">
             <span class="text-xs text-ink-400">{{ p.key === 'douyin' ? 'Client Key' : 'AppID / Client ID' }}</span>
-            <input v-model="p.client_id" class="input mt-1 font-mono text-xs" placeholder="填入开放平台的应用 ID" />
+            <input v-model="p.client_id" class="input mt-1 font-mono text-xs" :placeholder="t('systemSso.填入开放_1js71l')" />
           </label>
           <label class="block">
             <span class="text-xs text-ink-400">
@@ -247,7 +249,7 @@ onMounted(load)
             </select>
             <label v-else-if="f.type === 'checkbox'" class="flex items-center gap-2 mt-2">
               <input v-model="p.extra[f.key]" type="checkbox" class="w-4 h-4" />
-              <span class="text-sm text-ink-500">启用</span>
+              <span class="text-sm text-ink-500">{{ t("systemSso.enable") }}</span>
             </label>
             <input v-else v-model="p.extra[f.key]" class="input mt-1" />
             <span v-if="f.hint" class="text-[11px] text-ink-300 block mt-1">{{ f.hint }}</span>
@@ -256,7 +258,7 @@ onMounted(load)
 
         <!-- 开放端 -->
         <div class="mt-4 flex items-center gap-4 flex-wrap">
-          <span class="text-xs text-ink-400">开放端</span>
+          <span class="text-xs text-ink-400">{{ t("systemSso.开放端_eettd") }}</span>
           <label class="flex items-center gap-1.5 text-sm">
             <input
               type="checkbox"
@@ -264,7 +266,7 @@ onMounted(load)
               :checked="p.realms.includes('portal')"
               @change="toggleRealm(p, 'portal')"
             />
-            前台（客户）
+            {{ t("systemSso.前台_10vvmv") }}
           </label>
           <label
             class="flex items-center gap-1.5 text-sm"
@@ -277,16 +279,16 @@ onMounted(load)
               :checked="p.realms.includes('admin')"
               @change="toggleRealm(p, 'admin')"
             />
-            后台（管理账号）
-            <span v-if="!p.admin_allowed" class="text-[11px] text-ink-300">该渠道仅限前台</span>
+            {{ t("systemSso.后台_197y19") }}
+            <span v-if="!p.admin_allowed" class="text-[11px] text-ink-300">{{ t("systemSso.该渠道仅_obhqx2") }}</span>
           </label>
         </div>
 
         <!-- 回调地址 -->
         <div class="mt-3 flex items-center gap-2 flex-wrap">
-          <span class="text-xs text-ink-400 shrink-0">回调地址</span>
+          <span class="text-xs text-ink-400 shrink-0">{{ t("systemSso.回调地址_bjd3g5") }}</span>
           <code class="text-xs font-mono bg-ink-50 px-2 py-1 rounded truncate flex-1 min-w-0">{{ p.callback_url }}</code>
-          <button class="btn-ghost text-xs shrink-0" @click="copy(p.callback_url)">复制</button>
+          <button class="btn-ghost text-xs shrink-0" @click="copy(p.callback_url)">{{ t("systemSso.copy") }}</button>
         </div>
 
         <div class="mt-4 flex justify-end">
@@ -303,40 +305,40 @@ onMounted(load)
 
     <!-- 配置指引 -->
     <div class="card p-5 mt-5">
-      <h2 class="font-medium mb-3">在各平台要填什么</h2>
+      <h2 class="font-medium mb-3">{{ t("systemSso.在各平台_bwrmff") }}</h2>
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-ink-400 border-b">
-            <th class="p-2">渠道</th>
-            <th class="p-2">去哪个后台建应用</th>
-            <th class="p-2">回调地址填哪里</th>
+            <th class="p-2">{{ t("systemSso.渠道_jiur") }}</th>
+            <th class="p-2">{{ t("systemSso.去哪个后_1vbynf") }}</th>
+            <th class="p-2">{{ t("systemSso.回调地址_6vgirc") }}</th>
           </tr>
         </thead>
         <tbody class="text-ink-600">
           <tr class="border-b last:border-0">
-            <td class="p-2">微信</td>
-            <td class="p-2">微信开放平台 → 网站应用（需企业认证 300元/年）</td>
-            <td class="p-2">授权回调域填域名，不带路径</td>
+            <td class="p-2">{{ t("systemSso.微信_gpo3") }}</td>
+            <td class="p-2">{{ t("systemSso.微信开放_1x0odj") }}</td>
+            <td class="p-2">{{ t("systemSso.授权回调_ksb8g") }}</td>
           </tr>
           <tr class="border-b last:border-0">
-            <td class="p-2">抖音</td>
-            <td class="p-2">抖音开放平台 → 网站应用（需企业主体 + 网站备案）</td>
-            <td class="p-2">填完整回调地址</td>
+            <td class="p-2">{{ t("systemSso.抖音_hlp9") }}</td>
+            <td class="p-2">{{ t("systemSso.抖音开放_1bwzyh") }}</td>
+            <td class="p-2">{{ t("systemSso.填完整回_fgshu0") }}</td>
           </tr>
           <tr class="border-b last:border-0">
-            <td class="p-2">飞书</td>
-            <td class="p-2">飞书开放平台 → 企业自建应用</td>
-            <td class="p-2">重定向 URL 填完整地址</td>
+            <td class="p-2">{{ t("systemSso.飞书_qfk8") }}</td>
+            <td class="p-2">{{ t("systemSso.飞书开放_1kuwsu") }}</td>
+            <td class="p-2">{{ t("systemSso.重定向_1sfc5f") }}</td>
           </tr>
           <tr class="border-b last:border-0">
             <td class="p-2">Google</td>
-            <td class="p-2">Google Cloud Console → OAuth 客户端 ID</td>
-            <td class="p-2">已获授权的重定向 URI 填完整地址</td>
+            <td class="p-2">{{ t("systemSso.text_1qjfyc") }}</td>
+            <td class="p-2">{{ t("systemSso.已获授权_u27nzj") }}</td>
           </tr>
           <tr>
             <td class="p-2">GitHub</td>
             <td class="p-2">GitHub → Settings → Developer settings → OAuth Apps</td>
-            <td class="p-2">Authorization callback URL 填完整地址</td>
+            <td class="p-2">{{ t("systemSso.text_15xhbh") }}</td>
           </tr>
         </tbody>
       </table>

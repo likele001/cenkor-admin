@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
 
@@ -68,7 +70,7 @@ function fmt(ts: string | null) {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 function eventLabel(key: string) {
-  if (key === 'webhook.test') return '测试投递'
+  if (key === 'webhook.test') return t("webhooks.测试投递_ed8613")
   return EVENTS.value.find((e) => e.key === key)?.label || ''
 }
 
@@ -84,7 +86,7 @@ async function load() {
   try {
     const { data } = await api.get('/api/v1/system/webhooks')
     items.value = data.items || []
-  } catch (e: any) { alert(e?.response?.data?.detail || '加载失败') } finally { loading.value = false }
+  } catch (e: any) { alert(e?.response?.data?.detail || t("dashboard.loadFailed")) } finally { loading.value = false }
 }
 
 async function loadStats() {
@@ -105,7 +107,7 @@ async function loadLogs() {
     logs.value = data.items || []
     total.value = data.total || 0
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '加载投递日志失败')
+    alert(e?.response?.data?.detail || t("webhooks.加载投递_1mrhhb"))
   } finally { logsLoading.value = false }
 }
 
@@ -130,14 +132,14 @@ async function save() {
     else await api.post('/api/v1/system/webhooks', body)
     showModal.value = false
     await load()
-  } catch (e: any) { alert(e?.response?.data?.detail || '保存失败') }
+  } catch (e: any) { alert(e?.response?.data?.detail || t("aiMemory.saveFailed")) }
 }
 async function remove(w: Webhook) {
-  if (!window.confirm('确认删除该 Webhook？' + '\n投递日志会保留（id 置空），但不会再投递。')) return
+  if (!window.confirm('确认删除该 Webhook？' + t("webhooks.text_1fpxbd"))) return
   try {
     await api.delete(`/api/v1/system/webhooks/${w.id}`)
     await load()
-  } catch (e: any) { alert(e?.response?.data?.detail || '删除失败') }
+  } catch (e: any) { alert(e?.response?.data?.detail || t("aiMemory.删除失败_azdahk")) }
 }
 function toggleEvent(ev: string) {
   const i = form.value.events.indexOf(ev)
@@ -156,7 +158,7 @@ async function sendTest(w: Webhook) {
       alert(`测试投递：${st}${d.http_status ? `（HTTP ${d.http_status}）` : ''}${d.error ? `\n${d.error}` : ''}`)
     }
     await Promise.all([load(), loadStats(), loadLogs()])
-  } catch (e: any) { alert(e?.response?.data?.detail || '测试发送失败') }
+  } catch (e: any) { alert(e?.response?.data?.detail || t("webhooks.测试发送_p8kaq6")) }
 }
 
 async function openDetail(d: Delivery) {
@@ -164,7 +166,7 @@ async function openDetail(d: Delivery) {
     const { data } = await api.get(`/api/v1/system/webhook-deliveries/${d.id}`)
     detail.value = data
     detailOpen.value = true
-  } catch (e: any) { alert(e?.response?.data?.detail || '读取详情失败') }
+  } catch (e: any) { alert(e?.response?.data?.detail || t("webhooks.读取详情_1g9s1w")) }
 }
 
 async function replay(d: Delivery) {
@@ -174,7 +176,7 @@ async function replay(d: Delivery) {
     const st = data?.delivery?.status
     alert(`重放结果：${STATUS_LABEL[st] || st}${data?.delivery?.error ? `\n${data.delivery.error}` : ''}`)
     await Promise.all([loadStats(), loadLogs(), load()])
-  } catch (e: any) { alert(e?.response?.data?.detail || '重放失败') } finally { replaying.value = null }
+  } catch (e: any) { alert(e?.response?.data?.detail || t("webhooks.重放失败_itapyd")) } finally { replaying.value = null }
 }
 
 watch([fStatus, fEvent, fWebhook], () => { page.value = 1; loadLogs() })
@@ -193,31 +195,31 @@ onMounted(async () => {
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-2">
         <h1 class="text-2xl font-semibold tracking-tight">⚡ Webhook → Agent</h1>
-        <span class="text-sm text-ink-400">发布即触发下游</span>
+        <span class="text-sm text-ink-400">{{ t("webhooks.发布即触_752uzd") }}</span>
       </div>
-      <button class="btn-primary" @click="openCreate">新增订阅</button>
+      <button class="btn-primary" @click="openCreate">{{ t("webhooks.新增订阅_d7dx5d") }}</button>
     </div>
 
     <!-- 24h 概览 -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
       <div class="card p-4">
-        <div class="text-xs text-ink-400">近 24h 投递</div>
+        <div class="text-xs text-ink-400">{{ t("webhooks.近_12ve6h") }}</div>
         <div class="text-2xl font-semibold mt-1">{{ stats?.total ?? '—' }}</div>
       </div>
       <div class="card p-4">
-        <div class="text-xs text-ink-400">已送达</div>
+        <div class="text-xs text-ink-400">{{ t("webhooks.已送达_egnkf") }}</div>
         <div class="text-2xl font-semibold mt-1 text-green-600">{{ stats?.by_status?.success ?? 0 }}</div>
       </div>
       <div class="card p-4">
-        <div class="text-xs text-ink-400">失败</div>
+        <div class="text-xs text-ink-400">{{ t("webhooks.failed") }}</div>
         <div class="text-2xl font-semibold mt-1 text-red-600">{{ stats?.by_status?.failed ?? 0 }}</div>
       </div>
       <div class="card p-4">
-        <div class="text-xs text-ink-400">待重试</div>
+        <div class="text-xs text-ink-400">{{ t("webhooks.待重试_ep8ml") }}</div>
         <div class="text-2xl font-semibold mt-1 text-amber-600">{{ stats?.by_status?.pending ?? 0 }}</div>
       </div>
       <div class="card p-4">
-        <div class="text-xs text-ink-400">成功率</div>
+        <div class="text-xs text-ink-400">{{ t("webhooks.成功率_erro8") }}</div>
         <div class="text-2xl font-semibold mt-1">
           {{ stats?.success_rate == null ? '—' : (stats.success_rate * 100).toFixed(1) + '%' }}
         </div>
@@ -230,20 +232,20 @@ onMounted(async () => {
         @click="tab = 'subs'">订阅（{{ items.length }}）</button>
       <button class="px-4 py-2 text-sm -mb-px border-b-2"
         :class="tab === 'logs' ? 'border-ink-900 text-ink-900 font-medium' : 'border-transparent text-ink-400'"
-        @click="tab = 'logs'">投递日志</button>
+        @click="tab = 'logs'">{{ t("webhooks.投递日志_d17zan") }}</button>
     </div>
 
     <!-- 订阅 -->
     <div v-if="tab === 'subs'" class="card overflow-hidden">
-      <div v-if="loading" class="text-ink-500 p-6">加载中…</div>
+      <div v-if="loading" class="text-ink-500 p-6">{{ t("apiKeys.加载中_b0k5km") }}</div>
       <table v-else class="w-full text-sm">
         <thead>
           <tr class="text-left text-ink-400 border-b">
             <th class="p-3">URL</th>
-            <th class="p-3">事件</th>
-            <th class="p-3">状态</th>
-            <th class="p-3">最近投递</th>
-            <th class="p-3 text-right">操作</th>
+            <th class="p-3">{{ t("webhooks.事件_dsjv") }}</th>
+            <th class="p-3">{{ t("webhooks.status") }}</th>
+            <th class="p-3">{{ t("webhooks.最近投递_dl8ii6") }}</th>
+            <th class="p-3 text-right">{{ t("webhooks.actions") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -251,7 +253,7 @@ onMounted(async () => {
             <td class="p-3">
               <div class="font-mono text-xs truncate max-w-xs">{{ w.url }}</div>
               <div v-if="w.description" class="text-xs text-ink-400">{{ w.description }}</div>
-              <div v-if="w.secret" class="text-xs text-ink-300">已配置签名密钥</div>
+              <div v-if="w.secret" class="text-xs text-ink-300">{{ t("webhooks.已配置签_1mxh2w") }}</div>
             </td>
             <td class="p-3">
               <span v-for="ev in w.events" :key="ev"
@@ -267,17 +269,17 @@ onMounted(async () => {
                 </span>
                 <span class="text-ink-400 ml-1">{{ fmt(w.last_delivery.created_at) }}</span>
               </template>
-              <span v-else class="text-ink-300">从未投递</span>
+              <span v-else class="text-ink-300">{{ t("webhooks.从未投递_adf4u1") }}</span>
             </td>
             <td class="p-3 text-right space-x-2 whitespace-nowrap">
-              <button class="btn-ghost text-sm" :disabled="!w.enabled" @click="sendTest(w)">测试</button>
-              <button class="btn-ghost text-sm" @click="openEdit(w)">编辑</button>
-              <button class="btn-ghost text-sm text-red-600" @click="remove(w)">删除</button>
+              <button class="btn-ghost text-sm" :disabled="!w.enabled" @click="sendTest(w)">{{ t("webhooks.测试_jcve") }}</button>
+              <button class="btn-ghost text-sm" @click="openEdit(w)">{{ t("webhooks.edit") }}</button>
+              <button class="btn-ghost text-sm text-red-600" @click="remove(w)">{{ t("webhooks.delete") }}</button>
             </td>
           </tr>
           <tr v-if="!items.length">
             <td colspan="5" class="p-6 text-center text-ink-400">
-              暂无订阅 —— 点右上角新增，填下游 Agent 的接收地址
+              {{ t("webhooks.暂无订阅_a8sn6v") }}
             </td>
           </tr>
         </tbody>
@@ -288,37 +290,37 @@ onMounted(async () => {
     <div v-else>
       <div class="flex flex-wrap items-center gap-2 mb-3">
         <select v-model="fWebhook" class="input w-48">
-          <option value="">全部订阅</option>
+          <option value="">{{ t("webhooks.全部订阅_avjig3") }}</option>
           <option v-for="w in items" :key="w.id" :value="w.id">#{{ w.id }} {{ w.url.slice(0, 28) }}</option>
         </select>
         <select v-model="fEvent" class="input w-52">
-          <option value="">全部事件</option>
+          <option value="">{{ t("webhooks.全部事件_av8qbv") }}</option>
           <option v-for="e in EVENTS" :key="e.key" :value="e.key">{{ e.key }}</option>
         </select>
         <select v-model="fStatus" class="input w-36">
-          <option value="">全部状态</option>
-          <option value="success">已送达</option>
-          <option value="pending">待重试</option>
-          <option value="failed">失败</option>
-          <option value="dropped">已丢弃</option>
+          <option value="">{{ t("entryList.全部状态_avez63") }}</option>
+          <option value="success">{{ t("webhooks.已送达_egnkf") }}</option>
+          <option value="pending">{{ t("webhooks.待重试_ep8ml") }}</option>
+          <option value="failed">{{ t("webhooks.failed") }}</option>
+          <option value="dropped">{{ t("webhooks.已丢弃_e56kz") }}</option>
         </select>
-        <button class="btn-ghost text-sm" @click="loadLogs">刷新</button>
+        <button class="btn-ghost text-sm" @click="loadLogs">{{ t("webhooks.刷新_ejix") }}</button>
         <span class="text-xs text-ink-400 ml-auto">共 {{ total }} 条</span>
       </div>
 
       <div class="card overflow-hidden">
-        <div v-if="logsLoading" class="text-ink-500 p-6">加载中…</div>
+        <div v-if="logsLoading" class="text-ink-500 p-6">{{ t("apiKeys.加载中_b0k5km") }}</div>
         <table v-else class="w-full text-sm">
           <thead>
             <tr class="text-left text-ink-400 border-b">
-              <th class="p-3">时间</th>
-              <th class="p-3">事件</th>
-              <th class="p-3">状态</th>
-              <th class="p-3">尝试</th>
+              <th class="p-3">{{ t("webhooks.time") }}</th>
+              <th class="p-3">{{ t("webhooks.事件_dsjv") }}</th>
+              <th class="p-3">{{ t("webhooks.status") }}</th>
+              <th class="p-3">{{ t("webhooks.尝试_gfo8") }}</th>
               <th class="p-3">HTTP</th>
-              <th class="p-3">耗时</th>
-              <th class="p-3">说明</th>
-              <th class="p-3 text-right">操作</th>
+              <th class="p-3">{{ t("webhooks.耗时_mchr") }}</th>
+              <th class="p-3">{{ t("webhooks.说明_od5m") }}</th>
+              <th class="p-3 text-right">{{ t("webhooks.actions") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -342,23 +344,23 @@ onMounted(async () => {
                 {{ d.error || (d.next_retry_at ? '下次重试 ' + fmt(d.next_retry_at) : '') }}
               </td>
               <td class="p-3 text-right space-x-2 whitespace-nowrap">
-                <button class="btn-ghost text-sm" @click="openDetail(d)">详情</button>
+                <button class="btn-ghost text-sm" @click="openDetail(d)">{{ t("webhooks.detail") }}</button>
                 <button class="btn-ghost text-sm" :disabled="replaying === d.id" @click="replay(d)">
                   {{ replaying === d.id ? '投递中…' : '重放' }}
                 </button>
               </td>
             </tr>
             <tr v-if="!logs.length">
-              <td colspan="8" class="p-6 text-center text-ink-400">暂无投递记录</td>
+              <td colspan="8" class="p-6 text-center text-ink-400">{{ t("webhooks.暂无投递_1epd0y") }}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
       <div class="flex items-center justify-end gap-2 mt-3 text-sm">
-        <button class="btn-ghost" :disabled="page <= 1" @click="page--">上一页</button>
+        <button class="btn-ghost" :disabled="page <= 1" @click="page--">{{ t("webhooks.上一页_btlof") }}</button>
         <span class="text-ink-500">{{ page }} / {{ pageCount }}</span>
-        <button class="btn-ghost" :disabled="page >= pageCount" @click="page++">下一页</button>
+        <button class="btn-ghost" :disabled="page >= pageCount" @click="page++">{{ t("webhooks.下一页_btmf4") }}</button>
       </div>
     </div>
 
@@ -368,11 +370,11 @@ onMounted(async () => {
         <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑订阅' : '新增订阅' }}</h2>
         <div class="space-y-3">
           <div>
-            <label class="block text-sm font-medium mb-1">回调 URL</label>
+            <label class="block text-sm font-medium mb-1">{{ t("webhooks.回调_1us2um") }}</label>
             <input v-model="form.url" class="input" placeholder="https://agent.example.com/hooks/cenkor" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">订阅事件</label>
+            <label class="block text-sm font-medium mb-1">{{ t("webhooks.订阅事件_i8djfy") }}</label>
             <div class="flex flex-col gap-1.5">
               <label v-for="ev in EVENTS" :key="ev.key"
                 class="flex items-start gap-2 px-2 py-1.5 rounded text-xs cursor-pointer border"
@@ -386,24 +388,24 @@ onMounted(async () => {
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">签名密钥（HMAC-SHA256，可选）</label>
-            <input v-model="form.secret" class="input" placeholder="留空则不签名" />
+            <label class="block text-sm font-medium mb-1">{{ t("webhooks.签名密钥_1udhy6") }}</label>
+            <input v-model="form.secret" class="input" :placeholder="t('webhooks.留空则不_9sr6lg')" />
             <p class="text-xs text-ink-400 mt-1">
-              下游校验：<code>sha256=HMAC(secret, "{timestamp}\n{body}")</code>，配合
-              <code>X-Cenkor-Timestamp</code> 防重放。
+              {{ t("webhooks.下游校验_zdao1u") }}<code>sha256=HMAC(secret, "{timestamp}\n{body}")</code>{{ t("webhooks.text_12215z") }}
+              <code>X-Cenkor-Timestamp</code> {{ t("webhooks.防重放_jjtk0v") }}
             </p>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">描述</label>
-            <input v-model="form.description" class="input" placeholder="例：小红书分发 Agent" />
+            <label class="block text-sm font-medium mb-1">{{ t("webhooks.description") }}</label>
+            <input v-model="form.description" class="input" :placeholder="t('webhooks.例_1plfh9')" />
           </div>
           <label class="flex items-center gap-2">
-            <input type="checkbox" v-model="form.enabled" /><span class="text-sm">启用</span>
+            <input type="checkbox" v-model="form.enabled" /><span class="text-sm">{{ t("webhooks.enable") }}</span>
           </label>
         </div>
         <div class="flex justify-end gap-2 mt-6">
-          <button class="btn-ghost" @click="showModal = false">取消</button>
-          <button class="btn-primary" @click="save">保存</button>
+          <button class="btn-ghost" @click="showModal = false">{{ t("webhooks.cancel") }}</button>
+          <button class="btn-primary" @click="save">{{ t("webhooks.保存_e32z") }}</button>
         </div>
       </div>
     </div>
@@ -423,17 +425,17 @@ onMounted(async () => {
           </span>
         </div>
         <div class="text-xs space-y-1 mb-3">
-          <div><span class="text-ink-400">目标：</span><span class="font-mono">{{ detail.url }}</span></div>
+          <div><span class="text-ink-400">{{ t("webhooks.目标_hy7hd") }}</span><span class="font-mono">{{ detail.url }}</span></div>
           <div><span class="text-ink-400">Event-Id：</span><span class="font-mono">{{ detail.event_id }}</span></div>
-          <div v-if="detail.error"><span class="text-ink-400">错误：</span><span class="text-red-600">{{ detail.error }}</span></div>
+          <div v-if="detail.error"><span class="text-ink-400">{{ t("webhooks.错误_mje1w") }}</span><span class="text-red-600">{{ detail.error }}</span></div>
           <div v-if="detail.response_snippet">
-            <span class="text-ink-400">响应：</span><span class="font-mono">{{ detail.response_snippet }}</span>
+            <span class="text-ink-400">{{ t("webhooks.响应_cwn0z") }}</span><span class="font-mono">{{ detail.response_snippet }}</span>
           </div>
         </div>
         <div class="text-xs text-ink-400 mb-1">Payload</div>
         <pre class="bg-ink-50 rounded p-3 text-xs overflow-auto max-h-72">{{ JSON.stringify(detail.payload, null, 2) }}</pre>
         <div class="flex justify-end gap-2 mt-4">
-          <button class="btn-ghost" @click="detailOpen = false">关闭</button>
+          <button class="btn-ghost" @click="detailOpen = false">{{ t("webhooks.close") }}</button>
           <button class="btn-primary" :disabled="replaying === detail.id" @click="replay(detail)">
             {{ replaying === detail.id ? '投递中…' : '重放这条' }}
           </button>

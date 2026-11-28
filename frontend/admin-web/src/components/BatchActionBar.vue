@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -39,14 +41,14 @@ const emit = defineEmits<{ 'select-all': [boolean]; 'clear': [] }>()
             class="rounded text-brand-500 focus:ring-brand-500"
             @change="emit('select-all', ($event.target as HTMLInputElement).checked)"
           />
-          <span>全选当前页</span>
+          <span>{{ t("batchActionBar.全选当前_1gqlyc") }}</span>
         </label>
         <button
           type="button"
           class="text-brand-600 hover:text-brand-900 underline-offset-2 hover:underline"
           @click="emit('clear')"
         >
-          取消选择
+          {{ t("entryList.取消选择_b1em0i") }}
         </button>
       </div>
       <div class="flex items-center gap-2">

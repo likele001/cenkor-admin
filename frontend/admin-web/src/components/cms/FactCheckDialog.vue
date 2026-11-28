@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 /**
  * 事实核验弹层（P0-B AI 事实溯源的前端）
  *
@@ -132,7 +134,7 @@ function segments(text: string, facts: string[]): { text: string; hit: boolean }
 
 async function load() {
   if (!props.entryId) {
-    error.value = '内容还没保存，先保存再核验'
+    error.value = t("factCheckDialog.内容还没_151wj6")
     return
   }
   loading.value = true
@@ -144,7 +146,7 @@ async function load() {
     })
     data.value = payload as FactPayload
   } catch (e: any) {
-    error.value = e?.message || '核验失败'
+    error.value = e?.message || t("factCheckDialog.核验失败_dsap9k")
   } finally {
     loading.value = false
   }
@@ -176,7 +178,7 @@ watch(
       <!-- 头部 -->
       <div class="flex items-center justify-between gap-3 px-5 py-3 border-b">
         <div class="flex items-center gap-2">
-          <h3 class="font-medium text-sm">事实核验</h3>
+          <h3 class="font-medium text-sm">{{ t("factCheckDialog.事实核验_aakhdz") }}</h3>
           <span
             v-if="data"
             class="px-2 py-0.5 rounded border text-xs"
@@ -186,7 +188,7 @@ watch(
         </div>
         <div class="flex items-center gap-2 text-xs">
           <button v-if="data || error" class="btn-ghost px-2 py-1" :disabled="loading" @click="load">
-            重新核验
+            {{ t("factCheckDialog.重新核验_itfp5j") }}
           </button>
           <button class="text-ink-400 hover:text-ink-600 text-lg leading-none px-1" @click="close">✕</button>
         </div>
@@ -195,8 +197,8 @@ watch(
       <!-- 加载 / 错误 -->
       <div v-if="loading" class="flex-1 flex items-center justify-center text-xs text-ink-400 p-12 text-center">
         <div>
-          正在核验正文里的具体说法…
-          <div class="text-[11px] mt-1 text-ink-300">逐句交给模型判定，通常需要 20~60 秒</div>
+          {{ t("factCheckDialog.正在核验_1m7iy5") }}
+          <div class="text-[11px] mt-1 text-ink-300">{{ t("factCheckDialog.逐句交给_j7l1d9") }}</div>
         </div>
       </div>
       <div v-else-if="error" class="flex-1 flex items-center justify-center text-xs text-red-600 p-12">
@@ -213,18 +215,18 @@ watch(
                 'text-amber-600': data.summary.level === 'warn',
                 'text-red-600': data.summary.level === 'risk',
               }">{{ ratePercent }}</div>
-              <div class="text-[11px] text-ink-400 mt-1">有依据占比（只算能判定的）</div>
+              <div class="text-[11px] text-ink-400 mt-1">{{ t("factCheckDialog.有依据占_13iu6o") }}</div>
             </div>
             <div class="flex gap-4 text-xs text-ink-600">
-              <div><span class="font-semibold text-ink-800">{{ data.summary.claims }}</span> 处具体说法</div>
-              <div><span class="font-semibold text-emerald-600">{{ data.summary.supported }}</span> 有依据</div>
-              <div><span class="font-semibold text-red-600">{{ data.summary.unsupported }}</span> 查无依据</div>
-              <div><span class="font-semibold text-amber-600">{{ data.summary.uncertain }}</span> 无法确认</div>
+              <div><span class="font-semibold text-ink-800">{{ data.summary.claims }}</span> {{ t("factCheckDialog.处具体说_3iefj5") }}</div>
+              <div><span class="font-semibold text-emerald-600">{{ data.summary.supported }}</span> {{ t("factCheckDialog.有依据_fhe0q") }}</div>
+              <div><span class="font-semibold text-red-600">{{ data.summary.unsupported }}</span> {{ t("factCheckDialog.查无依据_dj23ws") }}</div>
+              <div><span class="font-semibold text-amber-600">{{ data.summary.uncertain }}</span> {{ t("factCheckDialog.无法确认_db3u7f") }}</div>
             </div>
           </div>
           <div class="text-[11px] text-ink-400 mt-2">
             依据来源：{{ sourceLine }}
-            <span v-if="data.summary.truncated" class="text-amber-600 ml-2">（正文超长，仅核验前 12000 字）</span>
+            <span v-if="data.summary.truncated" class="text-amber-600 ml-2">{{ t("factCheckDialog.text_tcm7ex") }}</span>
           </div>
           <div
             v-if="data.degraded && data.degraded_reason"
@@ -256,10 +258,10 @@ watch(
         <div class="flex-1 overflow-y-auto px-5 py-3 space-y-2">
           <div v-if="!shownItems.length" class="text-xs text-ink-400 py-8 text-center">
             <template v-if="!data.summary.claims">
-              正文里没有可核验的数字、日期或专名，属于纯描述内容，无需核验。
+              {{ t("factCheckDialog.正文里没_ixj74n") }}
             </template>
-            <template v-else-if="tab === 'bad'">没有「查无依据」的说法，这篇稿子的具体说法都站得住。</template>
-            <template v-else>没有「无法确认」的句子。</template>
+            <template v-else-if="tab === 'bad'">{{ t("factCheckDialog.没有_1v2wty") }}</template>
+            <template v-else>{{ t("factCheckDialog.没有_f4fwup") }}</template>
           </div>
 
           <div
@@ -284,8 +286,8 @@ watch(
             <div v-if="item.note" class="text-[11px] text-ink-500 pl-1">{{ item.note }}</div>
 
             <div class="flex flex-wrap items-center gap-1 pl-1">
-              <span v-if="item.by === 'rule'" class="text-[10px] text-ink-400">规则比对</span>
-              <span v-else class="text-[10px] text-ink-400">模型判定</span>
+              <span v-if="item.by === 'rule'" class="text-[10px] text-ink-400">{{ t("factCheckDialog.规则比对_hq386y") }}</span>
+              <span v-else class="text-[10px] text-ink-400">{{ t("factCheckDialog.模型判定_dr45q8") }}</span>
               <button
                 v-for="ev in item.evidence"
                 :key="ev.id"
@@ -295,7 +297,7 @@ watch(
               >
                 [{{ ev.id }}] {{ ev.title }}
               </button>
-              <span v-if="!item.evidence.length" class="text-[10px] text-ink-400">未引用任何依据</span>
+              <span v-if="!item.evidence.length" class="text-[10px] text-ink-400">{{ t("factCheckDialog.未引用任_b2du2w") }}</span>
             </div>
           </div>
         </div>

@@ -29,7 +29,7 @@ async function load() {
     const { data } = await api.get('/api/v1/cms/cases', { params: { search: search.value || undefined } })
     cases.value = data.items ?? data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }

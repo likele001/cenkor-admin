@@ -128,7 +128,7 @@ async function submitReview(e: Entry) {
   await loadEntries()
 }
 async function reviewEntry(e: Entry, action: 'approve' | 'reject') {
-  if (action === 'reject' && !window.confirm('驳回后内容将退回草稿，确认？')) return
+  if (action === 'reject' && !window.confirm(t("entryList.驳回后内_1woet4"))) return
   await api.post(`/api/v1/cms/entries/${e.id}/review`, { action })
   await loadEntries()
 }
@@ -168,13 +168,13 @@ function sourceMeta(e: Entry): { text: string; cls: string; title: string } {
   const cf: any = e.custom_fields || {}
   const collect = cf.collect || {}
   if (collect.source_name) {
-    return { text: `采集 · ${collect.source_name}`, cls: 'bg-amber-50 text-amber-700 border border-amber-200', title: collect.source_url || '采集来源' }
+    return { text: `采集 · ${collect.source_name}`, cls: 'bg-amber-50 text-amber-700 border border-amber-200', title: collect.source_url || t("entryList.采集来源_j0ibca") }
   }
   if (e.ai_origin && AI_META[e.ai_origin]) {
-    return { text: AI_META[e.ai_origin].label, cls: AI_META[e.ai_origin].cls, title: 'AI 生成，点击筛选同类' }
+    return { text: AI_META[e.ai_origin].label, cls: AI_META[e.ai_origin].cls, title: t("entryList.text_1j31a0") }
   }
   if (e.ai_origin) {
-    return { text: `AI · ${e.ai_origin}`, cls: 'bg-violet-50 text-violet-700 border border-violet-200', title: 'AI 生成' }
+    return { text: `AI · ${e.ai_origin}`, cls: 'bg-violet-50 text-violet-700 border border-violet-200', title: t("entryList.text_11mcw9") }
   }
   return { text: '人工', cls: 'bg-ink-100 text-ink-500', title: e.author_id ? `作者 ID ${e.author_id}` : '人工创建' }
 }
@@ -205,7 +205,7 @@ async function saveSort(e: Entry, ev: Event) {
     await api.put(`/api/v1/cms/entries/${e.id}`, { sort: v })
     e.sort = v
   } catch (err: any) {
-    alert(err?.response?.data?.detail || '权重保存失败')
+    alert(err?.response?.data?.detail || t("entryList.权重保存_r4m5ax"))
     input.value = String(e.sort)
   }
 }
@@ -229,7 +229,7 @@ async function batchAction(action: 'delete' | 'publish' | 'draft' | 'archive') {
     }
     await loadEntries()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("entryList.操作失败")')
+    alert(e?.response?.data?.detail || t("entryList.操作失败"))
   }
 }
 
@@ -267,7 +267,7 @@ onMounted(async () => {
       </div>
       <div class="flex gap-2">
         <select v-model="selectedCtKey" class="input w-full sm:w-40" @change="onCtChange">
-          <option value="">全部类型</option>
+          <option value="">{{ t("entryList.全部类型_avglbk") }}</option>
           <option v-for="ct in contentTypes" :key="ct.key" :value="ct.key">{{ ct.icon }} {{ ct.name }}</option>
         </select>
         <button class="btn-primary" @click="newEntry">{{ t('entryList.text_y2oa4s') }}</button>
@@ -282,15 +282,15 @@ onMounted(async () => {
         <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
       </select>
       <select v-model="aiFilter" class="input w-full sm:w-32" @change="onStatusChange">
-        <option value="">全部来源</option>
-        <option value="ai">AI 产出</option>
-        <option value="human">人工创建</option>
+        <option value="">{{ t("entryList.全部来源_avd4qz") }}</option>
+        <option value="ai">{{ t("entryList.text_11fq5n") }}</option>
+        <option value="human">{{ t("entryList.人工创建_abmewa") }}</option>
       </select>
       <select v-model="statusFilter" class="input w-full sm:w-32" @change="onStatusChange">
         <option value="">{{ t('portalUsersList.全部状态_avez63') }}</option>
         <option value="draft">{{ t('productEdit.草稿_n02e') }}</option>
-        <option value="pending_review">待审核</option>
-        <option value="approved">已通过</option>
+        <option value="pending_review">{{ t("entryList.待审核_eftvg") }}</option>
+        <option value="approved">{{ t("entryList.已通过_ego67") }}</option>
         <option value="published">{{ t('productEdit.已发布_e656s') }}</option>
         <option value="archived">{{ t('productEdit.已归档_e85oj') }}</option>
       </select>
@@ -322,14 +322,14 @@ onMounted(async () => {
             </th>
             <th class="py-2 px-2 w-12">ID</th>
             <th class="py-2 px-2">{{ t('newsList.标题_ij5d') }}</th>
-            <th class="py-2 px-2">类型</th>
+            <th class="py-2 px-2">{{ t("entryList.type") }}</th>
             <th class="py-2 px-2">{{ t('entryList.分类_emut') }}</th>
             <th class="py-2 px-2">{{ t('usersList.状态_k1e3') }}</th>
-            <th class="py-2 px-2" title="数值越小越靠前">权重</th>
+            <th class="py-2 px-2" :title="t('entryList.数值越小_1ooqwg')">{{ t("entryList.权重_id4a") }}</th>
             <th class="py-2 px-2">{{ t('entryList.浏览_jck9') }}</th>
-            <th class="py-2 px-2">来源</th>
-            <th class="py-2 px-2">关键词</th>
-            <th class="py-2 px-2">发布时间</th>
+            <th class="py-2 px-2">{{ t("entryList.来源_i6yz") }}</th>
+            <th class="py-2 px-2">{{ t("entryList.关键词_cnmdu") }}</th>
+            <th class="py-2 px-2">{{ t("entryList.发布时间_ayuphs") }}</th>
             <th class="py-2 px-2">{{ t('entryList.更新时间_devbay') }}</th>
             <th class="py-2 px-2 w-20">{{ t('usersList.操作_hkxb') }}</th>
           </tr>
@@ -363,7 +363,7 @@ onMounted(async () => {
                 type="number"
                 class="input w-16 px-1.5 py-0.5 text-xs"
                 :value="e.sort"
-                title="权重（越小越靠前），修改即保存"
+                :title="t('entryList.权重_18pvjx')"
                 @change="saveSort(e, $event)"
               />
             </td>
@@ -387,9 +387,9 @@ onMounted(async () => {
             <td class="py-2 px-2 text-ink-500 text-xs whitespace-nowrap">{{ fmtTime(e.updated_at) }}</td>
             <td class="py-2 px-2 whitespace-nowrap">
               <button class="text-blue-600 text-xs" @click="editEntry(e)">{{ t('usersList.编辑_mekb') }}</button>
-              <button v-if="e.status === 'draft' || e.status === 'approved'" class="text-purple-600 text-xs ml-2" @click="submitReview(e)">提交审核</button>
-              <button v-if="e.status === 'pending_review'" class="text-green-600 text-xs ml-2" @click="reviewEntry(e, 'approve')">通过</button>
-              <button v-if="e.status === 'pending_review'" class="text-red-500 text-xs ml-2" @click="reviewEntry(e, 'reject')">驳回</button>
+              <button v-if="e.status === 'draft' || e.status === 'approved'" class="text-purple-600 text-xs ml-2" @click="submitReview(e)">{{ t("entryList.提交审核_cx6emj") }}</button>
+              <button v-if="e.status === 'pending_review'" class="text-green-600 text-xs ml-2" @click="reviewEntry(e, 'approve')">{{ t("entryList.通过_past") }}</button>
+              <button v-if="e.status === 'pending_review'" class="text-red-500 text-xs ml-2" @click="reviewEntry(e, 'reject')">{{ t("entryList.驳回_qqx7") }}</button>
             </td>
           </tr>
         </tbody>
@@ -400,7 +400,7 @@ onMounted(async () => {
     <div v-if="totalPages > 1" class="mt-4 flex items-center gap-2 text-sm">
       <button class="btn-ghost" :disabled="page <= 1" @click="onPageChange(page - 1)">{{ t('portalUsersList.上一页_btlof') }}</button>
       <span>{{ page }} / {{ totalPages }}</span>
-      <button class="btn-ghost" :disabled="page >= totalPages" @click="onPageChange(page + 1)">下一页</button>
+      <button class="btn-ghost" :disabled="page >= totalPages" @click="onPageChange(page + 1)">{{ t("entryList.下一页_btmf4") }}</button>
     </div>
   </div>
 </template>

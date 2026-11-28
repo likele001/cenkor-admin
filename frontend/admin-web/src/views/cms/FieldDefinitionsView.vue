@@ -26,11 +26,11 @@ const FIELD_TYPES = [
   'repeater', 'relation',
 ]
 const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: 't("fieldDefinitions.单行文本")', longtext: 't("fieldDefinitions.多行文本")', richtext: 't("fieldDefinitions.富文本")', markdown: 'Markdown',
-  number: 't("fieldDefinitions.数字")', boolean: 't("fieldDefinitions.布尔")', date: 't("fieldDefinitions.date")', datetime: 't("fieldDefinitions.日期时间")',
-  url: 'URL', email: 'Email', phone: 't("fieldDefinitions.电话")', image: 't("fieldDefinitions.单图")', images: 't("fieldDefinitions.多图")',
-  file: 't("fieldDefinitions.单文件")', files: 't("fieldDefinitions.多文件")', select: 't("fieldDefinitions.单选")', multiselect: 't("fieldDefinitions.多选")',
-  color: 't("tags.颜色_qo9i")', json: 'JSON', repeater: 't("fieldDefinitions.重复子项")', relation: 't("fieldDefinitions.关联")',
+  text: t("fieldDefinitions.单行文本"), longtext: t("fieldDefinitions.多行文本"), richtext: t("fieldDefinitions.富文本"), markdown: 'Markdown',
+  number: t("fieldDefinitions.数字"), boolean: t("fieldDefinitions.布尔"), date: t("fieldDefinitions.date"), datetime: t("fieldDefinitions.日期时间"),
+  url: 'URL', email: 'Email', phone: t("fieldDefinitions.电话"), image: t("fieldDefinitions.单图"), images: t("fieldDefinitions.多图"),
+  file: t("fieldDefinitions.单文件"), files: t("fieldDefinitions.多文件"), select: t("fieldDefinitions.单选"), multiselect: t("fieldDefinitions.多选"),
+  color: t("tags.颜色_qo9i"), json: 'JSON', repeater: t("fieldDefinitions.重复子项"), relation: t("fieldDefinitions.关联"),
 }
 const NEEDS_OPTIONS = new Set(['select', 'multiselect'])
 
@@ -68,7 +68,7 @@ async function load() {
     const { data } = await api.get(`/api/v1/cms/content-types/${ctId.value}`)
     ct.value = data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || 't("caseEdit.loadFailed")'
+    error.value = e?.response?.data?.detail || t("caseEdit.loadFailed")
   } finally {
     loading.value = false
   }
@@ -141,7 +141,7 @@ async function saveField() {
     showFieldModal.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("caseEdit.saveFailed")')
+    alert(e?.response?.data?.detail || t("caseEdit.saveFailed"))
   } finally {
     saving.value = false
   }
@@ -210,7 +210,7 @@ async function deleteField(fd: FieldDef) {
     await api.delete(`/api/v1/cms/field-definitions/${fd.id}`)
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("categories.删除失败")')
+    alert(e?.response?.data?.detail || t("categories.删除失败"))
   }
 }
 
@@ -229,7 +229,7 @@ async function saveGroup() {
     showGroupModal.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("caseEdit.saveFailed")')
+    alert(e?.response?.data?.detail || t("caseEdit.saveFailed"))
   } finally {
     saving.value = false
   }
@@ -241,7 +241,7 @@ async function deleteGroup(fg: FieldGroup) {
     await api.delete(`/api/v1/cms/content-types/${ctId.value}/field-groups/${fg.id}`)
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || 't("categories.删除失败")')
+    alert(e?.response?.data?.detail || t("categories.删除失败"))
   }
 }
 

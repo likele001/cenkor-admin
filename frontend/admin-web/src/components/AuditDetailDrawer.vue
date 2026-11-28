@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, watch } from 'vue'
 import { api } from '@/lib/api'
 
@@ -35,7 +37,7 @@ watch(() => props.auditId, async (id) => {
     const { data } = await api.get(`/api/v1/system/audit/${id}`)
     detail.value = data
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally {
     loading.value = false
   }
@@ -85,33 +87,33 @@ function diffKeys(diff: any): Array<{ key: string; before: any; after: any }> {
           </div>
 
           <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            <div v-if="loading" class="text-ink-400 text-sm">加载中…</div>
+            <div v-if="loading" class="text-ink-400 text-sm">{{ t("auditDetailDrawer.加载中_b0k5km") }}</div>
             <div v-else-if="error" class="text-red-600 text-sm">{{ error }}</div>
             <template v-else-if="detail">
               <section>
-                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">基本信息</h3>
+                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">{{ t("auditDetailDrawer.基本信息_biyzkw") }}</h3>
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                  <div><dt class="text-ink-500">方法</dt><dd class="font-mono">{{ detail.method }}</dd></div>
-                  <div><dt class="text-ink-500">状态</dt><dd>{{ detail.status_code }}</dd></div>
-                  <div class="col-span-2"><dt class="text-ink-500">路径</dt><dd class="font-mono text-xs break-all">{{ detail.path }}</dd></div>
-                  <div><dt class="text-ink-500">用户 ID</dt><dd>{{ detail.user_id ?? '-' }}</dd></div>
-                  <div><dt class="text-ink-500">耗时</dt><dd>{{ detail.duration_ms }}ms</dd></div>
+                  <div><dt class="text-ink-500">{{ t("auditDetailDrawer.方法_hwe4") }}</dt><dd class="font-mono">{{ detail.method }}</dd></div>
+                  <div><dt class="text-ink-500">{{ t("auditDetailDrawer.status") }}</dt><dd>{{ detail.status_code }}</dd></div>
+                  <div class="col-span-2"><dt class="text-ink-500">{{ t("auditDetailDrawer.路径_onzp") }}</dt><dd class="font-mono text-xs break-all">{{ detail.path }}</dd></div>
+                  <div><dt class="text-ink-500">{{ t("auditDetailDrawer.用户_18a491") }}</dt><dd>{{ detail.user_id ?? '-' }}</dd></div>
+                  <div><dt class="text-ink-500">{{ t("auditDetailDrawer.耗时_mchr_2") }}</dt><dd>{{ detail.duration_ms }}ms</dd></div>
                   <div><dt class="text-ink-500">IP</dt><dd class="font-mono text-xs">{{ detail.ip || '-' }}</dd></div>
-                  <div><dt class="text-ink-500">时间</dt><dd class="font-mono text-xs">{{ detail.created_at }}</dd></div>
-                  <div class="col-span-2"><dt class="text-ink-500">请求 ID</dt><dd class="font-mono text-xs break-all">{{ detail.request_id }}</dd></div>
+                  <div><dt class="text-ink-500">{{ t("auditDetailDrawer.time") }}</dt><dd class="font-mono text-xs">{{ detail.created_at }}</dd></div>
+                  <div class="col-span-2"><dt class="text-ink-500">{{ t("auditDetailDrawer.请求_1rp4j0") }}</dt><dd class="font-mono text-xs break-all">{{ detail.request_id }}</dd></div>
                   <div v-if="detail.user_agent" class="col-span-2"><dt class="text-ink-500">UA</dt><dd class="text-xs break-all">{{ detail.user_agent }}</dd></div>
                 </dl>
               </section>
 
               <section v-if="diffKeys(detail.diff).length > 0">
-                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">变更对比</h3>
+                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">{{ t("auditDetailDrawer.变更对比_b08e8n") }}</h3>
                 <div class="border border-ink-200 rounded-lg overflow-hidden">
                   <div class="overflow-x-auto"><table class="w-full text-xs">
                     <thead class="bg-ink-50">
                       <tr class="text-ink-500 text-left">
-                        <th class="px-3 py-2 w-full sm:w-32 font-medium">字段</th>
-                        <th class="px-3 py-2 font-medium">变更前</th>
-                        <th class="px-3 py-2 font-medium">变更后</th>
+                        <th class="px-3 py-2 w-full sm:w-32 font-medium">{{ t("auditDetailDrawer.字段_g4la") }}</th>
+                        <th class="px-3 py-2 font-medium">{{ t("auditDetailDrawer.变更前_cs2i9") }}</th>
+                        <th class="px-3 py-2 font-medium">{{ t("auditDetailDrawer.变更后_cs2uq") }}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -130,12 +132,12 @@ function diffKeys(diff: any): Array<{ key: string; before: any; after: any }> {
               </section>
 
               <section v-else>
-                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">变更对比</h3>
-                <p class="text-sm text-ink-400">该请求无 diff 数据（可能为查询操作或未启用 diff 记录）</p>
+                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">{{ t("auditDetailDrawer.变更对比_b08e8n") }}</h3>
+                <p class="text-sm text-ink-400">{{ t("auditDetailDrawer.该请求无_1osgc6") }}</p>
               </section>
 
               <section v-if="detail.error">
-                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">错误</h3>
+                <h3 class="text-xs font-semibold text-ink-500 uppercase mb-2">{{ t("auditDetailDrawer.错误_q4mu") }}</h3>
                 <pre class="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-3 whitespace-pre-wrap break-all">{{ detail.error }}</pre>
               </section>
             </template>

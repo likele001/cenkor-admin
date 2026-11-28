@@ -36,7 +36,7 @@ async function load() {
     items.value = data.items
     total.value = data.total
   } catch (e: any) {
-    error.value = e?.response?.data?.detail || '加载失败'
+    error.value = e?.response?.data?.detail || t("dashboard.loadFailed")
   } finally { loading.value = false }
 }
 
@@ -63,7 +63,7 @@ async function save() {
     showEdit.value = false
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '保存失败')
+    alert(e?.response?.data?.detail || t("aiMemory.saveFailed"))
   } finally { saving.value = false }
 }
 
@@ -73,7 +73,7 @@ async function del(item: Link) {
     await api.delete(`/api/v1/links/${item.id}`)
     await load()
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '删除失败')
+    alert(e?.response?.data?.detail || t("aiMemory.删除失败_azdahk"))
   }
 }
 
@@ -96,43 +96,43 @@ onMounted(load)
   <div>
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight">链接收藏</h1>
-        <p class="text-ink-500">书签与外部链接收集管理</p>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ t("links.链接收藏_j7lz40") }}</h1>
+        <p class="text-ink-500">{{ t("links.书签与外_4crv2c") }}</p>
       </div>
-      <button class="btn-primary" @click="openNew">添加链接</button>
+      <button class="btn-primary" @click="openNew">{{ t("links.添加链接_e8786k") }}</button>
     </div>
 
     <div class="card mb-4 flex flex-wrap gap-3 items-center">
-      <input v-model="search" type="text" class="input w-full sm:w-60" placeholder="搜索标题/URL..." @keyup.enter="load" />
+      <input v-model="search" type="text" class="input w-full sm:w-60" :placeholder="t('links.搜索标题_w7pnpz')" @keyup.enter="load" />
       <select v-model="categoryFilter" class="input w-full sm:w-32" @change="load">
-        <option value="">全部分类</option>
-        <option value="general">通用</option>
-        <option value="dev">开发</option>
-        <option value="design">设计</option>
-        <option value="docs">文档</option>
-        <option value="tool">工具</option>
+        <option value="">{{ t("entryList.全部分类_av9kmt") }}</option>
+        <option value="general">{{ t("links.通用_p5ji") }}</option>
+        <option value="dev">{{ t("links.开发_gma9") }}</option>
+        <option value="design">{{ t("links.设计_ojab") }}</option>
+        <option value="docs">{{ t("links.文档_hubg") }}</option>
+        <option value="tool">{{ t("links.工具_gf1u") }}</option>
       </select>
-      <button class="btn-ghost" @click="load">搜索</button>
+      <button class="btn-ghost" @click="load">{{ t("links.search") }}</button>
     </div>
 
-    <div v-if="loading" class="card text-ink-500">加载中...</div>
+    <div v-if="loading" class="card text-ink-500">{{ t("announcements.加载中_27k1ha") }}</div>
     <div v-else-if="error" class="card text-red-600">{{ error }}</div>
     <div v-else class="card overflow-hidden p-0">
       <div class="overflow-x-auto"><table class="w-full text-sm">
         <thead class="bg-ink-50 border-b border-ink-200">
           <tr class="text-left text-ink-500">
             <th class="px-4 py-3 font-medium w-8"></th>
-            <th class="px-4 py-3 font-medium">标题</th>
+            <th class="px-4 py-3 font-medium">{{ t("links.title") }}</th>
             <th class="px-4 py-3 font-medium">URL</th>
-            <th class="px-4 py-3 font-medium">分类</th>
-            <th class="px-4 py-3 font-medium">访问</th>
-            <th class="px-4 py-3 font-medium">添加时间</th>
-            <th class="px-4 py-3 font-medium text-right">操作</th>
+            <th class="px-4 py-3 font-medium">{{ t("links.category") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("links.访问_olcf") }}</th>
+            <th class="px-4 py-3 font-medium">{{ t("links.添加时间_e7zi4j") }}</th>
+            <th class="px-4 py-3 font-medium text-right">{{ t("links.actions") }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="items.length === 0">
-            <td colspan="7" class="px-4 py-12 text-center text-ink-400">暂无链接</td>
+            <td colspan="7" class="px-4 py-12 text-center text-ink-400">{{ t("links.暂无链接_dd38g5") }}</td>
           </tr>
           <tr v-for="item in items" :key="item.id" class="border-b border-ink-100 last:border-0 hover:bg-ink-50">
             <td class="px-4 py-3">
@@ -150,8 +150,8 @@ onMounted(load)
             <td class="px-4 py-3 text-ink-500">{{ item.click_count }}</td>
             <td class="px-4 py-3 text-ink-500 text-xs">{{ item.created_at?.slice(0, 10) }}</td>
             <td class="px-4 py-3 text-right space-x-2">
-              <button class="text-sm text-ink-600 hover:text-ink-900" @click="openEdit(item)">编辑</button>
-              <button class="text-sm text-red-600 hover:underline" @click="del(item)">删除</button>
+              <button class="text-sm text-ink-600 hover:text-ink-900" @click="openEdit(item)">{{ t("links.edit") }}</button>
+              <button class="text-sm text-red-600 hover:underline" @click="del(item)">{{ t("links.delete") }}</button>
             </td>
           </tr>
         </tbody>
@@ -168,29 +168,29 @@ onMounted(load)
             <input v-model="form.url" required class="input" placeholder="https://..." />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">标题</label>
-            <input v-model="form.title" class="input" placeholder="可选，默认用 URL" />
+            <label class="block text-sm font-medium mb-1.5">{{ t("links.title") }}</label>
+            <input v-model="form.title" class="input" :placeholder="t('links.可选_f5tw8p')" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">分类</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t("links.category") }}</label>
             <select v-model="form.category" class="input">
-              <option value="general">通用</option>
-              <option value="dev">开发</option>
-              <option value="design">设计</option>
-              <option value="docs">文档</option>
-              <option value="tool">工具</option>
+              <option value="general">{{ t("links.通用_p5ji") }}</option>
+              <option value="dev">{{ t("links.开发_gma9") }}</option>
+              <option value="design">{{ t("links.设计_ojab") }}</option>
+              <option value="docs">{{ t("links.文档_hubg") }}</option>
+              <option value="tool">{{ t("links.工具_gf1u") }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">描述</label>
+            <label class="block text-sm font-medium mb-1.5">{{ t("links.description") }}</label>
             <RichTextEditor v-model="form.description" />
           </div>
           <label class="flex items-center gap-2 text-sm">
-            <input v-model="form.is_favorite" type="checkbox" class="rounded" /> 收藏
+            <input v-model="form.is_favorite" type="checkbox" class="rounded" /> {{ t("links.收藏_hy6x") }}
           </label>
           <div class="flex gap-3 pt-2">
             <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? '保存中...' : '保存' }}</button>
-            <button type="button" @click="showEdit = false" class="btn-ghost">取消</button>
+            <button type="button" @click="showEdit = false" class="btn-ghost">{{ t("links.cancel") }}</button>
           </div>
         </form>
       </div>
