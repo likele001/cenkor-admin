@@ -3,6 +3,9 @@
 > 🔴 **本文分两半：§1–§5 是 v0.5.12 的现状说明，§6 起是历史记录与事故复盘。**
 > 当前唯一权威规范是 [**database-migrations.md**](./database-migrations.md)，冲突时以它为准。
 >
+> **两者章节号含义不同，别串着查**：本文 §10 是「autogenerate 三道护栏」，
+> 权威文档的 §10 是「故障对照表」、§10.1 是「版本戳领先于真实结构」。
+>
 > | 章节 | 状态 |
 > |---|---|
 > | §1 硬规则、§2 拓扑图、§3 新增迁移、§4 校验清单 | ✅ 2026-11-03（v0.5.12）按现状重写 |
@@ -27,6 +30,21 @@
 > 适用：cenkor-admin（hub）后端。开源基础框架与商业应用共用同一套 Alembic 迁移目录，
 > 但两边的图必须各自闭合：**公开子图单根单 head，闭源迁移只能锚在公开 revision 上，
 > 不能反向依赖**。违反这条曾导致 2026-10-26 门户应用中心整页 500，见 §6。
+
+## 0. 报错先查这张表
+
+遇到迁移报错，先在下表定位，再决定翻本文还是权威文档。
+
+| 报错 / 症状 | 去哪看 | 一句话原因 |
+|---|---|---|
+| `UndefinedTable: relation "cms_sites" does not exist` | [database-migrations §10.1](./database-migrations.md) | 版本戳越过 CMS 分支，但分支 DDL 从未执行；用 `scripts/repair-cms-branch.py` 补齐 |
+| 升级后表仍不存在 / 少列 | 同上 | `alembic_version` 说在，库里的真实结构没跟上 |
+| `alembic upgrade head` 没跑全 | §3 | 图里有三条闭源支线，**必须用 `heads`（复数）** |
+| 迁移图断链 / 多个 head | §4 | 跑 `scripts/check-migration-graph.py` |
+| autogenerate 生成一堆 `drop_table` | §10（本文） | 模型没加载全，详见三道护栏 |
+
+> 前两行是 2026-11-28 新增。`cms_sites` 缺失的完整诊断、维修前后实测数据、
+> 以及「为什么迁移图自洽却仍会缺表」，都在权威文档 §10.1。
 
 ## 1. 四条硬规则
 
@@ -285,6 +303,10 @@ CENKOR_DATABASE_URL="postgresql+psycopg2://cenkor:PW@127.0.0.1:5432/testdb" \
 | `backend/scripts/check_schema_drift.py` | **全量双向 diff**：ORM 声明的结构 vs 线上真实库，按业务域汇总（见 §10） |
 | `backend/scripts/apply_app_publish_ddl.py` | 幂等补齐 0035 的列（预演 / `--apply`），仅用于本次事故收尾 |
 | `scripts/migrate-and-seed-host.sh` | 宿主机模式迁移 + 播种 |
+| `scripts/repair-cms-branch.py` | 修「版本戳越过 CMS 分支但 DDL 没跑」的库：把版本戳退回合流点、补跑 `cms_multisite` 起的一段、再还原。`--dry-run` 只诊断不动库，加 `--yes` 才执行 |
+
+> ⚠️ **升级一律用 `alembic upgrade heads`（复数）**。图里有三条闭源支线，
+> 用单数 `upgrade head` 只会走其中一条，另外两条永远不执行。
 
 ## 10. autogenerate 的三道护栏（2026-10-27 补齐）
 
