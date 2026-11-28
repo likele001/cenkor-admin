@@ -44,11 +44,16 @@ cd backend
 pip install -r requirements.txt
 PYTHONPATH=src uvicorn cenkor_admin.main:app --reload --port 8002
 
-# 前端（另开终端）
-cd frontend/admin-web
-npm install
-npm run dev                   # 默认 5173；用户中心在 portal-web，默认 5175
+# 前端（另开终端）—— 依赖必须在【仓库根】装
+npm ci                        # 在仓库根执行，按根 package-lock.json 装齐全部前端依赖
+npm run dev:admin             # 默认 5173；用户中心 `npm run dev:portal`，默认 5175
 ```
+
+> 🔴 **依赖安装必须在仓库根执行 `npm ci`，不要进 `frontend/*/` 里 `npm install`。**
+> 根 `package.json` 是 npm workspaces（`workspaces: ["frontend/*"]`），锁文件只有根目录
+> 的 `package-lock.json`，依赖统一提升到根 `node_modules`。在子目录装会多出一套
+> `node_modules`，与根的那套版本冲突，症状是「装过了却报模块找不到」。
+> 构建本身仍在子目录跑（`npm run build:admin` 等根脚本已封装好）。
 
 后端启动时 lifespan 会自动执行 `alembic upgrade heads` 建表，**一般不需要手动跑迁移**。
 种子数据：`python -m cenkor_admin.scripts.seed`（未设 `CENKOR_ADMIN_PASSWORD` 时随机生成口令，

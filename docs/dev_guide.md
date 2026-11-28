@@ -55,50 +55,72 @@ alembic upgrade heads
 python -m cenkor_admin.scripts.seed
 uvicorn cenkor_admin.main:app --host 0.0.0.0 --port 8000
 
-# 前端（后台）
-cd ../frontend/admin-web
-pnpm install
-pnpm dev          # http://localhost:5173
+# 前端：依赖必须在【仓库根】装一次（npm workspaces，详见下节）
+cd ../..            # 回到仓库根 cenkor-admin/
+npm ci              # 按根 package-lock.json 装齐所有前端依赖
 
-# 前端（前台）
-cd ../frontend/portal-web
-npm install
-npm run dev       # http://localhost:5175
+npm run dev:admin   # 管理后台  http://localhost:5173
+npm run dev:portal  # 用户中心  http://localhost:5175
 ```
+
+> 🔴 **依赖安装必须在仓库根执行 `npm ci`，不要进 `frontend/*/` 里装。**
+> 根 `package.json` 声明了 `workspaces: ["frontend/*"]`，npm 会把所有子项目的依赖
+> **提升到根 `node_modules`**，唯一的锁文件是**根目录的 `package-lock.json`**。
+> 在子目录里 `npm install` 会另建一套 `node_modules`，与根的那套版本打架，
+> 表现为「明明装过却报模块找不到」或类型检查结果随机变。
 
 ### 默认账号
 
 - 后台：`admin@cenkor.cn`（**无默认口令**，初始口令随机生成、首次 seed 时只打印一次；忘记可 `bash scripts/reset-admin-password.sh` 重置）
 - 前台：注册即可
 
-### 前端包管理与构建故障排查
+### 前端依赖安装与构建故障排查
 
-各前端目录用哪个包管理器，**看锁文件**，不要混用（混用会弄坏 node_modules 软链）：
+**唯一正确入口：仓库根 + `npm ci`。** 本项目是 npm workspaces 单体仓库：
 
-| 目录 | 包管理器 | 安装命令（在该目录内执行） |
-|------|----------|------------------------------|
-| `frontend/admin-web` | **pnpm**（有 pnpm-lock.yaml） | `pnpm install` |
-| `frontend/developer-web` | **pnpm**（有 pnpm-lock.yaml） | `pnpm install` |
-| `frontend/portal-web` | npm（无锁文件） | `npm install` |
-| `frontend/landing-web` | npm（有 package-lock.json） | `npm install` |
-
-依赖环境损坏时的修复顺序（**注意：`pnpm install --force` 必须 cd 进对应前端目录跑，仓库根目录无效**）：
+| 要点 | 说明 |
+|---|---|
+| 锁文件 | **只有根目录 `package-lock.json`**（lockfileVersion 3，含全部 workspace） |
+| 安装位置 | **仓库根**，`npm ci`（或首次 `npm install`） |
+| 依赖落点 | 提升到根 `node_modules/`；`frontend/*` 以**包名**软链（如 `cenkor-admin-web -> ../frontend/admin-web`） |
+| 禁止 | 进 `frontend/*/` 单独 `npm install` / `pnpm install`（会产生第二套 node_modules） |
 
 ```bash
-cd frontend/admin-web
-pnpm install --force          # 重建 node_modules 软链
-pnpm rebuild esbuild vue-demi # 补跑被跳过的构建脚本
-pnpm build                    # 验证：vue-tsc 类型检查 + vite 构建
+cd cenkor-admin            # 仓库根
+npm ci                     # 一次性装齐 admin-web / portal-web / landing-web 全部依赖
+npm run build:admin        # 构建管理后台（产物 frontend/admin-web/dist）
+npm run build:portal       # 构建用户中心
+bash scripts/build-frontends.sh   # 或一次性构建全部前端
 ```
 
-两个已知坑：
+> `frontend/admin-web/pnpm-workspace.yaml` 是迁到 npm workspaces 之前的**历史残留**，
+> 当前流程不使用 pnpm，看到它不必理会（更不要据此改用 `pnpm install`）。
 
-1. **pnpm 10+ 默认跳过依赖构建脚本**：esbuild 会缺二进制导致 vite 报错。已在各 `pnpm-workspace.yaml` 配置 `allowBuilds`（pnpm 11）+ `onlyBuiltDependencies`（pnpm 10）放行 esbuild / vue-demi，不要删。
-2. **`vue-tsc@2.0.0` 官方发布残缺（缺 index.js，上游坏包）**：报错特征 `Cannot find module '../index.js'`，重装也无法修复，必须升级版本：
+**依赖环境损坏时的修复顺序**（前两步在仓库根，后两步进子目录验证）：
+
+```bash
+rm -rf node_modules frontend/*/node_modules   # 根目录：清掉可能并存的第二套依赖
+npm ci                                        # 根目录：按锁文件重装
+
+cd frontend/admin-web                         # 进子目录验证（构建必须在子目录跑）
+npx vue-tsc --noEmit                          # 类型检查
+npx vite build                                # 构建
+```
+
+**两个已知坑**：
+
+1. **npm 11 会提示 `allow-scripts` 未批准的 install script**（`esbuild` / `@parcel/watcher` / `vue-demi`）。
+   这只是提示，实测 `esbuild` 二进制已正确落盘（`node_modules/@esbuild/linux-x64`），
+   构建不受影响，**不需要执行 `npm approve-scripts`**。真遇到 esbuild 缺二进制再单独处理：
    ```bash
-   pnpm add -D vue-tsc@2.2.10
+   npm rebuild esbuild vue-demi
    ```
-   admin-web / developer-web 已钉到 2.2.10；新拉仓库若 lockfile 又解析到 2.0.0，同样用这条命令修。
+2. **`vue-tsc` 版本**：根锁文件当前解析为 `3.3.14`（TypeScript 5.9.3）。历史上
+   `vue-tsc@2.0.0` 是官方残缺包（缺 `index.js`，报 `Cannot find module '../index.js'`），
+   重装无效，只能升级。现在版本已远高于它；**若新拉仓库解析回 2.0.0，同样用升级解决**：
+   ```bash
+   npm install -D vue-tsc@3 --workspace=frontend/admin-web
+   ```
 
 ---
 

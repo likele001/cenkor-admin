@@ -131,9 +131,17 @@ docker compose up -d
 📖 **完整流程 / 端口台账 / 配置优先级 / 验证清单 / 回滚与排障 → [`docs/deploy.md`](docs/deploy.md)**
 
 ```bash
+# 前端依赖在【仓库根】装一次（npm workspaces，锁文件只有根目录的 package-lock.json）
+npm ci                             # 不要在 frontend/*/ 里单独 npm install
 bash scripts/build-frontends.sh    # 构建前端 dist（宝塔直接 serve，构建完即生效）
 # 后端改动后：在宝塔面板 → 网站 → Python 项目 → cenkor → 重启
 ```
+
+> 🔴 **依赖安装必须在仓库根执行 `npm ci`。** 根 `package.json` 声明了
+> `workspaces: ["frontend/*"]`，所有前端依赖统一提升到根 `node_modules`，
+> 子目录里没有、也不应该有各自的 lockfile。在 `frontend/*/` 里跑 `npm install`
+> 会另建一套 node_modules 与根的那套冲突，症状是「装过了却报模块找不到」。
+> 细节见 [`docs/dev_guide.md`](docs/dev_guide.md) 的「前端依赖安装与构建故障排查」。
 
 **可选部署模式**（交付给别人 / 换环境，本机未采用）：
 
