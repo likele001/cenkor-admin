@@ -45,7 +45,7 @@ onMounted(load)
     <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
     <div v-else>
       <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 class="text-2xl font-semibold tracking-tight">客户案例（{{ cases.length }}）</h1>
+        <h1 class="text-2xl font-semibold tracking-tight">{{ $t('casesList.客户案例_fy8pbk') }}{{ cases.length }}）</h1>
         <div class="flex items-center gap-3">
           <SearchInput v-model="search" :placeholder="t('casesList.按名称_1j0h6v')" />
           <CsvExportButton endpoint="/api/v1/cms/cases/export" filename="cases.csv" :params="{ search: search || undefined }" />

@@ -150,34 +150,33 @@ onMounted(load)
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-semibold tracking-tight">URL 伪静态规则</h1>
+      <h1 class="text-2xl font-semibold tracking-tight">{{ $t('urlRules.text_3s9prq') }}</h1>
       <p class="text-ink-500">
-        控制内容在前台的访问地址。规则改动后，老地址会自动 301 到新地址，不会变成 404。
+        {{ $t('urlRules.控制内容_trzyn9') }}
       </p>
     </div>
 
     <!-- 优先级说明：三层规则，改哪一层决定谁说了算 -->
     <div class="card mb-6 bg-ink-50 border-ink-200">
-      <h2 class="text-sm font-semibold mb-3">规则优先级（从上到下，覆盖前面的）</h2>
+      <h2 class="text-sm font-semibold mb-3">{{ $t('urlRules.规则优先_1smnwi') }}</h2>
       <ol class="space-y-1.5 text-sm text-ink-700 list-decimal list-inside">
-        <li>单条内容自定义地址 —— 在文章编辑页填「自定义地址」，优先级最高，规则再改也不动它</li>
-        <li>栏目 / 标签覆盖 —— 在「分类管理」「标签管理」里单独设置，只对那一个栏目或标签生效</li>
-        <li>站点默认规则 —— 就是本页下面这几条，全站通用</li>
+        <li>{{ $t('urlRules.单条内容_3q2f4c') }}</li>
+        <li>{{ $t('urlRules.栏目_zzrbot') }}</li>
+        <li>{{ $t('urlRules.站点默认_1j15gq') }}</li>
       </ol>
       <p class="text-xs text-ink-500 mt-3">
-        注意：栏目级规则只决定「栏目页自己的地址」，不管该栏目下文章的地址 ——
-        文章地址看站点默认规则里有没有用 <code>{catdir}</code>。
+        {{ $t('urlRules.注意_ngvcv9') }} <code>{catdir}</code>。
       </p>
     </div>
 
-    <div v-if="loading" class="card text-ink-500">加载中…</div>
+    <div v-if="loading" class="card text-ink-500">{{ $t('urlRules.加载中_b0k5km') }}</div>
     <div v-else-if="loadError" class="card mb-4 text-red-600">⚠️ {{ loadError }}</div>
 
     <template v-else>
       <!-- 保存失败：只提示，不清空列表和草稿 -->
       <div v-if="saveError" class="card mb-4 text-red-600">⚠️ {{ saveError }}</div>
       <!-- 站点默认规则 -->
-      <h2 class="text-lg font-semibold mb-3">站点默认规则</h2>
+      <h2 class="text-lg font-semibold mb-3">{{ $t('urlRules.站点默认_8ysk2p') }}</h2>
       <div class="space-y-4 mb-8">
         <div v-for="rule in defaults" :key="rule.kind" class="card">
           <div class="flex items-start justify-between gap-4 mb-3">
@@ -195,7 +194,7 @@ onMounted(load)
                 >{{ sourceLabel[rule.source] || rule.source }}</span>
               </div>
               <p class="text-xs text-ink-500 mt-1">
-                内置默认：<code class="text-ink-700">{{ rule.builtin }}</code>
+                {{ $t('urlRules.内置默认_1fcqvf') }}<code class="text-ink-700">{{ rule.builtin }}</code>
               </p>
             </div>
           </div>
@@ -210,7 +209,7 @@ onMounted(load)
 
           <div class="mt-3 flex flex-wrap gap-2">
             <button class="btn-outline" :disabled="previewing === rule.kind" @click="preview(rule)">
-              {{ previewing === rule.kind ? '预览中…' : '预览' }}
+              {{ previewing === rule.kind ? $t('urlRules.预览中_jt2jj1') : $t('urlRules.预览_qp50') }}
             </button>
             <button
               v-if="canWrite"
@@ -218,10 +217,10 @@ onMounted(load)
               :disabled="saving === rule.kind"
               @click="save(rule)"
             >
-              {{ saving === rule.kind ? '保存中…' : '保存' }}
+              {{ saving === rule.kind ? $t('urlRules.保存中_agdrec') : $t('urlRules.保存_e32z') }}
             </button>
-            <button v-if="canWrite" class="btn-ghost" @click="resetDraft(rule)">填回默认值</button>
-            <span v-else class="text-xs text-ink-400 self-center">只读权限，无法修改规则</span>
+            <button v-if="canWrite" class="btn-ghost" @click="resetDraft(rule)">{{ $t('urlRules.填回默认_26g30d') }}</button>
+            <span v-else class="text-xs text-ink-400 self-center">{{ $t('urlRules.只读权限_c4jjhf') }}</span>
           </div>
 
           <!-- 预览结果：示例地址 + 冲突 -->
@@ -233,7 +232,7 @@ onMounted(load)
               {{ previews[rule.kind]!.ok ? '✓' : '✕' }} {{ previews[rule.kind]!.message }}
             </div>
             <div v-if="previews[rule.kind]!.samples.length" class="text-sm">
-              <span class="text-ink-500">示例地址：</span>
+              <span class="text-ink-500">{{ $t('urlRules.示例地址_1m7gzq') }}</span>
               <code
                 v-for="s in previews[rule.kind]!.samples"
                 :key="s"
@@ -248,11 +247,11 @@ onMounted(load)
                 :class="c.severity === 'block' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'"
               >
                 <div class="font-medium">
-                  {{ c.severity === 'block' ? '冲突' : '重叠' }}：{{ c.sample }}
+                  {{ c.severity === 'block' ? $t('urlRules.冲突_ekgf') : $t('urlRules.重叠_p9df') }}：{{ c.sample }}
                 </div>
                 <div>{{ c.reason }}</div>
                 <div class="text-xs opacity-75">
-                  对方规则：{{ c.other_source }} · <code>{{ c.other_pattern }}</code>
+                  {{ $t('urlRules.对方规则_hux72d') }}{{ c.other_source }} · <code>{{ c.other_pattern }}</code>
                 </div>
               </div>
             </div>
@@ -261,12 +260,12 @@ onMounted(load)
       </div>
 
       <!-- 栏目覆盖概览 -->
-      <h2 class="text-lg font-semibold mb-3">栏目覆盖（{{ overriddenCategories.length }}）</h2>
+      <h2 class="text-lg font-semibold mb-3">{{ $t('urlRules.栏目覆盖_1vaeb4') }}{{ overriddenCategories.length }}）</h2>
       <div class="card mb-8">
         <p class="text-sm text-ink-500 mb-3">
-          栏目级规则分两种：栏目页地址 / 该栏目下文章的地址，互不干扰。修改请到「分类管理」里编辑对应栏目。
+          {{ $t('urlRules.栏目级规_1xr4xo') }}
         </p>
-        <div v-if="!overriddenCategories.length" class="text-sm text-ink-400">暂无栏目自定义规则或模板</div>
+        <div v-if="!overriddenCategories.length" class="text-sm text-ink-400">{{ $t('urlRules.暂无栏目_9uva6b') }}</div>
         <div
           v-for="c in overriddenCategories"
           :key="c.id"
@@ -275,24 +274,24 @@ onMounted(load)
           <span class="font-medium text-sm">{{ c.name }}</span>
           <code class="text-xs text-ink-400">{{ c.slug }}</code>
           <span v-if="c.url_pattern" class="text-xs text-ink-500">
-            栏目页：<code class="text-ink-700">{{ c.url_pattern }}</code>
+            {{ $t('urlRules.栏目页_dmo3lw') }}<code class="text-ink-700">{{ c.url_pattern }}</code>
           </span>
           <span v-if="c.article_pattern" class="text-xs text-ink-500">
-            文章：<code class="text-ink-700">{{ c.article_pattern }}</code>
+            {{ $t('urlRules.文章_fhngh') }}<code class="text-ink-700">{{ c.article_pattern }}</code>
           </span>
           <span v-if="c.template" class="text-xs text-ink-500">
-            模板：<code class="text-ink-700">{{ c.template }}</code>
+            {{ $t('urlRules.模板_g2mak') }}<code class="text-ink-700">{{ c.template }}</code>
           </span>
         </div>
       </div>
 
       <!-- 标签覆盖概览 -->
-      <h2 class="text-lg font-semibold mb-3">标签覆盖（{{ overriddenTags.length }}）</h2>
+      <h2 class="text-lg font-semibold mb-3">{{ $t('urlRules.标签覆盖_1vqpr2') }}{{ overriddenTags.length }}）</h2>
       <div class="card mb-8">
         <p class="text-sm text-ink-500 mb-3">
-          标签页对 SEO 最友好，建议用短 slug。修改请到「标签管理」里编辑对应标签。
+          {{ $t('urlRules.标签页对_1o29mp') }}
         </p>
-        <div v-if="!overriddenTags.length" class="text-sm text-ink-400">暂无标签自定义规则</div>
+        <div v-if="!overriddenTags.length" class="text-sm text-ink-400">{{ $t('urlRules.暂无标签_mojo2h') }}</div>
         <div
           v-for="t in overriddenTags"
           :key="t.id"
@@ -305,12 +304,12 @@ onMounted(load)
       </div>
 
       <!-- 变更存档 -->
-      <h2 class="text-lg font-semibold mb-3">历史规则存档（{{ history.length }}）</h2>
+      <h2 class="text-lg font-semibold mb-3">{{ $t('urlRules.历史规则_mgzzcs') }}{{ history.length }}）</h2>
       <div class="card">
         <p class="text-sm text-ink-500 mb-3">
-          每次保存前的旧规则会存到这里，用来把老地址 301 到新地址。最多保留 50 条。
+          {{ $t('urlRules.每次保存_187kpk') }}
         </p>
-        <div v-if="!history.length" class="text-sm text-ink-400">暂无历史存档</div>
+        <div v-if="!history.length" class="text-sm text-ink-400">{{ $t('urlRules.暂无历史_1cjyax') }}</div>
         <div
           v-for="(h, i) in history.slice().reverse()"
           :key="i"

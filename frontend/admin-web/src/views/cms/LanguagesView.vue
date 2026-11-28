@@ -103,7 +103,7 @@ onMounted(load)
               <span v-else class="text-ink-300">—</span>
             </td>
             <td class="p-3">
-              <span :class="l.enabled ? 'text-green-600' : 'text-ink-300'">{{ l.enabled ? '启用' : '停用' }}</span>
+              <span :class="l.enabled ? 'text-green-600' : 'text-ink-300'">{{ l.enabled ? $t('languages.启用_eymx') : $t('languages.停用_eb7w') }}</span>
             </td>
             <td class="p-3 text-ink-400">{{ l.sort }}</td>
             <td class="p-3 text-right space-x-2">
@@ -121,7 +121,7 @@ onMounted(load)
     <!-- Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑语言' : '新增语言' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editing ? $t('languages.编辑语言_gmrc4u') : $t('languages.新增语言_d7dwkh') }}</h2>
         <div class="space-y-3">
           <div v-if="!editing">
             <label class="block text-sm font-medium mb-1">{{ t("languages.代码_e2ri") }}</label>

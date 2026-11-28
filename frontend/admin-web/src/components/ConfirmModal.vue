@@ -80,7 +80,7 @@ function _cancel() {
               class="px-4 py-2 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100"
               @click="emit('cancel')"
             >
-              {{ cancelText ?? '取消' }}
+              {{ cancelText ?? $t('confirmModal.取消_ev02') }}
             </button>
             <button
               type="button"
@@ -88,7 +88,7 @@ function _cancel() {
               :class="danger ? 'bg-red-600 hover:bg-red-700' : 'bg-ink-900 hover:bg-ink-800'"
               @click="emit('confirm')"
             >
-              {{ confirmText ?? '确定' }}
+              {{ confirmText ?? $t('confirmModal.确定_kzjg') }}
             </button>
           </div>
         </div>

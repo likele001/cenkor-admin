@@ -508,7 +508,7 @@ onMounted(load)
               v-if="delta(data.total_calls, data.prev.calls)"
               class="px-1 py-px rounded bg-ink-100 text-ink-600 tabular-nums"
             >{{ delta(data.total_calls, data.prev.calls) }}</span>
-            <span class="text-ink-400">较上 {{ data.days }} 天</span>
+            <span class="text-ink-400">{{ $t('aiUsage.较上_ou7b') }} {{ data.days }} {{ $t('aiUsage.天_hm1') }}</span>
           </div>
         </div>
 
@@ -518,7 +518,7 @@ onMounted(load)
             {{ fmt(data.total_tokens_in - data.total_tokens_cache) }}
           </div>
           <div class="text-[11px] text-ink-400 mt-1">
-            全价计费部分 · 共 {{ fmt(data.total_tokens_in) }}
+            {{ $t('aiUsage.全价计费_oz7e6l') }} {{ fmt(data.total_tokens_in) }}
           </div>
         </div>
 
@@ -536,10 +536,10 @@ onMounted(load)
           </div>
           <div class="text-[11px] mt-1 flex items-center gap-1.5">
             <template v-if="data.total_cache_saved > 0">
-              <span class="text-emerald-600">省 {{ currencySymbol(data.currency) }}{{ fmtMoney(data.total_cache_saved) }}</span>
+              <span class="text-emerald-600">{{ $t('aiUsage.省_ni9') }} {{ currencySymbol(data.currency) }}{{ fmtMoney(data.total_cache_saved) }}</span>
             </template>
             <span v-else class="text-ink-400">
-              {{ data.total_tokens_in ? '未配缓存单价' : '暂无记录' }}
+              {{ data.total_tokens_in ? $t('aiUsage.未配缓存_jafssq') : $t('aiUsage.暂无记录_dd1mmb') }}
             </span>
           </div>
         </div>
@@ -550,7 +550,7 @@ onMounted(load)
             {{ fmt(data.total_tokens_out) }}
           </div>
           <div class="text-[11px] text-ink-400 mt-1">
-            约 {{ data.total_calls ? fmt(Math.round(data.total_tokens_out / data.total_calls)) : 0 }} / 次
+            {{ $t('aiUsage.约_p0m') }} {{ data.total_calls ? fmt(Math.round(data.total_tokens_out / data.total_calls)) : 0 }} {{ $t('aiUsage.text_1ks0') }}
           </div>
         </div>
 
@@ -578,10 +578,10 @@ onMounted(load)
               class="px-1 py-px rounded bg-ink-100 text-ink-600 tabular-nums"
             >{{ delta(data.total_cost, data.prev.cost) }}</span>
             <span v-if="data.unpriced_calls" class="text-amber-600">
-              {{ data.unpriced_calls }} 次未定价
+              {{ data.unpriced_calls }} {{ $t('aiUsage.次未定价_dxzj46') }}
             </span>
             <span v-else-if="data.estimated" class="text-ink-400">
-              {{ data.estimated_calls }} 次按现价补算
+              {{ data.estimated_calls }} {{ $t('aiUsage.次按现价_xd5gf5') }}
             </span>
             <span v-else class="text-ink-400">{{ t("aiUsage.已覆盖全_zmcnb") }}</span>
           </div>
@@ -665,7 +665,7 @@ onMounted(load)
       <div class="card">
         <div class="flex items-center gap-3 flex-wrap mb-3">
           <h2 class="text-sm font-semibold text-ink-900">{{ t("aiUsage.按能力类_1coxju") }}</h2>
-          <span class="text-xs text-ink-400">共 {{ rows.length }} 类</span>
+          <span class="text-xs text-ink-400">{{ $t('aiUsage.共_g35') }} {{ rows.length }} {{ $t('aiUsage.类_ol7') }}</span>
           <div class="ml-auto flex items-center gap-1 text-xs">
             <span class="text-ink-400 mr-1">{{ t("aiUsage.排序_hge5") }}</span>
             <button
@@ -714,19 +714,19 @@ onMounted(load)
                     class="text-[10px] text-ink-300 truncate max-w-[200px]"
                     :title="r.models.map((m) => `${m.provider}/${m.model || '未记录'}`).join('、')"
                   >
-                    {{ r.models.map((m) => m.model || m.provider || '未记录').join(' / ') }}
+                    {{ r.models.map((m) => m.model || m.provider || $t('aiUsage.未记录_fs9jj')).join(' / ') }}
                   </div>
                 </td>
                 <td class="py-2.5 px-2 text-right text-ink-700 tabular-nums">
                   {{ r.calls.toLocaleString('zh-CN') }}
                   <div class="text-[10px] text-ink-300 tabular-nums">
-                    均 {{ fmt(r.avg_tokens_in) }} in
+                    {{ $t('aiUsage.均_h8n') }} {{ fmt(r.avg_tokens_in) }} in
                   </div>
                 </td>
                 <td class="py-2.5 px-2 text-right text-ink-700 tabular-nums">
                   {{ fmt(r.tokens_in) }}
                   <div v-if="r.tokens_cache" class="text-[10px] text-ink-300 tabular-nums">
-                    全价 {{ fmt(r.tokens_uncached) }}
+                    {{ $t('aiUsage.全价_ea33') }} {{ fmt(r.tokens_uncached) }}
                   </div>
                 </td>
                 <td class="py-2.5 px-2 text-right tabular-nums">
@@ -744,10 +744,10 @@ onMounted(load)
                   <template v-if="r.priced_calls > 0">
                     <span class="text-ink-900">{{ currencySymbol(data.currency) }}{{ fmtMoney(r.cost) }}</span>
                     <div v-if="r.unpriced_calls" class="text-[10px] text-amber-600">
-                      {{ r.unpriced_calls }} 次未定价
+                      {{ r.unpriced_calls }} {{ $t('aiUsage.次未定价_dxzj46') }}
                     </div>
                     <div v-else-if="r.cache_saved > 0" class="text-[10px] text-emerald-600">
-                      省 {{ fmtMoney(r.cache_saved) }}
+                      {{ $t('aiUsage.省_ni9') }} {{ fmtMoney(r.cache_saved) }}
                     </div>
                   </template>
                   <span v-else class="text-[11px] text-ink-300">{{ t("aiUsage.未配置_fte97") }}</span>
@@ -774,10 +774,9 @@ onMounted(load)
       <p class="text-xs text-ink-400 leading-relaxed">
         {{ t("aiUsage.金额按_1wsp1t") }}
         <template v-if="tokenMix">
-          本期 token 构成：未命中输入 {{ pct(tokenMix.uncached) }}、缓存命中 {{ pct(tokenMix.cache) }}、输出 {{ pct(tokenMix.out) }}。
+          {{ $t('aiUsage.本期_tk7hbm') }} {{ pct(tokenMix.uncached) }}{{ $t('aiUsage.text_1q1jui') }} {{ pct(tokenMix.cache) }}{{ $t('aiUsage.text_7pzt4') }} {{ pct(tokenMix.out) }}。
         </template>
-        {{ t("aiUsage.只统计成_cdlntu") }}<span class="font-mono">status=ok</span>）的调用，失败请求不计入 token。
-        每次调用记账时就把成本算好存下（快照），所以以后调单价不会改动历史金额。
+        {{ t("aiUsage.只统计成_cdlntu") }}<span class="font-mono">status=ok</span>{{ $t('aiUsage.text_ndxm9w') }}
       </p>
     </template>
 
@@ -806,7 +805,7 @@ onMounted(load)
                 :key="`${c.kind}-${c.provider}-${c.model}`"
                 class="px-2 py-1 text-xs rounded border border-amber-300 bg-white hover:bg-amber-100"
                 @click="fillDraft(c)"
-              >{{ c.model || c.provider || '未记录' }} · {{ kindLabel(c.kind) }} · {{ c.calls }} 次</button>
+              >{{ c.model || c.provider || $t('aiUsage.未记录_fs9jj') }} · {{ kindLabel(c.kind) }} · {{ c.calls }} {{ $t('aiUsage.次_l5t') }}</button>
             </div>
           </div>
 
@@ -836,11 +835,11 @@ onMounted(load)
                 <option v-for="u in UNIT_OPTIONS" :key="u.v" :value="u.v">{{ u.t }}</option>
               </select>
               <span v-if="draft.unit !== 'token'" class="block mt-1 text-[11px] text-ink-400">
-                按{{ draft.unit === 'image' ? '张' : '条' }}计费，没有 token，只填单{{ draft.unit === 'image' ? '张' : '条' }}价格。
+                {{ $t('aiUsage.按_jk9') }}{{ draft.unit === 'image' ? $t('aiUsage.张_isg') : $t('aiUsage.条_kf5') }}{{ $t('aiUsage.计费_1o63k9') }}{{ draft.unit === 'image' ? $t('aiUsage.张_isg') : $t('aiUsage.条_kf5') }}{{ $t('aiUsage.价格_c2dfh') }}
               </span>
             </label>
             <label class="text-xs text-ink-600">
-              {{ draft.unit === 'image' ? '单张单价（元 / 张）' : draft.unit === 'video' ? '单条单价（元 / 条）' : '输入单价（元 / 百万 token）' }}
+              {{ draft.unit === 'image' ? $t('aiUsage.单张单价_kfx702') : draft.unit === 'video' ? $t('aiUsage.单条单价_178uvz') : $t('aiUsage.输入单价_1gzny6') }}
               <input
                 v-model="draft.input_per_m"
                 type="number"
@@ -872,8 +871,7 @@ onMounted(load)
                 :placeholder="t('aiUsage.留空_1a991j')"
               />
               <span class="block mt-1 text-[11px] text-ink-400 leading-relaxed">
-                留空表示缓存和普通输入同价（宁可高估成本，也不假装便宜）；
-                填 0 表示命中缓存真的不收费。多数服务商的缓存价是输入价的 10%~25%。
+                {{ $t('aiUsage.留空表示_1vw155') }}
               </span>
             </label>
             <label class="text-xs text-ink-600 col-span-2">
@@ -906,13 +904,13 @@ onMounted(load)
               class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 text-ink-600 hover:bg-ink-50 disabled:opacity-50"
               :disabled="recalcBusy"
               @click="recalcCosts"
-            >{{ recalcBusy ? '重算中…' : '重算历史成本' }}</button>
+            >{{ recalcBusy ? $t('aiUsage.重算中_iwi35v') : $t('aiUsage.重算历史_1hngy4') }}</button>
             <span v-if="priceErr" class="text-xs text-red-600">{{ priceErr }}</span>
             <span v-else-if="priceOk" class="text-xs text-emerald-600">{{ priceOk }}</span>
           </div>
 
           <div class="pt-2 border-t border-ink-100">
-            <div class="text-xs text-ink-500 mb-2">已配置 {{ priceList.length }} 条规则</div>
+            <div class="text-xs text-ink-500 mb-2">{{ $t('aiUsage.已配置_egsab') }} {{ priceList.length }} {{ $t('aiUsage.条规则_fszxy') }}</div>
             <div v-if="!priceList.length" class="text-xs text-ink-400 py-4 text-center">
               {{ t("aiUsage.还没有任_1hjqtp") }}
             </div>
@@ -934,7 +932,7 @@ onMounted(load)
                     <span v-if="r.kind" class="ml-1 text-ink-400">@{{ kindLabel(r.kind) }}</span>
                   </td>
                   <td class="py-1.5 px-2 text-right tabular-nums whitespace-nowrap">
-                    {{ r.input_per_m }}<span class="text-ink-400 text-[10px] ml-0.5">{{ r.unit === 'token' ? '/M' : r.unit === 'image' ? '/张' : '/条' }}</span>
+                    {{ r.input_per_m }}<span class="text-ink-400 text-[10px] ml-0.5">{{ r.unit === 'token' ? '/M' : r.unit === 'image' ? $t('aiUsage.text_jwx') : $t('aiUsage.text_ljm') }}</span>
                   </td>
                   <td class="py-1.5 px-2 text-right tabular-nums">
                     {{ r.unit === 'token' ? r.output_per_m : '—' }}

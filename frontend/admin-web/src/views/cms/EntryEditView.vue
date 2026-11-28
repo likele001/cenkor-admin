@@ -595,7 +595,7 @@ onMounted(async () => {
     <div class="flex items-center gap-2 mb-6">
       <router-link to="/cms/entries" class="text-ink-400 hover:text-ink-600 text-sm">{{ t('fieldDefinitions.text_1aztzu') }}</router-link>
       <h1 class="text-2xl font-semibold tracking-tight">
-        {{ isNew ? '新建' : '编辑' }} {{ ct?.icon }} {{ ct?.name || '内容' }}
+        {{ isNew ? $t('entryEdit.新建_htfu') : $t('entryEdit.编辑_mekb') }} {{ ct?.icon }} {{ ct?.name || $t('entryEdit.内容_edas') }}
       </h1>
     </div>
 
@@ -610,14 +610,14 @@ onMounted(async () => {
               class="px-3 py-1 text-sm border-b-2"
               :class="activeLang === 'default' ? 'border-blue-500 text-blue-600 font-medium' : 'border-transparent text-ink-400'"
               @click="activeLang = 'default'"
-            >🌐 主语言</button>
+            >{{ $t('entryEdit.text_jd2z4y') }}</button>
             <button
               v-for="l in languages"
               :key="l.code"
               class="px-3 py-1 text-sm border-b-2"
               :class="activeLang === l.code ? 'border-blue-500 text-blue-600 font-medium' : 'border-transparent text-ink-400'"
               @click="activeLang = l.code"
-            >{{ l.flag || '🌍' }} {{ l.name }}<span v-if="l.is_default" class="text-xs text-ink-400 ml-1">(默认)</span></button>
+            >{{ l.flag || '🌍' }} {{ l.name }}<span v-if="l.is_default" class="text-xs text-ink-400 ml-1">{{ $t('entryEdit.text_omvg5') }}</span></button>
           </div>
           <div>
             <div class="flex items-center justify-between mb-1">
@@ -626,7 +626,7 @@ onMounted(async () => {
                 type="button"
                 class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
                 :disabled="!activeForm.title?.trim()"
-                title="用 AI 改写标题"
+                :title="$t('entryEdit.用_126nso')"
                 @click="rewriteTarget = 'title'"
               >✨ AI</button>
             </div>
@@ -637,26 +637,26 @@ onMounted(async () => {
             <input v-model="activeForm.slug" type="text" class="input" placeholder="url-friendly-key" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">自定义地址（可选）</label>
+            <label class="block text-sm font-medium mb-1">{{ $t('entryEdit.自定义地_1lycwd') }}</label>
             <input
               v-model="form.url_path"
               type="text"
               class="input font-mono text-sm"
-              placeholder="留空 = 按 URL 规则生成"
+              :placeholder="$t('entryEdit.留空_1na2as')"
             />
             <p class="text-xs text-ink-500 mt-1">
-              填了就以这个地址对外，规则再改也不动它。只支持站内相对路径。
+              {{ $t('entryEdit.填了就以_18c386') }}
             </p>
             <div v-if="resolvedUrl" class="mt-2 text-xs">
               <div class="text-ink-500">
-                最终地址：
+                {{ $t('entryEdit.最终地址_1rxipf') }}
                 <code class="text-ink-800">{{ resolvedUrl }}</code>
               </div>
               <div v-if="form.url_path && resolvedRuleUrl && resolvedRuleUrl !== resolvedUrl" class="text-ink-500 mt-0.5">
-                若不填自定义地址：<code class="text-ink-700">{{ resolvedRuleUrl }}</code>
+                {{ $t('entryEdit.若不填自_rvsq5w') }}<code class="text-ink-700">{{ resolvedRuleUrl }}</code>
               </div>
             </div>
-            <div v-else-if="resolvingUrl" class="mt-2 text-xs text-ink-400">计算中…</div>
+            <div v-else-if="resolvingUrl" class="mt-2 text-xs text-ink-400">{{ $t('entryEdit.计算中_i4h7vz') }}</div>
           </div>
           <div>
             <div class="flex items-center justify-between mb-1">
@@ -665,7 +665,7 @@ onMounted(async () => {
                 type="button"
                 class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
                 :disabled="!activeForm.content?.text?.trim()"
-                title="用 AI 改写正文（保留排版格式）"
+                :title="$t('entryEdit.用_bsa37k')"
                 @click="rewriteTarget = 'content'"
               >✨ AI</button>
             </div>
@@ -735,16 +735,16 @@ onMounted(async () => {
         <!-- 版本历史（M1·P0） -->
         <div v-if="!isNew" class="card space-y-2">
           <div class="flex items-center justify-between">
-            <h3 class="font-medium text-sm">📜 版本历史</h3>
+            <h3 class="font-medium text-sm">{{ $t('entryEdit.text_1w65t8') }}</h3>
             <button
               v-if="versions.length >= 2"
               class="btn-ghost px-2 py-0.5 text-xs"
               @click="openDiff()"
             >
-              对比最新两版
+              {{ $t('entryEdit.对比最新_4xa11r') }}
             </button>
           </div>
-          <div v-if="!versions.length" class="text-xs text-ink-400">暂无版本快照</div>
+          <div v-if="!versions.length" class="text-xs text-ink-400">{{ $t('entryEdit.暂无版本_1gig95') }}</div>
           <div v-for="v in versions" :key="v.version" class="flex items-center justify-between gap-2 text-xs border-b pb-1.5 last:border-0">
             <div class="min-w-0">
               <span class="font-mono font-semibold text-blue-600">v{{ v.version }}</span>
@@ -752,15 +752,15 @@ onMounted(async () => {
               <div class="text-ink-400">{{ new Date(v.created_at).toLocaleString() }}</div>
             </div>
             <div class="flex gap-1 shrink-0">
-              <button class="btn-ghost px-2 py-0.5 text-xs" @click="previewVersionFn(v)">查看</button>
+              <button class="btn-ghost px-2 py-0.5 text-xs" @click="previewVersionFn(v)">{{ $t('entryEdit.查看_ibpi') }}</button>
               <button
                 v-if="versions.length >= 2"
                 class="btn-ghost px-2 py-0.5 text-xs"
                 @click="openDiff(v.version)"
               >
-                对比
+                {{ $t('entryEdit.对比_g8hn') }}
               </button>
-              <button class="text-red-500 hover:underline px-1" @click="restoreVersion(v)">回滚</button>
+              <button class="text-red-500 hover:underline px-1" @click="restoreVersion(v)">{{ $t('entryEdit.回滚_fdto') }}</button>
             </div>
           </div>
         </div>
@@ -793,36 +793,36 @@ onMounted(async () => {
 
         <!-- 发布工作流（M2·P1）+ 暂存预览（M4·P3） -->
         <div v-if="!isNew" class="card space-y-2">
-          <h3 class="font-medium text-sm">🚦 发布工作流</h3>
+          <h3 class="font-medium text-sm">{{ $t('entryEdit.text_1dopa5') }}</h3>
           <div v-if="form.status !== 'published'" class="space-y-1">
-            <label class="text-xs text-ink-500">定时发布时间（可选）</label>
+            <label class="text-xs text-ink-500">{{ $t('entryEdit.定时发布_et50tv') }}</label>
             <input v-model="form.scheduled_at" type="datetime-local" class="input w-full text-sm" />
             <div class="text-[11px] text-ink-400">
-              到点自动上线。仅「已通过」状态生效 —— 待审核的内容不会被自动发布，审核这道关还得人过。
+              {{ $t('entryEdit.到点自动_1llsns') }}
             </div>
           </div>
           <button v-if="form.status === 'published'" class="btn-ghost text-sm text-emerald-600 w-full" @click="openPublish">
-            🚀 分发到渠道
+            {{ $t('entryEdit.text_1fuaid') }}
           </button>
-          <button class="btn-ghost text-sm text-blue-600 w-full" @click="previewEntry">🖥 暂存预览（未发布）</button>
+          <button class="btn-ghost text-sm text-blue-600 w-full" @click="previewEntry">{{ $t('entryEdit.text_k1g9r7') }}</button>
           <button class="btn-ghost text-sm text-amber-600 w-full" @click="factCheckOpen = true">
-            🔍 事实核验（查正文里的具体说法有没有依据）
+            {{ $t('entryEdit.text_qih2us') }}
           </button>
           <div v-if="form.status === 'draft' || form.status === 'approved'" class="flex gap-2">
-            <button class="btn-ghost text-sm text-purple-600 w-full" @click="submitReview">提交审核</button>
+            <button class="btn-ghost text-sm text-purple-600 w-full" @click="submitReview">{{ $t('entryEdit.提交审核_cx6emj') }}</button>
           </div>
           <div v-if="form.status === 'pending_review'" class="flex gap-2">
-            <button class="btn-ghost text-sm text-green-600 flex-1" @click="reviewEntry('approve')">通过并发布</button>
-            <button class="btn-ghost text-sm text-red-600 flex-1" @click="reviewEntry('reject')">驳回</button>
+            <button class="btn-ghost text-sm text-green-600 flex-1" @click="reviewEntry('approve')">{{ $t('entryEdit.通过并发_dpsunv') }}</button>
+            <button class="btn-ghost text-sm text-red-600 flex-1" @click="reviewEntry('reject')">{{ $t('entryEdit.驳回_qqx7') }}</button>
           </div>
           <div class="text-xs text-ink-400">
-            当前状态：{{ { draft: '草稿', published: '已发布', archived: '已归档', pending_review: '待审核', approved: '已通过' }[form.status] || form.status }}
+            {{ $t('entryEdit.当前状态_sf6q51') }}{{ { draft: $t('entryEdit.草稿_n02e'), published: $t('entryEdit.已发布_e656s'), archived: $t('entryEdit.已归档_e85oj'), pending_review: $t('entryEdit.待审核_eftvg'), approved: $t('entryEdit.已通过_ego67') }[form.status] || form.status }}
           </div>
         </div>
 
         <div v-if="showPublish" class="card space-y-3 border-emerald-200 bg-emerald-50/40">
           <div class="flex items-center justify-between">
-            <h3 class="font-medium text-sm">🚀 分发到渠道</h3>
+            <h3 class="font-medium text-sm">{{ $t('entryEdit.text_1fuaid') }}</h3>
             <button class="text-ink-400 hover:text-ink-600" @click="showPublish = false">✕</button>
           </div>
           <div class="space-y-1.5">
@@ -837,11 +837,11 @@ onMounted(async () => {
                 @change="togglePublishChannel(c.key)"
               />
               <span class="text-ink-800">{{ c.name }}</span>
-              <span v-if="!c.enabled" class="text-[11px] text-ink-400">（未在渠道配置里启用，本次仍会尝试）</span>
+              <span v-if="!c.enabled" class="text-[11px] text-ink-400">{{ $t('entryEdit.text_z7mjse') }}</span>
             </label>
           </div>
           <button class="btn-primary text-sm w-full" :disabled="publishing || !publishPicked.length" @click="doPublish">
-            {{ publishing ? '发布中…' : `发布到 ${publishPicked.length} 个渠道` }}
+            {{ publishing ? $t('entryEdit.发布中_ayq0kr') : `发布到 ${publishPicked.length} 个渠道` }}
           </button>
           <div v-if="publishResults.length" class="space-y-1.5 border-t border-emerald-200 pt-2">
             <div v-for="r in publishResults" :key="r.channel" class="text-[12px]">
@@ -849,10 +849,10 @@ onMounted(async () => {
                 {{ r.ok ? '✓' : '✕' }} {{ r.channel }}
               </span>
               <span v-if="r.error" class="ml-1 text-ink-500">{{ r.error }}</span>
-              <a v-else-if="r.external_url" :href="r.external_url" target="_blank" class="ml-1 text-blue-600 hover:underline">查看</a>
+              <a v-else-if="r.external_url" :href="r.external_url" target="_blank" class="ml-1 text-blue-600 hover:underline">{{ $t('entryEdit.查看_ibpi') }}</a>
             </div>
             <div v-if="publishResults.some((r) => r.payload?.html)" class="text-[11px] text-ink-500">
-              导出渠道已生成 HTML，到「分发渠道」页的任务列表里可以取用。
+              {{ $t('entryEdit.导出渠道_y7llis') }}
             </div>
           </div>
         </div>
@@ -861,7 +861,7 @@ onMounted(async () => {
 
         <div class="card">
           <button class="btn-primary w-full" :disabled="saving" @click="save">
-            {{ saving ? '保存中…' : (isNew ? '创建' : '保存') }}
+            {{ saving ? $t('entryEdit.保存中_agdrec') : (isNew ? $t('entryEdit.创建_ehj3') : $t('entryEdit.保存_e32z')) }}
           </button>
           <router-link to="/cms/entries" class="btn-ghost w-full mt-2 text-center">{{ t('usersList.取消_ev02') }}</router-link>
         </div>
@@ -872,15 +872,15 @@ onMounted(async () => {
     <div v-if="showVersionPreview" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" @click.self="showVersionPreview = false">
       <div class="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-auto p-5">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="font-medium">版本快照预览</h3>
+          <h3 class="font-medium">{{ $t('entryEdit.版本快照_1pqxr4') }}</h3>
           <button @click="showVersionPreview = false" class="text-ink-400 hover:text-ink-600 text-lg leading-none">✕</button>
         </div>
         <div class="space-y-2 text-sm">
-          <div><span class="text-ink-400">标题：</span><span class="font-medium">{{ previewVersion.title }}</span></div>
+          <div><span class="text-ink-400">{{ $t('entryEdit.标题_fzw09') }}</span><span class="font-medium">{{ previewVersion.title }}</span></div>
           <div><span class="text-ink-400">Slug：</span>{{ previewVersion.slug || '-' }}</div>
           <div>
-            <span class="text-ink-400">正文：</span>
-            <div class="whitespace-pre-wrap border rounded p-2 mt-1 bg-ink-50/50">{{ previewVersion.content?.text || '(无正文)' }}</div>
+            <span class="text-ink-400">{{ $t('entryEdit.正文_g8x06') }}</span>
+            <div class="whitespace-pre-wrap border rounded p-2 mt-1 bg-ink-50/50">{{ previewVersion.content?.text || $t('entryEdit.text_dws0a5') }}</div>
           </div>
         </div>
       </div>

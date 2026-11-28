@@ -33,7 +33,7 @@ const emit = defineEmits<{ 'select-all': [boolean]; 'clear': [] }>()
       class="sticky top-0 z-20 mb-3 px-4 py-2.5 rounded-lg bg-brand-50 border border-brand-200 flex items-center justify-between text-sm shadow-sm"
     >
       <div class="flex items-center gap-3">
-        <span class="font-medium text-brand-700">已选 {{ selectedCount }} / {{ totalCount }} 项</span>
+        <span class="font-medium text-brand-700">{{ $t('batchActionBar.已选_grpz') }} {{ selectedCount }} / {{ totalCount }} {{ $t('batchActionBar.项_u49') }}</span>
         <label class="inline-flex items-center gap-1.5 text-brand-600 cursor-pointer">
           <input
             type="checkbox"

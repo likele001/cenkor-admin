@@ -256,7 +256,7 @@ onMounted(load)
           <router-link to="/cms/content-types" class="text-ink-400 hover:text-ink-600 text-sm">{{ t('fieldDefinitions.text_1aztzu') }}</router-link>
         </div>
         <h1 class="text-2xl font-semibold tracking-tight">
-          {{ ct?.icon || '📦' }} {{ ct?.name || '...' }} — 字段管理
+          {{ ct?.icon || '📦' }} {{ ct?.name || '...' }} {{ $t('fieldDefinitions.text_1syn26') }}
         </h1>
         <p class="text-ink-500 text-sm">key: <code>{{ ct?.key }}</code></p>
       </div>
@@ -332,7 +332,7 @@ onMounted(load)
     <!-- Field Modal -->
     <div v-if="showFieldModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showFieldModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg font-semibold mb-4">{{ editingField ? '编辑字段' : '新建字段' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editingField ? $t('fieldDefinitions.编辑字段_gmiwmx') : $t('fieldDefinitions.新建字段_d83094') }}</h2>
         <div class="space-y-3">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -394,7 +394,7 @@ onMounted(load)
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn-ghost" @click="showFieldModal = false">{{ t('usersList.取消_ev02') }}</button>
-          <button class="btn-primary" :disabled="saving" @click="saveField">{{ saving ? '保存中…' : '保存' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="saveField">{{ saving ? $t('fieldDefinitions.保存中_agdrec') : $t('fieldDefinitions.保存_e32z') }}</button>
         </div>
       </div>
     </div>
@@ -402,7 +402,7 @@ onMounted(load)
     <!-- Group Modal -->
     <div v-if="showGroupModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showGroupModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editingGroup ? '编辑分组' : '新建分组' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editingGroup ? $t('fieldDefinitions.编辑分组_gmhfcp') : $t('fieldDefinitions.新建分组_d81iyw') }}</h2>
         <div class="space-y-3">
           <div>
             <label class="block text-sm font-medium mb-1">Key</label>
@@ -425,7 +425,7 @@ onMounted(load)
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn-ghost" @click="showGroupModal = false">{{ t('usersList.取消_ev02') }}</button>
-          <button class="btn-primary" :disabled="saving" @click="saveGroup">{{ saving ? '保存中…' : '保存' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="saveGroup">{{ saving ? $t('fieldDefinitions.保存中_agdrec') : $t('fieldDefinitions.保存_e32z') }}</button>
         </div>
       </div>
     </div>

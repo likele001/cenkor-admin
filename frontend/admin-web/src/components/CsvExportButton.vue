@@ -41,6 +41,6 @@ async function download() {
     :disabled="loading"
     @click="download"
   >
-    {{ loading ? '导出中…' : '导出 CSV' }}
+    {{ loading ? $t('csvExportButton.导出中_by1pjr') : $t('csvExportButton.导出_xxfqdg') }}
   </button>
 </template>

@@ -442,8 +442,7 @@ onMounted(loadAll)
             <h2 class="text-base font-semibold text-ink-900">{{ t("aiSettings.text_bafum9") }}</h2>
             <p class="mt-1 text-sm text-ink-500">
               {{ t("aiSettings.已就绪_e7qyz") }}
-              <span class="font-semibold text-ink-900">{{ readyCount }}</span> / {{ capabilities.length }} 项能力
-              · 服务商 {{ overview?.providers?.total ?? 0 }} 个（启用 {{ overview?.providers?.enabled ?? 0 }}）
+              <span class="font-semibold text-ink-900">{{ readyCount }}</span> / {{ capabilities.length }} {{ $t('aiSettings.项能力_1yq1fb') }} {{ overview?.providers?.total ?? 0 }} {{ $t('aiSettings.个_awom0n') }} {{ overview?.providers?.enabled ?? 0 }}）
             </p>
           </div>
           <div class="flex items-center gap-2">
@@ -452,7 +451,7 @@ onMounted(loadAll)
               :class="readyCount > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-ink-100 text-ink-500'"
             >
               <span class="w-1.5 h-1.5 rounded-full" :class="readyCount > 0 ? 'bg-emerald-500' : 'bg-ink-400'"></span>
-              {{ readyCount > 0 ? 'AI 可用' : 'AI 未配置' }}
+              {{ readyCount > 0 ? $t('aiSettings.text_11gtg1') : $t('aiSettings.text_wcg8s3') }}
             </span>
           </div>
         </div>
@@ -461,7 +460,7 @@ onMounted(loadAll)
           {{ t("aiSettings.检测到_fvdvp") }} <code class="font-mono">.env</code> {{ t("aiSettings.里配置了_p1yqf3") }}<b>{{ t("aiSettings.一旦绑定_1mfwm4") }}</b>。
         </p>
         <p v-if="overview?.registry_error" class="mt-3 text-xs text-red-600">
-          配置加载异常：{{ overview.registry_error }}
+          {{ $t('aiSettings.配置加载_14s7gw') }}{{ overview.registry_error }}
         </p>
       </div>
 
@@ -506,7 +505,7 @@ onMounted(loadAll)
                   class="text-xs px-2 py-0.5 rounded-full"
                   :class="cap.effective.source === 'db' ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'"
                 >
-                  {{ cap.effective.source === 'db' ? '后台配置' : '环境变量' }}
+                  {{ cap.effective.source === 'db' ? $t('aiSettings.后台配置_ayns9v') : $t('aiSettings.环境变量_eynoob') }}
                 </span>
                 <span v-else class="text-xs px-2 py-0.5 rounded-full bg-ink-100 text-ink-500">{{ t("aiSettings.未配置_fte97") }}</span>
               </div>
@@ -522,10 +521,10 @@ onMounted(loadAll)
 
             <div class="flex items-center gap-2 shrink-0">
               <button class="btn-ghost text-sm" :disabled="!cap.effective || capTesting === cap.key" @click="testCapability(cap)">
-                {{ capTesting === cap.key ? '测试中…' : '测试' }}
+                {{ capTesting === cap.key ? $t('aiSettings.测试中_ed42yr') : $t('aiSettings.测试_jcve') }}
               </button>
               <button class="btn-secondary text-sm" @click="editingCap === cap.key ? closeCapEditor() : openCapEditor(cap)">
-                {{ editingCap === cap.key ? '收起' : cap.effective ? '改绑' : '配置' }}
+                {{ editingCap === cap.key ? $t('aiSettings.收起_hzpd') : cap.effective ? $t('aiSettings.改绑_hwvs') : $t('aiSettings.配置_pewx') }}
               </button>
               <button v-if="cap.binding" class="text-xs text-red-600 hover:underline px-1" @click="unbindCapability(cap)">
                 {{ t("aiSettings.解绑_o5e6") }}
@@ -540,7 +539,7 @@ onMounted(loadAll)
             :class="capTestResult[cap.key].ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'"
           >
             <div class="font-medium">
-              {{ capTestResult[cap.key].ok ? '调用成功' : '调用失败' }}
+              {{ capTestResult[cap.key].ok ? $t('aiSettings.调用成功_i5dj2s') : $t('aiSettings.调用失败_i5ccbd') }}
               <span v-if="capTestResult[cap.key].latency_ms" class="font-normal text-ink-500">· {{ capTestResult[cap.key].latency_ms }} ms</span>
             </div>
             <div class="mt-0.5 break-all">{{ capTestResult[cap.key].detail }}</div>
@@ -555,7 +554,7 @@ onMounted(loadAll)
                 <select v-model.number="capDraft.provider_id" class="input">
                   <option :value="null" disabled>{{ t("aiSettings.请选择_l72nr") }}</option>
                   <option v-for="p in enabledOptions" :key="p.id" :value="p.id">
-                    {{ p.name }}{{ p.has_api_key ? '' : '（未填密钥）' }}
+                    {{ p.name }}{{ p.has_api_key ? '' : $t('aiSettings.text_2fz3tt') }}
                   </option>
                 </select>
                 <p v-if="!enabledOptions.length" class="mt-1 text-xs text-amber-600">
@@ -596,7 +595,7 @@ onMounted(loadAll)
 
             <div class="flex items-center gap-2">
               <button class="btn-primary text-sm" :disabled="capSaving" @click="saveCapability(cap)">
-                {{ capSaving ? '保存中…' : '保存绑定' }}
+                {{ capSaving ? $t('aiSettings.保存中_agdrec') : $t('aiSettings.保存绑定_agmczo') }}
               </button>
               <button class="btn-ghost text-sm" @click="closeCapEditor">{{ t("aiSettings.cancel") }}</button>
               <span class="text-xs text-ink-400">{{ t("aiSettings.参数留空_jram8y") }}</span>
@@ -612,13 +611,13 @@ onMounted(loadAll)
             {{ t("aiSettings.一家服务_31mprz") }}
           </p>
           <button class="btn-primary text-sm" @click="showForm ? (showForm = false) : openCreate()">
-            {{ showForm ? '取消' : '+ 添加服务商' }}
+            {{ showForm ? $t('aiSettings.取消_ev02') : $t('aiSettings.text_lp8ny0') }}
           </button>
         </div>
 
         <!-- 表单 -->
         <form v-if="showForm" class="card space-y-3" @submit.prevent="saveProvider">
-          <h3 class="font-semibold">{{ editingProvider ? `编辑：${editingProvider.name}` : '添加服务商' }}</h3>
+          <h3 class="font-semibold">{{ editingProvider ? `编辑：${editingProvider.name}` : $t('aiSettings.添加服务_eor1il') }}</h3>
 
           <div v-if="!editingProvider && presets.length" class="flex flex-wrap gap-2">
             <span class="text-xs text-ink-500 self-center">{{ t("aiSettings.快速填充_12fjle") }}</span>
@@ -658,7 +657,7 @@ onMounted(loadAll)
             <label class="block text-sm font-medium mb-1">
               {{ t("aiSettings.text_w1oo79") }}
               <span v-if="editingProvider" class="text-xs text-ink-400 font-normal">
-                （当前 {{ editingProvider.api_key_hint || '未配置' }}，留空表示不修改）
+                {{ $t('aiSettings.text_11tftu') }} {{ editingProvider.api_key_hint || $t('aiSettings.未配置_fte97') }}{{ $t('aiSettings.text_1amx30') }}
               </span>
             </label>
             <input
@@ -707,7 +706,7 @@ onMounted(loadAll)
 
           <div class="flex items-center gap-2 pt-1">
             <button type="submit" class="btn-primary text-sm" :disabled="formSaving">
-              {{ formSaving ? '保存中…' : '保存' }}
+              {{ formSaving ? $t('aiSettings.保存中_agdrec') : $t('aiSettings.保存_e32z') }}
             </button>
             <button type="button" class="btn-ghost text-sm" @click="showForm = false">{{ t("aiSettings.cancel") }}</button>
           </div>
@@ -756,10 +755,10 @@ onMounted(loadAll)
                   <td class="px-4 py-3">
                     <div class="flex items-center gap-1.5">
                       <span class="w-1.5 h-1.5 rounded-full" :class="p.enabled ? 'bg-emerald-500' : 'bg-ink-300'"></span>
-                      <span class="text-xs" :class="p.enabled ? 'text-ink-700' : 'text-ink-400'">{{ p.enabled ? '启用' : '停用' }}</span>
+                      <span class="text-xs" :class="p.enabled ? 'text-ink-700' : 'text-ink-400'">{{ p.enabled ? $t('aiSettings.启用_eymx') : $t('aiSettings.停用_eb7w') }}</span>
                     </div>
                     <div v-if="p.last_test_at" class="mt-1 text-xs" :class="p.last_test_ok ? 'text-emerald-600' : 'text-red-600'">
-                      {{ p.last_test_ok ? '上次测试通过' : '上次测试失败' }}
+                      {{ p.last_test_ok ? $t('aiSettings.上次测试_j0bga6') : $t('aiSettings.上次测试_j023it') }}
                       <span class="text-ink-400">· {{ fmtTime(p.last_test_at) }}</span>
                     </div>
                     <div v-if="providerTestResult[p.id]" class="mt-1 text-xs break-all" :class="providerTestResult[p.id].ok ? 'text-emerald-600' : 'text-red-600'">
@@ -769,7 +768,7 @@ onMounted(loadAll)
                   </td>
                   <td class="px-4 py-3 text-right whitespace-nowrap">
                     <button class="text-xs text-ink-700 hover:underline mr-2" :disabled="testingProvider === p.id" @click="testProvider(p)">
-                      {{ testingProvider === p.id ? '测试中…' : '测试' }}
+                      {{ testingProvider === p.id ? $t('aiSettings.测试中_ed42yr') : $t('aiSettings.测试_jcve') }}
                     </button>
                     <button class="text-xs text-ink-700 hover:underline mr-2" @click="openEdit(p)">{{ t("aiSettings.edit") }}</button>
                     <button class="text-xs text-red-600 hover:underline" @click="removeProvider(p)">{{ t("aiSettings.delete") }}</button>

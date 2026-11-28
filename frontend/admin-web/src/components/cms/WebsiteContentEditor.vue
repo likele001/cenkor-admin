@@ -149,8 +149,7 @@ const STR_LISTS = [
 <template>
   <div class="space-y-4">
     <div class="rounded-lg border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-700">
-      {{ t("websiteContentEditor.这里的内_1uug9j") }} <strong>www.cenkor.cn</strong> 的产品详情页与落地页。
-      改完请点页面底部「保存修改」，官网会自动同步（约 5 分钟内）。
+      {{ t("websiteContentEditor.这里的内_1uug9j") }} <strong>www.cenkor.cn</strong> {{ $t('websiteContentEditor.的产品详_1frpke') }}
     </div>
 
     <!-- 一句话摘要 -->
@@ -177,7 +176,7 @@ const STR_LISTS = [
       class="card"
     >
       <summary class="cursor-pointer font-medium text-ink-900">
-        {{ sec.label }} <span class="text-sm font-normal text-ink-400">（{{ list(sec.key).length }} 条）</span>
+        {{ sec.label }} <span class="text-sm font-normal text-ink-400">（{{ list(sec.key).length }} {{ $t('websiteContentEditor.条_izew') }}</span>
       </summary>
       <p class="mt-2 text-sm text-ink-500">{{ sec.hint }}</p>
 
@@ -189,7 +188,7 @@ const STR_LISTS = [
         class="mt-4 rounded-lg border border-ink-200 p-4 space-y-3"
       >
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="text-xs font-medium text-ink-500">第 {{ i + 1 }} 条</span>
+          <span class="text-xs font-medium text-ink-500">{{ $t('websiteContentEditor.第_obw') }} {{ i + 1 }} {{ $t('websiteContentEditor.条_kf5') }}</span>
           <div class="flex flex-wrap gap-2 text-xs">
             <button type="button" class="btn-ghost" :disabled="i === 0" @click="moveItem(sec.key, i, -1)">{{ t("websiteContentEditor.上移_dxyp") }}</button>
             <button type="button" class="btn-ghost" :disabled="i === list(sec.key).length - 1" @click="moveItem(sec.key, i, 1)">{{ t("websiteContentEditor.下移_dxzk") }}</button>
@@ -252,7 +251,7 @@ const STR_LISTS = [
     <!-- 字符串数组：适合 / 不适合 -->
     <details v-for="sec in STR_LISTS" :key="sec.key" :open="sec.open" class="card">
       <summary class="cursor-pointer font-medium text-ink-900">
-        {{ sec.label }} <span class="text-sm font-normal text-ink-400">（{{ list(sec.key).length }} 条）</span>
+        {{ sec.label }} <span class="text-sm font-normal text-ink-400">（{{ list(sec.key).length }} {{ $t('websiteContentEditor.条_izew') }}</span>
       </summary>
       <p class="mt-2 text-sm text-ink-500">{{ sec.hint }}</p>
       <p v-if="!list(sec.key).length" class="mt-3 text-sm text-ink-400">{{ t("websiteContentEditor.暂无内容_1mub4u") }}</p>

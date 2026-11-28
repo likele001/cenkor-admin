@@ -69,7 +69,16 @@ const manualKey = computed(() => {
 const manualUrl = computed(() =>
   manualKey.value ? `${MANUAL_BASE}/${manualKey.value}_操作手册` : `${MANUAL_BASE}/`,
 )
-const manualLabel = computed(() => MANUAL_LABEL[manualKey.value] || '用户手册总目录')
+const manualLabel = computed(() => {
+  const k = manualKey.value
+  if (!k) return t('appLayout.用户手册总目录')
+  const mk = Object.keys(MANUAL_MAP).find((p) => MANUAL_MAP[p] === k)
+  const dbKey = k === 'notification' ? 'system:notifications' : k.replace(/_/g, ':')
+  const tk = `nav.menu.${dbKey.replace(/:/g, '__')}`
+  const tv = t(tk)
+  if (tv !== tk) return tv
+  return MANUAL_LABEL[k] || t('appLayout.用户手册总目录')
+})
 
 interface MenuItem {
   id: number
@@ -137,8 +146,18 @@ const navKeyMap: Record<string, string> = {
   '/links': 'nav.links',
 }
 
+// 菜单标题：数据库里存的是中文 title，翻译走 nav.menu.<key>（key 里的 ':' 换成 '__'）。
+// 找不到译文时回退数据库 title，保证新增菜单不会显示成裸 key。
 function resolveTitle(item: { title?: string; key?: string; path?: string | null }) {
-  if (item.key && item.path && navKeyMap[item.path]) return t(navKeyMap[item.path])
+  if (item.key) {
+    const mk = `nav.menu.${item.key.replace(/:/g, '__')}`
+    const mt = t(mk)
+    if (mt !== mk) return mt
+  }
+  if (item.key && item.path && navKeyMap[item.path]) {
+    const nk = t(navKeyMap[item.path])
+    if (nk !== navKeyMap[item.path]) return nk
+  }
   if (item.key) {
     const k = `nav.${item.key.replace(/^cms:|^system:|^announcements:|^tickets:|^links:/, '')}`
     const translated = t(k)
@@ -362,7 +381,7 @@ async function logout() {
               :href="manualUrl"
               target="_blank"
               rel="noopener noreferrer"
-              :title="`打开「${manualLabel}」的使用手册`"
+              :title="t('appLayout.打开使用手册', { name: manualLabel })"
               class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-ink-500 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 shrink-0"
             >
               <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

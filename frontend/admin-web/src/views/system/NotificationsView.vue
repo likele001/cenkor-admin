@@ -83,7 +83,7 @@ onMounted(load)
       </div>
       <div class="flex gap-2">
         <button class="btn-ghost text-sm" @click="unreadOnly = !unreadOnly; load()">
-          {{ unreadOnly ? '查看全部' : '只看未读' }}
+          {{ unreadOnly ? $t('notifications.查看全部_dll6ti') : $t('notifications.只看未读_b2yt6a') }}
         </button>
         <button class="btn-ghost text-sm" @click="markAllRead">{{ t("notifications.全部已读_avbop5") }}</button>
         <button class="btn-primary text-sm" @click="showSend = true">{{ t("notifications.发送通知_b6dbh7") }}</button>
@@ -148,7 +148,7 @@ onMounted(load)
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn-ghost" @click="showSend = false">{{ t("notifications.cancel") }}</button>
           <button class="btn-primary" :disabled="sending || !sendForm.title" @click="send">
-            {{ sending ? '发送中...' : '发送给所有人' }}
+            {{ sending ? $t('notifications.发送中_6kni41') : $t('notifications.发送给所_d4ikfc') }}
           </button>
         </div>
       </div>

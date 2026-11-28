@@ -245,8 +245,8 @@ onMounted(async () => {
               <div>
                 <h2 class="text-base font-semibold text-ink-900">{{ detail.label }}</h2>
                 <p class="mt-0.5 text-xs text-ink-400 font-mono">
-                  {{ detail.key }} · 当前生效
-                  {{ activeVer ? `v${activeVer.version}` : '（出厂默认）' }}
+                  {{ detail.key }} {{ $t('aiPrompts.text_sh6k6k') }}
+                  {{ activeVer ? `v${activeVer.version}` : $t('aiPrompts.text_1pbcnh') }}
                 </p>
               </div>
               <span
@@ -319,7 +319,7 @@ onMounted(async () => {
                   {{ t("aiPrompts.生效中_hn8ec") }}
                 </span>
                 <span class="text-xs text-ink-500 flex-1 min-w-[160px] truncate">
-                  {{ v.note || '（无说明）' }}
+                  {{ v.note || $t('aiPrompts.text_g60c0n') }}
                 </span>
                 <span class="text-xs text-ink-400">{{ fmtTime(v.created_at) }}</span>
                 <button
@@ -345,7 +345,7 @@ onMounted(async () => {
           <div v-if="diffText" class="card">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-sm font-semibold text-ink-900">
-                v{{ diffFrom }} → v{{ activeVer?.version }} 的差异
+                v{{ diffFrom }} → v{{ activeVer?.version }} {{ $t('aiPrompts.的差异_htffc') }}
               </h3>
               <button class="text-xs text-ink-500 hover:text-ink-900" @click="diffText = ''">
                 {{ t("aiPrompts.close") }}

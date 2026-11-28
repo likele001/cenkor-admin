@@ -160,7 +160,7 @@ onMounted(load)
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
         <div class="flex items-center justify-between mb-6">
-          <h1 class="text-2xl font-semibold tracking-tight">菜单树（{{ flatMenus.length }} 个）</h1>
+          <h1 class="text-2xl font-semibold tracking-tight">{{ $t('menus.菜单树_gzgjio') }}{{ flatMenus.length }} {{ $t('menus.个_ep0f') }}</h1>
           <button @click="openNew(null)" class="btn-primary">{{ t('menus.text_6dvuyx') }}</button>
         </div>
 
@@ -191,7 +191,7 @@ onMounted(load)
                   <td class="px-4 py-3">
                     <span class="text-xs px-2 py-0.5 rounded-full"
                       :class="m.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-100 text-ink-500'">
-                      {{ m.status === 'active' ? '激活' : m.status }}
+                      {{ m.status === 'active' ? $t('menus.激活_jlvf') : m.status }}
                     </span>
                   </td>
                   <td class="px-4 py-3 text-ink-500">{{ m.sort }}</td>
@@ -233,7 +233,7 @@ onMounted(load)
     <div v-if="showDialog" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40" @click.self="showDialog = false">
       <div class="bg-white rounded-2xl w-full max-w-md p-6">
         <h2 class="text-lg font-semibold mb-4">
-          {{ isNew ? (isChild ? '新建子菜单' : '新建顶级菜单') : '编辑菜单' }}
+          {{ isNew ? (isChild ? $t('menus.新建子菜_1it5d4') : $t('menus.新建顶级_221pmc')) : $t('menus.编辑菜单_gmpnxw') }}
         </h2>
         <form @submit.prevent="save" class="space-y-4">
           <div>
@@ -277,7 +277,7 @@ onMounted(load)
           <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
           <div class="flex gap-3 pt-2">
             <button type="submit" :disabled="saving" class="btn-primary flex-1">
-              {{ saving ? '保存中…' : isNew ? '创建' : '保存' }}
+              {{ saving ? $t('menus.保存中_agdrec') : isNew ? $t('menus.创建_ehj3') : $t('menus.保存_e32z') }}
             </button>
             <button type="button" @click="showDialog = false" class="btn-ghost">{{ t('usersList.取消_ev02') }}</button>
           </div>

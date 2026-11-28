@@ -131,7 +131,7 @@ watch(search, () => { load() })
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <h1 class="text-2xl font-semibold tracking-tight">用户列表（{{ users.length }}）</h1>
+          <h1 class="text-2xl font-semibold tracking-tight">{{ $t('usersList.用户列表_18mt02') }}{{ users.length }}）</h1>
           <div class="flex items-center gap-3">
             <SearchInput v-model="search" :placeholder="t('usersList.按用户名_nj7r77')" />
             <CsvExportButton endpoint="/api/v1/auth/users/export" filename="users.csv" :params="{ search: search || undefined }" />
@@ -172,7 +172,7 @@ watch(search, () => { load() })
                 <td class="px-4 py-3">
                   <span class="text-xs px-2 py-0.5 rounded-full"
                     :class="u.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-200 text-ink-600'">
-                    {{ u.status === 'active' ? '活跃' : u.status }}
+                    {{ u.status === 'active' ? $t('usersList.活跃_jcvc') : u.status }}
                   </span>
                 </td>
                 <td class="px-4 py-3 text-ink-500 text-xs">
@@ -194,7 +194,7 @@ watch(search, () => { load() })
     <!-- 编辑/新建对话框 -->
     <div v-if="showDialog" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40" @click.self="showDialog = false">
       <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建用户' : '编辑用户' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ isNew ? $t('usersList.新建用户_d87cgp') : $t('usersList.编辑用户_gmn8ui') }}</h2>
         <form @submit.prevent="save" class="space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -241,7 +241,7 @@ watch(search, () => { load() })
           <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
           <div class="flex gap-3 pt-2">
             <button type="submit" :disabled="saving" class="btn-primary flex-1">
-              {{ saving ? '保存中…' : isNew ? '创建' : '保存' }}
+              {{ saving ? $t('usersList.保存中_agdrec') : isNew ? $t('usersList.创建_ehj3') : $t('usersList.保存_e32z') }}
             </button>
             <button type="button" @click="showDialog = false" class="btn-ghost">{{ t('usersList.取消_ev02') }}</button>
           </div>

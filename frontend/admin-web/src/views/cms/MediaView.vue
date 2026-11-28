@@ -243,7 +243,7 @@ watch(search, () => { load() })
           <input :value="selected.url" readonly class="input text-xs font-mono" />
           <div class="flex gap-2">
             <button @click="copyUrl(selected)" class="btn-outline flex-1 text-sm">
-              {{ copied ? '✓ 已复制' : '复制 URL' }}
+              {{ copied ? $t('media.text_b4l9ym') : $t('media.复制_yf5v20') }}
             </button>
             <a :href="getPresignedUrl(selected)" target="_blank" class="btn-ghost text-sm">{{ t('media.打开_h8ul') }}</a>
             <button @click="del(selected)" class="text-sm text-red-600 hover:underline px-2">{{ t('usersList.删除_eslg') }}</button>

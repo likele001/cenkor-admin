@@ -131,7 +131,7 @@ onMounted(load)
           type="search"
           :placeholder="t('siteConfig.输入_g7nwvq')"
         />
-        <span class="text-sm text-ink-400">共 {{ totalMatched }} 项</span>
+        <span class="text-sm text-ink-400">{{ $t('siteConfig.共_g35') }} {{ totalMatched }} {{ $t('siteConfig.项_u49') }}</span>
       </div>
 
       <div v-if="items.length === 0" class="card text-center text-ink-400 py-12">{{ t('siteConfig.暂无配置_1n3u3j') }}</div>
@@ -151,7 +151,7 @@ onMounted(load)
               </div>
               <span v-if="item.updated_at" class="text-xs text-ink-400 shrink-0">{{ item.updated_at.slice(0, 10) }}</span>
             </div>
-            <label class="sr-only" :for="`cfg-${item.key}`">{{ item.key }} 的值</label>
+            <label class="sr-only" :for="`cfg-${item.key}`">{{ item.key }} {{ $t('siteConfig.的值_klko') }}</label>
             <textarea :id="`cfg-${item.key}`" v-model="editValues[item.key]" rows="2" class="input font-mono text-sm" />
             <div class="mt-3 flex items-center gap-3">
               <button
@@ -159,7 +159,7 @@ onMounted(load)
                 :disabled="saving === item.key"
                 @click="save(item)"
               >
-                {{ saving === item.key ? '保存中…' : '保存' }}
+                {{ saving === item.key ? $t('siteConfig.保存中_agdrec') : $t('siteConfig.保存_e32z') }}
               </button>
               <span v-if="savedKey === item.key" class="text-sm text-emerald-600" role="status">{{ t("siteConfig.已保存_1a46re") }}</span>
             </div>

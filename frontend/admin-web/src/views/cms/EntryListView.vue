@@ -295,12 +295,12 @@ onMounted(async () => {
         <option value="archived">{{ t('productEdit.已归档_e85oj') }}</option>
       </select>
       <button class="btn-ghost" @click="onSearch">{{ t('portalUsersList.搜索_hpqe') }}</button>
-      <span class="text-ink-400 text-sm ml-auto">共 {{ total }} 条</span>
+      <span class="text-ink-400 text-sm ml-auto">{{ $t('entryList.共_g35') }} {{ total }} {{ $t('entryList.条_kf5') }}</span>
     </div>
 
     <!-- Batch actions -->
     <div v-if="selected.length" class="mb-2 p-2 bg-blue-50 rounded flex items-center gap-2 text-sm">
-      已选 {{ selected.length }} 条
+      {{ $t('entryList.已选_grpz') }} {{ selected.length }} {{ $t('entryList.条_kf5') }}
       <button class="btn-ghost text-xs" @click="batchAction('publish')">{{ t('entryList.发布_erte') }}</button>
       <button class="btn-ghost text-xs" @click="batchAction('draft')">{{ t('entryList.转草稿_ln9fm') }}</button>
       <button class="btn-ghost text-xs" @click="batchAction('archive')">{{ t('entryList.归档_gsb5') }}</button>
@@ -355,7 +355,7 @@ onMounted(async () => {
               >{{ STATUS_META[e.status]?.label || e.status }}</span>
               <!-- 审核通过但排期在未来：让审核的人一眼看到「不是没生效，是等到点才发」 -->
               <div v-if="e.status === 'approved' && e.scheduled_at" class="mt-0.5 text-[11px] text-ink-400 whitespace-nowrap">
-                ⏰ {{ fmtSchedule(e.scheduled_at) }} 自动发布
+                ⏰ {{ fmtSchedule(e.scheduled_at) }} {{ $t('entryList.自动发布_gqenyo') }}
               </div>
             </td>
             <td class="py-2 px-2">

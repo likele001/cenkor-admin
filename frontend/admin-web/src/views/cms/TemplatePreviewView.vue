@@ -151,7 +151,7 @@ onMounted(async () => {
       <div class="card">
         <h3 class="font-medium text-sm mb-2">{{ t('templatePreview.渲染结果_jsth5o') }}</h3>
         <div v-if="error" class="text-red-600 text-sm">{{ error }}</div>
-        <pre v-else class="whitespace-pre-wrap text-sm bg-ink-50 p-3 rounded font-mono">{{ rendered || '（点击「渲染」按钮查看效果）' }}</pre>
+        <pre v-else class="whitespace-pre-wrap text-sm bg-ink-50 p-3 rounded font-mono">{{ rendered || $t('templatePreview.text_myt3fk') }}</pre>
 
         <h3 class="font-medium text-sm mt-4 mb-2">{{ t('templatePreview.字段定义_3y0ez1') }}</h3>
         <div v-if="fields.length" class="text-xs space-y-1">

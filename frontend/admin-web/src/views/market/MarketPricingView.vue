@@ -137,7 +137,7 @@ async function save() {
         <div>
           <h2 class="font-semibold">{{ t("marketPricing.商品与扣_1obbh9") }}</h2>
           <p class="text-xs text-ink-500 mt-1">
-            共 {{ total }} 个商品 · 全局默认扣点 {{ bpToPercent(defaultFeeBp) }}%
+            {{ $t('marketPricing.共_g35') }} {{ total }} {{ $t('marketPricing.个商品_1ybz4j') }} {{ bpToPercent(defaultFeeBp) }}%
           </p>
         </div>
         <input v-model="keyword" class="input !w-56" :placeholder="t('marketPricing.搜索_mamtnr')" />
@@ -179,7 +179,7 @@ async function save() {
                 {{ MODEL_LABEL[r.model] || r.model }}
               </span>
               <div v-if="r.model !== 'free'" class="text-xs text-ink-400 mt-1">
-                {{ r.enabled ? '在售' : '已下架' }}
+                {{ r.enabled ? $t('marketPricing.在售_faiu') : $t('marketPricing.已下架_e57r1') }}
               </div>
             </td>
             <td class="px-3 py-3 text-right">
@@ -221,7 +221,7 @@ async function save() {
       </table>
 
       <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 text-sm">
-        <span class="text-ink-500">共 {{ total }} 条</span>
+        <span class="text-ink-500">{{ $t('marketPricing.共_g35') }} {{ total }} {{ $t('marketPricing.条_kf5') }}</span>
         <div class="flex items-center gap-2">
           <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">{{ t("marketPricing.上一页_btlof") }}</button>
           <span class="text-ink-500">{{ page }} / {{ totalPages }}</span>
@@ -270,7 +270,7 @@ async function save() {
             <div class="flex gap-4 text-sm">
               <label class="inline-flex items-center gap-2 cursor-pointer">
                 <input v-model="meta.fee_mode" type="radio" value="default" />
-                <span>用全局默认（{{ bpToPercent(defaultFeeBp) }}%）</span>
+                <span>{{ $t('marketPricing.用全局默_14pw8u') }}{{ bpToPercent(defaultFeeBp) }}%）</span>
               </label>
               <label class="inline-flex items-center gap-2 cursor-pointer">
                 <input v-model="meta.fee_mode" type="radio" value="override" />
@@ -294,7 +294,7 @@ async function save() {
 
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
           <button class="btn-ghost" @click="showEdit = false">{{ t("marketPricing.cancel") }}</button>
-          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? $t('marketPricing.保存中_agdrec') : $t('marketPricing.保存_e32z') }}</button>
         </div>
       </div>
     </div>

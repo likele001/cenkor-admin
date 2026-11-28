@@ -137,7 +137,7 @@ watch(search, () => { load() })
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <h1 class="text-2xl font-semibold tracking-tight">角色列表（{{ roles.length }}）</h1>
+          <h1 class="text-2xl font-semibold tracking-tight">{{ $t('roles.角色列表_1mgp1q') }}{{ roles.length }}）</h1>
           <div class="flex items-center gap-3">
             <SearchInput v-model="search" :placeholder="t('roles.按_fqum9q')" />
             <button @click="openNew" class="btn-primary">{{ t('roles.text_y2u7b3') }}</button>
@@ -168,7 +168,7 @@ watch(search, () => { load() })
     <!-- 对话框 -->
     <div v-if="showDialog" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40" @click.self="showDialog = false">
       <div class="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建角色' : '编辑角色' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ isNew ? $t('roles.新建角色_d8b1d6') : $t('roles.编辑角色_gmqxqz') }}</h2>
         <form @submit.prevent="save" class="space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -185,7 +185,7 @@ watch(search, () => { load() })
             <RichTextEditor v-model="form.description" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-2">权限（{{ permissions.length }} 个）</label>
+            <label class="block text-sm font-medium mb-2">{{ $t('roles.权限_fvgor') }}{{ permissions.length }} {{ $t('roles.个_ep0f') }}</label>
             <div class="border border-ink-200 rounded-xl p-3 max-h-80 overflow-y-auto space-y-3">
               <div v-for="(perms, prefix) in groupedPerms()" :key="prefix">
                 <div class="text-xs font-medium text-ink-500 uppercase tracking-widest mb-1">{{ prefix }}</div>
@@ -201,7 +201,7 @@ watch(search, () => { load() })
           <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
           <div class="flex gap-3 pt-2">
             <button type="submit" :disabled="saving" class="btn-primary flex-1">
-              {{ saving ? '保存中…' : isNew ? '创建' : '保存' }}
+              {{ saving ? $t('roles.保存中_agdrec') : isNew ? $t('roles.创建_ehj3') : $t('roles.保存_e32z') }}
             </button>
             <button type="button" @click="showDialog = false" class="btn-ghost">{{ t('usersList.取消_ev02') }}</button>
           </div>

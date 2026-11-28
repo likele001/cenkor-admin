@@ -104,7 +104,7 @@ onMounted(load)
           {{ t('apiKeys.创建APIKey以便外部系统通过') }} <code class="px-1 rounded bg-ink-100">Authorization: Bearer ck_...</code> {{ t('apiKeys.调用') }}
         </p>
         <button class="btn-primary" @click="showCreate = !showCreate">
-          {{ showCreate ? '取消' : '+ 新建 API Key' }}
+          {{ showCreate ? $t('apiKeys.取消_ev02') : $t('apiKeys.text_1elae6') }}
         </button>
       </div>
 
@@ -123,7 +123,7 @@ onMounted(load)
           <input v-model.number="form.expires_days" type="number" min="1" max="3650" class="input" placeholder="365" />
         </div>
         <button type="submit" class="btn-primary" :disabled="creating">
-          {{ creating ? '创建中…' : '创建' }}
+          {{ creating ? $t('apiKeys.创建中_ar3fh4') : $t('apiKeys.创建_ehj3') }}
         </button>
       </form>
 
@@ -132,7 +132,7 @@ onMounted(load)
         <h3 class="text-sm font-semibold text-amber-800">{{ t('apiKeys.text_1x8682') }}</h3>
         <div class="mt-2 flex items-center gap-2">
           <code class="flex-1 px-3 py-2 bg-white border border-amber-200 rounded font-mono text-xs break-all">{{ newKey.token }}</code>
-          <button class="btn-primary text-sm" @click="copyToken">{{ copied ? '已复制' : '复制' }}</button>
+          <button class="btn-primary text-sm" @click="copyToken">{{ copied ? $t('apiKeys.已复制_e6ywr') : $t('apiKeys.复制_fljd') }}</button>
         </div>
         <button class="mt-3 text-xs text-amber-700 hover:underline" @click="newKey = null">{{ t('apiKeys.我已保存_11twiv') }}</button>
       </div>

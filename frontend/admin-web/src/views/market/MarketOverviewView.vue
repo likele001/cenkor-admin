@@ -114,7 +114,7 @@ const devTotalCents = computed(() => {
       <div class="card">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold">{{ t("marketOverview.开发者应_dci3ul") }}</h3>
-          <span class="text-sm text-ink-500">合计 ¥{{ centsToYuan(devTotalCents) }}</span>
+          <span class="text-sm text-ink-500">{{ $t('marketOverview.合计_b6082m') }}{{ centsToYuan(devTotalCents) }}</span>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div>
@@ -199,7 +199,7 @@ const devTotalCents = computed(() => {
         </div>
         <div class="flex items-center gap-3 mt-5">
           <button class="btn-primary" :disabled="saving" @click="saveSettings">
-            {{ saving ? '保存中…' : '保存参数' }}
+            {{ saving ? $t('marketOverview.保存中_agdrec') : $t('marketOverview.保存参数_agf39l') }}
           </button>
           <span v-if="msg" class="text-sm text-emerald-600">{{ msg }}</span>
           <span v-if="cfgError" class="text-sm text-red-600">{{ cfgError }}</span>

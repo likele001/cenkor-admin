@@ -38,7 +38,7 @@ const tabs: Array<{ key: 'all' | 'published' | 'draft' | 'archived'; label: stri
         class="rounded"
         @change="emit('update:include-deleted', ($event.target as HTMLInputElement).checked)"
       />
-      <span>包含已删除（回收站）</span>
+      <span>{{ $t('statusFilterTabs.包含已删_99o1fk') }}</span>
     </label>
   </div>
 </template>

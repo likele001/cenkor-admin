@@ -260,8 +260,8 @@ function imgDelete() {
 
     <EditorContent :editor="editor" class="rte-content" />
     <div class="rte-footer">
-      <span class="text-xs text-ink-400">支持粘贴图片 / Markdown 快捷输入（`# `、`- `、`> `、`---`）</span>
-      <span class="text-xs text-ink-400">{{ charCount }} 字</span>
+      <span class="text-xs text-ink-400">{{ $t('richTextEditor.支持粘贴_7c4tn4') }}</span>
+      <span class="text-xs text-ink-400">{{ charCount }} {{ $t('richTextEditor.字_i1j') }}</span>
     </div>
     <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onImage" />
     <input ref="replaceInput" type="file" accept="image/*" class="hidden" @change="onReplaceImage" />

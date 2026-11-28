@@ -132,7 +132,7 @@ watch(() => props.visible, (v) => {
     <div v-if="visible" class="mp-overlay" @click.self="emit('close')">
       <div class="mp-modal" @click.stop>
         <div class="mp-header">
-          <h3 class="mp-title">{{ multiple ? '从媒体库选择图片（可多选）' : '从媒体库选择图片' }}</h3>
+          <h3 class="mp-title">{{ multiple ? $t('mediaPicker.从媒体库_in89d2') : $t('mediaPicker.从媒体库_9rcj71') }}</h3>
           <button type="button" class="mp-close" @click="emit('close')">✕</button>
         </div>
 
@@ -150,7 +150,7 @@ watch(() => props.visible, (v) => {
             :disabled="uploading"
             @click="openFilePicker"
           >
-            {{ uploading ? '上传中...' : '⬆️ 上传新图' }}
+            {{ uploading ? $t('mediaPicker.上传中_1b2adf') : $t('mediaPicker.text_169ha1') }}
           </button>
           <input
             ref="fileInput"
@@ -185,7 +185,7 @@ watch(() => props.visible, (v) => {
         </div>
 
         <div class="mp-footer">
-          <span class="mp-count">已选 {{ selected.size }} 张</span>
+          <span class="mp-count">{{ $t('mediaPicker.已选_grpz') }} {{ selected.size }} {{ $t('mediaPicker.张_isg') }}</span>
           <div class="mp-actions">
             <button type="button" class="mp-btn cancel" @click="emit('close')">{{ t("mediaPicker.cancel") }}</button>
             <button type="button" class="mp-btn confirm" :disabled="selected.size === 0" @click="confirm">

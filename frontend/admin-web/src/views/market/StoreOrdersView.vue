@@ -259,7 +259,7 @@ async function runCleanup(exec: boolean) {
         <div>
           <h2 class="font-semibold">{{ t("storeOrders.订单管理_hytrqw") }}</h2>
           <p class="text-xs text-ink-500 mt-1">
-            共 {{ total }} 条 · 未付款的单可直接删除，已付款的只能作废隐藏（账目留痕）
+            {{ $t('storeOrders.共_g35') }} {{ total }} {{ $t('storeOrders.条_1vjlmy') }}
           </p>
         </div>
         <div class="flex gap-2">
@@ -326,8 +326,8 @@ async function runCleanup(exec: boolean) {
             </td>
             <td class="px-3 py-3">
               <div>{{ tab === 'store' ? (row.app_name || row.app_key) : row.subject }}</div>
-              <div v-if="tab === 'store'" class="text-xs text-ink-400">{{ row.app_key }} · {{ row.seats }} 席</div>
-              <div v-else-if="row.biz_id" class="text-xs text-ink-400">业务单 {{ row.biz_id }}</div>
+              <div v-if="tab === 'store'" class="text-xs text-ink-400">{{ row.app_key }} · {{ row.seats }} {{ $t('storeOrders.席_ilp') }}</div>
+              <div v-else-if="row.biz_id" class="text-xs text-ink-400">{{ $t('storeOrders.业务单_buc8e') }} {{ row.biz_id }}</div>
             </td>
             <td class="px-3 py-3">
               <div>{{ row.buyer_name || row.buyer_email || '—' }}</div>
@@ -343,7 +343,7 @@ async function runCleanup(exec: boolean) {
             </td>
             <td class="px-3 py-3">
               <div class="text-xs">{{ fmtTime(row.created_at) }}</div>
-              <div v-if="row.paid_at" class="text-xs text-emerald-600 mt-1">付款 {{ fmtTime(row.paid_at) }}</div>
+              <div v-if="row.paid_at" class="text-xs text-emerald-600 mt-1">{{ $t('storeOrders.付款_dzza') }} {{ fmtTime(row.paid_at) }}</div>
             </td>
             <td class="px-3 py-3 text-right whitespace-nowrap">
               <button class="text-xs text-blue-600 hover:text-blue-800 mr-2" @click="openDetail(row)">{{ t("storeOrders.detail") }}</button>
@@ -401,7 +401,7 @@ async function runCleanup(exec: boolean) {
       </table>
 
       <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 text-sm">
-        <span class="text-ink-500">共 {{ total }} 条</span>
+        <span class="text-ink-500">{{ $t('storeOrders.共_g35') }} {{ total }} {{ $t('storeOrders.条_kf5') }}</span>
         <div class="flex items-center gap-2">
           <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">{{ t("storeOrders.上一页_btlof") }}</button>
           <span class="text-ink-500">{{ page }} / {{ totalPages }}</span>
@@ -427,18 +427,18 @@ async function runCleanup(exec: boolean) {
           <div v-else-if="detail.error" class="text-red-600">{{ detail.error }}</div>
           <template v-else>
             <div class="rounded-xl bg-ink-50 border border-ink-200 p-3 text-xs text-ink-600 grid grid-cols-2 gap-y-1">
-              <div>状态：{{ detail.status || detailRow?.status }}</div>
-              <div>金额：{{ yuan(detail.amount_cents ?? detailRow?.amount_cents) }}</div>
-              <div>创建：{{ fmtTime(detail.created_at || detailRow?.created_at) }}</div>
-              <div>付款：{{ fmtTime(detail.paid_at || detailRow?.paid_at) }}</div>
-              <div v-if="detail.biz_id">业务单：{{ detail.biz_id }}</div>
-              <div v-if="detail.trade_no">网关单号：{{ detail.trade_no }}</div>
-              <div v-if="detail.expire_at">失效时间：{{ fmtTime(detail.expire_at) }}</div>
-              <div v-if="detail.return_url" class="col-span-2">回跳：{{ detail.return_url }}</div>
+              <div>{{ $t('storeOrders.状态_halin') }}{{ detail.status || detailRow?.status }}</div>
+              <div>{{ $t('storeOrders.金额_m48tq') }}{{ yuan(detail.amount_cents ?? detailRow?.amount_cents) }}</div>
+              <div>{{ $t('storeOrders.创建_cihtn') }}{{ fmtTime(detail.created_at || detailRow?.created_at) }}</div>
+              <div>{{ $t('storeOrders.付款_c3dro') }}{{ fmtTime(detail.paid_at || detailRow?.paid_at) }}</div>
+              <div v-if="detail.biz_id">{{ $t('storeOrders.业务单_a75xm4') }}{{ detail.biz_id }}</div>
+              <div v-if="detail.trade_no">{{ $t('storeOrders.网关单号_b7mweu') }}{{ detail.trade_no }}</div>
+              <div v-if="detail.expire_at">{{ $t('storeOrders.失效时间_6si9vp') }}{{ fmtTime(detail.expire_at) }}</div>
+              <div v-if="detail.return_url" class="col-span-2">{{ $t('storeOrders.回跳_dfld1') }}{{ detail.return_url }}</div>
               <div v-if="detail.refunds?.length" class="col-span-2">
-                退款：{{ detail.refunds.length }} 笔，合计 {{ yuan(detail.refunds.reduce((s: number, r: any) => s + (r.amount_cents || 0), 0)) }}
+                {{ $t('storeOrders.退款_lmy70') }}{{ detail.refunds.length }} {{ $t('storeOrders.笔_gkmjo1') }} {{ yuan(detail.refunds.reduce((s: number, r: any) => s + (r.amount_cents || 0), 0)) }}
               </div>
-              <div v-if="detail.notify_count !== undefined">回调次数：{{ detail.notify_count }}</div>
+              <div v-if="detail.notify_count !== undefined">{{ $t('storeOrders.回调次数_2lqnpi') }}{{ detail.notify_count }}</div>
             </div>
 
             <div v-if="detail.order">
@@ -450,7 +450,7 @@ async function runCleanup(exec: boolean) {
               <pre class="text-xs bg-ink-50 rounded-lg p-3 overflow-auto">{{ JSON.stringify({ ...detail.license, token: undefined }, null, 2) }}</pre>
             </div>
             <div v-if="detail.pay_orders?.length">
-              <p class="text-xs text-ink-500 mb-1">关联支付单（{{ detail.pay_orders.length }} 笔）</p>
+              <p class="text-xs text-ink-500 mb-1">{{ $t('storeOrders.关联支付_gqtopp') }}{{ detail.pay_orders.length }} {{ $t('storeOrders.笔_mc1h') }}</p>
               <div class="space-y-1">
                 <div
                   v-for="p in detail.pay_orders"
@@ -464,12 +464,12 @@ async function runCleanup(exec: boolean) {
               </div>
             </div>
             <div v-if="detail.notify_logs?.length">
-              <p class="text-xs text-ink-500 mb-1">最近回调（{{ detail.notify_logs.length }} 条）</p>
+              <p class="text-xs text-ink-500 mb-1">{{ $t('storeOrders.最近回调_1u32lh') }}{{ detail.notify_logs.length }} {{ $t('storeOrders.条_izew') }}</p>
               <div class="space-y-1">
                 <div v-for="lg in detail.notify_logs" :key="lg.id" class="text-xs border border-ink-100 rounded-lg px-3 py-2 flex gap-3">
                   <span class="text-ink-400">{{ fmtTime(lg.created_at) }}</span>
                   <span>{{ lg.direction }}</span>
-                  <span :class="lg.verified ? 'text-emerald-600' : 'text-red-600'">{{ lg.verified ? '验签通过' : '验签失败' }}</span>
+                  <span :class="lg.verified ? 'text-emerald-600' : 'text-red-600'">{{ lg.verified ? $t('storeOrders.验签通过_k0j1zz') : $t('storeOrders.验签失败_k09p8m') }}</span>
                   <span v-if="lg.error" class="text-red-600 truncate">{{ lg.error }}</span>
                 </div>
               </div>
@@ -487,7 +487,7 @@ async function runCleanup(exec: boolean) {
       <div class="bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div class="px-5 py-4 border-b border-ink-200">
           <h3 class="font-semibold">{{ t("storeOrders.作废订单_aevenq") }}</h3>
-          <p class="text-xs text-ink-500 mt-0.5">{{ archiveTarget ? keyOf(archiveTarget) : '' }} · 只从列表隐藏，状态与账目不动</p>
+          <p class="text-xs text-ink-500 mt-0.5">{{ archiveTarget ? keyOf(archiveTarget) : '' }} {{ $t('storeOrders.text_1n125t') }}</p>
         </div>
         <div class="px-5 py-4 space-y-3">
           <textarea v-model="archiveReason" rows="2" class="input" :placeholder="t('storeOrders.作废原因_hwkust')"></textarea>
@@ -552,7 +552,7 @@ async function runCleanup(exec: boolean) {
     <div v-if="showCleanup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showCleanup = false">
       <div class="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[85vh] overflow-auto">
         <div class="px-5 py-4 border-b border-ink-200">
-          <h3 class="font-semibold">批量清理 · {{ tab === 'store' ? '商店订单' : '支付订单' }}</h3>
+          <h3 class="font-semibold">{{ $t('storeOrders.批量清理_ith5da') }} {{ tab === 'store' ? $t('storeOrders.商店订单_b5pyv8') : $t('storeOrders.支付订单_d3nnek') }}</h3>
           <p class="text-xs text-ink-500 mt-0.5">{{ t("storeOrders.只会碰未_mcsqkw") }}</p>
         </div>
         <div class="px-5 py-4 space-y-3">
@@ -588,10 +588,9 @@ async function runCleanup(exec: boolean) {
 
           <div v-if="cleanPreview" class="rounded-xl bg-ink-50 border border-ink-200 p-3 text-xs text-ink-600 space-y-1">
             <div>
-              {{ cleanPreview.dry_run ? '预计影响' : '已处理' }} {{ cleanPreview.dry_run ? cleanPreview.will_process : cleanPreview.processed }} 条
-              · 命中 {{ cleanPreview.matched }} · 跳过 {{ cleanPreview.skipped }}
+              {{ cleanPreview.dry_run ? $t('storeOrders.预计影响_jtfie1') : $t('storeOrders.已处理_e75dg') }} {{ cleanPreview.dry_run ? cleanPreview.will_process : cleanPreview.processed }} {{ $t('storeOrders.条_tmvzco') }} {{ cleanPreview.matched }} {{ $t('storeOrders.text_3yfy5') }} {{ cleanPreview.skipped }}
             </div>
-            <div>分界线：{{ fmtTime(cleanPreview.cutoff) }}</div>
+            <div>{{ $t('storeOrders.分界线_au977l') }}{{ fmtTime(cleanPreview.cutoff) }}</div>
             <div v-if="cleanPreview.sample?.length" class="mt-2 space-y-0.5">
               <div v-for="s in cleanPreview.sample" :key="s.order_no || s.out_trade_no" class="font-mono">
                 {{ s.order_no || s.out_trade_no }} · {{ s.status }} · {{ yuan(s.amount_cents) }}
@@ -603,7 +602,7 @@ async function runCleanup(exec: boolean) {
           <button class="btn-ghost" @click="showCleanup = false">{{ t("storeOrders.close") }}</button>
           <button class="btn-outline" :disabled="cleanBusy" @click="runCleanup(false)">{{ t("storeOrders.先预览_cnaj0") }}</button>
           <button class="btn-primary" :disabled="cleanBusy || !cleanPreview" @click="runCleanup(true)">
-            {{ cleanBusy ? '处理中…' : '确认执行' }}
+            {{ cleanBusy ? $t('storeOrders.处理中_bpjyjf') : $t('storeOrders.确认执行_frrinv') }}
           </button>
         </div>
       </div>

@@ -82,7 +82,7 @@ onMounted(load)
             <td class="p-3 font-medium">{{ f.title }}</td>
             <td class="p-3"><code class="text-xs text-ink-400">{{ f.key }}</code></td>
             <td class="p-3">{{ f.submissions }}</td>
-            <td class="p-3"><span :class="f.enabled ? 'text-green-600' : 'text-ink-300'">{{ f.enabled ? '启用' : '停用' }}</span></td>
+            <td class="p-3"><span :class="f.enabled ? 'text-green-600' : 'text-ink-300'">{{ f.enabled ? $t('forms.启用_eymx') : $t('forms.停用_eb7w') }}</span></td>
             <td class="p-3 text-right space-x-2 whitespace-nowrap">
               <button class="btn-ghost text-sm" @click="openSubmissions(f)">{{ t("forms.提交记录_cxej5l") }}</button>
               <button class="btn-ghost text-sm" @click="downloadCsv(f)">{{ t("forms.export") }}</button>
@@ -98,7 +98,7 @@ onMounted(load)
     <!-- 编辑弹窗 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑表单' : '新增表单' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editing ? $t('forms.编辑表单_gmqfs8') : $t('forms.新增表单_d7d07v') }}</h2>
         <div class="space-y-3">
           <div v-if="!editing">
             <label class="block text-sm font-medium mb-1">Key</label>
@@ -135,7 +135,7 @@ onMounted(load)
     <div v-if="showSubs" class="fixed inset-0 bg-black/40 z-50 flex justify-end" @click.self="showSubs = false">
       <div class="bg-white h-full w-full max-w-lg overflow-auto p-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">提交记录 · {{ activeForm?.title }}</h2>
+          <h2 class="text-lg font-semibold">{{ $t('forms.提交记录_1sbbt8') }} {{ activeForm?.title }}</h2>
           <button @click="showSubs = false" class="text-ink-400 hover:text-ink-600">✕</button>
         </div>
         <div v-if="!subs.length" class="text-ink-400 text-sm">{{ t("forms.暂无提交_dcur5e") }}</div>

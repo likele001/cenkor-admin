@@ -199,7 +199,7 @@ import { computed } from 'vue'
                 'bg-amber-50 text-amber-700': u.status === 'disabled',
                 'bg-red-50 text-red-700': u.status === 'locked',
               }"
-            >{{ { active: '活跃', disabled: '禁用', locked: '锁定' }[u.status] || u.status }}</span>
+            >{{ { active: $t('portalUsersList.活跃_jcvc'), disabled: $t('portalUsersList.禁用_lb5z'), locked: $t('portalUsersList.锁定_puih') }[u.status] || u.status }}</span>
           </td>
           <td class="py-2 px-2 text-ink-400 text-xs">{{ u.register_ip || '-' }}</td>
           <td class="py-2 px-2 text-ink-500 text-xs">
@@ -256,7 +256,7 @@ import { computed } from 'vue'
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn-ghost" @click="showCreate = false">{{ t('usersList.取消_ev02') }}</button>
-          <button class="btn-primary" :disabled="saving" @click="create">{{ saving ? '创建中…' : '创建' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="create">{{ saving ? $t('portalUsersList.创建中_ar3fh4') : $t('portalUsersList.创建_ehj3') }}</button>
         </div>
       </div>
     </div>
@@ -264,7 +264,7 @@ import { computed } from 'vue'
     <!-- Reset Password Modal -->
     <div v-if="showReset" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showReset = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">重置密码 — {{ resetTarget?.username }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ $t('portalUsersList.重置密码_1xu8ct') }} {{ resetTarget?.username }}</h2>
         <div>
           <label class="block text-sm font-medium mb-1">{{ t('portalUsersList.新密码_11z82o') }}</label>
           <input v-model="newPassword" type="password" minlength="8" class="input" />

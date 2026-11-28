@@ -185,7 +185,7 @@ onMounted(async () => {
             <span v-if="cat.color" class="inline-block w-3 h-3 rounded-full ml-2" :style="{ backgroundColor: cat.color }"></span>
             <code v-if="cat.url_pattern" class="block text-xs text-green-700 mt-1">{{ cat.url_pattern }}</code>
           </div>
-          <span class="text-xs text-ink-400">{{ cat.children?.length || 0 }} 子分类</span>
+          <span class="text-xs text-ink-400">{{ cat.children?.length || 0 }} {{ $t('categories.子分类_ds4g5') }}</span>
           <div class="flex gap-1">
             <button class="btn-ghost text-xs" @click="openCreate(cat.id)">{{ t('categories.text_11zpjk') }}</button>
             <button class="btn-ghost text-xs" @click="openEdit(cat)">{{ t('usersList.编辑_mekb') }}</button>
@@ -229,7 +229,7 @@ onMounted(async () => {
     <!-- Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑分类' : '新建分类' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editing ? $t('categories.编辑分类_gmhewg') : $t('categories.新建分类_d81iin') }}</h2>
         <div class="space-y-3">
           <div>
             <label class="block text-sm font-medium mb-1">{{ t('tags.名称_eyrn') }}</label>
@@ -249,42 +249,42 @@ onMounted(async () => {
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">栏目页地址规则（可选）</label>
+            <label class="block text-sm font-medium mb-1">{{ $t('categories.栏目页地_119m3w') }}</label>
             <UrlPatternInput
               v-model="form.url_pattern"
               :vars="CAT_RULE_VARS"
               :presets="CAT_RULE_PRESETS"
-              placeholder="留空 = 用站点默认，例如 category/{slug}/"
+              :placeholder="$t('categories.留空_1tgby0')"
             />
             <p class="text-xs text-ink-500 mt-1">
-              只决定这个「栏目页」自己的地址，不管栏目下文章的地址。
+              {{ $t('categories.只决定这_1qw4zn') }}
             </p>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">该栏目下文章的地址规则（可选）</label>
+            <label class="block text-sm font-medium mb-1">{{ $t('categories.该栏目下_xc1aj4') }}</label>
             <UrlPatternInput
               v-model="form.article_pattern"
               :vars="ART_RULE_VARS"
               :presets="ART_RULE_PRESETS"
-              placeholder="留空 = 用站点默认，例如 {catdir}/{slug}.html"
+              :placeholder="$t('categories.留空_1r16sk')"
             />
             <p class="text-xs text-ink-500 mt-1">
-              只对这个栏目下的文章详情页生效；改规则后老地址自动 301，不会 404。
+              {{ $t('categories.只对这个_1i0ep1') }}
             </p>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">栏目模板（可选）</label>
+            <label class="block text-sm font-medium mb-1">{{ $t('categories.栏目模板_8qb3gk') }}</label>
             <input
               v-model="form.template"
               class="input font-mono text-sm"
               list="tpl-options"
-              placeholder="留空 = 用默认模板"
+              :placeholder="$t('categories.留空_lt6vao')"
             />
             <datalist id="tpl-options">
               <option v-for="t in TPL_OPTIONS" :key="t" :value="t" />
             </datalist>
             <p class="text-xs text-ink-500 mt-1">
-              主题内的模板文件名（模板预览里可在线编辑）。填了不存在的文件名会自动回退默认模板。
+              {{ $t('categories.主题内的_n1yr2e') }}
             </p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -304,7 +304,7 @@ onMounted(async () => {
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn-ghost" @click="showModal = false">{{ t('usersList.取消_ev02') }}</button>
-          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? $t('categories.保存中_agdrec') : $t('categories.保存_e32z') }}</button>
         </div>
       </div>
     </div>

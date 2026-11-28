@@ -145,7 +145,7 @@ onMounted(load)
             </td>
             <td class="px-4 py-3">
               <span class="text-xs px-1.5 py-0.5 rounded-full" :class="item.is_published ? 'bg-green-50 text-green-700' : 'bg-ink-100 text-ink-500'">
-                {{ item.is_published ? '已发布' : '草稿' }}
+                {{ item.is_published ? $t('announcements.已发布_e656s') : $t('announcements.草稿_n02e') }}
               </span>
             </td>
             <td class="px-4 py-3 text-ink-500">{{ item.view_count }}</td>
@@ -167,7 +167,7 @@ onMounted(load)
     <!-- Edit Modal -->
     <div v-if="showEdit" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40" @click.self="showEdit = false">
       <div class="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建公告' : '编辑公告' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ isNew ? $t('announcements.新建公告_d816w8') : $t('announcements.编辑公告_gmh3a1') }}</h2>
         <form @submit.prevent="save" class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ t("announcements.title") }}</label>
@@ -215,7 +215,7 @@ onMounted(load)
             </label>
           </div>
           <div class="flex gap-3 pt-2">
-            <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? '保存中...' : '保存' }}</button>
+            <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? $t('announcements.保存中_vts3p8') : $t('announcements.保存_e32z') }}</button>
             <button type="button" @click="showEdit = false" class="btn-ghost">{{ t("announcements.cancel") }}</button>
           </div>
         </form>

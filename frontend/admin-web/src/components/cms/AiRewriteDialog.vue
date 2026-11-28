@@ -231,7 +231,7 @@ watch(
         <div class="flex items-center gap-2">
           <span class="text-base">✨</span>
           <h3 class="font-medium text-ink-900">{{ title }}</h3>
-          <span class="text-xs text-ink-400">{{ html ? '正文按段落改写，格式保持不变' : '整段改写' }}</span>
+          <span class="text-xs text-ink-400">{{ html ? $t('aiRewriteDialog.正文按段_1myhoh') : $t('aiRewriteDialog.整段改写_d8xczl') }}</span>
         </div>
         <button class="text-ink-400 hover:text-ink-700 text-lg leading-none" @click="close">✕</button>
       </header>
@@ -253,7 +253,7 @@ watch(
             {{ p.label }}
           </button>
           <button class="btn-ghost text-xs ml-auto" :disabled="busy" @click="run()">
-            {{ busy ? '改写中…' : '再来一次' }}
+            {{ busy ? $t('aiRewriteDialog.改写中_d3xtll') : $t('aiRewriteDialog.再来一次_aptj15') }}
           </button>
         </div>
 
@@ -279,7 +279,7 @@ watch(
         <div v-if="busy" class="py-16 text-center text-sm text-ink-400">{{ t("aiRewriteDialog.正在改写_53y8gx") }}</div>
 
         <div v-else-if="!result" class="py-16 text-center text-xs text-ink-400">
-          {{ ran ? '上面选个动作试试' : '选择一个改写动作' }}
+          {{ ran ? $t('aiRewriteDialog.上面选个_1vzmqi') : $t('aiRewriteDialog.选择一个_d2kvvi') }}
         </div>
 
         <div v-else :class="html ? 'space-y-4' : 'grid grid-cols-1 md:grid-cols-2 gap-4'">
@@ -306,7 +306,7 @@ watch(
 
         <div v-if="html && result" class="mt-4">
           <button class="text-xs text-ink-500 hover:text-ink-800" @click="showOriginal = !showOriginal">
-            {{ showOriginal ? '收起修改前' : '查看修改前' }}
+            {{ showOriginal ? $t('aiRewriteDialog.收起修改_1mrcb2') : $t('aiRewriteDialog.查看修改_1uf9tz') }}
           </button>
           <div
             v-if="showOriginal"

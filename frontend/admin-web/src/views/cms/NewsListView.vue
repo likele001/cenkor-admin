@@ -65,7 +65,7 @@ onMounted(load)
       <div v-else-if="error" class="card text-red-600">⚠️ {{ error }}</div>
       <div v-else>
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <h1 class="text-2xl font-semibold tracking-tight">新闻列表（{{ news.length }}）</h1>
+          <h1 class="text-2xl font-semibold tracking-tight">{{ $t('newsList.新闻列表_1pplih') }}{{ news.length }}）</h1>
           <div class="flex items-center gap-3">
             <SearchInput v-model="search" :placeholder="t('newsList.按标题_ve272g')" />
             <CsvExportButton endpoint="/api/v1/cms/news/export" filename="news.csv" :params="{ search: search || undefined }" />
@@ -93,7 +93,7 @@ onMounted(load)
                 <td class="px-4 py-3">
                   <span class="text-xs px-2 py-0.5 rounded-full"
                     :class="n.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-100 text-ink-600'">
-                    {{ n.status === 'published' ? '已发布' : n.status }}
+                    {{ n.status === 'published' ? $t('newsList.已发布_e656s') : n.status }}
                   </span>
                 </td>
                 <td class="px-4 py-3 text-ink-500">{{ n.view_count }}</td>

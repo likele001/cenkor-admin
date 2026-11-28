@@ -88,8 +88,7 @@ onMounted(load)
 
     <main class="max-w-5xl mx-auto px-6 py-10">
       <p class="text-sm text-ink-500 mb-4">
-        {{ t('tasks.调度配置存储于应用内存重启后恢复为') }} <code class="px-1 rounded bg-ink-100">default_schedule</code>。
-        生产环境建议接入 Celery Beat + Beat Schedule DB。
+        {{ t('tasks.调度配置存储于应用内存重启后恢复为') }} <code class="px-1 rounded bg-ink-100">default_schedule</code>{{ $t('tasks.text_1y8ea9') }}
       </p>
 
       <div v-if="loading" class="card text-ink-500">{{ t('usersList.加载中_b0k5km') }}</div>

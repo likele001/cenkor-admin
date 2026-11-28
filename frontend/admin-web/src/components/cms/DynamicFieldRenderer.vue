@@ -284,8 +284,8 @@ function onImageError(e: Event) {
         <span v-if="validation.unit" class="unit-badge">{{ validation.unit }}</span>
       </div>
       <div v-if="validation.min !== undefined || validation.max !== undefined" class="validation-hint">
-        <span v-if="validation.min !== undefined">最小: {{ validation.min }}</span>
-        <span v-if="validation.max !== undefined">最大: {{ validation.max }}</span>
+        <span v-if="validation.min !== undefined">{{ $t('dynamicFieldRenderer.最小_firyj') }} {{ validation.min }}</span>
+        <span v-if="validation.max !== undefined">{{ $t('dynamicFieldRenderer.最大_fia5v') }} {{ validation.max }}</span>
       </div>
     </div>
 
@@ -297,7 +297,7 @@ function onImageError(e: Event) {
             @change="fieldValue = ($event.target as HTMLInputElement).checked" class="toggle-input" />
           <span class="toggle-slider"></span>
         </div>
-        <span class="toggle-label">{{ fieldValue ? '是' : '否' }}</span>
+        <span class="toggle-label">{{ fieldValue ? $t('dynamicFieldRenderer.是_k6n') : $t('dynamicFieldRenderer.否_gme') }}</span>
       </label>
     </div>
 
@@ -354,7 +354,7 @@ function onImageError(e: Event) {
           <img :src="fieldValue" class="preview-img" @error="onImageError" />
           <div class="image-actions">
             <button type="button" class="action-btn replace" :disabled="disabled || uploading" @click="onFileUpload('image')">
-              {{ uploading ? '⏳' : '🔄' }} 替换
+              {{ uploading ? '⏳' : '🔄' }} {{ $t('dynamicFieldRenderer.替换_i2bn') }}
             </button>
             <button type="button" class="action-btn pick" :disabled="disabled || uploading" @click="openMediaPicker(false)">
               {{ t("dynamicFieldRenderer.text_if8faf") }}
@@ -369,7 +369,7 @@ function onImageError(e: Event) {
       <div v-else>
         <div class="upload-zone" @click="!disabled && onFileUpload('image')" :class="{ disabled, uploading }">
           <div class="upload-icon">🖼️</div>
-          <div class="upload-text">{{ uploading ? '上传中...' : '点击上传图片' }}</div>
+          <div class="upload-text">{{ uploading ? $t('dynamicFieldRenderer.上传中_1b2adf') : $t('dynamicFieldRenderer.点击上传_nwb41') }}</div>
           <div class="upload-hint">{{ t("dynamicFieldRenderer.支持_jnarqs") }}</div>
         </div>
         <div class="media-picker-trigger">
@@ -395,7 +395,7 @@ function onImageError(e: Event) {
         <div class="upload-zone add-more" @click="!disabled && onMultiFileUpload('images')"
           :class="{ disabled, uploading }">
           <div class="upload-icon">➕</div>
-          <div class="upload-text">{{ uploading ? '上传中...' : '添加图片' }}</div>
+          <div class="upload-text">{{ uploading ? $t('dynamicFieldRenderer.上传中_1b2adf') : $t('dynamicFieldRenderer.添加图片_e7wrf2') }}</div>
         </div>
       </div>
       <div class="media-picker-trigger">
@@ -420,7 +420,7 @@ function onImageError(e: Event) {
       </div>
       <div v-else class="upload-zone file-zone" @click="!disabled && onFileUpload('file')" :class="{ disabled, uploading }">
         <div class="upload-icon">📎</div>
-        <div class="upload-text">{{ uploading ? '上传中...' : '点击上传文件' }}</div>
+        <div class="upload-text">{{ uploading ? $t('dynamicFieldRenderer.上传中_1b2adf') : $t('dynamicFieldRenderer.点击上传_nyl53') }}</div>
       </div>
       <p v-if="uploadError" class="error-text">{{ uploadError }}</p>
     </div>
@@ -437,7 +437,7 @@ function onImageError(e: Event) {
         <button type="button" class="add-file-btn" :disabled="disabled || uploading"
           @click="onMultiFileUpload('files')">
           <span class="btn-icon">📎</span>
-          <span>{{ uploading ? '上传中...' : '添加文件' }}</span>
+          <span>{{ uploading ? $t('dynamicFieldRenderer.上传中_1b2adf') : $t('dynamicFieldRenderer.添加文件_e7z1g4') }}</span>
         </button>
       </div>
       <p v-if="uploadError" class="error-text">{{ uploadError }}</p>
@@ -447,7 +447,7 @@ function onImageError(e: Event) {
     <div v-else-if="definition.field_type === 'select'" class="field-input-wrapper">
       <div class="select-wrapper">
         <select v-model="fieldValue" class="field-select" :disabled="disabled">
-          <option value="" disabled>请选择 {{ definition.label }}</option>
+          <option value="" disabled>{{ $t('dynamicFieldRenderer.请选择_l72nr') }} {{ definition.label }}</option>
           <option v-for="opt in definition.field_options" :key="opt.id" :value="opt.value">
             {{ opt.label }}
           </option>

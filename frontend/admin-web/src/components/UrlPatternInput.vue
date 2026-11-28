@@ -161,16 +161,16 @@ const requiredHint = computed(() =>
 
     <!-- 校验提示：从重到轻依次展示 -->
     <p v-if="missingRequired" class="text-xs text-red-600 mt-1.5">
-      ⚠️ 规则里必须包含 {{ requiredHint }} 其中之一，否则前台将无法解析这个地址
+      {{ $t('urlPatternInput.text_bh7f9e') }} {{ requiredHint }} {{ $t('urlPatternInput.其中之一_1efbnb') }}
     </p>
     <p v-else-if="dupVars.length" class="text-xs text-red-600 mt-1.5">
-      ⚠️ 变量重复出现：{{ dupVars.map(n => '{' + n + '}').join(' ') }}，同一变量用两次会让地址产生歧义
+      {{ $t('urlPatternInput.text_upy5ks') }}{{ dupVars.map(n => '{' + n + '}').join(' ') }}{{ $t('urlPatternInput.text_ambclj') }}
     </p>
     <p v-else-if="adjacentVars" class="text-xs text-red-600 mt-1.5">
       {{ t("urlPatternInput.text_buclle") }} <code>{'{catdir}/{slug}'}</code>{{ t("urlPatternInput.text_i80r5k") }} <code>{'{catdir}{slug}'}</code> {{ t("urlPatternInput.无法反解_daxlkb") }}
     </p>
     <p v-else-if="unknownVars.length" class="text-xs text-amber-600 mt-1.5">
-      ⚠️ 不认识的变量：{{ unknownVars.map(n => '{' + n + '}').join(' ') }}，请检查是否拼写有误
+      {{ $t('urlPatternInput.text_d1vzul') }}{{ unknownVars.map(n => '{' + n + '}').join(' ') }}{{ $t('urlPatternInput.text_o3tq16') }}
     </p>
     <p v-else-if="exampleUrl && showExample" class="text-xs text-ink-500 mt-1.5">
       {{ t("urlPatternInput.示例_i65k9") }}<code class="text-green-700">{{ exampleUrl }}</code>

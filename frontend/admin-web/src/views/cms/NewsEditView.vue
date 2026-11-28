@@ -65,7 +65,7 @@ async function save() {
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-4xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/cms/news" class="text-sm text-ink-500 hover:text-ink-900">{{ t('newsEdit.text_x9eong') }}</router-link>
-        <span class="font-semibold">{{ isNew ? '新建新闻' : '编辑新闻' }}</span>
+        <span class="font-semibold">{{ isNew ? $t('newsEdit.新建新闻_d84zyt') : $t('newsEdit.编辑新闻_gmkwcm') }}</span>
       </div>
     </header>
 
@@ -124,7 +124,7 @@ async function save() {
         <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
         <div class="flex gap-3">
           <button type="submit" :disabled="saving" class="btn-primary">
-            {{ saving ? '保存中…' : isNew ? '发布' : '保存修改' }}
+            {{ saving ? $t('newsEdit.保存中_agdrec') : isNew ? $t('newsEdit.发布_erte') : $t('newsEdit.保存修改_agefs6') }}
           </button>
           <router-link to="/cms/news" class="btn-ghost">{{ t('usersList.取消_ev02') }}</router-link>
         </div>

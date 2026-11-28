@@ -188,11 +188,11 @@ onMounted(() => {
       <span class="text-lg leading-none">🆙</span>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-amber-900">
-          发现新版本 {{ release.latest }}（当前 {{ release.current }}）
+          {{ $t('dashboard.发现新版_1mm7yn') }} {{ release.latest }}{{ $t('dashboard.text_11tftu') }} {{ release.current }}）
         </div>
         <div class="mt-0.5 text-xs text-amber-700">
           {{ t("dashboard.建议升级_e49h5x") }}
-          <span v-if="release.released_at" class="opacity-70">· 发布于 {{ release.released_at }}</span>
+          <span v-if="release.released_at" class="opacity-70">{{ $t('dashboard.text_35x5zn') }} {{ release.released_at }}</span>
         </div>
         <div class="mt-2 flex items-center gap-3 text-xs">
           <a v-if="release.upgrade_docs" :href="release.upgrade_docs" target="_blank" rel="noopener" class="text-accent hover:underline">{{ t("dashboard.查看升级_1ytcfb") }}</a>
@@ -226,7 +226,7 @@ onMounted(() => {
               <p v-if="a.created_at" class="mt-1 text-xs text-ink-400">{{ formatDate(a.created_at) }}</p>
             </div>
             <button type="button" class="text-sm text-accent hover:underline shrink-0" @click="toggleAnn(a)">
-              {{ expandedAnnId === a.id ? '收起' : '查看全文' }}
+              {{ expandedAnnId === a.id ? $t('dashboard.收起_hzpd') : $t('dashboard.查看全文_dlky91') }}
             </button>
           </div>
           <div v-if="expandedAnnId === a.id && annDetail[a.id]" class="mt-3 border-t border-ink-200 pt-3">

@@ -213,14 +213,14 @@ const vectorDimText = computed(() => {
     <!-- 页头 -->
     <div class="flex items-center gap-3">
       <div>
-        <h1 class="text-xl font-semibold text-ink-900">AI 驾驶舱</h1>
+        <h1 class="text-xl font-semibold text-ink-900">{{ $t('aiHome.text_wk0gw1') }}</h1>
         <p v-if="data" class="text-xs text-ink-500 mt-0.5">
-          {{ data.site.name }} · 数字来自真实调用记录，更新于 {{ fmtTime(data.generated_at) }}
+          {{ data.site.name }} {{ $t('aiHome.text_1huxba') }} {{ fmtTime(data.generated_at) }}
         </p>
       </div>
       <div class="ml-auto flex items-center gap-3">
-        <router-link to="/cms/ai-workbench" class="btn-outline">AI 起草</router-link>
-        <router-link to="/cms/ai-batch" class="btn-primary">批量生产</router-link>
+        <router-link to="/cms/ai-workbench" class="btn-outline">{{ $t('aiHome.text_11qoiy') }}</router-link>
+        <router-link to="/cms/ai-batch" class="btn-primary">{{ $t('aiHome.批量生产_d11rha') }}</router-link>
       </div>
     </div>
 
@@ -228,31 +228,31 @@ const vectorDimText = computed(() => {
       {{ error }}
     </div>
 
-    <div v-if="loading && !data" class="text-sm text-ink-400 py-12 text-center">加载中…</div>
+    <div v-if="loading && !data" class="text-sm text-ink-400 py-12 text-center">{{ $t('aiHome.加载中_b0k5km') }}</div>
 
     <template v-if="data">
       <!-- 四个大数 -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="card !p-5">
-          <div class="text-xs text-ink-500">今日出稿</div>
+          <div class="text-xs text-ink-500">{{ $t('aiHome.今日出稿_ad2xwg') }}</div>
           <div class="text-3xl font-semibold text-ink-900 mt-1">{{ data.output.today }}</div>
-          <div class="text-xs text-ink-400 mt-1">本周 {{ data.output.week }} 篇</div>
+          <div class="text-xs text-ink-400 mt-1">{{ $t('aiHome.本周_i0fw') }} {{ data.output.week }} {{ $t('aiHome.篇_og7') }}</div>
         </div>
         <div class="card !p-5">
-          <div class="text-xs text-ink-500">本月出稿</div>
+          <div class="text-xs text-ink-500">{{ $t('aiHome.本月出稿_dfylsx') }}</div>
           <div class="text-3xl font-semibold text-ink-900 mt-1">{{ data.output.month }}</div>
-          <div class="text-xs text-ink-400 mt-1">累计 {{ data.output.total }} 篇</div>
+          <div class="text-xs text-ink-400 mt-1">{{ $t('aiHome.累计_m24y') }} {{ data.output.total }} {{ $t('aiHome.篇_og7') }}</div>
         </div>
         <div class="card !p-5">
-          <div class="text-xs text-ink-500">本月 token 消耗</div>
+          <div class="text-xs text-ink-500">{{ $t('aiHome.本月_4oas7u') }}</div>
           <div class="text-3xl font-semibold text-ink-900 mt-1">{{ fmtTokens(data.usage.month_tokens) }}</div>
-          <div class="text-xs text-ink-400 mt-1">{{ data.usage.month_calls }} 次调用</div>
+          <div class="text-xs text-ink-400 mt-1">{{ data.usage.month_calls }} {{ $t('aiHome.次调用_gdch2') }}</div>
         </div>
         <div class="card !p-5">
-          <div class="text-xs text-ink-500">AI 产出占比（本月）</div>
+          <div class="text-xs text-ink-500">{{ $t('aiHome.text_12rxrw') }}</div>
           <div class="text-3xl font-semibold text-ink-900 mt-1">{{ fmtPct(data.coverage.month_ratio) }}</div>
           <div class="text-xs text-ink-400 mt-1">
-            {{ data.coverage.month_ai }} / {{ data.coverage.month_all }} 篇
+            {{ data.coverage.month_ai }} / {{ data.coverage.month_all }} {{ $t('aiHome.篇_og7') }}
           </div>
         </div>
       </div>
@@ -260,7 +260,7 @@ const vectorDimText = computed(() => {
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <!-- 近 7 天出稿 -->
         <div class="card lg:col-span-2">
-          <h3 class="text-sm font-semibold text-ink-900">近 7 天 AI 出稿</h3>
+          <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiHome.近_u2z70u') }}</h3>
           <div class="mt-4 flex items-end gap-2 h-32">
             <div
               v-for="t in data.output.trend"
@@ -291,12 +291,12 @@ const vectorDimText = computed(() => {
         <!-- 能力矩阵 -->
         <div class="card lg:col-span-3">
           <div class="flex items-center">
-            <h3 class="text-sm font-semibold text-ink-900">AI 能力</h3>
+            <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiHome.text_11oaie') }}</h3>
             <span class="ml-auto text-xs text-ink-400">
-              就绪 {{ data.health.ready_count }} / {{ data.health.total_count }}
+              {{ $t('aiHome.就绪_gdll') }} {{ data.health.ready_count }} / {{ data.health.total_count }}
             </span>
             <router-link to="/cms/ai-settings" class="ml-3 text-xs text-ink-500 hover:text-ink-900 underline underline-offset-4">
-              配置 →
+              {{ $t('aiHome.配置_iufc37') }}
             </router-link>
           </div>
           <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -318,7 +318,7 @@ const vectorDimText = computed(() => {
                   </span>
                 </div>
                 <div class="text-xs text-ink-400 truncate">
-                  {{ c.ready ? `${c.provider} · ${c.model}` : c.configured_only ? '已配置，未接入调用' : '未配置' }}
+                  {{ c.ready ? `${c.provider} · ${c.model}` : c.configured_only ? $t('aiHome.已配置_1n47pm') : $t('aiHome.未配置_fte97') }}
                 </div>
               </div>
             </div>
@@ -330,13 +330,13 @@ const vectorDimText = computed(() => {
         <!-- 进行中批次 -->
         <div class="card lg:col-span-2">
           <div class="flex items-center">
-            <h3 class="text-sm font-semibold text-ink-900">批量生产</h3>
+            <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiHome.批量生产_d11rha') }}</h3>
             <router-link to="/cms/ai-batch" class="ml-auto text-xs text-ink-500 hover:text-ink-900 underline underline-offset-4">
-              管理 →
+              {{ $t('aiHome.管理_g2cnnb') }}
             </router-link>
           </div>
           <div v-if="!data.batches.length" class="text-xs text-ink-400 mt-3">
-            还没有批次。粘贴一批选题，AI 按顺序逐篇起草。
+            {{ $t('aiHome.还没有批_1yf021') }}
           </div>
           <div v-else class="mt-3 space-y-2.5">
             <div v-for="b in data.batches" :key="b.id" class="text-sm">
@@ -346,7 +346,7 @@ const vectorDimText = computed(() => {
                   {{ batchStatus(b.status).label }}
                 </span>
                 <span class="ml-auto text-xs text-ink-400 shrink-0">
-                  {{ b.succeeded }}/{{ b.total }}<template v-if="b.failed"> · 失败 {{ b.failed }}</template>
+                  {{ b.succeeded }}/{{ b.total }}<template v-if="b.failed"> {{ $t('aiHome.text_3pgd9') }} {{ b.failed }}</template>
                 </span>
               </div>
               <div class="mt-1 h-1.5 rounded-full bg-ink-100 overflow-hidden">
@@ -362,19 +362,19 @@ const vectorDimText = computed(() => {
         <!-- 语义检索覆盖 -->
         <div class="card lg:col-span-3">
           <div class="flex items-center">
-            <h3 class="text-sm font-semibold text-ink-900">语义检索覆盖</h3>
+            <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiHome.语义检索_jmlwxa') }}</h3>
             <button
               v-if="data.vectors.ratio < 1"
               class="ml-auto px-2.5 py-1 text-xs rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-50"
               :disabled="vectorBusy"
               @click="rebuildVectors"
-            >{{ vectorBusy ? '补建中…' : '补齐向量' }}</button>
+            >{{ vectorBusy ? $t('aiHome.补建中_hlln66') : $t('aiHome.补齐向量_hv2ieh') }}</button>
             <!-- 覆盖率满时按钮不消失而是置灰：能力在哪、为什么不能点，都要看得见 -->
             <span
               v-else
               class="ml-auto px-2.5 py-1 text-xs rounded-lg border border-ink-100 text-ink-300 cursor-default"
-              title="所有条目都已有向量"
-            >向量已齐</span>
+              :title="$t('aiHome.所有条目_kjhz7g')"
+            >{{ $t('aiHome.向量已齐_b7jdvg') }}</span>
           </div>
           <div class="mt-3 flex items-center gap-4">
             <div class="flex-1 h-2 rounded-full bg-ink-100 overflow-hidden">
@@ -389,29 +389,29 @@ const vectorDimText = computed(() => {
             {{ vectorMsg }}
           </p>
           <p v-if="data.vectors.ratio < 1" class="text-xs text-ink-400 mt-2">
-            有条目还没建向量，语义检索和「找相似」会漏掉它们。点「补齐向量」一次最多补 50 条，不够再点。
+            {{ $t('aiHome.有条目还_924k6y') }}
           </p>
-          <p v-else class="text-xs text-ink-400 mt-2">全部条目已建立向量索引。</p>
+          <p v-else class="text-xs text-ink-400 mt-2">{{ $t('aiHome.全部条目_2o7j17') }}</p>
         </div>
       </div>
 
       <!-- 最近 AI 调用 -->
       <div class="card">
         <div class="flex items-center">
-          <h3 class="text-sm font-semibold text-ink-900">最近 AI 调用</h3>
-          <span class="ml-auto text-xs text-ink-400">{{ data.usage.today_calls }} 次今日</span>
+          <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiHome.最近_17z6yr') }}</h3>
+          <span class="ml-auto text-xs text-ink-400">{{ data.usage.today_calls }} {{ $t('aiHome.次今日_g2ukc') }}</span>
         </div>
-        <div v-if="!data.recent.length" class="text-xs text-ink-400 mt-3">还没有调用记录。</div>
+        <div v-if="!data.recent.length" class="text-xs text-ink-400 mt-3">{{ $t('aiHome.还没有调_14pnpq') }}</div>
         <div v-else class="mt-3 overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-xs text-ink-400 border-b border-ink-100">
-                <th class="py-2 pr-4 font-normal">类型</th>
-                <th class="py-2 pr-4 font-normal">模型</th>
+                <th class="py-2 pr-4 font-normal">{{ $t('aiHome.类型_lnjk') }}</th>
+                <th class="py-2 pr-4 font-normal">{{ $t('aiHome.模型_ij62') }}</th>
                 <th class="py-2 pr-4 font-normal text-right">token</th>
-                <th class="py-2 pr-4 font-normal text-right">耗时</th>
-                <th class="py-2 pr-4 font-normal">结果</th>
-                <th class="py-2 pr-4 font-normal">时间</th>
+                <th class="py-2 pr-4 font-normal text-right">{{ $t('aiHome.耗时_mchr') }}</th>
+                <th class="py-2 pr-4 font-normal">{{ $t('aiHome.结果_m52h') }}</th>
+                <th class="py-2 pr-4 font-normal">{{ $t('aiHome.时间_i5z2') }}</th>
                 <th class="py-2 font-normal"></th>
               </tr>
             </thead>
@@ -430,7 +430,7 @@ const vectorDimText = computed(() => {
                     class="text-xs px-1.5 py-0.5 rounded-full"
                     :class="g.status === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'"
                   >
-                    {{ g.status === 'ok' ? '成功' : '失败' }}
+                    {{ g.status === 'ok' ? $t('aiHome.成功_h4sv') : $t('aiHome.失败_fy1g') }}
                   </span>
                   <span v-if="g.error" class="text-xs text-red-500 ml-1" :title="g.error">!</span>
                 </td>
@@ -441,7 +441,7 @@ const vectorDimText = computed(() => {
                     :to="`/cms/entries/${g.entry_id}`"
                     class="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-4 whitespace-nowrap"
                   >
-                    打开草稿 →
+                    {{ $t('aiHome.打开草稿_hysuqd') }}
                   </router-link>
                 </td>
               </tr>

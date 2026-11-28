@@ -229,7 +229,7 @@ onMounted(async () => {
     <div class="flex items-center gap-1 mb-3 border-b">
       <button class="px-4 py-2 text-sm -mb-px border-b-2"
         :class="tab === 'subs' ? 'border-ink-900 text-ink-900 font-medium' : 'border-transparent text-ink-400'"
-        @click="tab = 'subs'">订阅（{{ items.length }}）</button>
+        @click="tab = 'subs'">{{ $t('webhooks.订阅_l7745') }}{{ items.length }}）</button>
       <button class="px-4 py-2 text-sm -mb-px border-b-2"
         :class="tab === 'logs' ? 'border-ink-900 text-ink-900 font-medium' : 'border-transparent text-ink-400'"
         @click="tab = 'logs'">{{ t("webhooks.投递日志_d17zan") }}</button>
@@ -260,7 +260,7 @@ onMounted(async () => {
                 class="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded mr-1 mb-1 inline-block">{{ ev }}</span>
             </td>
             <td class="p-3">
-              <span :class="w.enabled ? 'text-green-600' : 'text-ink-300'">{{ w.enabled ? '启用' : '停用' }}</span>
+              <span :class="w.enabled ? 'text-green-600' : 'text-ink-300'">{{ w.enabled ? $t('webhooks.启用_eymx') : $t('webhooks.停用_eb7w') }}</span>
             </td>
             <td class="p-3 text-xs">
               <template v-if="w.last_delivery">
@@ -305,7 +305,7 @@ onMounted(async () => {
           <option value="dropped">{{ t("webhooks.已丢弃_e56kz") }}</option>
         </select>
         <button class="btn-ghost text-sm" @click="loadLogs">{{ t("webhooks.刷新_ejix") }}</button>
-        <span class="text-xs text-ink-400 ml-auto">共 {{ total }} 条</span>
+        <span class="text-xs text-ink-400 ml-auto">{{ $t('webhooks.共_g35') }} {{ total }} {{ $t('webhooks.条_kf5') }}</span>
       </div>
 
       <div class="card overflow-hidden">
@@ -346,7 +346,7 @@ onMounted(async () => {
               <td class="p-3 text-right space-x-2 whitespace-nowrap">
                 <button class="btn-ghost text-sm" @click="openDetail(d)">{{ t("webhooks.detail") }}</button>
                 <button class="btn-ghost text-sm" :disabled="replaying === d.id" @click="replay(d)">
-                  {{ replaying === d.id ? '投递中…' : '重放' }}
+                  {{ replaying === d.id ? $t('webhooks.投递中_d13lh2') : $t('webhooks.重放_pcsx') }}
                 </button>
               </td>
             </tr>
@@ -367,7 +367,7 @@ onMounted(async () => {
     <!-- 新建/编辑 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑订阅' : '新增订阅' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editing ? $t('webhooks.编辑订阅_gmrcpq') : $t('webhooks.新增订阅_d7dx5d') }}</h2>
         <div class="space-y-3">
           <div>
             <label class="block text-sm font-medium mb-1">{{ t("webhooks.回调_1us2um") }}</label>
@@ -415,9 +415,9 @@ onMounted(async () => {
       <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[85vh] overflow-auto">
         <div class="flex items-start justify-between mb-3">
           <div>
-            <h2 class="text-lg font-semibold">投递 #{{ detail.id }}</h2>
+            <h2 class="text-lg font-semibold">{{ $t('webhooks.投递_d0q57k') }}{{ detail.id }}</h2>
             <div class="text-xs text-ink-400 mt-1">
-              {{ detail.event }} · {{ fmt(detail.created_at) }} · 尝试 {{ detail.attempts }} 次
+              {{ detail.event }} · {{ fmt(detail.created_at) }} {{ $t('webhooks.text_3py01') }} {{ detail.attempts }} {{ $t('webhooks.次_l5t') }}
             </div>
           </div>
           <span class="px-2 py-0.5 rounded text-xs" :class="STATUS_STYLE[detail.status]">
@@ -437,7 +437,7 @@ onMounted(async () => {
         <div class="flex justify-end gap-2 mt-4">
           <button class="btn-ghost" @click="detailOpen = false">{{ t("webhooks.close") }}</button>
           <button class="btn-primary" :disabled="replaying === detail.id" @click="replay(detail)">
-            {{ replaying === detail.id ? '投递中…' : '重放这条' }}
+            {{ replaying === detail.id ? $t('webhooks.投递中_d13lh2') : $t('webhooks.重放这条_itjt6h') }}
           </button>
         </div>
       </div>

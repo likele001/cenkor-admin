@@ -170,7 +170,7 @@ onMounted(load)
       </div>
       <div class="mt-3">
         <button class="btn-primary text-sm" :disabled="saving === 'settings'" @click="saveSettings">
-          {{ saving === 'settings' ? '保存中…' : '保存域名' }}
+          {{ saving === 'settings' ? $t('systemSso.保存中_agdrec') : $t('systemSso.保存域名_agfp0p') }}
         </button>
       </div>
     </div>
@@ -181,8 +181,7 @@ onMounted(load)
       class="card p-4 mb-5 border-l-4 border-amber-400 bg-amber-50"
     >
       <p class="text-sm text-amber-800">
-        还没有任何渠道配置完整。前台登录页此时不会显示第三方按钮，
-        账号密码登录不受影响。
+        {{ $t('systemSso.还没有任_1ncqsd') }}
       </p>
     </div>
 
@@ -225,7 +224,7 @@ onMounted(load)
           <label class="block">
             <span class="text-xs text-ink-400">
               AppSecret
-              <span v-if="p.client_secret_hint" class="text-ink-300">（当前 {{ p.client_secret_hint }}）</span>
+              <span v-if="p.client_secret_hint" class="text-ink-300">{{ $t('systemSso.text_11tftu') }} {{ p.client_secret_hint }}）</span>
             </span>
             <input
               v-model="secrets[p.key]"
@@ -297,7 +296,7 @@ onMounted(load)
             :disabled="saving === p.key"
             @click="saveProvider(p)"
           >
-            {{ saving === p.key ? '保存中…' : `保存 ${p.name}` }}
+            {{ saving === p.key ? $t('systemSso.保存中_agdrec') : `保存 ${p.name}` }}
           </button>
         </div>
       </div>

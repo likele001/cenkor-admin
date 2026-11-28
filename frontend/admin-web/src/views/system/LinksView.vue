@@ -161,7 +161,7 @@ onMounted(load)
     <!-- Edit Modal -->
     <div v-if="showEdit" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40" @click.self="showEdit = false">
       <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg font-semibold mb-4">{{ isNew ? '添加链接' : '编辑链接' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ isNew ? $t('links.添加链接_e8786k') : $t('links.编辑链接_gmso2q') }}</h2>
         <form @submit.prevent="save" class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1.5">URL</label>
@@ -189,7 +189,7 @@ onMounted(load)
             <input v-model="form.is_favorite" type="checkbox" class="rounded" /> {{ t("links.收藏_hy6x") }}
           </label>
           <div class="flex gap-3 pt-2">
-            <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? '保存中...' : '保存' }}</button>
+            <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? $t('links.保存中_vts3p8') : $t('links.保存_e32z') }}</button>
             <button type="button" @click="showEdit = false" class="btn-ghost">{{ t("links.cancel") }}</button>
           </div>
         </form>

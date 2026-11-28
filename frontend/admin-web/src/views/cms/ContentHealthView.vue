@@ -347,17 +347,17 @@ onMounted(load)
             class="px-3 py-2 text-sm rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-50"
             :disabled="!!exporting || !report"
             @click="exportReport('md')"
-          >{{ exporting === 'md' ? '导出中…' : '导出 MD' }}</button>
+          >{{ exporting === 'md' ? $t('contentHealth.导出中_by1pjr') : $t('contentHealth.导出_eubr09') }}</button>
           <button
             class="px-3 py-2 text-sm rounded-lg border border-ink-900 bg-white text-ink-900 hover:bg-ink-50 disabled:opacity-50"
             :disabled="!!exporting || !report"
             @click="exportReport('html')"
-          >{{ exporting === 'html' ? '导出中…' : '导出报告' }}</button>
+          >{{ exporting === 'html' ? $t('contentHealth.导出中_by1pjr') : $t('contentHealth.导出报告_by5h6r') }}</button>
           <button
             class="px-4 py-2 text-sm rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
             :disabled="loading"
             @click="load"
-          >{{ loading ? '体检中…' : '重新体检' }}</button>
+          >{{ loading ? $t('contentHealth.体检中_afwc2u') : $t('contentHealth.重新体检_itb6vk') }}</button>
         </div>
       </div>
 
@@ -375,8 +375,7 @@ onMounted(load)
             >{{ levelText[report.level] }}</span>
           </div>
           <p class="mt-3 text-xs text-ink-400">
-            扫描 {{ report.scanned }} 条{{ report.truncated ? '（已截断，超过单次上限）' : '' }} ·
-            问题 {{ report.problem_count }} 条 ·
+            {{ $t('contentHealth.扫描_hadg') }} {{ report.scanned }} {{ $t('contentHealth.条_kf5') }}{{ report.truncated ? $t('contentHealth.text_1ys3wi') : '' }} {{ $t('contentHealth.text_3zuk3') }} {{ report.problem_count }} {{ $t('contentHealth.条_f5514') }}
             {{ new Date(report.generated_at).toLocaleString('zh-CN') }}
           </p>
         </div>
@@ -402,8 +401,7 @@ onMounted(load)
         v-if="report && report.perf_ready === false"
         class="mb-6 text-xs rounded-xl px-4 py-3 bg-sky-50 border border-sky-200 text-sky-900"
       >
-        效果维度未启用：埋点还没有采集到任何数据，本次不评价「有没有人看」。
-        接入埋点后会自动补充零访问、读完率、转化三类问题（窗口 {{ report.perf_window_days || 30 }} 天）。
+        {{ $t('contentHealth.效果维度_17wpjd') }} {{ report.perf_window_days || 30 }} {{ $t('contentHealth.天_e9s76') }}
       </p>
 
       <!-- 行动清单 -->
@@ -421,13 +419,13 @@ onMounted(load)
                 <span
                   class="px-1.5 py-0.5 text-[10px] rounded"
                   :class="a.severity === 'critical' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'"
-                >{{ a.severity === 'critical' ? '严重' : '一般' }}</span>
-                <span class="text-xs text-ink-400">{{ a.hit }} 篇 · 影响面 {{ a.impact }}</span>
+                >{{ a.severity === 'critical' ? $t('contentHealth.严重_e3bc') : $t('contentHealth.一般_dzcc') }}</span>
+                <span class="text-xs text-ink-400">{{ a.hit }} {{ $t('contentHealth.篇_1yxa6z') }} {{ a.impact }}</span>
               </div>
-              <p class="mt-1 text-xs text-ink-500">改法：{{ a.remedy }}</p>
+              <p class="mt-1 text-xs text-ink-500">{{ $t('contentHealth.改法_fdnmm') }}{{ a.remedy }}</p>
               <p v-if="a.entries.length" class="mt-1 text-[11px] text-ink-400 truncate">
-                涉及：{{ a.entries.slice(0, 3).map((e) => e.title).join('；') }}
-                <span v-if="a.entries.length > 3"> 等 {{ a.entries.length }} 篇</span>
+                {{ $t('contentHealth.涉及_gh87t') }}{{ a.entries.slice(0, 3).map((e) => e.title).join('；') }}
+                <span v-if="a.entries.length > 3"> {{ $t('contentHealth.等_ocp') }} {{ a.entries.length }} {{ $t('contentHealth.篇_og7') }}</span>
               </p>
             </div>
           </li>
@@ -488,18 +486,18 @@ onMounted(load)
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 flex-wrap">
                   <button class="font-medium text-left hover:underline truncate" @click="toggle(item.entry_id)">
-                    {{ item.title || '(无标题)' }}
+                    {{ item.title || $t('contentHealth.text_dwiza8') }}
                   </button>
                   <span class="text-xs text-ink-400">#{{ item.entry_id }}</span>
                   <span v-if="item.status !== 'published'" class="text-xs px-1.5 py-0.5 rounded bg-ink-100 text-ink-500">
                     {{ item.status }}
                   </span>
-                  <span class="text-xs text-ink-400">{{ item.chars }} 字</span>
-                  <span class="text-xs text-ink-400">链入 {{ item.inbound_links }} / 链出 {{ item.outbound_links }}</span>
+                  <span class="text-xs text-ink-400">{{ item.chars }} {{ $t('contentHealth.字_i1j') }}</span>
+                  <span class="text-xs text-ink-400">{{ $t('contentHealth.链入_psfb') }} {{ item.inbound_links }} {{ $t('contentHealth.text_1kgnh') }} {{ item.outbound_links }}</span>
                   <span
                     v-if="item.dimensions"
                     class="text-[11px] text-ink-400"
-                  >结构 {{ item.dimensions.structure }} · SEO {{ item.dimensions.seo }} · 效果 {{ item.dimensions.performance }}</span>
+                  >{{ $t('contentHealth.结构_m51t') }} {{ item.dimensions.structure }} · SEO {{ item.dimensions.seo }} {{ $t('contentHealth.text_3razh') }} {{ item.dimensions.performance }}</span>
                 </div>
 
                 <div class="mt-1.5 flex flex-wrap gap-1.5">
@@ -518,16 +516,16 @@ onMounted(load)
                   <li v-for="(is_, idx) in item.issues" :key="idx">
                     <span class="font-medium">{{ is_.label }}：</span>{{ is_.message }}
                     <div v-if="is_.hrefs?.length" class="mt-1 text-ink-400 break-all">
-                      死链：{{ is_.hrefs.join(' , ') }}
+                      {{ $t('contentHealth.死链_ghhg7') }}{{ is_.hrefs.join(' , ') }}
                     </div>
                     <div v-if="is_.rivals?.length" class="mt-1 text-ink-400">
-                      竞争：{{ is_.rivals.map((r) => `#${r.entry_id} ${r.title}`).join('；') }}
+                      {{ $t('contentHealth.竞争_iemtr') }}{{ is_.rivals.map((r) => `#${r.entry_id} ${r.title}`).join('；') }}
                     </div>
                     <div v-if="is_.shared?.length" class="mt-1 text-ink-400">
-                      共用关键词：{{ is_.shared.join('、') }}
+                      {{ $t('contentHealth.共用关键_14y9km') }}{{ is_.shared.join('、') }}
                     </div>
                     <div v-if="report.check_summary[is_.check]?.remedy" class="mt-1 text-ink-500">
-                      改法：{{ report.check_summary[is_.check].remedy }}
+                      {{ $t('contentHealth.改法_fdnmm') }}{{ report.check_summary[is_.check].remedy }}
                     </div>
                   </li>
                 </ul>
@@ -538,11 +536,11 @@ onMounted(load)
                   class="px-2.5 py-1 text-xs rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-50"
                   :disabled="rechecking.has(item.entry_id)"
                   @click="recheck(item.entry_id)"
-                >{{ rechecking.has(item.entry_id) ? '重检中…' : '重检' }}</button>
+                >{{ rechecking.has(item.entry_id) ? $t('contentHealth.重检中_itqquk') : $t('contentHealth.重检_pdhv') }}</button>
                 <button
                   class="px-2.5 py-1 text-xs rounded-lg border border-ink-200 hover:bg-ink-50"
                   @click="toggle(item.entry_id)"
-                >{{ expanded.has(item.entry_id) ? '收起' : '详情' }}</button>
+                >{{ expanded.has(item.entry_id) ? $t('contentHealth.收起_hzpd') : $t('contentHealth.详情_obrz') }}</button>
                 <button
                   class="px-2.5 py-1 text-xs rounded-lg bg-ink-900 text-white hover:bg-ink-800"
                   @click="openEntry(item.entry_id)"

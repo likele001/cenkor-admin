@@ -190,7 +190,7 @@ function close() {
               v{{ data.manifest.version }}
             </span>
             <span v-if="data?.changed.length" class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
-              已改 {{ data.changed.length }} 项
+              {{ $t('themeSettingsDialog.已改_gj9j') }} {{ data.changed.length }} {{ $t('themeSettingsDialog.项_u49') }}
             </span>
           </h3>
           <p v-if="data?.manifest.description" class="mt-1 truncate text-xs text-ink-500">
@@ -210,8 +210,7 @@ function close() {
           <p>{{ t("themeSettingsDialog.这个主题_12cc03") }}</p>
           <p class="mt-2 text-xs text-ink-400">
             {{ t("themeSettingsDialog.作者可以_16o2t6") }} <code class="rounded bg-ink-50 px-1">theme.json</code> {{ t("themeSettingsDialog.的_nes") }}
-            <code class="rounded bg-ink-50 px-1">settings</code> 里声明主色、字号这类选项，
-            声明之后这里会自动出现表单。
+            <code class="rounded bg-ink-50 px-1">settings</code> {{ $t('themeSettingsDialog.里声明主_106pur') }}
           </p>
         </div>
 
@@ -273,7 +272,7 @@ function close() {
                       :checked="draft[item.key]"
                       @change="setValue(item.key, boolOf($event))"
                     />
-                    <span class="text-xs text-ink-500">{{ draft[item.key] ? '开' : '关' }}</span>
+                    <span class="text-xs text-ink-500">{{ draft[item.key] ? $t('themeSettingsDialog.开_irk') : $t('themeSettingsDialog.关_g37') }}</span>
                   </label>
 
                   <!-- 滑杆 -->
@@ -349,11 +348,11 @@ function close() {
           {{ t("themeSettingsDialog.全部恢复_4rrwxj") }}
         </button>
         <span class="ml-auto text-xs text-ink-400">
-          {{ hasDirty ? `${dirtyKeys.length} 项待保存` : '改动保存后前台刷新即生效' }}
+          {{ hasDirty ? `${dirtyKeys.length} 项待保存` : $t('themeSettingsDialog.改动保存_1jd3at') }}
         </span>
         <button class="btn-ghost text-sm" :disabled="saving" @click="close">{{ t("themeSettingsDialog.cancel") }}</button>
         <button class="btn-primary text-sm" :disabled="saving || !hasDirty" @click="save">
-          {{ saving ? '保存中…' : '保存' }}
+          {{ saving ? $t('themeSettingsDialog.保存中_agdrec') : $t('themeSettingsDialog.保存_e32z') }}
         </button>
       </div>
     </div>

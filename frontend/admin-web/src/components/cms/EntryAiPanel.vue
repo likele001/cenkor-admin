@@ -456,13 +456,13 @@ function slugify(s: string): string {
 <template>
   <div class="card space-y-3">
     <div class="flex items-center justify-between">
-      <h3 class="font-medium text-sm">✨ AI 助手</h3>
-      <span v-if="busy" class="text-xs text-ink-400">处理中…</span>
+      <h3 class="font-medium text-sm">{{ $t('entryAiPanel.text_14bxay') }}</h3>
+      <span v-if="busy" class="text-xs text-ink-400">{{ $t('entryAiPanel.处理中_bpjyjf') }}</span>
     </div>
 
     <p v-if="aiUnavailable" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
-      AI 尚未配置。
-      <router-link to="/cms/ai-settings" class="font-medium underline">去设置 →</router-link>
+      {{ $t('entryAiPanel.text_1uf9iq') }}
+      <router-link to="/cms/ai-settings" class="font-medium underline">{{ $t('entryAiPanel.去设置_1pekgm') }}</router-link>
     </p>
     <p v-if="errorMsg" class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-2">
       {{ errorMsg }}
@@ -474,28 +474,28 @@ function slugify(s: string): string {
     <!-- 摘要 -->
     <div class="border-t border-ink-100 pt-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs font-medium text-ink-700">生成摘要</span>
+        <span class="text-xs font-medium text-ink-700">{{ $t('entryAiPanel.生成摘要_f6ns8q') }}</span>
         <button
           class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
           :disabled="!hasBody || !!busy"
-          aria-label="生成摘要"
-          title="生成摘要"
+          :aria-label="$t('entryAiPanel.生成摘要_f6ns8q')"
+          :title="$t('entryAiPanel.生成摘要_f6ns8q')"
           @click="makeSummary"
         >
-          {{ busy === 'summary' ? '生成中…' : '生成' }}
+          {{ busy === 'summary' ? $t('entryAiPanel.生成中_f6jfoq') : $t('entryAiPanel.生成_kgk1') }}
         </button>
       </div>
-      <p v-if="!hasBody" class="mt-1 text-xs text-ink-400">正文写下 20 字以上就能生成</p>
+      <p v-if="!hasBody" class="mt-1 text-xs text-ink-400">{{ $t('entryAiPanel.正文写下_13bi4c') }}</p>
       <div v-if="summary" class="mt-1.5 space-y-1.5">
         <p class="text-xs text-ink-700 bg-ink-50 border border-ink-200 rounded-lg px-2.5 py-2 leading-relaxed">
           {{ summary }}
         </p>
         <div class="flex gap-2">
           <button v-if="summaryKey" class="btn-ghost text-xs px-2 py-0.5" @click="applySummary">
-            填入 {{ summaryKey }}
+            {{ $t('entryAiPanel.填入_fhi2') }} {{ summaryKey }}
           </button>
-          <button v-else class="btn-ghost text-xs px-2 py-0.5" @click="applySummary">用作文本字段</button>
-          <button class="text-xs text-ink-400 hover:text-ink-700 px-1" @click="summary = ''">丢弃</button>
+          <button v-else class="btn-ghost text-xs px-2 py-0.5" @click="applySummary">{{ $t('entryAiPanel.用作文本_xnhyuv') }}</button>
+          <button class="text-xs text-ink-400 hover:text-ink-700 px-1" @click="summary = ''">{{ $t('entryAiPanel.丢弃_dt7l') }}</button>
         </div>
       </div>
     </div>
@@ -503,29 +503,29 @@ function slugify(s: string): string {
     <!-- SEO -->
     <div class="border-t border-ink-100 pt-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs font-medium text-ink-700">SEO 建议</span>
+        <span class="text-xs font-medium text-ink-700">{{ $t('entryAiPanel.text_14ekgj') }}</span>
         <button
           class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
           :disabled="!canEntryOp"
-          aria-label="生成 SEO 建议"
-          title="生成 SEO 建议"
+          :aria-label="$t('entryAiPanel.生成_7eeaxy')"
+          :title="$t('entryAiPanel.生成_7eeaxy')"
           @click="makeSeo"
         >
-          {{ busy === 'seo' ? '生成中…' : '生成' }}
+          {{ busy === 'seo' ? $t('entryAiPanel.生成中_f6jfoq') : $t('entryAiPanel.生成_kgk1') }}
         </button>
       </div>
-      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">先保存一次，再生成 SEO</p>
+      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">{{ $t('entryAiPanel.先保存一_1xb2jj') }}</p>
       <div v-if="seo" class="mt-1.5 space-y-2 text-xs">
         <div>
-          <div class="text-ink-400">标题</div>
+          <div class="text-ink-400">{{ $t('entryAiPanel.标题_ij5d') }}</div>
           <div class="text-ink-800 leading-relaxed">{{ seo.title || '—' }}</div>
         </div>
         <div>
-          <div class="text-ink-400">描述</div>
+          <div class="text-ink-400">{{ $t('entryAiPanel.描述_hrlt') }}</div>
           <div class="text-ink-800 leading-relaxed">{{ seo.description || '—' }}</div>
         </div>
         <div v-if="seo.keywords?.length">
-          <div class="text-ink-400">关键词</div>
+          <div class="text-ink-400">{{ $t('entryAiPanel.关键词_cnmdu') }}</div>
           <div class="mt-1 flex flex-wrap gap-1">
             <span
               v-for="k in seo.keywords"
@@ -535,8 +535,8 @@ function slugify(s: string): string {
           </div>
         </div>
         <div class="flex gap-2 pt-0.5">
-          <button class="btn-ghost text-xs px-2 py-0.5" @click="applySlug">按 SEO 标题生成 slug</button>
-          <button class="text-xs text-ink-400 hover:text-ink-700 px-1" @click="seo = null">收起</button>
+          <button class="btn-ghost text-xs px-2 py-0.5" @click="applySlug">{{ $t('entryAiPanel.按_nw5dsf') }}</button>
+          <button class="text-xs text-ink-400 hover:text-ink-700 px-1" @click="seo = null">{{ $t('entryAiPanel.收起_hzpd') }}</button>
         </div>
       </div>
     </div>
@@ -544,15 +544,15 @@ function slugify(s: string): string {
     <!-- 翻译 -->
     <div v-if="translatableLangs.length" class="border-t border-ink-100 pt-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs font-medium text-ink-700">翻译成其他语言</span>
+        <span class="text-xs font-medium text-ink-700">{{ $t('entryAiPanel.翻译成其_femlil') }}</span>
         <button
           class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
           :disabled="!canEntryOp || !targetLangs.length"
-          aria-label="翻译到选中语言"
-          title="翻译到选中语言"
+          :aria-label="$t('entryAiPanel.翻译到选_w97tm9')"
+          :title="$t('entryAiPanel.翻译到选_w97tm9')"
           @click="doTranslate"
         >
-          {{ busy === 'translate' ? '翻译中…' : `翻译 ${targetLangs.length || ''}` }}
+          {{ busy === 'translate' ? $t('entryAiPanel.翻译中_gpyp8v') : `翻译 ${targetLangs.length || ''}` }}
         </button>
       </div>
       <div class="mt-1.5 flex flex-wrap gap-1.5">
@@ -570,8 +570,8 @@ function slugify(s: string): string {
           {{ l.flag || '🌍' }} {{ l.name }}
         </button>
       </div>
-      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">先保存一次，再翻译</p>
-      <p v-else class="mt-1 text-xs text-ink-400">译文写入草稿，不会覆盖已有译文</p>
+      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">{{ $t('entryAiPanel.先保存一_1yxlxv') }}</p>
+      <p v-else class="mt-1 text-xs text-ink-400">{{ $t('entryAiPanel.译文写入_1ilwtc') }}</p>
     </div>
 
     <!-- 内链管理：建议、保存、审核交给独立组件 -->
@@ -586,7 +586,7 @@ function slugify(s: string): string {
     <!-- 多渠道再分发 -->
     <div class="border-t border-ink-200 pt-3 mt-3">
       <div class="flex items-center justify-between gap-2">
-        <span class="text-xs font-medium text-ink-700">多渠道再分发</span>
+        <span class="text-xs font-medium text-ink-700">{{ $t('entryAiPanel.多渠道再_q6qdij') }}</span>
         <div class="flex gap-1">
           <button
             v-for="ch in REDIST_CHANNELS"
@@ -602,19 +602,19 @@ function slugify(s: string): string {
         <button
           class="btn-ghost text-xs px-2 py-0.5"
           :disabled="!canEntryOp"
-          aria-label="生成渠道稿"
+          :aria-label="$t('entryAiPanel.生成渠道_18laeb')"
           @click="makeRedist"
         >
-          {{ busy === 'redist' ? '改写中…' : '生成' }}
+          {{ busy === 'redist' ? $t('entryAiPanel.改写中_d3xtll') : $t('entryAiPanel.生成_kgk1') }}
         </button>
       </div>
 
-      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">先保存一次，再改写</p>
+      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">{{ $t('entryAiPanel.先保存一_1yxh2i') }}</p>
       <p v-else-if="!redistResult" class="mt-1 text-xs text-ink-400">
-        改写成各渠道体裁，只产出文本不自动发布 —— 平台发布由你确认
+        {{ $t('entryAiPanel.改写成各_38kmee') }}
       </p>
       <p v-if="busy === 'redist'" class="mt-1 text-xs text-ink-400">
-        公众号长文需 30~60 秒（模型推理开销），请稍等
+        {{ $t('entryAiPanel.公众号长_taenq1') }}
       </p>
 
       <div v-if="redistResult" class="mt-2 text-xs border border-ink-200 rounded-lg p-2.5 bg-ink-50">
@@ -622,16 +622,16 @@ function slugify(s: string): string {
           <div class="min-w-0">
             <div class="text-ink-800 font-medium break-words">{{ redistResult.title }}</div>
             <div class="text-ink-400 mt-0.5">
-              {{ redistResult.channel_label }} · {{ redistResult.chars }} 字 / 上限 {{ redistResult.limit }}
+              {{ redistResult.channel_label }} · {{ redistResult.chars }} {{ $t('entryAiPanel.字_1pyye6') }} {{ redistResult.limit }}
             </div>
           </div>
           <button class="btn-ghost text-xs px-2 py-0.5 shrink-0" @click="copyRedist">
-            {{ copied ? '已复制' : '复制全文' }}
+            {{ copied ? $t('entryAiPanel.已复制_e6ywr') : $t('entryAiPanel.复制全文_bkscdk') }}
           </button>
         </div>
 
         <p v-if="redistResult.over_limit" class="mt-1.5 text-red-600">
-          超出字数上限，平台会截断，建议精简
+          {{ $t('entryAiPanel.超出字数_1g8fqa') }}
         </p>
 
         <div class="mt-1.5 max-h-56 overflow-auto text-ink-700 leading-relaxed">
@@ -647,7 +647,7 @@ function slugify(s: string): string {
         </div>
 
         <p v-if="redistResult.notes" class="mt-1.5 text-ink-500 leading-relaxed">
-          改动说明：{{ redistResult.notes }}
+          {{ $t('entryAiPanel.改动说明_1fmsam') }}{{ redistResult.notes }}
         </p>
       </div>
     </div>
@@ -655,7 +655,7 @@ function slugify(s: string): string {
     <!-- AI 配图 -->
     <div class="border-t border-ink-200 pt-3 mt-3">
       <div class="flex items-center justify-between gap-2">
-        <span class="text-xs font-medium text-ink-700">AI 配图</span>
+        <span class="text-xs font-medium text-ink-700">{{ $t('entryAiPanel.text_11r39l') }}</span>
         <div class="flex gap-1">
           <button
             v-for="a in ILL_ASPECTS"
@@ -681,19 +681,19 @@ function slugify(s: string): string {
         <button
           class="btn-ghost text-xs px-2 py-0.5"
           :disabled="!canEntryOp"
-          aria-label="生成配图"
+          :aria-label="$t('entryAiPanel.生成配图_f6v5k2')"
           @click="makeIllustration"
         >
-          {{ busy === 'illustration' ? '生成中…' : '生成' }}
+          {{ busy === 'illustration' ? $t('entryAiPanel.生成中_f6jfoq') : $t('entryAiPanel.生成_kgk1') }}
         </button>
       </div>
 
-      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">先保存一次，再配图</p>
+      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">{{ $t('entryAiPanel.先保存一_1yxolh') }}</p>
       <p v-else-if="!illustration" class="mt-1 text-xs text-ink-400">
-        读正文语义出图并落媒体库，不自动插入 —— 满意再挂上去
+        {{ $t('entryAiPanel.读正文语_wz3vgy') }}
       </p>
       <p v-if="busy === 'illustration'" class="mt-1 text-xs text-ink-400">
-        生图约 15~40 秒，请稍等
+        {{ $t('entryAiPanel.生图约_ncui7q') }}
       </p>
 
       <div v-if="illustration" class="mt-2 text-xs border border-ink-200 rounded-lg p-2.5 bg-ink-50">
@@ -707,20 +707,20 @@ function slugify(s: string): string {
         <div class="mt-2 flex flex-wrap gap-1">
           <button class="btn-ghost text-xs px-2 py-0.5" :disabled="busy === 'attach'"
                   @click="attachIllustration('og_image')">
-            {{ illAttached === 'og_image' ? '已设为分享图' : '设为分享图' }}
+            {{ illAttached === 'og_image' ? $t('entryAiPanel.已设为分_agaqbv') : $t('entryAiPanel.设为分享_1ndsxo') }}
           </button>
           <button class="btn-ghost text-xs px-2 py-0.5" :disabled="busy === 'attach'"
                   @click="attachIllustration('body_head')">
-            {{ illAttached === 'body_head' ? '已插入正文' : '插入正文首图' }}
+            {{ illAttached === 'body_head' ? $t('entryAiPanel.已插入正_p3sjux') : $t('entryAiPanel.插入正文_yx8n3') }}
           </button>
-          <a :href="illustration.url" target="_blank" class="btn-ghost text-xs px-2 py-0.5">看原图</a>
+          <a :href="illustration.url" target="_blank" class="btn-ghost text-xs px-2 py-0.5">{{ $t('entryAiPanel.看原图_huetm') }}</a>
         </div>
       </div>
     </div>
     <!-- AI 视频 -->
     <div class="border-t border-ink-200 pt-3 mt-3">
       <div class="flex items-center justify-between gap-2">
-        <span class="text-xs font-medium text-ink-700">AI 视频</span>
+        <span class="text-xs font-medium text-ink-700">{{ $t('entryAiPanel.text_11q64j') }}</span>
         <div class="flex gap-1">
           <button
             v-for="m in VID_MODES"
@@ -757,21 +757,21 @@ function slugify(s: string): string {
         <button
           class="btn-ghost text-xs px-2 py-0.5 ml-auto"
           :disabled="!canEntryOp"
-          aria-label="生成视频"
+          :aria-label="$t('entryAiPanel.生成视频_f6u8f0')"
           @click="makeVideo"
         >
-          {{ busy === 'video' ? '提交中…' : '生成' }}
+          {{ busy === 'video' ? $t('entryAiPanel.提交中_cx3q0d') : $t('entryAiPanel.生成_kgk1') }}
         </button>
       </div>
 
-      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">先保存一次，再生成视频</p>
+      <p v-if="!entryId" class="mt-1 text-xs text-ink-400">{{ $t('entryAiPanel.先保存一_1b0xlk') }}</p>
       <p v-else-if="!videoJob" class="mt-1 text-xs text-ink-400">
         {{ vidMode === 'i2v'
-          ? '拿上面那张配图当首帧，做 3~10 秒镜头运动'
-          : '按正文语义直接出片，不自动插入 —— 满意再挂上去' }}
+          ? $t('entryAiPanel.拿上面那_l0yktb')
+          : $t('entryAiPanel.按正文语_1jx87l') }}
       </p>
       <p v-if="vidRunning" class="mt-1 text-xs text-ink-400">
-        {{ vidStatusText }}，页面可以关，回来再查也一样
+        {{ vidStatusText }}{{ $t('entryAiPanel.text_1o709s') }}
       </p>
 
       <div v-if="videoJob" class="mt-2 text-xs border border-ink-200 rounded-lg p-2.5 bg-ink-50">
@@ -799,21 +799,21 @@ function slugify(s: string): string {
             :disabled="busy === 'video-attach' || !videoJob.cover_url"
             @click="attachVideo('og_image')"
           >
-            {{ vidAttached === 'og_image' ? '已设为分享图' : '设为分享图' }}
+            {{ vidAttached === 'og_image' ? $t('entryAiPanel.已设为分_agaqbv') : $t('entryAiPanel.设为分享_1ndsxo') }}
           </button>
           <button
             class="btn-ghost text-xs px-2 py-0.5"
             :disabled="busy === 'video-attach'"
             @click="attachVideo('body_head')"
           >
-            {{ vidAttached === 'body_head' ? '已插入正文' : '插入正文' }}
+            {{ vidAttached === 'body_head' ? $t('entryAiPanel.已插入正_p3sjux') : $t('entryAiPanel.插入正文_cxovbr') }}
           </button>
           <a
             v-if="videoJob.url"
             :href="videoJob.url"
             target="_blank"
             class="btn-ghost text-xs px-2 py-0.5"
-          >看原片</a>
+          >{{ $t('entryAiPanel.看原片_huk7n') }}</a>
         </div>
       </div>
     </div>

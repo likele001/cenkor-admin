@@ -147,7 +147,7 @@ onMounted(async () => {
     <!-- Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑标签' : '新建标签' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editing ? $t('tags.编辑标签_gml5g2') : $t('tags.新建标签_d85929') }}</h2>
         <div class="space-y-3">
           <div>
             <label class="block text-sm font-medium mb-1">{{ t('tags.名称_eyrn') }}</label>
@@ -186,7 +186,7 @@ onMounted(async () => {
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn-ghost" @click="showModal = false">{{ t('usersList.取消_ev02') }}</button>
-          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? $t('tags.保存中_agdrec') : $t('tags.保存_e32z') }}</button>
         </div>
       </div>
     </div>

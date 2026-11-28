@@ -308,7 +308,7 @@ function statusColor(s: string): string {
             <span class="text-3xl">{{ item.icon || '🎨' }}</span>
             <div class="flex-1 min-w-0">
               <h3 class="font-semibold text-gray-900 truncate">{{ item.name }}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">by {{ item.author || '未知' }}</p>
+              <p class="text-xs text-gray-500 mt-0.5">by {{ item.author || $t('themeMarket.未知_i7ej') }}</p>
             </div>
             <span
               v-if="item.is_free"
@@ -325,7 +325,7 @@ function statusColor(s: string): string {
           </div>
 
           <p class="mt-3 text-sm text-gray-600 line-clamp-2">
-            {{ item.summary || item.description || '暂无简介' }}
+            {{ item.summary || item.description || $t('themeMarket.暂无简介_dcys89') }}
           </p>
 
           <div class="mt-3 flex items-center gap-2 text-xs text-gray-500">
@@ -343,7 +343,7 @@ function statusColor(s: string): string {
                 : 'bg-blue-600 text-white hover:bg-blue-700',
             ]"
           >
-            {{ item.has_update ? '更新' : item.installed ? '重新安装' : '安装' }}
+            {{ item.has_update ? $t('themeMarket.更新_i2ik') : item.installed ? $t('themeMarket.重新安装_itdfz3') : $t('themeMarket.安装_gbj0') }}
           </button>
         </div>
       </div>
@@ -365,16 +365,16 @@ function statusColor(s: string): string {
             <div>
               <h3 class="font-semibold text-gray-900">{{ item.name }}</h3>
               <p class="text-xs text-gray-500 mt-0.5">
-                {{ item.source === 'builtin' ? '内置主题' : '已安装' }}
+                {{ item.source === 'builtin' ? $t('themeMarket.内置主题_at7g1y') : $t('themeMarket.已安装_e7owe') }}
                 <span v-if="item.version"> · v{{ item.version }}</span>
               </p>
             </div>
             <div class="flex gap-2">
               <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                {{ item.files }} 文件
+                {{ item.files }} {{ $t('themeMarket.文件_hpan') }}
               </span>
               <span v-if="item.settings_count" class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
-                {{ item.settings_count }} 设置
+                {{ item.settings_count }} {{ $t('themeMarket.设置_ogvk') }}
               </span>
             </div>
           </div>
@@ -434,7 +434,7 @@ function statusColor(s: string): string {
           :disabled="importingKb"
           class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
         >
-          {{ importingKb ? '导入中...' : '一键灌入知识库' }}
+          {{ importingKb ? $t('themeMarket.导入中_15hwad') : $t('themeMarket.一键灌入_3b32iz') }}
         </button>
       </div>
 
@@ -485,7 +485,7 @@ function statusColor(s: string): string {
     >
       <div class="bg-white rounded-xl max-w-md w-full p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">
-          安装 {{ installTarget?.name }}
+          {{ $t('themeMarket.安装_gbj0') }} {{ installTarget?.name }}
         </h2>
 
         <div v-if="!installTarget?.is_free" class="mb-4">
@@ -518,7 +518,7 @@ function statusColor(s: string): string {
             :disabled="installing"
             class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            {{ installing ? '安装中...' : '确认安装' }}
+            {{ installing ? $t('themeMarket.安装中_1pi12m') : $t('themeMarket.确认安装_frqcpe') }}
           </button>
         </div>
       </div>

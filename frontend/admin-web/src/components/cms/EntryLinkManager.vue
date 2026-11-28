@@ -240,7 +240,7 @@ watch(
         :title="t('entryLinkManager.用向量召_a9w5zy')"
         @click="analyze"
       >
-        {{ busy === 'analyze' ? '分析中…' : '分析建议' }}
+        {{ busy === 'analyze' ? $t('entryLinkManager.分析中_arzalf') : $t('entryLinkManager.分析建议_as2qpq') }}
       </button>
     </div>
 
@@ -268,13 +268,13 @@ watch(
       <!-- AI 建议 -->
       <div v-if="suggestions.length" class="space-y-1.5">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-ink-400">AI 建议（{{ suggestions.length }}）</span>
+          <span class="text-xs text-ink-400">{{ $t('entryLinkManager.text_wb8tcs') }}{{ suggestions.length }}）</span>
           <button
             class="text-xs text-violet-600 hover:text-violet-800 disabled:text-ink-300"
             :disabled="!canOperate"
             @click="saveAll"
           >
-            {{ busy === 'save-all' ? '保存中…' : '全部保存' }}
+            {{ busy === 'save-all' ? $t('entryLinkManager.保存中_agdrec') : $t('entryLinkManager.全部保存_av90uz') }}
           </button>
         </div>
         <div
@@ -292,7 +292,7 @@ watch(
               class="btn-ghost text-xs px-2 py-0.5"
               @click="insert(s.anchor_text, s.source_url, s.title, `s-${s.entry_id}`)"
             >
-              {{ didApply[`s-${s.entry_id}`] ? '再插入' : '插入正文' }}
+              {{ didApply[`s-${s.entry_id}`] ? $t('entryLinkManager.再插入_cffvk') : $t('entryLinkManager.插入正文_cxovbr') }}
             </button>
             <button
               class="btn-ghost text-xs px-2 py-0.5 disabled:text-ink-300"
@@ -300,8 +300,8 @@ watch(
               @click="saveSuggestion(s)"
             >
               {{ savedTargetIds.has(s.entry_id)
-                ? '已保存'
-                : busy === `save-${s.entry_id}` ? '保存中…' : '保存待审' }}
+                ? $t('entryLinkManager.已保存_e5ggd')
+                : busy === `save-${s.entry_id}` ? $t('entryLinkManager.保存中_agdrec') : $t('entryLinkManager.保存待审_agh1cn') }}
             </button>
           </div>
         </div>
@@ -309,7 +309,7 @@ watch(
 
       <!-- 已保存的内链 -->
       <div v-if="visibleSaved.length" class="space-y-1.5">
-        <div class="text-xs text-ink-400">已保存（{{ visibleSaved.length }}）</div>
+        <div class="text-xs text-ink-400">{{ $t('entryLinkManager.已保存_c6qkgr') }}{{ visibleSaved.length }}）</div>
         <div
           v-for="l in visibleSaved"
           :key="l.id"
@@ -337,7 +337,7 @@ watch(
               class="btn-ghost text-xs px-2 py-0.5"
               @click="insert(l.anchor_text, l.target_url, l.target_title || '', `l-${l.id}`)"
             >
-              {{ didApply[`l-${l.id}`] ? '再插入' : '插入正文' }}
+              {{ didApply[`l-${l.id}`] ? $t('entryLinkManager.再插入_cffvk') : $t('entryLinkManager.插入正文_cxovbr') }}
             </button>
             <button
               v-if="l.status === 'pending'"

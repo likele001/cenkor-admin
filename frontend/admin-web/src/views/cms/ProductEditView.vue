@@ -129,7 +129,7 @@ onMounted(load)
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-4xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/cms/products" class="text-sm text-ink-500 hover:text-ink-900">{{ t('productEdit.text_u39d8b') }}</router-link>
-        <span class="font-semibold">{{ isNew ? '新建产品' : '编辑产品' }}</span>
+        <span class="font-semibold">{{ isNew ? $t('productEdit.新建产品_d80q10') : $t('productEdit.编辑产品_gmgmet') }}</span>
       </div>
     </header>
 
@@ -295,7 +295,7 @@ onMounted(load)
 
         <div class="flex gap-3">
           <button type="submit" :disabled="saving" class="btn-primary">
-            {{ saving ? '保存中…' : isNew ? '创建产品' : '保存修改' }}
+            {{ saving ? $t('productEdit.保存中_agdrec') : isNew ? $t('productEdit.创建产品_ar3ss9') : $t('productEdit.保存修改_agefs6') }}
           </button>
           <router-link to="/cms/products" class="btn-ghost">{{ t('usersList.取消_ev02') }}</router-link>
         </div>

@@ -152,7 +152,7 @@ onMounted(load)
     <!-- Edit Modal -->
     <div v-if="showEdit" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40" @click.self="showEdit = false">
       <div class="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg font-semibold mb-4">{{ isNew ? '新建工单' : '编辑工单' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ isNew ? $t('tickets.新建工单_d83b2y') : $t('tickets.编辑工单_gmj7gr') }}</h2>
         <form @submit.prevent="save" class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ t("tickets.title") }}</label>
@@ -192,7 +192,7 @@ onMounted(load)
             <RichTextEditor v-model="form.description" />
           </div>
           <div class="flex gap-3 pt-2">
-            <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? '保存中...' : '保存' }}</button>
+            <button type="submit" :disabled="saving" class="btn-primary flex-1">{{ saving ? $t('tickets.保存中_vts3p8') : $t('tickets.保存_e32z') }}</button>
             <button type="button" @click="showEdit = false" class="btn-ghost">{{ t("tickets.cancel") }}</button>
           </div>
         </form>

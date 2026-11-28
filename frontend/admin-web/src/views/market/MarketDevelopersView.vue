@@ -101,7 +101,7 @@ async function submitAdjust() {
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-ink-200">
         <div>
           <h2 class="font-semibold">{{ t("marketDevelopers.开发者与_ld2yym") }}</h2>
-          <p class="text-xs text-ink-500 mt-1">共 {{ total }} 位开发者 · 余额由账本流水累计，可在此做人工补偿或扣罚</p>
+          <p class="text-xs text-ink-500 mt-1">{{ $t('marketDevelopers.共_g35') }} {{ total }} {{ $t('marketDevelopers.位开发者_ow02wz') }}</p>
         </div>
         <input v-model="keyword" class="input !w-56" :placeholder="t('marketDevelopers.搜索开发_196ri8')" />
       </div>
@@ -138,7 +138,7 @@ async function submitAdjust() {
               <span
                 class="text-xs px-1.5 py-0.5 rounded"
                 :class="d.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-ink-100 text-ink-500'"
-              >{{ d.status === 'active' ? '正常' : '已停用' }}</span>
+              >{{ d.status === 'active' ? $t('marketDevelopers.正常_is6t') : $t('marketDevelopers.已停用_e5ola') }}</span>
               <div class="text-xs text-ink-400 mt-1">{{ fmtDate(d.created_at) }}</div>
             </td>
             <td class="px-3 py-3 text-right">{{ d.app_count }}</td>
@@ -154,7 +154,7 @@ async function submitAdjust() {
       </table>
 
       <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 text-sm">
-        <span class="text-ink-500">共 {{ total }} 条</span>
+        <span class="text-ink-500">{{ $t('marketDevelopers.共_g35') }} {{ total }} {{ $t('marketDevelopers.条_kf5') }}</span>
         <div class="flex items-center gap-2">
           <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">{{ t("marketDevelopers.上一页_btlof") }}</button>
           <span class="text-ink-500">{{ page }} / {{ totalPages }}</span>
@@ -176,8 +176,8 @@ async function submitAdjust() {
 
         <div class="px-5 py-4 space-y-3">
           <div class="rounded-xl bg-ink-50 border border-ink-200 p-3 text-xs text-ink-600 space-y-1">
-            <div>可提现 ¥{{ current?.wallet?.available ?? '0.00' }}</div>
-            <div>待结算 ¥{{ current?.wallet?.pending ?? '0.00' }} · 提现中 ¥{{ current?.wallet?.frozen ?? '0.00' }}</div>
+            <div>{{ $t('marketDevelopers.可提现_1l44o2') }}{{ current?.wallet?.available ?? '0.00' }}</div>
+            <div>{{ $t('marketDevelopers.待结算_ytngdq') }}{{ current?.wallet?.pending ?? '0.00' }} {{ $t('marketDevelopers.text_1g0h8f') }}{{ current?.wallet?.frozen ?? '0.00' }}</div>
           </div>
 
           <div>
@@ -204,7 +204,7 @@ async function submitAdjust() {
               <option value="pending">{{ t("marketDevelopers.待结算_elx7t") }}</option>
               <option value="frozen">{{ t("marketDevelopers.提现冻结_d2k6zc") }}</option>
             </select>
-            <p class="text-xs text-ink-400 mt-1">{{ POOL_HINT[form.pool] }}，调整会计入资金流水</p>
+            <p class="text-xs text-ink-400 mt-1">{{ POOL_HINT[form.pool] }}{{ $t('marketDevelopers.text_7flo0x') }}</p>
           </div>
 
           <div>
@@ -217,7 +217,7 @@ async function submitAdjust() {
 
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
           <button class="btn-ghost" @click="showAdjust = false">{{ t("marketDevelopers.cancel") }}</button>
-          <button class="btn-primary" :disabled="saving" @click="submitAdjust">{{ saving ? '提交中…' : '确认调整' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="submitAdjust">{{ saving ? $t('marketDevelopers.提交中_cx3q0d') : $t('marketDevelopers.确认调整_fryekn') }}</button>
         </div>
       </div>
     </div>

@@ -177,9 +177,9 @@ onMounted(analyze)
   <div class="min-h-screen bg-ink-50">
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-6xl mx-auto px-6 h-14 flex items-center gap-4">
-        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">← AI 驾驶舱</router-link>
-        <span class="font-semibold">选题缺口</span>
-        <span class="text-xs text-ink-400">该写什么，两种问法</span>
+        <router-link to="/cms/ai" class="text-sm text-ink-500 hover:text-ink-900">{{ $t('topicGap.text_11m1s0') }}</router-link>
+        <span class="font-semibold">{{ $t('topicGap.选题缺口_isz1eg') }}</span>
+        <span class="text-xs text-ink-400">{{ $t('topicGap.该写什么_1eb0u9') }}</span>
       </div>
     </header>
 
@@ -191,14 +191,14 @@ onMounted(analyze)
           :class="mode === 'semantic' ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50'"
           @click="switchMode('semantic')"
         >
-          语义反推
+          {{ $t('topicGap.语义反推_hz86lz') }}
         </button>
         <button
           class="px-4 py-1.5 rounded-lg transition-colors"
           :class="mode === 'search' ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50'"
           @click="switchMode('search')"
         >
-          真实搜索词
+          {{ $t('topicGap.真实搜索_1fjzih') }}
         </button>
       </div>
 
@@ -209,7 +209,7 @@ onMounted(analyze)
 
         <div class="card mb-6 flex flex-wrap items-end gap-4">
           <label class="text-sm text-ink-600">
-            内容类型 key（可空）
+            {{ $t('topicGap.内容类型_45tpfd') }}
             <input
               v-model="ctKey"
               placeholder="article"
@@ -217,7 +217,7 @@ onMounted(analyze)
             />
           </label>
           <label class="text-sm text-ink-600">
-            缺口数量
+            {{ $t('topicGap.缺口数量_geh4p4') }}
             <input
               v-model.number="limit"
               type="number"
@@ -231,28 +231,26 @@ onMounted(analyze)
             :disabled="loading"
             @click="analyze"
           >
-            {{ loading ? `分析中… ${elapsed}s` : '重新分析' }}
+            {{ loading ? `分析中… ${elapsed}s` : $t('topicGap.重新分析_itbn65') }}
           </button>
         </div>
 
         <div v-if="loading && !report" class="card text-sm text-ink-500">
-          正在读取内容库并让模型判断覆盖缺口，通常 20~60 秒。
+          {{ $t('topicGap.正在读取_amsp62') }}
         </div>
 
         <template v-if="report">
           <div class="grid gap-4 md:grid-cols-3 mb-6">
             <div class="card md:col-span-2">
-              <p class="text-xs text-ink-400 mb-2">覆盖概况</p>
+              <p class="text-xs text-ink-400 mb-2">{{ $t('topicGap.覆盖概况_hucwoz') }}</p>
               <p class="text-sm leading-relaxed text-ink-800">{{ report.coverage_summary || '—' }}</p>
               <p class="mt-3 text-xs text-ink-400">
-                已发布 {{ report.total_entries }} 篇 ·
-                采样 {{ report.sampled_entries ?? '—' }} 篇 ·
-                缺口 {{ totalGaps }} 条
-                <span v-if="report.refs_dropped"> · 已剔除 {{ report.refs_dropped }} 条虚构引用</span>
+                {{ $t('topicGap.已发布_e656s') }} {{ report.total_entries }} {{ $t('topicGap.篇_g1j1n6') }} {{ report.sampled_entries ?? '—' }} {{ $t('topicGap.篇_g1fs17') }} {{ totalGaps }} {{ $t('topicGap.条_kf5') }}
+                <span v-if="report.refs_dropped"> {{ $t('topicGap.text_37czdl') }} {{ report.refs_dropped }} {{ $t('topicGap.条虚构引_1ufmvs') }}</span>
               </p>
             </div>
             <div class="card">
-              <p class="text-xs text-ink-400 mb-2">决策阶段分布</p>
+              <p class="text-xs text-ink-400 mb-2">{{ $t('topicGap.决策阶段_xttn7j') }}</p>
               <ul class="space-y-1.5">
                 <li v-for="r in intentView" :key="r.key" class="flex items-center justify-between text-sm">
                   <span class="text-ink-600">{{ r.label }}</span>
@@ -260,13 +258,13 @@ onMounted(analyze)
                 </li>
               </ul>
               <p class="mt-3 text-xs text-ink-400 leading-relaxed">
-                B2B 常见病：认知层一堆，决策层（报价/交期/验收）空白。
+                {{ $t('topicGap.text_ywv6lt') }}
               </p>
             </div>
           </div>
 
           <p v-if="!report.gaps.length" class="card text-sm text-ink-500">
-            {{ report.warning || '没有识别出明显缺口。' }}
+            {{ report.warning || $t('topicGap.没有识别_l1bypo') }}
           </p>
 
           <div class="space-y-3">
@@ -296,9 +294,9 @@ onMounted(analyze)
 
                   <p class="mt-2 text-xs text-ink-400">
                     <template v-if="g.related_existing.length">
-                      已有相关：{{ g.related_existing.join('、') }}
+                      {{ $t('topicGap.已有相关_pnsm6g') }}{{ g.related_existing.join('、') }}
                     </template>
-                    <template v-else>站内无相关文章</template>
+                    <template v-else>{{ $t('topicGap.站内无相_ywrm2w') }}</template>
                   </p>
                 </div>
 
@@ -306,11 +304,11 @@ onMounted(analyze)
                   <button
                     class="px-3 py-1.5 text-xs rounded-lg bg-ink-900 text-white hover:bg-ink-800"
                     @click="startDraftGap(g)"
-                  >去起草</button>
+                  >{{ $t('topicGap.去起草_cyai5') }}</button>
                   <button
                     class="px-3 py-1.5 text-xs rounded-lg border border-ink-200 text-ink-600 hover:bg-ink-50"
                     @click="copyTitle(g.suggested_title)"
-                  >复制标题</button>
+                  >{{ $t('topicGap.复制标题_bkwgze') }}</button>
                 </div>
               </div>
             </div>
@@ -320,8 +318,7 @@ onMounted(analyze)
 
       <template v-else>
         <p class="mb-4 text-xs text-ink-500 leading-relaxed">
-          读者在搜索框里真正打的字。「搜了没结果」是最便宜的选题清单 ——
-          它不需要模型判断，需求已经写在问题里了。
+          {{ $t('topicGap.读者在搜_16p3zz') }}
         </p>
 
         <p v-if="termError" class="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
@@ -330,7 +327,7 @@ onMounted(analyze)
 
         <div class="card mb-6 flex flex-wrap items-end gap-4">
           <label class="text-sm text-ink-600">
-            回看天数
+            {{ $t('topicGap.回看天数_bgaxw4') }}
             <input
               v-model.number="termDays"
               type="number"
@@ -340,58 +337,58 @@ onMounted(analyze)
             />
           </label>
           <label class="text-sm text-ink-600">
-            排序
+            {{ $t('topicGap.排序_hge5') }}
             <select v-model="termOrder" class="ml-2 px-2 py-1 border border-ink-200 rounded-lg text-sm">
-              <option value="zero">零结果最多</option>
-              <option value="gap">零结果占比高</option>
-              <option value="hits">搜得最多</option>
+              <option value="zero">{{ $t('topicGap.零结果最_12frun') }}</option>
+              <option value="gap">{{ $t('topicGap.零结果占_1j0f2s') }}</option>
+              <option value="hits">{{ $t('topicGap.搜得最多_d125p1') }}</option>
             </select>
           </label>
           <label class="flex items-center gap-1.5 text-sm text-ink-600">
             <input v-model="onlyZero" type="checkbox" class="w-3.5 h-3.5" />
-            只看没搜到的
+            {{ $t('topicGap.只看没搜_1v4uaz') }}
           </label>
           <button
             class="ml-auto px-4 py-2 text-sm rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
             :disabled="termLoading"
             @click="loadTerms"
           >
-            {{ termLoading ? '加载中…' : '刷新' }}
+            {{ termLoading ? $t('topicGap.加载中_b0k5km') : $t('topicGap.刷新_ejix') }}
           </button>
         </div>
 
         <div v-if="termSummary" class="grid gap-4 md:grid-cols-4 mb-6">
           <div class="card">
-            <p class="text-xs text-ink-400 mb-1">搜索次数</p>
+            <p class="text-xs text-ink-400 mb-1">{{ $t('topicGap.搜索次数_d5eph1') }}</p>
             <p class="text-2xl font-medium text-ink-900">{{ termSummary.total }}</p>
           </div>
           <div class="card">
-            <p class="text-xs text-ink-400 mb-1">零结果</p>
+            <p class="text-xs text-ink-400 mb-1">{{ $t('topicGap.零结果_mq5jz') }}</p>
             <p class="text-2xl font-medium text-ink-900">{{ termSummary.zero_result }}</p>
-            <p class="text-xs text-ink-400 mt-1">占 {{ pct(termSummary.zero_rate) }}</p>
+            <p class="text-xs text-ink-400 mt-1">{{ $t('topicGap.占_ggw') }} {{ pct(termSummary.zero_rate) }}</p>
           </div>
           <div class="card">
-            <p class="text-xs text-ink-400 mb-1">不同词</p>
+            <p class="text-xs text-ink-400 mb-1">{{ $t('topicGap.不同词_bumfi') }}</p>
             <p class="text-2xl font-medium text-ink-900">{{ termSummary.distinct_terms }}</p>
           </div>
           <div class="card">
-            <p class="text-xs text-ink-400 mb-1">访客</p>
+            <p class="text-xs text-ink-400 mb-1">{{ $t('topicGap.访客_o9tv') }}</p>
             <p class="text-2xl font-medium text-ink-900">{{ termSummary.visitors }}</p>
-            <p class="text-xs text-ink-400 mt-1">近 {{ termSummary.days }} 天</p>
+            <p class="text-xs text-ink-400 mt-1">{{ $t('topicGap.近_sep') }} {{ termSummary.days }} {{ $t('topicGap.天_hm1') }}</p>
           </div>
         </div>
 
-        <div v-if="termLoading && !terms.length" class="card text-sm text-ink-500">加载中…</div>
+        <div v-if="termLoading && !terms.length" class="card text-sm text-ink-500">{{ $t('topicGap.加载中_b0k5km') }}</div>
 
         <div v-else-if="terms.length" class="card p-0 overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-ink-50 text-xs text-ink-500">
               <tr>
-                <th class="text-left px-4 py-2 font-normal">搜索词</th>
-                <th class="text-right px-3 py-2 font-normal w-20">次数</th>
-                <th class="text-right px-3 py-2 font-normal w-20">零结果</th>
-                <th class="text-right px-3 py-2 font-normal w-20">占比</th>
-                <th class="text-right px-3 py-2 font-normal w-28">最近</th>
+                <th class="text-left px-4 py-2 font-normal">{{ $t('topicGap.搜索词_f9xc7') }}</th>
+                <th class="text-right px-3 py-2 font-normal w-20">{{ $t('topicGap.次数_is1b') }}</th>
+                <th class="text-right px-3 py-2 font-normal w-20">{{ $t('topicGap.零结果_mq5jz') }}</th>
+                <th class="text-right px-3 py-2 font-normal w-20">{{ $t('topicGap.占比_eruc') }}</th>
+                <th class="text-right px-3 py-2 font-normal w-28">{{ $t('topicGap.最近_ib4h') }}</th>
                 <th class="px-4 py-2 w-32"></th>
               </tr>
             </thead>
@@ -410,7 +407,7 @@ onMounted(analyze)
                   <button
                     class="px-2.5 py-1 text-xs rounded-lg bg-ink-900 text-white hover:bg-ink-800"
                     @click="startDraft(t.query)"
-                  >去起草</button>
+                  >{{ $t('topicGap.去起草_cyai5') }}</button>
                 </td>
               </tr>
             </tbody>
@@ -418,8 +415,7 @@ onMounted(analyze)
         </div>
 
         <p v-else class="card text-sm text-ink-500">
-          还没有搜索记录。访问公开站的搜索页（/search?q=…）就会开始积累；
-          数据从今天起攒，越早开越早有得看。
+          {{ $t('topicGap.还没有搜_1pp8eo') }}
         </p>
       </template>
     </main>

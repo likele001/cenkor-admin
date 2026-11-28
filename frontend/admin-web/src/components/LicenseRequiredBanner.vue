@@ -57,7 +57,7 @@ onUnmounted(() => {
       <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/90 text-[11px] font-semibold text-white">!</span>
       <div class="min-w-0">
         <p class="text-sm font-medium text-amber-900">
-          应用「{{ current.appKey }}」未授权
+          {{ $t('licenseRequiredBanner.应用_eewe0') }}{{ current.appKey }}{{ $t('licenseRequiredBanner.text_6hryuw') }}
         </p>
         <p class="mt-0.5 text-xs text-amber-800/90 leading-relaxed">{{ current.message }}</p>
         <RouterLink

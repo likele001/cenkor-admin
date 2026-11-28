@@ -566,23 +566,23 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
   <div class="flex h-[calc(100vh-64px)] flex-col">
     <div class="flex flex-wrap items-center gap-2 border-b border-ink-100 pb-3">
       <div>
-        <h1 class="text-xl font-semibold tracking-tight">模板工作台</h1>
-        <p class="text-xs text-ink-500">改完即存，右侧实时看效果；语法错误会在编辑器里标红</p>
+        <h1 class="text-xl font-semibold tracking-tight">{{ $t('templateStudio.模板工作_280ozf') }}</h1>
+        <p class="text-xs text-ink-500">{{ $t('templateStudio.改完即存_j0y4jm') }}</p>
       </div>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <button
           class="btn-ghost text-sm"
           :class="showTags ? 'text-blue-600' : ''"
-          title="列出模板里能用的变量、数据 API 与过滤器，点一下插入"
+          :title="$t('templateStudio.列出模板_1dvz73')"
           @click="toggleTags"
         >
-          标签速查
+          {{ $t('templateStudio.标签速查_dn4svx') }}
         </button>
-        <button class="btn-ghost text-sm" @click="showHelp = true">使用说明</button>
+        <button class="btn-ghost text-sm" @click="showHelp = true">{{ $t('templateStudio.使用说明_aisqn7') }}</button>
         <select :value="currentTheme" class="input w-44 text-sm" @change="onThemeChange">
           <option v-for="t in themes" :key="t.theme" :value="t.theme">
-            {{ t.name }}（{{ t.theme }}）{{ t.active ? '· 生效中' : '' }}
+            {{ t.name }}（{{ t.theme }}）{{ t.active ? $t('templateStudio.text_3au0kb') : '' }}
           </option>
         </select>
         <button
@@ -591,24 +591,24 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
           :title="isActiveTheme ? '已经是生效主题' : '把站点切到这个主题'"
           @click="activateTheme"
         >
-          设为生效
+          {{ $t('templateStudio.设为生效_hyjjgl') }}
         </button>
         <button
           class="btn-ghost text-sm"
-          title="按主题声明的可配置项调整主色、字号、文案等"
+          :title="$t('templateStudio.按主题声_1qxbzx')"
           @click="showThemeSettings = true"
         >
-          主题配置
+          {{ $t('templateStudio.主题配置_ai9rni') }}
         </button>
-        <button class="btn-ghost text-sm" @click="exportTheme">导出 zip</button>
-        <button class="btn-ghost text-sm" @click="importInput?.click()">导入 zip</button>
+        <button class="btn-ghost text-sm" @click="exportTheme">{{ $t('templateStudio.导出_xxgvpb') }}</button>
+        <button class="btn-ghost text-sm" @click="importInput?.click()">{{ $t('templateStudio.导入_vnjjai') }}</button>
         <input ref="importInput" type="file" accept=".zip" class="hidden" @change="doImport" />
         <button
           class="btn-ghost text-sm text-red-600"
           :disabled="!themes.find((t) => t.theme === currentTheme)?.deletable"
           @click="deleteTheme"
         >
-          删除主题
+          {{ $t('templateStudio.删除主题_azbhmp') }}
         </button>
       </div>
     </div>
@@ -622,8 +622,8 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
       <!-- 文件树 -->
       <aside class="col-span-2 flex min-h-0 flex-col overflow-hidden rounded-lg border border-ink-100">
         <div class="border-b border-ink-100 px-2 py-1.5 text-xs text-ink-500">
-          {{ loadingFiles ? '加载中…' : `${files.length} 个文件` }}
-          <span v-if="files.some(f => f.disk)" class="ml-1 text-green-600" title="绿色 = 磁盘文件，优先于在线编辑">· 含磁盘文件</span>
+          {{ loadingFiles ? $t('templateStudio.加载中_b0k5km') : `${files.length} 个文件` }}
+          <span v-if="files.some(f => f.disk)" class="ml-1 text-green-600" :title="$t('templateStudio.绿色_1v0mzo')">{{ $t('templateStudio.text_1qoxk9') }}</span>
         </div>
         <div class="min-h-0 flex-1 overflow-auto p-1.5">
           <div v-for="[dir, list] in groups" :key="dir" class="mb-2">
@@ -639,15 +639,15 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
                     :class="f.source === 'disk' ? 'h-1.5 bg-green-500' : f.source === 'db' ? 'h-1.5 bg-blue-500' : f.source === 'builtin' ? 'h-1.5 bg-ink-300' : 'h-1.5 bg-ink-200'"
                     :title="f.source === 'disk' ? '磁盘文件（优先于一切）' : f.source === 'db' ? '已覆盖（DB）' : f.source === 'builtin' ? '内置' : '继承自 default'" />
               <span class="truncate">{{ f.path.includes('/') ? f.path.slice(f.path.lastIndexOf('/') + 1) : f.path }}</span>
-              <span v-if="f.disk" class="ml-auto text-[10px] text-green-600">盘</span>
-              <span v-else-if="f.overridden" class="ml-auto text-[10px] text-blue-600">改</span>
+              <span v-if="f.disk" class="ml-auto text-[10px] text-green-600">{{ $t('templateStudio.盘_nh4') }}</span>
+              <span v-else-if="f.overridden" class="ml-auto text-[10px] text-blue-600">{{ $t('templateStudio.改_jzt') }}</span>
             </button>
           </div>
         </div>
         <div class="border-t border-ink-100 p-2">
-          <input v-model="newTheme" class="input mb-1 w-full text-xs" placeholder="新主题名，如 my-theme" />
+          <input v-model="newTheme" class="input mb-1 w-full text-xs" :placeholder="$t('templateStudio.新主题名_11j642')" />
           <button class="btn-ghost w-full text-xs" :disabled="!newTheme.trim()" @click="createTheme">
-            从当前主题复制一份
+            {{ $t('templateStudio.从当前主_86p4yz') }}
           </button>
         </div>
       </aside>
@@ -655,19 +655,19 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
       <!-- 编辑器 -->
       <section class="col-span-6 flex min-h-0 flex-col overflow-hidden rounded-lg border border-ink-100">
         <div class="flex items-center gap-2 border-b border-ink-100 px-2 py-1.5">
-          <code class="text-xs font-medium">{{ currentPath || '未选择文件' }}</code>
+          <code class="text-xs font-medium">{{ currentPath || $t('templateStudio.未选择文_1usppb') }}</code>
           <span class="rounded px-1 text-[10px]"
                 :class="sourceKind === 'disk' ? 'bg-green-50 text-green-700' : sourceKind === 'db' ? 'bg-blue-50 text-blue-700' : 'bg-ink-50 text-ink-500'">
-            {{ sourceKind === 'disk' ? '磁盘文件 · 编辑器改动存库但不生效' : sourceKind === 'db' ? '已覆盖' : sourceKind === 'builtin' ? '内置' : '继承' }}
+            {{ sourceKind === 'disk' ? $t('templateStudio.磁盘文件_1o90d5') : sourceKind === 'db' ? $t('templateStudio.已覆盖_efeyq') : sourceKind === 'builtin' ? $t('templateStudio.内置_ekcp') : $t('templateStudio.继承_m4jc') }}
           </span>
-          <span v-if="dirty" class="text-[10px] text-amber-600">未保存</span>
-          <span v-if="syntaxError" class="text-[10px] text-red-600">第 {{ syntaxError.line }} 行：{{ syntaxError.message }}</span>
+          <span v-if="dirty" class="text-[10px] text-amber-600">{{ $t('templateStudio.未保存_fi2f9') }}</span>
+          <span v-if="syntaxError" class="text-[10px] text-red-600">{{ $t('templateStudio.第_obw') }} {{ syntaxError.line }} {{ $t('templateStudio.行_okzy') }}{{ syntaxError.message }}</span>
           <div class="ml-auto flex items-center gap-1">
             <button class="btn-ghost text-xs" :disabled="!dirty || saving" @click="save">
-              {{ saving ? '保存中…' : '保存 ⌘S' }}
+              {{ saving ? $t('templateStudio.保存中_agdrec') : $t('templateStudio.保存_13nzbd') }}
             </button>
-            <button class="btn-ghost text-xs" :disabled="sourceKind !== 'db'" @click="openDiff">差异</button>
-            <button class="btn-ghost text-xs" :disabled="sourceKind !== 'db'" @click="revert">还原</button>
+            <button class="btn-ghost text-xs" :disabled="sourceKind !== 'db'" @click="openDiff">{{ $t('templateStudio.差异_ghxw') }}</button>
+            <button class="btn-ghost text-xs" :disabled="sourceKind !== 'db'" @click="revert">{{ $t('templateStudio.还原_oxc7') }}</button>
           </div>
         </div>
         <div class="relative min-h-0 flex-1 overflow-hidden">
@@ -679,8 +679,8 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
             class="absolute inset-y-0 right-0 flex w-[17rem] flex-col border-l border-ink-100 bg-white"
           >
             <div class="flex items-center gap-1 border-b border-ink-100 px-2 py-1.5">
-              <span class="text-xs font-medium">标签速查</span>
-              <button class="ml-auto text-[11px] text-ink-400 hover:text-ink-700" @click="showTags = false">关闭</button>
+              <span class="text-xs font-medium">{{ $t('templateStudio.标签速查_dn4svx') }}</span>
+              <button class="ml-auto text-[11px] text-ink-400 hover:text-ink-700" @click="showTags = false">{{ $t('templateStudio.关闭_eod6') }}</button>
             </div>
 
             <div class="flex gap-1 border-b border-ink-100 px-2 py-1.5">
@@ -696,12 +696,12 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
             </div>
 
             <div class="border-b border-ink-100 px-2 py-1.5">
-              <input v-model="tagQuery" class="input h-7 w-full text-xs" placeholder="搜名字或用途，如 分页 / date" />
+              <input v-model="tagQuery" class="input h-7 w-full text-xs" :placeholder="$t('templateStudio.搜名字或_fqzoi')" />
             </div>
 
             <div class="min-h-0 flex-1 overflow-auto p-1.5">
-              <p v-if="loadingTags" class="p-2 text-[11px] text-ink-400">加载中…</p>
-              <p v-else-if="!filteredTags.length" class="p-2 text-[11px] text-ink-400">没匹配的标签</p>
+              <p v-if="loadingTags" class="p-2 text-[11px] text-ink-400">{{ $t('templateStudio.加载中_b0k5km') }}</p>
+              <p v-else-if="!filteredTags.length" class="p-2 text-[11px] text-ink-400">{{ $t('templateStudio.没匹配的_f6kr3a') }}</p>
               <div v-for="[g, list] in tagGroups" :key="g" class="mb-2">
                 <div v-if="g" class="px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-400">{{ g }}</div>
                 <button
@@ -722,10 +722,10 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
             </div>
 
             <div v-if="ctxApi" class="border-t border-ink-100 px-2 py-1.5 text-[10px] leading-4 text-ink-400">
-              <p>自动转义开着，输出 HTML 要加 <code class="text-ink-600">|safe</code></p>
-              <p class="mt-0.5">不能调 Python 内置，只能调上面这些和 {% macro %}</p>
+              <p>{{ $t('templateStudio.自动转义_18o3qd') }} <code class="text-ink-600">|safe</code></p>
+              <p class="mt-0.5">{{ $t('templateStudio.不能调_o3mog') }}</p>
               <p v-if="ctxApi.app_tags.functions.length || ctxApi.app_tags.filters.length" class="mt-1 text-ink-500">
-                来自 App：{{ [...ctxApi.app_tags.functions, ...ctxApi.app_tags.filters].join('、') }}
+                {{ $t('templateStudio.来自_e5nhhw') }}{{ [...ctxApi.app_tags.functions, ...ctxApi.app_tags.filters].join('、') }}
               </p>
             </div>
           </aside>
@@ -737,21 +737,21 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
         <div class="flex items-center gap-2 border-b border-ink-100 px-2 py-1.5">
           <template v-if="!showDiff">
             <select v-model="previewKind" class="input h-7 w-24 text-xs">
-              <option value="article">文章</option>
-              <option value="news">新闻</option>
-              <option value="product">产品</option>
-              <option value="case">案例</option>
-              <option value="page">单页</option>
-              <option value="list">列表</option>
+              <option value="article">{{ $t('templateStudio.文章_hxyx') }}</option>
+              <option value="news">{{ $t('templateStudio.新闻_i4az') }}</option>
+              <option value="product">{{ $t('templateStudio.产品_dud6') }}</option>
+              <option value="case">{{ $t('templateStudio.案例_i69v') }}</option>
+              <option value="page">{{ $t('templateStudio.单页_f0e8') }}</option>
+              <option value="list">{{ $t('templateStudio.列表_epm9') }}</option>
             </select>
-            <input v-model="previewSlug" class="input h-7 flex-1 text-xs" placeholder="slug（留空用示例数据）" />
-            <button class="btn-ghost text-xs" :disabled="previewing" @click="runPreview">刷新</button>
+            <input v-model="previewSlug" class="input h-7 flex-1 text-xs" :placeholder="$t('templateStudio.text_fp9oz4')" />
+            <button class="btn-ghost text-xs" :disabled="previewing" @click="runPreview">{{ $t('templateStudio.刷新_ejix') }}</button>
           </template>
           <template v-else>
-            <span class="text-xs font-medium">差异</span>
+            <span class="text-xs font-medium">{{ $t('templateStudio.差异_ghxw') }}</span>
             <span class="text-[10px] text-green-600">+{{ diffStat.added }}</span>
             <span class="text-[10px] text-red-600">-{{ diffStat.removed }}</span>
-            <button class="btn-ghost ml-auto text-xs" @click="showDiff = false">关闭</button>
+            <button class="btn-ghost ml-auto text-xs" @click="showDiff = false">{{ $t('templateStudio.关闭_eod6') }}</button>
           </template>
         </div>
         <div v-if="showDiff" class="min-h-0 flex-1 overflow-auto bg-ink-50/40 p-2 font-mono text-[11px] leading-5">
@@ -775,72 +775,68 @@ watch(currentPath, (p) => { if (p) loadFile(p) })
       <div class="w-full max-w-3xl rounded-lg bg-white p-6 text-sm leading-relaxed shadow-xl">
         <div class="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 class="text-lg font-semibold">主题模板使用说明</h2>
-            <p class="mt-1 text-xs text-ink-500">只需要会 HTML + 一点 Jinja 语法，不用懂框架</p>
+            <h2 class="text-lg font-semibold">{{ $t('templateStudio.主题模板_16yino') }}</h2>
+            <p class="mt-1 text-xs text-ink-500">{{ $t('templateStudio.只需要会_1jn0ti') }}</p>
           </div>
-          <button class="btn-ghost text-xs" @click="showHelp = false">关闭</button>
+          <button class="btn-ghost text-xs" @click="showHelp = false">{{ $t('templateStudio.关闭_eod6') }}</button>
         </div>
 
         <div class="mb-5 rounded border border-amber-200 bg-amber-50 p-3 text-[13px]">
-          <p class="font-medium text-amber-800">动手前先知道这三件事</p>
+          <p class="font-medium text-amber-800">{{ $t('templateStudio.动手前先_pwzru9') }}</p>
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-amber-900">
             <li>
-              <b>首页不归主题管。</b>站点根地址返回的是静态站的
-              <code class="rounded bg-amber-100 px-1">index.html</code>，不经过模板引擎。
-              主题管的是内容页：详情页、列表页、分类页、标签页、搜索页、404。
+              <b>{{ $t('templateStudio.首页不归_1s7sp8') }}</b>{{ $t('templateStudio.站点根地_eob3o1') }}
+              <code class="rounded bg-amber-100 px-1">index.html</code>{{ $t('templateStudio.text_f9bxs2') }}
             </li>
             <li>
-              <b>主题是「覆盖」机制。</b>数据库里有的文件用你的，没有的自动回退到
-              <code class="rounded bg-amber-100 px-1">default</code> 主题，
-              所以只改 3 个文件也算一个完整主题。
+              <b>{{ $t('templateStudio.主题是_6a9omb') }}</b>{{ $t('templateStudio.数据库里_knu8r9') }}
+              <code class="rounded bg-amber-100 px-1">default</code> {{ $t('templateStudio.主题_kcpze2') }}
             </li>
             <li>
-              <b>保存即生效。</b>不用重启、不用清缓存，保存会同时清掉模板缓存。
-              但要点<b>「设为生效」</b>才算上线 —— 只是保存并不会切换线上使用的主题。
+              <b>{{ $t('templateStudio.保存即生_wzc76p') }}</b>{{ $t('templateStudio.不用重启_1g86m5') }}<b>{{ $t('templateStudio.text_1mq0iq') }}</b>{{ $t('templateStudio.才算上线_nov578') }}
             </li>
           </ol>
         </div>
 
         <div class="mb-5">
-          <h3 class="mb-2 font-semibold">三步做第一个主题</h3>
+          <h3 class="mb-2 font-semibold">{{ $t('templateStudio.三步做第_s912wl') }}</h3>
           <ol class="list-decimal space-y-1 pl-5">
-            <li>左下角输入主题名（小写字母数字，如 <code class="rounded bg-ink-100 px-1">magazine</code>），点「从当前主题复制一份」—— 12 个文件整体复制，不用从空白开始。</li>
-            <li>改文件：先改 <code class="rounded bg-ink-100 px-1">assets/style.css</code> 顶部的配色变量，效果最直观。</li>
-            <li>右上角点「设为生效」，线上全站换版式。回退就是把下拉切回 <code class="rounded bg-ink-100 px-1">default</code> 再点一次。</li>
+            <li>{{ $t('templateStudio.左下角输_vq1u9g') }} <code class="rounded bg-ink-100 px-1">magazine</code>{{ $t('templateStudio.text_1ldik8') }}</li>
+            <li>{{ $t('templateStudio.改文件_xlq1j7') }} <code class="rounded bg-ink-100 px-1">assets/style.css</code> {{ $t('templateStudio.顶部的配_if572e') }}</li>
+            <li>{{ $t('templateStudio.右上角点_8hm4m0') }} <code class="rounded bg-ink-100 px-1">default</code> {{ $t('templateStudio.再点一次_1dac88') }}</li>
           </ol>
         </div>
 
         <div class="mb-5">
-          <h3 class="mb-2 font-semibold">文件对照</h3>
+          <h3 class="mb-2 font-semibold">{{ $t('templateStudio.文件对照_d50il9') }}</h3>
           <table class="w-full text-[13px]">
             <tbody class="[&_td]:border-b [&_td]:border-ink-100 [&_td]:py-1.5 [&_td]:align-top">
-              <tr><td class="w-56 pr-3"><code>partials/header.html</code></td><td>站头、品牌、主菜单</td></tr>
-              <tr><td class="pr-3"><code>partials/footer.html</code></td><td>页脚；想加「回到顶部」这类小组件也写这里</td></tr>
-              <tr><td class="pr-3"><code>partials/card.html</code></td><td>列表卡片，循环变量固定叫 <code>r</code></td></tr>
-              <tr><td class="pr-3"><code>partials/pagination.html</code></td><td>分页条，地址都是后端算好的，别自己拼 ?page=</td></tr>
-              <tr><td class="pr-3"><code>detail.html</code></td><td>文章 / 产品 / 案例 / 新闻详情页</td></tr>
-              <tr><td class="pr-3"><code>list.html</code></td><td>七种列表页共用（含分类、标签、搜索）</td></tr>
-              <tr><td class="pr-3"><code>layout.html</code></td><td>全站 head、字体、脚本入口</td></tr>
-              <tr><td class="pr-3"><code>assets/style.css</code></td><td>全站样式，整段内联进 &lt;style&gt;</td></tr>
+              <tr><td class="w-56 pr-3"><code>partials/header.html</code></td><td>{{ $t('templateStudio.站头_49et7o') }}</td></tr>
+              <tr><td class="pr-3"><code>partials/footer.html</code></td><td>{{ $t('templateStudio.页脚_vfpuek') }}</td></tr>
+              <tr><td class="pr-3"><code>partials/card.html</code></td><td>{{ $t('templateStudio.列表卡片_13xal1') }} <code>r</code></td></tr>
+              <tr><td class="pr-3"><code>partials/pagination.html</code></td><td>{{ $t('templateStudio.分页条_6feh7e') }}</td></tr>
+              <tr><td class="pr-3"><code>detail.html</code></td><td>{{ $t('templateStudio.文章_31omsc') }}</td></tr>
+              <tr><td class="pr-3"><code>list.html</code></td><td>{{ $t('templateStudio.七种列表_y3ohtd') }}</td></tr>
+              <tr><td class="pr-3"><code>layout.html</code></td><td>{{ $t('templateStudio.全站_1tqwi7') }}</td></tr>
+              <tr><td class="pr-3"><code>assets/style.css</code></td><td>{{ $t('templateStudio.全站样式_1bc994') }}</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="mb-5">
-          <h3 class="mb-2 font-semibold">最容易踩的五个坑</h3>
+          <h3 class="mb-2 font-semibold">{{ $t('templateStudio.最容易踩_1r5ahk') }}</h3>
           <ul class="list-disc space-y-1 pl-5">
-            <li>正文变量不加 <code class="rounded bg-ink-100 px-1">| safe</code>，页面会显示一堆 <code class="rounded bg-ink-100 px-1">&amp;lt;p&amp;gt;</code>。</li>
-            <li><code class="rounded bg-ink-100 px-1">item.cover</code> 可能是空串，要用 <code class="rounded bg-ink-100 px-1">if</code> 包着，否则输出 <code class="rounded bg-ink-100 px-1">&lt;img src=""&gt;</code> 多一次 404 请求。</li>
-            <li>列表数据用顶层 <code class="rounded bg-ink-100 px-1">items</code>，别用 <code class="rounded bg-ink-100 px-1">page.items</code>（会撞上 dict 的方法名）。</li>
-            <li>别删 <code class="rounded bg-ink-100 px-1">partials/meta.html</code>，OG、Twitter Card、JSON-LD 全在里面，删了不影响人看但会掉搜索富摘要。</li>
-            <li>预览区是禁用脚本的 iframe：<b>加了 JS 在预览里不会执行</b>，保存后线上才生效。</li>
+            <li>{{ $t('templateStudio.正文变量_1ylubc') }} <code class="rounded bg-ink-100 px-1">| safe</code>{{ $t('templateStudio.text_1sjqcp') }} <code class="rounded bg-ink-100 px-1">&amp;lt;p&amp;gt;</code>。</li>
+            <li><code class="rounded bg-ink-100 px-1">item.cover</code> {{ $t('templateStudio.可能是空_19z90f') }} <code class="rounded bg-ink-100 px-1">if</code> {{ $t('templateStudio.包着_pv2f2j') }} <code class="rounded bg-ink-100 px-1">&lt;img src=""&gt;</code> {{ $t('templateStudio.多一次_1kaq29') }}</li>
+            <li>{{ $t('templateStudio.列表数据_2ebbs5') }} <code class="rounded bg-ink-100 px-1">items</code>{{ $t('templateStudio.text_11rh49') }} <code class="rounded bg-ink-100 px-1">page.items</code>{{ $t('templateStudio.text_1nakuw') }}</li>
+            <li>{{ $t('templateStudio.别删_efdh') }} <code class="rounded bg-ink-100 px-1">partials/meta.html</code>{{ $t('templateStudio.text_12ahzc') }}</li>
+            <li>{{ $t('templateStudio.预览区是_1p8s8g') }}<b>{{ $t('templateStudio.加了_1fo1iz') }}</b>{{ $t('templateStudio.text_1blkus') }}</li>
           </ul>
         </div>
 
         <p class="border-t border-ink-100 pt-3 text-xs text-ink-500">
-          完整教程（目录约定、16 个数据 API、过滤器、沙箱边界、导入导出、排错）见仓库
-          <code class="rounded bg-ink-100 px-1">docs/template-guide.md</code>，
-          其中「二·补、从零做一个自己的主题」是一份可以照着做的完整实战。
+          {{ $t('templateStudio.完整教程_idacqj') }}
+          <code class="rounded bg-ink-100 px-1">docs/template-guide.md</code>{{ $t('templateStudio.text_1yrxt0') }}
         </p>
       </div>
     </div>

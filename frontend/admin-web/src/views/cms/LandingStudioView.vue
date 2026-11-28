@@ -279,7 +279,7 @@ onUnmounted(() => {
             {{ t("landingStudio.参考知识_24aaau") }}
           </label>
           <button class="btn-primary ml-auto" :disabled="drafting" @click="generate">
-            {{ drafting ? `生成中 ${elapsed}s…` : '生成' }}
+            {{ drafting ? `生成中 ${elapsed}s…` : $t('landingStudio.生成_kgk1') }}
           </button>
         </div>
         <p class="mt-2 text-[11px] text-ink-400">
@@ -292,7 +292,7 @@ onUnmounted(() => {
         <div class="flex items-center gap-3 mb-4">
           <h2 class="font-semibold">{{ t("landingStudio.text_qqvi7o") }}</h2>
           <span class="text-xs text-ink-400">
-            表单「{{ draft.form?.title }}」共 {{ draft.form?.fields?.length || 0 }} 个字段，提交即进 CRM 线索
+            {{ $t('landingStudio.表单_kdpdr') }}{{ draft.form?.title }}{{ $t('landingStudio.text_8mbo') }} {{ draft.form?.fields?.length || 0 }} {{ $t('landingStudio.个字段_1enalh') }}
           </span>
         </div>
 
@@ -322,7 +322,7 @@ onUnmounted(() => {
                   {{ b.data.subtitle || b.data.desc }}
                 </p>
                 <p v-else-if="b.data.items?.length" class="text-xs text-ink-400 mt-0.5 truncate">
-                  {{ b.data.items.length }} 项：{{ b.data.items.map((x: any) => x.title || x.q || x.label || x.value).join(' / ') }}
+                  {{ b.data.items.length }} {{ $t('landingStudio.项_rc1t') }}{{ b.data.items.map((x: any) => x.title || x.q || x.label || x.value).join(' / ') }}
                 </p>
               </div>
             </div>
@@ -330,15 +330,15 @@ onUnmounted(() => {
           <div class="space-y-3">
             <div>
               <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.text_14em2i") }}</p>
-              <p class="text-sm">{{ currentPage.seo?.title || '（空）' }}</p>
+              <p class="text-sm">{{ currentPage.seo?.title || $t('landingStudio.text_11z07r') }}</p>
             </div>
             <div>
               <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.description") }}</p>
-              <p class="text-xs text-ink-600">{{ currentPage.seo?.description || '（空）' }}</p>
+              <p class="text-xs text-ink-600">{{ currentPage.seo?.description || $t('landingStudio.text_11z07r') }}</p>
             </div>
             <div>
               <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.关键词_cnmdu") }}</p>
-              <p class="text-xs text-ink-600">{{ currentPage.seo?.keywords || '（空）' }}</p>
+              <p class="text-xs text-ink-600">{{ currentPage.seo?.keywords || $t('landingStudio.text_11z07r') }}</p>
             </div>
             <div v-if="mode === 'page'">
               <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.访问路径_i96gg4") }}</p>
@@ -350,10 +350,10 @@ onUnmounted(() => {
             <div v-else>
               <p class="text-xs text-ink-400 mb-1">{{ t("landingStudio.子站标识_c14dt4") }}</p>
               <input v-model="siteKey" class="text-xs rounded border border-ink-200 px-2 py-1 w-40" :placeholder="t('landingStudio.如_nfa59c')" />
-              <p class="text-[11px] text-ink-400 mt-1">发布后：/lp/{{ siteKey || 'site' }}/home</p>
+              <p class="text-[11px] text-ink-400 mt-1">{{ $t('landingStudio.发布后_vu3r5m') }}{{ siteKey || 'site' }}/home</p>
             </div>
             <button class="btn-primary w-full" :disabled="saving || saved" @click="saveDraft">
-              {{ saved ? '已保存' : saving ? '保存中…' : '保存为草稿' }}
+              {{ saved ? $t('landingStudio.已保存_e5ggd') : saving ? $t('landingStudio.保存中_agdrec') : $t('landingStudio.保存为草_13zw6a') }}
             </button>
           </div>
         </div>
@@ -402,13 +402,13 @@ onUnmounted(() => {
                 </button>
               </td>
               <td class="py-2.5 text-xs text-ink-500">
-                {{ r.kind === 'page' ? '单页' : r.site_key ? '子站·' + r.site_key : '子站' }}
+                {{ r.kind === 'page' ? $t('landingStudio.单页_f0e8') : r.site_key ? $t('landingStudio.子站_dydzi') + r.site_key : $t('landingStudio.子站_g7ex') }}
               </td>
               <td class="py-2.5">
                 <span
                   class="text-xs px-2 py-0.5 rounded-full"
                   :class="r.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-ink-100 text-ink-500'"
-                >{{ r.status === 'published' ? '已发布' : '草稿' }}</span>
+                >{{ r.status === 'published' ? $t('landingStudio.已发布_e656s') : $t('landingStudio.草稿_n02e') }}</span>
               </td>
               <td class="py-2.5 text-right text-xs text-ink-500 pr-4 tabular-nums">{{ r.block_count }}</td>
               <td class="py-2.5 text-right text-xs pr-4 tabular-nums"
@@ -422,7 +422,7 @@ onUnmounted(() => {
                   class="ml-1.5 px-2 py-1 text-xs rounded border"
                   :class="r.status === 'published' ? 'border-ink-200 hover:bg-ink-50' : 'border-accent text-accent-dark hover:bg-ink-50'"
                   @click="togglePublish(r)"
-                >{{ r.status === 'published' ? '下线' : '发布' }}</button>
+                >{{ r.status === 'published' ? $t('landingStudio.下线_dyxg') : $t('landingStudio.发布_erte') }}</button>
                 <button class="ml-1.5 px-2 py-1 text-xs rounded border border-red-200 text-red-600 hover:bg-red-50" @click="removeRow(r)">{{ t("landingStudio.delete") }}</button>
               </td>
             </tr>

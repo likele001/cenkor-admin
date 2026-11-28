@@ -48,7 +48,7 @@ onMounted(search)
     <div class="card overflow-hidden">
       <div v-if="loading" class="text-ink-500 p-6">{{ t("searchResults.搜索中_d59ehr") }}</div>
       <template v-else>
-        <div class="text-sm text-ink-400 px-3 pt-3">共 {{ total }} 条结果</div>
+        <div class="text-sm text-ink-400 px-3 pt-3">{{ $t('searchResults.共_g35') }} {{ total }} {{ $t('searchResults.条结果_fr96y') }}</div>
         <table class="w-full text-sm">
           <thead>
             <tr class="text-left text-ink-400 border-b">
@@ -64,7 +64,7 @@ onMounted(search)
               <td class="p-3"><span class="text-xs px-1.5 py-0.5 bg-ink-50 rounded">{{ statusLabel(it.status) }}</span></td>
               <td class="p-3 text-xs text-ink-400">{{ it.updated_at ? new Date(it.updated_at).toLocaleString() : '' }}</td>
             </tr>
-            <tr v-if="!items.length"><td colspan="4" class="p-6 text-center text-ink-400">{{ q ? '无匹配结果' : '输入关键词开始搜索' }}</td></tr>
+            <tr v-if="!items.length"><td colspan="4" class="p-6 text-center text-ink-400">{{ q ? $t('searchResults.无匹配结_1ia23p') : $t('searchResults.输入关键_19eznl') }}</td></tr>
           </tbody>
         </table>
       </template>

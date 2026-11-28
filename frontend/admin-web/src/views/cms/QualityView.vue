@@ -332,7 +332,7 @@ onMounted(async () => {
             {{ stats?.coverage.percent ?? 0 }}<span class="text-lg">%</span>
           </p>
           <p class="mt-2 text-xs text-ink-400">
-            已评 {{ stats?.coverage.reviewed ?? 0 }} / {{ stats?.coverage.total ?? 0 }} 条 AI 产出
+            {{ $t('quality.已评_gqvm') }} {{ stats?.coverage.reviewed ?? 0 }} / {{ stats?.coverage.total ?? 0 }} {{ $t('quality.条_1s7oxb') }}
           </p>
         </div>
         <div class="card">
@@ -340,7 +340,7 @@ onMounted(async () => {
           <p class="text-3xl font-semibold leading-none">
             {{ avgScore }}<span class="text-lg text-ink-400">/5</span>
           </p>
-          <p class="mt-2 text-xs text-ink-400">本周 {{ lastPoint?.count ?? 0 }} 条评价</p>
+          <p class="mt-2 text-xs text-ink-400">{{ $t('quality.本周_i0fw') }} {{ lastPoint?.count ?? 0 }} {{ $t('quality.条评价_ftbkk') }}</p>
         </div>
         <div class="card">
           <p class="text-xs text-ink-400 mb-1">{{ t("quality.判定分布_aqsdgz") }}</p>
@@ -359,7 +359,7 @@ onMounted(async () => {
           <div v-if="stats?.ab.length" class="space-y-1">
             <div v-for="a in stats?.ab" :key="a.model" class="flex items-center justify-between text-xs gap-2">
               <span class="truncate text-ink-600">{{ a.model }}</span>
-              <span class="text-ink-900 font-medium whitespace-nowrap">{{ a.wins }}胜 {{ a.losses }}负 {{ a.ties }}平</span>
+              <span class="text-ink-900 font-medium whitespace-nowrap">{{ a.wins }}{{ $t('quality.胜_pgc') }} {{ a.losses }}{{ $t('quality.负_rvj') }} {{ a.ties }}{{ $t('quality.平_inn') }}</span>
             </div>
           </div>
           <p v-else class="text-xs text-ink-400">{{ t("quality.还没有判_18irj8") }}</p>
@@ -369,7 +369,7 @@ onMounted(async () => {
       <!-- 曲线 + 模型对比 -->
       <div class="grid gap-4 md:grid-cols-3 mb-6">
         <div class="card md:col-span-2">
-          <p class="text-xs text-ink-400 mb-4">质量曲线（按周，近 {{ stats?.weeks || 12 }} 周）</p>
+          <p class="text-xs text-ink-400 mb-4">{{ $t('quality.质量曲线_19bnq1') }} {{ stats?.weeks || 12 }} {{ $t('quality.周_fr8h') }}</p>
           <div v-if="stats?.curve.length" class="flex items-end gap-3 h-40">
             <div v-for="w in stats?.curve" :key="w.week" class="flex-1 flex flex-col items-center justify-end gap-1">
               <span class="text-[10px] text-ink-500">{{ w.avg.toFixed(1) }}</span>
@@ -431,17 +431,17 @@ onMounted(async () => {
           <button
             class="ml-auto px-4 py-2 text-sm rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
             :disabled="loading" @click="draw"
-          >{{ loading ? '抽样中…' : '换一批' }}</button>
+          >{{ loading ? $t('quality.抽样中_cvyzar') : $t('quality.换一批_exumz') }}</button>
         </div>
 
         <div v-if="rows.length" class="space-y-4">
           <article v-for="row in rows" :key="row.entry_id" class="card">
             <div class="min-w-0">
               <a :href="'/cms/entries/' + row.entry_id" target="_blank"
-                 class="font-medium text-ink-900 hover:underline">{{ row.title || '（无标题）' }}</a>
+                 class="font-medium text-ink-900 hover:underline">{{ row.title || $t('quality.text_g0zhsw') }}</a>
               <p class="mt-1 text-xs text-ink-400">
-                {{ row.chars }} 字 · {{ row.model || '模型未知' }} · {{ row.status }}
-                · {{ row.has_seo ? 'SEO 已填' : 'SEO 缺失' }}
+                {{ row.chars }} {{ $t('quality.字_ddnou') }} {{ row.model || $t('quality.模型未知_dr7w1x') }} · {{ row.status }}
+                · {{ row.has_seo ? $t('quality.text_14ek03') : $t('quality.text_14epo1') }}
                 <span v-if="row.created_at"> · {{ new Date(row.created_at).toLocaleDateString('zh-CN') }}</span>
               </p>
               <p class="mt-2 text-sm text-ink-600 leading-relaxed">{{ row.excerpt }}</p>
@@ -474,7 +474,7 @@ onMounted(async () => {
               <button
                 class="px-4 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                 :disabled="busy === 'review-' + row.entry_id" @click="submit(row)"
-              >{{ busy === 'review-' + row.entry_id ? '提交中…' : '提交评价' }}</button>
+              >{{ busy === 'review-' + row.entry_id ? $t('quality.提交中_cx3q0d') : $t('quality.提交评价_cxegef') }}</button>
             </div>
           </article>
         </div>
@@ -511,7 +511,7 @@ onMounted(async () => {
             <button
               class="ml-auto px-4 py-2 text-sm rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
               :disabled="busy === 'ab'" @click="runAb"
-            >{{ busy === 'ab' ? '两个模型在写…（约 1 分钟）' : '生成两版对比' }}</button>
+            >{{ busy === 'ab' ? $t('quality.两个模型_1o0otk') : $t('quality.生成两版_sl22nk') }}</button>
           </div>
           <p class="mt-2 text-xs text-ink-400">
             {{ t("quality.提示_126a5t") }}
@@ -529,7 +529,7 @@ onMounted(async () => {
                         class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">{{ t("quality.胜_pgc") }}</span>
                 </span>
               </span>
-              <span class="text-xs text-ink-400">{{ abRun.left.chars }} 字 · {{ (abRun.left.ms / 1000).toFixed(1) }}s</span>
+              <span class="text-xs text-ink-400">{{ abRun.left.chars }} {{ $t('quality.字_ddnou') }} {{ (abRun.left.ms / 1000).toFixed(1) }}s</span>
             </div>
             <p v-if="abRun.left.error" class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {{ abRun.left.error }}
@@ -547,7 +547,7 @@ onMounted(async () => {
                         class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">{{ t("quality.胜_pgc") }}</span>
                 </span>
               </span>
-              <span class="text-xs text-ink-400">{{ abRun.right.chars }} 字 · {{ (abRun.right.ms / 1000).toFixed(1) }}s</span>
+              <span class="text-xs text-ink-400">{{ abRun.right.chars }} {{ $t('quality.字_ddnou') }} {{ (abRun.right.ms / 1000).toFixed(1) }}s</span>
             </div>
             <p v-if="abRun.right.error" class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {{ abRun.right.error }}

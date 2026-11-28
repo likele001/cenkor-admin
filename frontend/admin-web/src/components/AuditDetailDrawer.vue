@@ -82,7 +82,7 @@ function diffKeys(diff: any): Array<{ key: string; before: any; after: any }> {
         <div class="flex-1 bg-ink-900/40 backdrop-blur-sm" @click="emit('close')" />
         <div class="w-full max-w-2xl bg-white shadow-xl flex flex-col overflow-hidden">
           <div class="px-6 py-4 border-b border-ink-200 flex items-center justify-between">
-            <h2 class="text-lg font-semibold">审计详情 #{{ auditId }}</h2>
+            <h2 class="text-lg font-semibold">{{ $t('auditDetailDrawer.审计详情_l6vz7m') }}{{ auditId }}</h2>
             <button class="text-ink-500 hover:text-ink-900" @click="emit('close')">✕</button>
           </div>
 

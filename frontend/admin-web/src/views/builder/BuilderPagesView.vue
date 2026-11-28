@@ -193,7 +193,7 @@ onMounted(loadPages)
               <td class="p-3"><code class="text-xs text-ink-400">{{ p.key }}</code></td>
               <td class="p-3">{{ p.schema?.length || 0 }}</td>
               <td class="p-3">
-                <span :class="p.status === 'published' ? 'text-green-600' : 'text-ink-400'">{{ p.status === 'published' ? '已发布' : '草稿' }}</span>
+                <span :class="p.status === 'published' ? 'text-green-600' : 'text-ink-400'">{{ p.status === 'published' ? $t('builderPages.已发布_e656s') : $t('builderPages.草稿_n02e') }}</span>
               </td>
               <td class="p-3 text-right space-x-2 whitespace-nowrap">
                 <a v-if="p.status === 'published'" :href="`/api/v1/public/pages/${p.key}/render`" target="_blank" class="btn-ghost text-sm">{{ t("builderPages.预览_qp50") }}</a>
@@ -217,7 +217,7 @@ onMounted(loadPages)
             <input v-if="!editing" v-model="formKey" class="input input-sm w-32 font-mono" placeholder="key" />
             <input v-model="formTitle" class="input input-sm w-56" :placeholder="t('builderPages.页面标题_juxqri')" />
           </div>
-          <span class="text-xs text-ink-400">{{ editing ? '编辑：' + editing.key : '新建页面' }}</span>
+          <span class="text-xs text-ink-400">{{ editing ? $t('builderPages.编辑_jbxvj') + editing.key : $t('builderPages.新建页面_d8dn4n') }}</span>
         </div>
         <button class="btn-primary" @click="save">{{ t("builderPages.text_kyvypm") }}</button>
       </div>
@@ -245,7 +245,7 @@ onMounted(loadPages)
         <main class="panel canvas" @click.self="selectedId = null">
           <div class="panel-title">
             {{ t("builderPages.画布_kgfc") }}
-            <span class="text-xs text-ink-400">（{{ blocks.length }} 个区块）</span>
+            <span class="text-xs text-ink-400">（{{ blocks.length }} {{ $t('builderPages.个区块_a7jzdu') }}</span>
           </div>
           <VueDraggable
             v-model="blocks"
@@ -282,7 +282,7 @@ onMounted(loadPages)
         <aside class="panel prop">
           <div class="panel-title">{{ t("builderPages.属性_g8ll") }}</div>
           <div v-if="selected" class="prop-form">
-            <div class="prop-head">编辑 · {{ BLOCK_LABEL[selected.type] }}</div>
+            <div class="prop-head">{{ $t('builderPages.编辑_gm2sya') }} {{ BLOCK_LABEL[selected.type] }}</div>
 
             <template v-if="selected.type === 'hero'">
               <label class="field-label">{{ t("builderPages.主标题_bz1f0") }}</label>

@@ -66,7 +66,7 @@ onMounted(load)
             <td class="p-3 font-mono text-xs">{{ r.from_path }}</td>
             <td class="p-3 font-mono text-xs text-blue-600">→ {{ r.to_path }}</td>
             <td class="p-3"><span class="text-xs px-1.5 py-0.5 bg-ink-50 rounded">{{ r.code }}</span></td>
-            <td class="p-3"><span :class="r.enabled ? 'text-green-600' : 'text-ink-300'">{{ r.enabled ? '是' : '否' }}</span></td>
+            <td class="p-3"><span :class="r.enabled ? 'text-green-600' : 'text-ink-300'">{{ r.enabled ? $t('redirects.是_k6n') : $t('redirects.否_gme') }}</span></td>
             <td class="p-3 text-right space-x-2">
               <button class="btn-ghost text-sm" @click="openEdit(r)">{{ t("redirects.edit") }}</button>
               <button class="btn-ghost text-sm text-red-600" @click="remove(r)">{{ t("redirects.delete") }}</button>
@@ -79,7 +79,7 @@ onMounted(load)
 
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑重定向' : '新增重定向' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editing ? $t('redirects.编辑重定_ieem21') : $t('redirects.新增重定_1i82bh') }}</h2>
         <div class="space-y-3">
           <div>
             <label class="block text-sm font-medium mb-1">{{ t("redirects.来源路径_1ody88") }}</label>

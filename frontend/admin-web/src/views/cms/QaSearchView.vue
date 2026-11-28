@@ -132,7 +132,7 @@ function jumpByIndex(i: number) {
             :disabled="loading || !question.trim()"
             @click="submit()"
           >
-            {{ loading ? `思考中 ${elapsed}s` : '提问' }}
+            {{ loading ? `思考中 ${elapsed}s` : $t('qaSearch.提问_hsta') }}
           </button>
         </div>
 
@@ -147,8 +147,7 @@ function jumpByIndex(i: number) {
         </div>
 
         <p class="mt-3 text-xs text-ink-400 leading-relaxed">
-          只检索已发布内容。查不到会明确返回「站内暂无相关内容」——这是设计，不是故障。
-          回答里的每个 <span class="text-ink-600">[n]</span> {{ t("qaSearch.都能点回_hrop90") }}
+          {{ $t('qaSearch.只检索已_6n526x') }} <span class="text-ink-600">[n]</span> {{ t("qaSearch.都能点回_hrop90") }}
         </p>
       </div>
 
@@ -191,7 +190,7 @@ function jumpByIndex(i: number) {
           <div class="mt-3 pt-3 border-t border-ink-100 flex flex-wrap gap-3 text-xs text-ink-400">
             <span>{{ elapsed }}s</span>
             <span v-if="!result.llm_used">{{ t("qaSearch.未调用模_1decdz") }}</span>
-            <span>{{ result.citations.length }} 条出处</span>
+            <span>{{ result.citations.length }} {{ $t('qaSearch.条出处_fjjor') }}</span>
           </div>
         </div>
 
@@ -208,7 +207,7 @@ function jumpByIndex(i: number) {
               <div class="flex items-start gap-2">
                 <span class="shrink-0 text-xs text-sky-700 font-medium">[{{ c.index }}]</span>
                 <div class="min-w-0">
-                  <p class="text-sm text-ink-900 truncate">{{ c.title || '未命名' }}</p>
+                  <p class="text-sm text-ink-900 truncate">{{ c.title || $t('qaSearch.未命名_fitay') }}</p>
                   <p v-if="c.heading_path" class="text-xs text-ink-500 truncate">{{ c.heading_path }}</p>
                   <p class="mt-1 text-xs text-ink-400" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ c.snippet }}</p>
                 </div>

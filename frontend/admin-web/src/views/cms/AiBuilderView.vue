@@ -177,8 +177,8 @@ function goFields() {
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← Dashboard</router-link>
-        <span class="font-semibold">AI 建模向导</span>
-        <span class="text-xs text-ink-400">说清你要管什么内容，生成字段结构，确认后落库</span>
+        <span class="font-semibold">{{ $t('aiBuilder.text_73b0ru') }}</span>
+        <span class="text-xs text-ink-400">{{ $t('aiBuilder.说清你要_9bre9v') }}</span>
       </div>
     </header>
 
@@ -188,37 +188,37 @@ function goFields() {
         v-if="aiUnavailable"
         class="mb-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3"
       >
-        AI 尚未配置，无法生成草案。
-        <router-link to="/cms/ai-settings" class="font-medium underline">去 AI 设置绑定服务商与密钥 →</router-link>
+        {{ $t('aiBuilder.text_wyv7qy') }}
+        <router-link to="/cms/ai-settings" class="font-medium underline">{{ $t('aiBuilder.去_1kv3c3') }}</router-link>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <!-- 左：需求输入 -->
         <section class="lg:col-span-2 space-y-4">
           <div class="card">
-            <h2 class="text-base font-semibold text-ink-900">告诉 AI 你要管什么</h2>
+            <h2 class="text-base font-semibold text-ink-900">{{ $t('aiBuilder.告诉_15tk9d') }}</h2>
             <p class="mt-1 text-xs text-ink-500 leading-relaxed">
-              写清内容对象、要记哪些信息、给谁看。越具体，字段越贴合。
+              {{ $t('aiBuilder.写清内容_1ns19l') }}
             </p>
 
-            <label class="block mt-4 text-xs font-medium text-ink-700">需求描述</label>
+            <label class="block mt-4 text-xs font-medium text-ink-700">{{ $t('aiBuilder.需求描述_jhzetf') }}</label>
             <textarea
               v-model="description"
               rows="6"
               class="input mt-1.5 resize-y"
-              placeholder="例：我要管理工业阀门产品，需要记录型号、口径、压力等级、材质、连接方式、适用介质、产品图片和样本 PDF，还要能按行业分类。"
+              :placeholder="$t('aiBuilder.例_1o286s')"
             ></textarea>
-            <p class="mt-1 text-xs text-ink-400">{{ description.trim().length }} 字，至少 4 字</p>
+            <p class="mt-1 text-xs text-ink-400">{{ description.trim().length }} {{ $t('aiBuilder.字_1x8phu') }}</p>
 
-            <label class="block mt-3 text-xs font-medium text-ink-700">补充要求（可选）</label>
+            <label class="block mt-3 text-xs font-medium text-ink-700">{{ $t('aiBuilder.补充要求_1iqy3h') }}</label>
             <input
               v-model="extraHint"
               class="input mt-1.5"
-              placeholder="例：必填项只要型号和名称；不要价格字段"
+              :placeholder="$t('aiBuilder.例_a895nu')"
             />
 
             <button class="btn-primary w-full mt-4" :disabled="!canPropose" @click="propose">
-              {{ loading ? '正在生成…' : spec ? '重新生成草案' : '生成结构草案' }}
+              {{ loading ? $t('aiBuilder.正在生成_56cv8w') : spec ? $t('aiBuilder.重新生成_17cemr') : $t('aiBuilder.生成结构_yopwld') }}
             </button>
 
             <p v-if="errorMsg" class="mt-3 text-xs text-red-600 leading-relaxed">{{ errorMsg }}</p>
@@ -226,7 +226,7 @@ function goFields() {
 
           <!-- 迭代记录 -->
           <div v-if="rounds.length" class="card">
-            <h3 class="text-sm font-semibold text-ink-900">生成记录</h3>
+            <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiBuilder.生成记录_f6u8ty') }}</h3>
             <ul class="mt-3 space-y-2">
               <li
                 v-for="(r, i) in rounds"
@@ -239,7 +239,7 @@ function goFields() {
                   <span class="text-ink-400">{{ r.at }}</span>
                 </div>
                 <p class="mt-1 text-ink-500 line-clamp-2">{{ r.desc }}</p>
-                <p class="mt-1 text-ink-400">{{ r.fieldCount }} 个字段<span v-if="r.hint"> · 含补充要求</span></p>
+                <p class="mt-1 text-ink-400">{{ r.fieldCount }} {{ $t('aiBuilder.个字段_bwa94') }}<span v-if="r.hint"> {{ $t('aiBuilder.text_1simd7') }}</span></p>
               </li>
             </ul>
           </div>
@@ -249,9 +249,9 @@ function goFields() {
         <section class="lg:col-span-3">
           <div v-if="!spec" class="card flex flex-col items-center justify-center py-20 text-center">
             <div class="text-4xl">🧩</div>
-            <p class="mt-3 text-sm font-medium text-ink-700">还没有草案</p>
+            <p class="mt-3 text-sm font-medium text-ink-700">{{ $t('aiBuilder.还没有草_8bebun') }}</p>
             <p class="mt-1 text-xs text-ink-400 max-w-xs leading-relaxed">
-              左侧描述你的内容需求，AI 会生成内容类型和字段结构。生成后可以在这里逐项调整，确认无误再创建。
+              {{ $t('aiBuilder.左侧描述_hrjztj') }}
             </p>
           </div>
 
@@ -259,18 +259,18 @@ function goFields() {
             <!-- 创建成功 -->
             <div v-if="createdId" class="card border-emerald-200 bg-emerald-50">
               <p class="text-sm font-medium text-emerald-800">
-                内容类型「{{ spec.name }}」已创建（id={{ createdId }}，{{ spec.fields.length }} 个字段）
+                {{ $t('aiBuilder.内容类型_1apaxc') }}{{ spec.name }}{{ $t('aiBuilder.text_1tzcnw') }}{{ createdId }}，{{ spec.fields.length }} {{ $t('aiBuilder.个字段_a8u881') }}
               </p>
               <div class="mt-3 flex gap-2">
-                <button class="btn-primary" @click="goFields">配置字段与选项 →</button>
-                <router-link :to="`/cms/entries?ct=${spec.key}`" class="btn-outline">去录入内容</router-link>
+                <button class="btn-primary" @click="goFields">{{ $t('aiBuilder.配置字段_1q3qc3') }}</button>
+                <router-link :to="`/cms/entries?ct=${spec.key}`" class="btn-outline">{{ $t('aiBuilder.去录入内_1jmkhx') }}</router-link>
               </div>
             </div>
 
             <!-- 基本信息 -->
             <div class="card">
               <div class="flex items-center justify-between">
-                <h2 class="text-base font-semibold text-ink-900">草案</h2>
+                <h2 class="text-base font-semibold text-ink-900">{{ $t('aiBuilder.草案_mwin') }}</h2>
                 <span v-if="spec._meta?.model" class="text-xs text-ink-400 font-mono">
                   {{ spec._meta.model }}
                 </span>
@@ -280,41 +280,41 @@ function goFields() {
                 v-if="spec.key_conflict"
                 class="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
               >
-                标识 <code class="font-mono">{{ spec.key }}</code> 已存在，改一个 key 再创建。
+                {{ $t('aiBuilder.标识_igm7') }} <code class="font-mono">{{ spec.key }}</code> {{ $t('aiBuilder.已存在_deo03i') }}
               </p>
 
               <div class="mt-4 grid grid-cols-1 sm:grid-cols-6 gap-3">
                 <div class="sm:col-span-1">
-                  <label class="block text-xs font-medium text-ink-700">图标</label>
+                  <label class="block text-xs font-medium text-ink-700">{{ $t('aiBuilder.图标_fd8p') }}</label>
                   <input v-model="spec.icon" class="input mt-1.5 text-center" maxlength="4" />
                 </div>
                 <div class="sm:col-span-3">
-                  <label class="block text-xs font-medium text-ink-700">名称</label>
+                  <label class="block text-xs font-medium text-ink-700">{{ $t('aiBuilder.名称_eyrn') }}</label>
                   <input v-model="spec.name" class="input mt-1.5" />
                 </div>
                 <div class="sm:col-span-2">
-                  <label class="block text-xs font-medium text-ink-700">标识 key</label>
+                  <label class="block text-xs font-medium text-ink-700">{{ $t('aiBuilder.标识_ew3y3i') }}</label>
                   <input v-model="spec.key" class="input mt-1.5 font-mono" />
                 </div>
               </div>
 
               <div class="mt-3">
-                <label class="block text-xs font-medium text-ink-700">说明</label>
-                <input v-model="spec.description" class="input mt-1.5" placeholder="一句话说明装什么内容" />
+                <label class="block text-xs font-medium text-ink-700">{{ $t('aiBuilder.说明_od5m') }}</label>
+                <input v-model="spec.description" class="input mt-1.5" :placeholder="$t('aiBuilder.一句话说_rcfd7z')" />
               </div>
 
               <div class="mt-4 flex flex-wrap gap-5 text-xs text-ink-700">
                 <label class="inline-flex items-center gap-2">
                   <input v-model="spec.supports_category" type="checkbox" class="rounded border-ink-300" />
-                  支持分类
+                  {{ $t('aiBuilder.支持分类_d6cdpj') }}
                 </label>
                 <label class="inline-flex items-center gap-2">
                   <input v-model="spec.supports_tags" type="checkbox" class="rounded border-ink-300" />
-                  支持标签
+                  {{ $t('aiBuilder.支持标签_d6g495') }}
                 </label>
                 <label class="inline-flex items-center gap-2">
                   <input v-model="spec.translatable" type="checkbox" class="rounded border-ink-300" />
-                  需要多语言
+                  {{ $t('aiBuilder.需要多语_13vtkj') }}
                 </label>
               </div>
             </div>
@@ -323,20 +323,20 @@ function goFields() {
             <div class="card">
               <div class="flex items-center justify-between">
                 <h3 class="text-sm font-semibold text-ink-900">
-                  字段 <span class="text-ink-400 font-normal">（{{ spec.fields.length }} 个）</span>
+                  {{ $t('aiBuilder.字段_g4la') }} <span class="text-ink-400 font-normal">（{{ spec.fields.length }} {{ $t('aiBuilder.个_ep0f') }}</span>
                 </h3>
-                <button class="btn-ghost text-xs" @click="addField">+ 添加字段</button>
+                <button class="btn-ghost text-xs" @click="addField">{{ $t('aiBuilder.text_z2gmoo') }}</button>
               </div>
 
               <div class="mt-3 -mx-2 overflow-x-auto">
                 <table class="w-full text-xs">
                   <thead>
                     <tr class="text-left text-ink-500 border-b border-ink-200">
-                      <th class="px-2 py-2 font-medium">字段名</th>
+                      <th class="px-2 py-2 font-medium">{{ $t('aiBuilder.字段名_dwexb') }}</th>
                       <th class="px-2 py-2 font-medium">field_key</th>
-                      <th class="px-2 py-2 font-medium">类型</th>
-                      <th class="px-2 py-2 font-medium text-center">必填</th>
-                      <th class="px-2 py-2 font-medium">选项</th>
+                      <th class="px-2 py-2 font-medium">{{ $t('aiBuilder.类型_lnjk') }}</th>
+                      <th class="px-2 py-2 font-medium text-center">{{ $t('aiBuilder.必填_grwm') }}</th>
+                      <th class="px-2 py-2 font-medium">{{ $t('aiBuilder.选项_pc40') }}</th>
                       <th class="px-2 py-2"></th>
                     </tr>
                   </thead>
@@ -363,13 +363,13 @@ function goFields() {
                           v-if="f.field_type === 'select' || f.field_type === 'multiselect'"
                           :value="choicesText(f)"
                           class="input py-1 text-xs"
-                          placeholder="逗号分隔"
+                          :placeholder="$t('aiBuilder.逗号分隔_iiyrym')"
                           @input="setChoices(f, $event)"
                         />
                         <span v-else class="text-ink-300">—</span>
                       </td>
                       <td class="px-2 py-2 text-right">
-                        <button class="text-ink-400 hover:text-red-600" title="删除字段" @click="removeField(i)">
+                        <button class="text-ink-400 hover:text-red-600" :title="$t('aiBuilder.删除字段_azdh1e')" @click="removeField(i)">
                           ✕
                         </button>
                       </td>
@@ -380,10 +380,10 @@ function goFields() {
 
               <div class="mt-5 flex items-center gap-3">
                 <button class="btn-primary" :disabled="!canApply" @click="apply">
-                  {{ applying ? '正在创建…' : '确认创建' }}
+                  {{ applying ? $t('aiBuilder.正在创建_517pfm') : $t('aiBuilder.确认创建_froiph') }}
                 </button>
                 <span class="text-xs text-ink-400">
-                  创建后内容类型与字段会落库，可再进「内容类型」页调整
+                  {{ $t('aiBuilder.创建后内_115c7t') }}
                 </span>
               </div>
             </div>

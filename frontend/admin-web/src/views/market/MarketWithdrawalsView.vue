@@ -123,7 +123,7 @@ async function submitPay() {
         <div>
           <h2 class="font-semibold">{{ t("marketWithdrawals.提现审核_1b04zc") }}</h2>
           <p class="text-xs text-ink-500 mt-1">
-            审核通过后线下打款，再回填凭证；驳回则金额退回开发者可提现余额。共 {{ total }} 单
+            {{ $t('marketWithdrawals.审核通过_67o9im') }} {{ total }} {{ $t('marketWithdrawals.单_ggl') }}
           </p>
         </div>
         <select v-model="statusFilter" class="input !w-36">
@@ -176,12 +176,12 @@ async function submitPay() {
                 {{ WD_LABEL[w.status] || w.status }}
               </span>
               <div v-if="w.review_remark" class="text-xs text-ink-400 mt-1">{{ w.review_remark }}</div>
-              <div v-if="w.pay_voucher" class="text-xs text-ink-400 mt-1">凭证 {{ w.pay_voucher }}</div>
+              <div v-if="w.pay_voucher" class="text-xs text-ink-400 mt-1">{{ $t('marketWithdrawals.凭证_ep9w') }} {{ w.pay_voucher }}</div>
             </td>
             <td class="px-3 py-3 text-xs text-ink-500 whitespace-nowrap">
-              申请 {{ fmtTime(w.created_at) }}
-              <div v-if="w.paid_at">打款 {{ fmtTime(w.paid_at) }}</div>
-              <div v-if="w.remark" class="text-ink-400">备注 {{ w.remark }}</div>
+              {{ $t('marketWithdrawals.申请_kpb8') }} {{ fmtTime(w.created_at) }}
+              <div v-if="w.paid_at">{{ $t('marketWithdrawals.打款_hb9n') }} {{ fmtTime(w.paid_at) }}</div>
+              <div v-if="w.remark" class="text-ink-400">{{ $t('marketWithdrawals.备注_fqo1') }} {{ w.remark }}</div>
             </td>
             <td class="px-3 py-3">
               <div class="flex justify-end gap-2">
@@ -208,7 +208,7 @@ async function submitPay() {
       </table>
 
       <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 text-sm">
-        <span class="text-ink-500">共 {{ total }} 条</span>
+        <span class="text-ink-500">{{ $t('marketWithdrawals.共_g35') }} {{ total }} {{ $t('marketWithdrawals.条_kf5') }}</span>
         <div class="flex items-center gap-2">
           <button class="btn-outline !py-1 !px-3" :disabled="page <= 1" @click="page--">{{ t("marketWithdrawals.上一页_btlof") }}</button>
           <span class="text-ink-500">{{ page }} / {{ totalPages }}</span>
@@ -226,7 +226,7 @@ async function submitPay() {
         </div>
         <div class="px-5 py-4 space-y-3">
           <div class="rounded-xl bg-ink-50 border border-ink-200 p-3 text-xs text-ink-600">
-            {{ current?.developer_name }} 申请 ¥{{ current?.amount }}，驳回后金额退回其可提现余额。
+            {{ current?.developer_name }} {{ $t('marketWithdrawals.申请_fcnpgp') }}{{ current?.amount }}{{ $t('marketWithdrawals.text_82gwtg') }}
           </div>
           <div>
             <label class="block text-xs text-ink-500 mb-1">{{ t("marketWithdrawals.驳回理由_jul1py") }}</label>
@@ -237,7 +237,7 @@ async function submitPay() {
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
           <button class="btn-ghost" @click="showReject = false">{{ t("marketWithdrawals.cancel") }}</button>
           <button class="btn-primary !bg-red-600 hover:!bg-red-700" :disabled="!!acting" @click="submitReject">
-            {{ acting ? '提交中…' : '确认驳回' }}
+            {{ acting ? $t('marketWithdrawals.提交中_cx3q0d') : $t('marketWithdrawals.确认驳回_fs0s3l') }}
           </button>
         </div>
       </div>
@@ -252,10 +252,10 @@ async function submitPay() {
         </div>
         <div class="px-5 py-4 space-y-3">
           <div class="rounded-xl bg-ink-50 border border-ink-200 p-3 text-xs text-ink-600 space-y-1">
-            <div>开发者：{{ current?.developer_name }}</div>
-            <div>{{ t("marketWithdrawals.应到账_ca6qj4") }}<strong>¥{{ current?.actual }}</strong>（申请 ¥{{ current?.amount }}，手续费 ¥{{ current?.fee }}）</div>
+            <div>{{ $t('marketWithdrawals.开发者_cca1xi') }}{{ current?.developer_name }}</div>
+            <div>{{ t("marketWithdrawals.应到账_ca6qj4") }}<strong>¥{{ current?.actual }}</strong>{{ $t('marketWithdrawals.text_i32ldd') }}{{ current?.amount }}{{ $t('marketWithdrawals.text_1pcyv8') }}{{ current?.fee }}）</div>
             <div>
-              收款：{{ ACCOUNT_LABEL[current?.account_type] }} {{ current?.account_no }}
+              {{ $t('marketWithdrawals.收款_fdbo2') }}{{ ACCOUNT_LABEL[current?.account_type] }} {{ current?.account_no }}
               {{ current?.account_name }}
             </div>
           </div>
@@ -271,7 +271,7 @@ async function submitPay() {
         </div>
         <div class="px-5 py-4 border-t border-ink-200 flex justify-end gap-2">
           <button class="btn-ghost" @click="showPay = false">{{ t("marketWithdrawals.cancel") }}</button>
-          <button class="btn-primary" :disabled="!!acting" @click="submitPay">{{ acting ? '提交中…' : '确认已打款' }}</button>
+          <button class="btn-primary" :disabled="!!acting" @click="submitPay">{{ acting ? $t('marketWithdrawals.提交中_cx3q0d') : $t('marketWithdrawals.确认已打_1qp7da') }}</button>
         </div>
       </div>
     </div>

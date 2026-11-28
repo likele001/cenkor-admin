@@ -121,8 +121,8 @@ onMounted(load)
               <span v-if="ct.supports_category" class="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{{ t('entryList.分类_emut') }}</span>
               <span v-if="ct.supports_tags" class="text-xs px-1.5 py-0.5 bg-green-50 text-green-600 rounded">{{ t('productsList.标签_idef') }}</span>
               <span v-if="ct.translatable" class="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">{{ t("contentTypeList.text_jeoarl") }}</span>
-              <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_definitions?.length || 0 }} 字段</span>
-              <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_groups?.length || 0 }} 分组</span>
+              <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_definitions?.length || 0 }} {{ $t('contentTypeList.字段_g4la') }}</span>
+              <span class="text-xs px-1.5 py-0.5 bg-ink-50 text-ink-500 rounded">{{ ct.field_groups?.length || 0 }} {{ $t('contentTypeList.分组_enb2') }}</span>
             </div>
           </div>
         </div>
@@ -137,7 +137,7 @@ onMounted(load)
     <!-- Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showModal = false">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-semibold mb-4">{{ editing ? '编辑内容类型' : '新建内容类型' }}</h2>
+        <h2 class="text-lg font-semibold mb-4">{{ editing ? $t('contentTypeList.编辑内容_1t351j') : $t('contentTypeList.新建内容_1rzw3v') }}</h2>
         <div class="space-y-3">
           <div v-if="!editing">
             <label class="block text-sm font-medium mb-1">Key</label>
@@ -172,7 +172,7 @@ onMounted(load)
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn-ghost" @click="showModal = false">{{ t('usersList.取消_ev02') }}</button>
-          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存' }}</button>
+          <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? $t('contentTypeList.保存中_agdrec') : $t('contentTypeList.保存_e32z') }}</button>
         </div>
       </div>
     </div>

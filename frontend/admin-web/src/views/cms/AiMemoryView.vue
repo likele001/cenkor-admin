@@ -455,9 +455,9 @@ onMounted(async () => {
   <div class="p-6 max-w-[1280px] mx-auto space-y-5">
     <div class="flex items-start gap-3 flex-wrap">
       <div>
-        <h1 class="text-xl font-semibold text-ink-900">AI 记忆</h1>
+        <h1 class="text-xl font-semibold text-ink-900">{{ $t('aiMemory.text_11q6mm') }}</h1>
         <p class="text-xs text-ink-500 mt-0.5">
-          让 AI 记住本站的调性、术语与已经写过的内容 —— 不再是每次从零开始的陌生人
+          {{ $t('aiMemory.让_1sl52n') }}
         </p>
       </div>
       <div class="ml-auto flex items-center gap-2">
@@ -465,16 +465,16 @@ onMounted(async () => {
           class="px-3 py-1.5 text-xs rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 disabled:opacity-50"
           :disabled="!!busy"
           @click="distill"
-        >{{ busy === 'distill' ? '提炼中…' : 'AI 提炼风格' }}</button>
+        >{{ busy === 'distill' ? $t('aiMemory.提炼中_d23hxh') : $t('aiMemory.text_7qk3rm') }}</button>
         <button
           class="px-3 py-1.5 text-xs rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 disabled:opacity-50"
           :disabled="!!busy"
           @click="rebuildDigests"
-        >{{ busy === 'rebuild' ? '索引中…' : '重建内容索引' }}</button>
+        >{{ busy === 'rebuild' ? $t('aiMemory.索引中_g6hc0c') : $t('aiMemory.重建内容_cl61xw') }}</button>
         <button
           class="px-3 py-1.5 text-xs rounded-lg bg-ink-900 text-white hover:bg-ink-800"
           @click="openEditor()"
-        >新增记忆</button>
+        >{{ $t('aiMemory.新增记忆_d7dmro') }}</button>
       </div>
     </div>
 
@@ -496,46 +496,46 @@ onMounted(async () => {
     <!-- 统计 -->
     <div v-if="stats" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <div class="card !p-4">
-        <div class="text-xs text-ink-500">生效中的记忆</div>
+        <div class="text-xs text-ink-500">{{ $t('aiMemory.生效中的_1574o2') }}</div>
         <div class="text-2xl font-semibold text-ink-900 mt-1 tabular-nums">{{ stats.approved }}</div>
         <div class="text-[11px] text-ink-400 mt-1">
-          {{ stats.by_scope.map((s) => `${s.label}${s.count}`).join(' · ') || '还没有任何记忆' }}
+          {{ stats.by_scope.map((s) => `${s.label}${s.count}`).join(' · ') || $t('aiMemory.还没有任_u4f3jk') }}
         </div>
       </div>
       <div class="card !p-4">
-        <div class="text-xs text-ink-500">待审（AI 提炼）</div>
+        <div class="text-xs text-ink-500">{{ $t('aiMemory.待审_gxqa29') }}</div>
         <div class="text-2xl font-semibold mt-1 tabular-nums"
              :class="stats.pending ? 'text-amber-600' : 'text-ink-900'">{{ stats.pending }}</div>
-        <div class="text-[11px] text-ink-400 mt-1">审核通过后才会注入提示词</div>
+        <div class="text-[11px] text-ink-400 mt-1">{{ $t('aiMemory.审核通过_1le2fv') }}</div>
       </div>
       <div class="card !p-4">
-        <div class="text-xs text-ink-500">内容索引覆盖</div>
+        <div class="text-xs text-ink-500">{{ $t('aiMemory.内容索引_ranvbr') }}</div>
         <div class="text-2xl font-semibold text-ink-900 mt-1 tabular-nums">
           {{ stats.digests }}<span class="text-sm text-ink-400"> / {{ stats.entries }}</span>
         </div>
         <div class="text-[11px] text-ink-400 mt-1">
-          {{ stats.entries ? `${Math.round(stats.coverage * 100)}% 的条目有摘要` : '暂无条目' }}
+          {{ stats.entries ? `${Math.round(stats.coverage * 100)}% 的条目有摘要` : $t('aiMemory.暂无条目_dcvky3') }}
         </div>
       </div>
       <div class="card !p-4">
-        <div class="text-xs text-ink-500">累计注入</div>
+        <div class="text-xs text-ink-500">{{ $t('aiMemory.累计注入_gde0y7') }}</div>
         <div class="text-2xl font-semibold text-ink-900 mt-1 tabular-nums">{{ stats.injection_total }}</div>
-        <div class="text-[11px] text-ink-400 mt-1">被写进提示词的次数</div>
+        <div class="text-[11px] text-ink-400 mt-1">{{ $t('aiMemory.被写进提_1nc7rw') }}</div>
       </div>
     </div>
 
     <!-- 待审区 -->
     <div v-if="pending.length && view === 'memory'" class="card border-amber-200 bg-amber-50/50">
       <div class="flex items-center gap-3 mb-3">
-        <h2 class="text-sm font-semibold text-amber-900">AI 提炼的风格建议（{{ pending.length }}）</h2>
+        <h2 class="text-sm font-semibold text-amber-900">{{ $t('aiMemory.text_1rkib2') }}{{ pending.length }}）</h2>
         <span class="text-[11px] text-amber-700">
-          机器归纳的东西看着像真的、实际经常是编的 —— 确认前不会生效
+          {{ $t('aiMemory.机器归纳_ql3qii') }}
         </span>
         <button
           class="ml-auto px-2.5 py-1 text-xs rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
           :disabled="!!busy"
           @click="approveAll"
-        >全部通过</button>
+        >{{ $t('aiMemory.全部通过_avk8kt') }}</button>
       </div>
       <div class="space-y-2">
         <div
@@ -551,12 +551,12 @@ onMounted(async () => {
             class="text-xs text-emerald-600 hover:text-emerald-800 shrink-0"
             :disabled="!!busy"
             @click="setStatus(p, 'approved')"
-          >通过</button>
+          >{{ $t('aiMemory.通过_past') }}</button>
           <button
             class="text-xs text-ink-400 hover:text-red-600 shrink-0"
             :disabled="!!busy"
             @click="setStatus(p, 'rejected')"
-          >驳回</button>
+          >{{ $t('aiMemory.驳回_qqx7') }}</button>
         </div>
       </div>
     </div>
@@ -568,14 +568,14 @@ onMounted(async () => {
           ? 'border-ink-900 text-ink-900 font-medium'
           : 'border-transparent text-ink-500 hover:text-ink-800'"
         @click="switchView('memory')"
-      >站点记忆</button>
+      >{{ $t('aiMemory.站点记忆_fyzml2') }}</button>
       <button
         class="-mb-px px-3 py-2 text-xs border-b-2 transition-colors"
         :class="view === 'session'
           ? 'border-ink-900 text-ink-900 font-medium'
           : 'border-transparent text-ink-500 hover:text-ink-800'"
         @click="switchView('session')"
-      >会话记忆
+      >{{ $t('aiMemory.会话记忆_akbwih') }}
         <span v-if="sessionStats?.sessions" class="ml-1 text-ink-400">{{ sessionStats.sessions }}</span>
       </button>
     </div>
@@ -584,25 +584,24 @@ onMounted(async () => {
       <!-- 左：记忆条目 -->
       <div class="card">
         <div class="flex items-center gap-3 mb-3">
-          <h2 class="text-sm font-semibold text-ink-900">记忆条目</h2>
-          <span class="text-xs text-ink-400">权重高的先注入</span>
+          <h2 class="text-sm font-semibold text-ink-900">{{ $t('aiMemory.记忆条目_i0svur') }}</h2>
+          <span class="text-xs text-ink-400">{{ $t('aiMemory.权重高的_11jca7') }}</span>
           <button class="ml-auto text-xs text-ink-500 hover:text-ink-900" @click="toggleDigests">
-            {{ digestOpen ? '收起内容索引' : '查看内容索引' }}
+            {{ digestOpen ? $t('aiMemory.收起内容_19xtqx') : $t('aiMemory.查看内容_1ygcvy') }}
           </button>
         </div>
 
-        <div v-if="loading && !items.length" class="py-12 text-center text-sm text-ink-400">加载中…</div>
+        <div v-if="loading && !items.length" class="py-12 text-center text-sm text-ink-400">{{ $t('aiMemory.加载中_b0k5km') }}</div>
 
         <div v-else-if="!approved.length" class="py-14 text-center">
-          <p class="text-sm text-ink-500">还没有任何生效中的记忆。</p>
+          <p class="text-sm text-ink-500">{{ $t('aiMemory.还没有任_bnsbde') }}</p>
           <p class="text-xs text-ink-400 mt-1.5 max-w-md mx-auto leading-relaxed">
-            最小起步只需三条：一条品牌调性（这站是什么调子）、一条目标读者（写给谁看）、
-            一组术语（哪些词必须统一写法）。填完起草质量立刻不一样。
+            {{ $t('aiMemory.最小起步_dstoev') }}
           </p>
           <button
             class="mt-4 px-3 py-1.5 text-xs rounded-lg bg-ink-900 text-white hover:bg-ink-800"
             @click="openEditor()"
-          >添加第一条</button>
+          >{{ $t('aiMemory.添加第一_eroga0') }}</button>
         </div>
 
         <div v-else class="space-y-5">
@@ -614,7 +613,7 @@ onMounted(async () => {
               <button
                 class="ml-auto text-[11px] text-ink-400 hover:text-ink-900 shrink-0"
                 @click="openEditor(undefined, g.scope)"
-              >+ 添加</button>
+              >{{ $t('aiMemory.text_1b9y2') }}</button>
             </div>
             <div class="space-y-1">
               <div
@@ -630,18 +629,18 @@ onMounted(async () => {
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-ink-800 leading-relaxed">{{ it.content }}</p>
                   <p class="text-[10px] text-ink-300 mt-0.5">
-                    权重 {{ it.weight }}
-                    · 注入 {{ it.injection_count }} 次
-                    <span v-if="it.source === 'ai'" class="text-amber-500">· AI 提炼</span>
-                    <span v-if="!it.enabled" class="text-red-400">· 已停用</span>
+                    {{ $t('aiMemory.权重_id4a') }} {{ it.weight }}
+                    {{ $t('aiMemory.text_3shae') }} {{ it.injection_count }} {{ $t('aiMemory.次_l5t') }}
+                    <span v-if="it.source === 'ai'" class="text-amber-500">{{ $t('aiMemory.text_31ba63') }}</span>
+                    <span v-if="!it.enabled" class="text-red-400">{{ $t('aiMemory.text_37cgr9') }}</span>
                   </p>
                 </div>
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition shrink-0">
-                  <button class="text-[11px] text-ink-500 hover:text-ink-900" @click="openEditor(it)">改</button>
+                  <button class="text-[11px] text-ink-500 hover:text-ink-900" @click="openEditor(it)">{{ $t('aiMemory.改_jzt') }}</button>
                   <button class="text-[11px] text-ink-500 hover:text-ink-900" @click="toggleEnabled(it)">
-                    {{ it.enabled ? '停用' : '启用' }}
+                    {{ it.enabled ? $t('aiMemory.停用_eb7w') : $t('aiMemory.启用_eymx') }}
                   </button>
-                  <button class="text-[11px] text-red-400 hover:text-red-700" @click="removeMemory(it)">删</button>
+                  <button class="text-[11px] text-red-400 hover:text-red-700" @click="removeMemory(it)">{{ $t('aiMemory.删_g80') }}</button>
                 </div>
               </div>
             </div>
@@ -651,11 +650,11 @@ onMounted(async () => {
         <!-- 内容索引 -->
         <div v-if="digestOpen" class="mt-5 pt-4 border-t border-ink-100">
           <div class="flex items-center gap-2 mb-2">
-            <h3 class="text-xs font-semibold text-ink-700">内容索引（已发布内容的记忆）</h3>
-            <span class="text-[10px] text-ink-400">起草时会带上最近 15 条</span>
+            <h3 class="text-xs font-semibold text-ink-700">{{ $t('aiMemory.内容索引_wjkayu') }}</h3>
+            <span class="text-[10px] text-ink-400">{{ $t('aiMemory.起草时会_1ipa7k') }}</span>
           </div>
           <div v-if="!digests.length" class="text-xs text-ink-400 py-6 text-center">
-            还没有索引。点右上角「重建内容索引」生成。
+            {{ $t('aiMemory.还没有索_1rxyfg') }}
           </div>
           <div v-else class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
             <div v-for="d in digests" :key="d.entry_id" class="rounded-lg border border-ink-100 px-3 py-2">
@@ -676,16 +675,16 @@ onMounted(async () => {
       <!-- 右：注入预览 -->
       <div class="card xl:sticky xl:top-4">
         <div class="flex items-center gap-2 mb-2">
-          <h2 class="text-sm font-semibold text-ink-900">AI 实际吃到的原文</h2>
+          <h2 class="text-sm font-semibold text-ink-900">{{ $t('aiMemory.text_1xopjm') }}</h2>
           <button
             class="ml-auto text-[11px] text-ink-500 hover:text-ink-900 disabled:opacity-50"
             :disabled="previewBusy"
             @click="loadPreview"
-          >{{ previewBusy ? '刷新中…' : '刷新' }}</button>
+          >{{ previewBusy ? $t('aiMemory.刷新中_askp0y') : $t('aiMemory.刷新_ejix') }}</button>
         </div>
         <div class="flex items-center gap-3 mb-3 text-[11px] text-ink-500">
           <label class="flex items-center gap-1">
-            预算
+            {{ $t('aiMemory.预算_qmc3') }}
             <input
               v-model.number="budget"
               type="number"
@@ -695,26 +694,26 @@ onMounted(async () => {
               class="w-16 px-1.5 py-0.5 rounded border border-ink-200 text-ink-700"
               @change="loadPreview"
             />
-            字
+            {{ $t('aiMemory.字_i1j') }}
           </label>
           <label class="flex items-center gap-1">
             <input v-model="withContent" type="checkbox" @change="loadPreview" />
-            含内容记忆
+            {{ $t('aiMemory.含内容记_1jn80b') }}
           </label>
         </div>
 
         <div v-if="preview" class="flex items-center gap-1.5 flex-wrap mb-2">
           <span class="px-1.5 py-0.5 rounded bg-ink-100 text-ink-600 text-[10px]">
-            注入 {{ preview.injected }} 条
+            {{ $t('aiMemory.注入_iyyl') }} {{ preview.injected }} {{ $t('aiMemory.条_kf5') }}
           </span>
           <span v-if="preview.content_memory" class="px-1.5 py-0.5 rounded bg-ink-100 text-ink-600 text-[10px]">
-            内容记忆 {{ preview.content_memory }} 篇
+            {{ $t('aiMemory.内容记忆_ao9azu') }} {{ preview.content_memory }} {{ $t('aiMemory.篇_og7') }}
           </span>
           <span v-if="preview.truncated" class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px]">
-            {{ preview.truncated }} 条超预算未注入
+            {{ preview.truncated }} {{ $t('aiMemory.条超预算_1k4tn1') }}
           </span>
           <span class="px-1.5 py-0.5 rounded bg-ink-100 text-ink-600 text-[10px]">
-            {{ preview.chars }} 字
+            {{ preview.chars }} {{ $t('aiMemory.字_i1j') }}
           </span>
         </div>
 
@@ -723,18 +722,16 @@ onMounted(async () => {
           class="text-[11px] leading-relaxed text-ink-700 bg-ink-50 rounded-lg p-3 whitespace-pre-wrap break-words max-h-[520px] overflow-y-auto font-mono"
         >{{ preview.block }}</pre>
         <div v-else class="text-xs text-ink-400 py-10 text-center">
-          当前没有可注入的记忆。
+          {{ $t('aiMemory.当前没有_5u6roy') }}
         </div>
 
         <p class="text-[11px] text-ink-400 mt-3 leading-relaxed">
-          这段文本会被拼在每次起草的 system prompt <span class="text-ink-600">末尾</span> ——
-          固定内容在前、记忆在后，前缀缓存才能命中。放在最前面会让每次请求前缀都不同，缓存全废。
+          {{ $t('aiMemory.这段文本_18c8id') }} <span class="text-ink-600">{{ $t('aiMemory.末尾_i1yr') }}</span> {{ $t('aiMemory.text_uudiwe') }}
         </p>
 
         <div v-if="zombie.length" class="mt-3 rounded-lg bg-ink-50 px-3 py-2">
           <p class="text-[11px] text-ink-500 leading-relaxed">
-            有 {{ zombie.length }} 条记忆从未被注入过（权重偏低，预算先被别的吃掉了）。
-            如果它们很重要，去把权重调高。
+            {{ $t('aiMemory.有_kcp') }} {{ zombie.length }} {{ $t('aiMemory.条记忆从_ggv1cu') }}
           </p>
         </div>
       </div>
@@ -744,18 +741,18 @@ onMounted(async () => {
     <div v-show="view === 'session'" class="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-5 items-start">
       <div class="card">
         <div class="flex items-center gap-2 mb-3">
-          <h2 class="text-sm font-semibold text-ink-900">会话</h2>
+          <h2 class="text-sm font-semibold text-ink-900">{{ $t('aiMemory.会话_e803') }}</h2>
           <span class="text-[11px] text-ink-400">
-            {{ sessionStats?.sessions ?? 0 }} 篇 / {{ sessionStats?.turns ?? 0 }} 条记录
+            {{ sessionStats?.sessions ?? 0 }} {{ $t('aiMemory.篇_i4p3q') }} {{ sessionStats?.turns ?? 0 }} {{ $t('aiMemory.条记录_ftebq') }}
           </span>
           <button class="ml-auto text-xs text-ink-500 hover:text-ink-900" @click="loadSessions">
-            刷新
+            {{ $t('aiMemory.刷新_ejix') }}
           </button>
         </div>
 
         <div v-if="!sessions.length" class="text-xs text-ink-400 py-10 text-center leading-relaxed">
-          还没有会话。<br />
-          在工作台起草并保存、或对已有内容跑一次 SEO / 翻译，就会自动建一条。
+          {{ $t('aiMemory.还没有会_18ij6y') }}<br />
+          {{ $t('aiMemory.在工作台_qh4en5') }}
         </div>
 
         <div v-else class="space-y-1.5 max-h-[600px] overflow-y-auto">
@@ -769,8 +766,8 @@ onMounted(async () => {
             @click="openSession(s.id)"
           >
             <div class="flex items-center gap-2">
-              <span class="text-xs font-medium text-ink-900 truncate">{{ s.title || '未命名条目' }}</span>
-              <span class="ml-auto text-[10px] text-ink-400 shrink-0">{{ s.turn_count }} 条</span>
+              <span class="text-xs font-medium text-ink-900 truncate">{{ s.title || $t('aiMemory.未命名条_1n867t') }}</span>
+              <span class="ml-auto text-[10px] text-ink-400 shrink-0">{{ s.turn_count }} {{ $t('aiMemory.条_kf5') }}</span>
             </div>
             <div class="text-[11px] text-ink-500 truncate mt-0.5">
               <span class="text-ink-400">{{ s.last_kind }}</span> · {{ s.last_content }}
@@ -782,23 +779,23 @@ onMounted(async () => {
 
       <div class="card">
         <div v-if="!sessionDetail" class="text-xs text-ink-400 py-16 text-center">
-          左边选一篇，看它被 AI 改过哪些地方
+          {{ $t('aiMemory.左边选一_glph9g') }}
         </div>
 
         <div v-else>
           <div class="flex items-center gap-3 mb-1">
-            <h2 class="text-sm font-semibold text-ink-900 truncate">{{ sessionDetail.title || '未命名条目' }}</h2>
+            <h2 class="text-sm font-semibold text-ink-900 truncate">{{ sessionDetail.title || $t('aiMemory.未命名条_1n867t') }}</h2>
             <span class="px-1.5 py-0.5 rounded bg-ink-100 text-ink-600 text-[10px] shrink-0">
-              {{ sessionDetail.turns.length }} 条记录
+              {{ sessionDetail.turns.length }} {{ $t('aiMemory.条记录_ftebq') }}
             </span>
             <button
               class="ml-auto text-xs text-ink-400 hover:text-red-600 shrink-0"
               :disabled="!!sessionBusy"
               @click="removeSession({ id: sessionDetail.id, entry_id: sessionDetail.entry_id, title: sessionDetail.title, turn_count: sessionDetail.turn_count, last_kind: '', last_content: '' })"
-            >删除会话</button>
+            >{{ $t('aiMemory.删除会话_azbkg7') }}</button>
           </div>
           <p class="text-[11px] text-ink-400 mb-4">
-            最近 {{ 8 }} 条会压成一段拼进提示词末尾；人工备注原样注入，优先级最高
+            {{ $t('aiMemory.最近_ib4h') }} {{ 8 }} {{ $t('aiMemory.条会压成_eov1yz') }}
           </p>
 
           <div class="space-y-2 mb-4">
@@ -815,7 +812,7 @@ onMounted(async () => {
                 :class="t.role === 'user'
                   ? 'bg-amber-100 text-amber-700'
                   : 'bg-ink-100 text-ink-600'"
-              >{{ t.role === 'user' ? '人' : 'AI' }} · {{ t.kind_label }}</span>
+              >{{ t.role === 'user' ? $t('aiMemory.人_fju') : 'AI' }} · {{ t.kind_label }}</span>
               <div class="flex-1 min-w-0">
                 <div class="text-xs text-ink-800 leading-relaxed break-words">{{ t.content }}</div>
                 <div class="text-[10px] text-ink-300 mt-1">{{ fmtTime(t.created_at) }}</div>
@@ -824,22 +821,22 @@ onMounted(async () => {
                 class="text-[11px] text-ink-300 hover:text-red-600 shrink-0"
                 :disabled="!!sessionBusy"
                 @click="removeTurn(t)"
-              >删</button>
+              >{{ $t('aiMemory.删_g80') }}</button>
             </div>
           </div>
 
           <div class="rounded-lg border border-ink-200 p-3">
             <div class="text-xs font-medium text-ink-800 mb-2">
-              给这篇加一条要求
+              {{ $t('aiMemory.给这篇加_gzs123') }}
               <span class="text-[11px] font-normal text-ink-400 ml-1">
-                只对这篇生效，不会写进全站记忆
+                {{ $t('aiMemory.只对这篇_x6854s') }}
               </span>
             </div>
             <textarea
               v-model="noteText"
               rows="2"
               maxlength="1000"
-              placeholder="例：结论要落到排产上，不要泛泛谈数字化；不要提竞品参数"
+              :placeholder="$t('aiMemory.例_173a0h')"
               class="w-full text-xs rounded-lg border border-ink-200 px-3 py-2 outline-none focus:border-ink-400"
             />
             <div class="flex items-center gap-2 mt-2">
@@ -848,7 +845,7 @@ onMounted(async () => {
                 class="ml-auto px-3 py-1.5 text-xs rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
                 :disabled="!noteText.trim() || !!sessionBusy"
                 @click="addNote"
-              >{{ sessionBusy === 'note' ? '写入中…' : '写入备注' }}</button>
+              >{{ sessionBusy === 'note' ? $t('aiMemory.写入中_amssxx') : $t('aiMemory.写入备注_amv2jx') }}</button>
             </div>
           </div>
         </div>
@@ -863,14 +860,14 @@ onMounted(async () => {
     >
       <div class="bg-white rounded-xl w-full max-w-[600px] my-10 shadow-xl">
         <div class="flex items-center gap-3 px-5 py-3.5 border-b border-ink-100">
-          <h2 class="font-semibold text-ink-900 text-sm">{{ draft.id ? '编辑记忆' : '新增记忆' }}</h2>
+          <h2 class="font-semibold text-ink-900 text-sm">{{ draft.id ? $t('aiMemory.编辑记忆_gmr2c1') : $t('aiMemory.新增记忆_d7dmro') }}</h2>
           <span class="text-xs text-ink-400">{{ SCOPE_HINT[draft.scope] }}</span>
           <button class="ml-auto text-ink-400 hover:text-ink-700 text-xl leading-none" @click="editorOpen = false">×</button>
         </div>
 
         <div class="p-5 space-y-3">
           <label class="block text-xs text-ink-600">
-            分类
+            {{ $t('aiMemory.分类_emut') }}
             <select
               v-model="draft.scope"
               class="mt-1 w-full px-2.5 py-1.5 text-sm rounded-lg border border-ink-200 bg-white focus:outline-none focus:ring-2 focus:ring-ink-900/10"
@@ -880,7 +877,7 @@ onMounted(async () => {
           </label>
 
           <label v-if="draft.scope === 'term' || draft.scope === 'ban'" class="block text-xs text-ink-600">
-            {{ draft.scope === 'term' ? '规范写法' : '要禁用的词' }}
+            {{ draft.scope === 'term' ? $t('aiMemory.规范写法_hx4s4b') : $t('aiMemory.要禁用的_1k8lcy') }}
             <input
               v-model="draft.key"
               class="mt-1 w-full px-2.5 py-1.5 text-sm rounded-lg border border-ink-200 focus:outline-none focus:ring-2 focus:ring-ink-900/10"
@@ -889,7 +886,7 @@ onMounted(async () => {
           </label>
 
           <label class="block text-xs text-ink-600">
-            {{ draft.scope === 'term' ? '说明（易错写法 / 全称）' : draft.scope === 'ban' ? '原因 / 该换成什么' : '内容' }}
+            {{ draft.scope === 'term' ? $t('aiMemory.说明_1296cw') : draft.scope === 'ban' ? $t('aiMemory.原因_3qvfor') : $t('aiMemory.内容_edas') }}
             <textarea
               v-model="draft.content"
               rows="4"
@@ -905,13 +902,13 @@ onMounted(async () => {
           </label>
 
           <label class="block text-xs text-ink-600">
-            权重（0-100，越高越先注入）
+            {{ $t('aiMemory.权重_1j0o85') }}
             <div class="flex items-center gap-3 mt-1">
               <input v-model.number="draft.weight" type="range" min="0" max="100" step="5" class="flex-1" />
               <span class="w-8 text-sm text-ink-900 tabular-nums text-right">{{ draft.weight }}</span>
             </div>
             <span class="block mt-1 text-[11px] text-ink-400">
-              预算有限时按权重从高到低装。品牌调性建议 80+，术语 70，冷门事实 30-50。
+              {{ $t('aiMemory.预算有限_ty9sx4') }}
             </span>
           </label>
 
@@ -920,11 +917,11 @@ onMounted(async () => {
               class="px-3 py-1.5 text-sm rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
               :disabled="busy === 'save'"
               @click="saveMemory"
-            >保存</button>
+            >{{ $t('aiMemory.保存_e32z') }}</button>
             <button
               class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 text-ink-600 hover:bg-ink-50"
               @click="editorOpen = false"
-            >取消</button>
+            >{{ $t('aiMemory.取消_ev02') }}</button>
           </div>
         </div>
       </div>

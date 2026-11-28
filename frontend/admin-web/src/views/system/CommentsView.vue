@@ -47,7 +47,7 @@ onMounted(load)
       <div class="flex items-center gap-3">
         <h1 class="text-2xl font-semibold tracking-tight">{{ t("comments.text_1ct9fq") }}</h1>
         <span class="text-sm text-ink-400">M4·P3</span>
-        <span v-if="stats.pending" class="text-xs px-2 py-1 bg-yellow-50 text-yellow-600 rounded">{{ stats.pending }} 条待审核</span>
+        <span v-if="stats.pending" class="text-xs px-2 py-1 bg-yellow-50 text-yellow-600 rounded">{{ stats.pending }} {{ $t('comments.条待审核_dfudq3') }}</span>
       </div>
       <select v-model="statusFilter" class="input w-40" @change="load">
         <option value="">{{ t("entryList.全部状态_avez63") }}</option>
@@ -69,7 +69,7 @@ onMounted(load)
         <tbody>
           <tr v-for="c in items" :key="c.id" class="border-b last:border-0 align-top">
             <td class="p-3">
-              <div class="text-ink-500 text-xs mb-1">{{ c.content_type_key }} / #{{ c.object_id }}<span v-if="c.parent_id" class="ml-1 text-ink-400">回复 #{{ c.parent_id }}</span></div>
+              <div class="text-ink-500 text-xs mb-1">{{ c.content_type_key }} / #{{ c.object_id }}<span v-if="c.parent_id" class="ml-1 text-ink-400">{{ $t('comments.回复_bbh3ci') }}{{ c.parent_id }}</span></div>
               <div class="line-clamp-2">{{ c.content }}</div>
             </td>
             <td class="p-3">

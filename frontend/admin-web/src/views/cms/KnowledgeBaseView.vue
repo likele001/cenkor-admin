@@ -329,17 +329,17 @@ onUnmounted(() => {
           <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.文档_hubg") }}</p>
           <p class="text-3xl font-semibold leading-none">{{ stats.docs }}</p>
           <p class="mt-2 text-[11px] text-ink-400">
-            就绪 {{ stats.ready_docs }}
-            <span v-if="stats.by_status?.failed"> · 失败 {{ stats.by_status.failed }}</span>
+            {{ $t('knowledgeBase.就绪_gdll') }} {{ stats.ready_docs }}
+            <span v-if="stats.by_status?.failed"> {{ $t('knowledgeBase.text_3pgd9') }} {{ stats.by_status.failed }}</span>
             <span v-if="stats.by_status?.pending || stats.by_status?.indexing">
-              · 处理中 {{ (stats.by_status.pending || 0) + (stats.by_status.indexing || 0) }}
+              {{ $t('knowledgeBase.text_36sbnm') }} {{ (stats.by_status.pending || 0) + (stats.by_status.indexing || 0) }}
             </span>
           </p>
         </div>
         <div class="card">
           <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.可检索分_1lsc4e") }}</p>
           <p class="text-3xl font-semibold leading-none">{{ stats.indexed_chunks }}</p>
-          <p class="mt-2 text-[11px] text-ink-400">共切出 {{ stats.chunks }} 段</p>
+          <p class="mt-2 text-[11px] text-ink-400">{{ $t('knowledgeBase.共切出_cbu9w') }} {{ stats.chunks }} {{ $t('knowledgeBase.段_l9x') }}</p>
         </div>
         <div class="card">
           <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.语料字数_i2oeh1") }}</p>
@@ -349,9 +349,9 @@ onUnmounted(() => {
         <div class="card">
           <p class="text-xs text-ink-400 mb-1">{{ t("knowledgeBase.向量模型_b7l2aw") }}</p>
           <p class="text-sm font-medium leading-tight mt-1 truncate" :title="stats.embed_model">
-            {{ stats.embed_model || '未建立索引' }}
+            {{ stats.embed_model || $t('knowledgeBase.未建立索_1opkie') }}
           </p>
-          <p class="mt-2 text-[11px] text-ink-400">召回门槛 {{ stats.limits?.min_score }}</p>
+          <p class="mt-2 text-[11px] text-ink-400">{{ $t('knowledgeBase.召回门槛_ayi6sl') }} {{ stats.limits?.min_score }}</p>
         </div>
       </div>
 
@@ -391,7 +391,7 @@ onUnmounted(() => {
             @drop.prevent="onDrop"
           >
             <p class="text-sm text-ink-600">
-              {{ uploading ? '正在抽取文本…' : '把文件拖到这里，或点击选择' }}
+              {{ uploading ? $t('knowledgeBase.正在抽取_78lib') : $t('knowledgeBase.把文件拖_1rmd3l') }}
             </p>
             <p class="mt-1 text-xs text-ink-400">{{ t("knowledgeBase.扫描件_y821yt") }}</p>
           </div>
@@ -418,12 +418,12 @@ onUnmounted(() => {
             class="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono leading-relaxed"
           />
           <div class="flex items-center gap-3">
-            <span class="text-xs text-ink-400">{{ pasteText.length }} 字</span>
+            <span class="text-xs text-ink-400">{{ pasteText.length }} {{ $t('knowledgeBase.字_i1j') }}</span>
             <button
               class="ml-auto px-4 py-2 text-sm rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
               :disabled="uploading"
               @click="doPaste"
-            >{{ uploading ? '入库中…' : '入库并索引' }}</button>
+            >{{ uploading ? $t('knowledgeBase.入库中_ant3hj') : $t('knowledgeBase.入库并索_1agfzq') }}</button>
           </div>
         </div>
       </div>
@@ -445,16 +445,16 @@ onUnmounted(() => {
             class="px-4 py-2 text-sm rounded-lg bg-ink-900 text-white hover:bg-ink-800 disabled:opacity-50"
             :disabled="searching"
             @click="runSearch"
-          >{{ searching ? '检索中…' : '测试' }}</button>
+          >{{ searching ? $t('knowledgeBase.检索中_dqbywr') : $t('knowledgeBase.测试_jcve') }}</button>
         </div>
 
         <div v-if="searched" class="mt-4">
           <p class="text-xs text-ink-500 mb-2">
-            召回 {{ hits.length }} 段，其中
+            {{ $t('knowledgeBase.召回_er1u') }} {{ hits.length }} {{ $t('knowledgeBase.段_emt6em') }}
             <span :class="effectiveCount > 0 ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'">
-              {{ effectiveCount }} 段达标
+              {{ effectiveCount }} {{ $t('knowledgeBase.段达标_ggygu') }}
             </span>
-            （门槛 {{ threshold }}，未达标的只展示、不会用于 AI 生成）
+            {{ $t('knowledgeBase.text_122upn') }} {{ threshold }}{{ $t('knowledgeBase.text_glufr2') }}
           </p>
           <div v-if="!hits.length" class="py-6 text-center text-sm text-ink-400">
             {{ t("knowledgeBase.没有召回_b1d9l4") }}
@@ -517,9 +517,9 @@ onUnmounted(() => {
             @click="refresh"
           >{{ t("knowledgeBase.刷新_ejix") }}</button>
           <span v-if="pendingCount" class="text-xs text-sky-600">
-            {{ pendingCount }} 份处理中，每 4 秒自动刷新
+            {{ pendingCount }} {{ $t('knowledgeBase.份处理中_15mp5p') }}
           </span>
-          <span class="ml-auto text-xs text-ink-400">共 {{ total }} 份</span>
+          <span class="ml-auto text-xs text-ink-400">{{ $t('knowledgeBase.共_g35') }} {{ total }} {{ $t('knowledgeBase.份_flp') }}</span>
         </div>
 
         <div v-if="loading && !docs.length" class="py-16 text-center text-sm text-ink-400">
@@ -607,8 +607,8 @@ onUnmounted(() => {
           <div class="min-w-0">
             <p class="font-semibold truncate">{{ detailDoc?.title }}</p>
             <p class="text-xs text-ink-400">
-              {{ detailDoc?.category || '未分类' }} ·
-              {{ detailDoc?.chars }} 字 · {{ detailChunks.length }} 段
+              {{ detailDoc?.category || $t('knowledgeBase.未分类_fim73') }} ·
+              {{ detailDoc?.chars }} {{ $t('knowledgeBase.字_ddnou') }} {{ detailChunks.length }} {{ $t('knowledgeBase.段_l9x') }}
               <span v-if="detailDoc?.embed_model"> · {{ detailDoc.embed_model }}</span>
             </p>
           </div>
@@ -629,7 +629,7 @@ onUnmounted(() => {
           </div>
 
           <section>
-            <h3 class="text-sm font-semibold mb-2">检索分片（{{ detailChunks.length }}）</h3>
+            <h3 class="text-sm font-semibold mb-2">{{ $t('knowledgeBase.检索分片_1yjqg0') }}{{ detailChunks.length }}）</h3>
             <p class="text-xs text-ink-400 mb-3">
               {{ t("knowledgeBase.text_uksm75") }}
             </p>
@@ -641,12 +641,12 @@ onUnmounted(() => {
               >
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-[11px] font-mono text-ink-400">#{{ c.seq + 1 }}</span>
-                  <span class="text-xs font-medium text-ink-700">{{ c.heading || '（无小节）' }}</span>
-                  <span class="text-[11px] text-ink-400">{{ c.chars }} 字</span>
+                  <span class="text-xs font-medium text-ink-700">{{ c.heading || $t('knowledgeBase.text_fz4mke') }}</span>
+                  <span class="text-[11px] text-ink-400">{{ c.chars }} {{ $t('knowledgeBase.字_i1j') }}</span>
                   <span
                     class="text-[11px] px-1.5 py-0.5 rounded"
                     :class="c.has_vector ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'"
-                  >{{ c.has_vector ? '已向量化' : '缺向量' }}</span>
+                  >{{ c.has_vector ? $t('knowledgeBase.已向量化_c7l1vq') : $t('knowledgeBase.缺向量_j1ymw') }}</span>
                 </div>
                 <p class="mt-1 text-xs text-ink-600 leading-relaxed whitespace-pre-wrap">{{ c.text }}</p>
               </li>

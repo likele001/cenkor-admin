@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+const fileInput = ref<HTMLInputElement | null>(null)
 const { t } = useI18n()
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
@@ -184,13 +185,16 @@ onMounted(loadList)
       </div>
       <div class="flex flex-wrap items-center justify-end gap-2">
         <input
+          ref="fileInput"
           type="file"
           accept=".csv,text/csv"
-          class="text-xs text-ink-500 file:mr-2 file:rounded file:border file:border-ink-200 file:bg-ink-50 file:px-2 file:py-1"
+          class="hidden"
           @change="(e: any) => (keywordFile = e.target.files?.[0] || null)"
         />
+        <span class="text-xs text-ink-500 max-w-[16rem] truncate">{{ keywordFile?.name || $t('sitePlan.未选择文件_c0hhxw') }}</span>
+        <button class="btn-outline text-sm" :disabled="loading" @click="fileInput?.click()">{{ $t('sitePlan.选择文件_w0s4kf') }}</button>
         <button class="btn text-sm" :disabled="loading || !keywordFile" @click="importKeywords">{{ t("sitePlan.导入关键_16j98y") }}</button>
-        <button class="btn btn-primary text-sm" :disabled="loading" @click="draft">{{ loading ? '生成中…' : '生成方案' }}</button>
+        <button class="btn btn-primary text-sm" :disabled="loading" @click="draft">{{ loading ? $t('sitePlan.生成中_f6jfoq') : $t('sitePlan.生成方案_f6nu4g') }}</button>
       </div>
     </div>
 
@@ -199,20 +203,20 @@ onMounted(loadList)
     </div>
 
     <div v-if="importStats" class="rounded-md bg-ink-50 border border-ink-200 text-xs text-ink-600 px-3 py-2">
-      关键词包：共 {{ importStats.rows }} 行，有效 {{ importStats.valid }}，丢弃 {{ importStats.dropped }}
+      {{ $t('sitePlan.关键词包_w5i4ne') }} {{ importStats.rows }} {{ $t('sitePlan.行_i8qc2n') }} {{ importStats.valid }}{{ $t('sitePlan.text_11qo19') }} {{ importStats.dropped }}
       <span v-if="importStats.drop_samples && importStats.drop_samples.length">
-        · 示例：{{ importStats.drop_samples.map((d: any) => `第${d.row}行 ${d.reason}`).join('；') }}
+        {{ $t('sitePlan.text_3bcxq8') }}{{ importStats.drop_samples.map((d: any) => `第${d.row}行 ${d.reason}`).join('；') }}
       </span>
     </div>
 
     <div v-if="plan" class="rounded-lg border border-ink-200 bg-white p-4 space-y-4">
       <div>
         <h2 class="font-semibold text-ink-900">{{ t("sitePlan.方案预览_d9wdyr") }}</h2>
-        <p class="text-sm text-ink-500 mt-1">{{ plan.summary || '（无摘要）' }}</p>
+        <p class="text-sm text-ink-500 mt-1">{{ plan.summary || $t('sitePlan.text_g0di5k') }}</p>
       </div>
 
       <div>
-        <h3 class="text-sm font-medium text-ink-700 mb-2">栏目树（{{ plan.categories.length }}）</h3>
+        <h3 class="text-sm font-medium text-ink-700 mb-2">{{ $t('sitePlan.栏目树_dmfv9y') }}{{ plan.categories.length }}）</h3>
         <ul class="text-sm space-y-1">
           <li v-for="c in plan.categories" :key="c.key" :style="{ paddingLeft: depthOf(c) * 18 + 'px' }">
             <span class="text-ink-900">{{ c.name }}</span>
@@ -223,7 +227,7 @@ onMounted(loadList)
       </div>
 
       <div>
-        <h3 class="text-sm font-medium text-ink-700 mb-2">首批选题（{{ plan.articles.length }}）</h3>
+        <h3 class="text-sm font-medium text-ink-700 mb-2">{{ $t('sitePlan.首批选题_19apoz') }}{{ plan.articles.length }}）</h3>
         <ul class="text-sm space-y-1">
           <li v-for="(a, i) in plan.articles" :key="i">
             <span class="text-ink-400 mr-1">{{ i + 1 }}.</span>
@@ -234,13 +238,13 @@ onMounted(loadList)
       </div>
 
       <div v-if="diff" class="rounded-md bg-sky-50 border border-sky-200 text-sm px-3 py-2 text-sky-900">
-        将新建 {{ diff.categories_new }} 个栏目，复用 {{ diff.categories_existing.length }} 个已有栏目；
-        {{ diff.articles }} 篇选题进入批量队列。
+        {{ $t('sitePlan.将新建_dz1zk') }} {{ diff.categories_new }} {{ $t('sitePlan.个栏目_ntybpa') }} {{ diff.categories_existing.length }} {{ $t('sitePlan.个已有栏_1gpekd') }}
+        {{ diff.articles }} {{ $t('sitePlan.篇选题进_1e5guz') }}
       </div>
 
       <div v-if="result" class="rounded-md bg-emerald-50 border border-emerald-200 text-sm px-3 py-2 text-emerald-800">
-        已建 {{ result.categories_created }} 个栏目、复用 {{ result.categories_reused }} 个；
-        <router-link v-if="result.batch_job_id" :to="`/cms/ai-batch?id=${result.batch_job_id}`" class="underline">查看批次 #{{ result.batch_job_id }}</router-link>
+        {{ $t('sitePlan.已建_gi14') }} {{ result.categories_created }} {{ $t('sitePlan.个栏目_mzmlbn') }} {{ result.categories_reused }} {{ $t('sitePlan.个_ep0x') }}
+        <router-link v-if="result.batch_job_id" :to="`/cms/ai-batch?id=${result.batch_job_id}`" class="underline">{{ $t('sitePlan.查看批次_1lvhch') }}{{ result.batch_job_id }}</router-link>
       </div>
 
       <div class="flex flex-wrap justify-end gap-2">
@@ -249,7 +253,7 @@ onMounted(loadList)
         <button class="btn text-sm" :disabled="!savedId || status !== 'confirmed'" @click="dryRun">{{ t("sitePlan.预览差异_jt5kew") }}</button>
         <button class="btn btn-primary text-sm" :disabled="!savedId || status !== 'confirmed' || loading" @click="applyPlan">{{ t("sitePlan.执行_hhhh") }}</button>
       </div>
-      <p v-if="savedId" class="text-xs text-ink-400 text-right">方案 #{{ savedId }} · 状态 {{ status }}</p>
+      <p v-if="savedId" class="text-xs text-ink-400 text-right">{{ $t('sitePlan.方案_d95pma') }}{{ savedId }} {{ $t('sitePlan.text_3tjpw') }} {{ status }}</p>
     </div>
 
     <div class="rounded-lg border border-ink-200 bg-white">
@@ -259,9 +263,9 @@ onMounted(loadList)
         <li v-for="p in plans" :key="p.id" class="px-4 py-3 text-sm flex items-center justify-between gap-3">
           <div class="min-w-0">
             <div class="text-ink-900 truncate">{{ p.summary || `方案 #${p.id}` }}</div>
-            <div class="text-xs text-ink-400">#{{ p.id }} · {{ p.categories }} 栏目 · {{ p.articles }} 选题 · {{ p.status }}</div>
+            <div class="text-xs text-ink-400">#{{ p.id }} · {{ p.categories }} {{ $t('sitePlan.栏目_dlwsk6') }} {{ p.articles }} {{ $t('sitePlan.选题_iscyo6') }} {{ p.status }}</div>
           </div>
-          <router-link v-if="p.batch_job_id" :to="`/cms/ai-batch?id=${p.batch_job_id}`" class="text-sky-600 shrink-0">批次 #{{ p.batch_job_id }}</router-link>
+          <router-link v-if="p.batch_job_id" :to="`/cms/ai-batch?id=${p.batch_job_id}`" class="text-sky-600 shrink-0">{{ $t('sitePlan.批次_cuth3f') }}{{ p.batch_job_id }}</router-link>
         </li>
       </ul>
     </div>

@@ -767,7 +767,7 @@ function categoryLabel(c: string): string {
         class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
         :class="activeTab === 'cloud' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
         @click="activeTab = 'cloud'; loadCloud()"
-      >官方应用市场 ({{ cloudApps.length }})</button>
+      >{{ $t('apps.官方应用_1kg8c1') }}{{ cloudApps.length }})</button>
     </div>
 
     <div v-if="activeTab === 'installed'" class="mb-4 flex flex-wrap items-center gap-2">
@@ -776,7 +776,7 @@ function categoryLabel(c: string): string {
         class="btn-ghost text-xs"
         :disabled="uploading"
         @click="zipInput?.click()"
-      >{{ uploading ? '安装中…' : '上传安装包（.zip）' }}</button>
+      >{{ uploading ? $t('apps.安装中_c41791') : $t('apps.上传安装_1lvfap') }}</button>
       <span class="text-xs text-ink-400">{{ t("apps.离线安装_10kaur") }}</span>
     </div>
 
@@ -987,13 +987,13 @@ function categoryLabel(c: string): string {
           @click="subTab = 'approved'">{{ t('apps.subApproved') }} ({{ pendingApps.filter(s => s.status === 'approved').length }})</button>
         <button class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
           :class="subTab === 'published' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
-          @click="subTab = 'published'">已上架 ({{ pendingApps.filter(s => s.status === 'published').length }})</button>
+          @click="subTab = 'published'">{{ $t('apps.已上架_mfn0fa') }}{{ pendingApps.filter(s => s.status === 'published').length }})</button>
         <button class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
           :class="subTab === 'installed' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
           @click="subTab = 'installed'">{{ t('apps.subInstalled') }} ({{ pendingApps.filter(s => s.status === 'installed').length }})</button>
         <button class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
           :class="subTab === 'yanked' ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-700'"
-          @click="subTab = 'yanked'">已撤回 ({{ pendingApps.filter(s => s.status === 'yanked').length }})</button>
+          @click="subTab = 'yanked'">{{ $t('apps.已撤回_p7sp4k') }}{{ pendingApps.filter(s => s.status === 'yanked').length }})</button>
       </div>
 
       <div
@@ -1002,12 +1002,12 @@ function categoryLabel(c: string): string {
       >
         <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
           <input type="checkbox" class="accent-ink-900" :checked="allSelected" @change="toggleSelectAll" />
-          全选（待审核 {{ selectablePending.length }}）
+          {{ $t('apps.全选_le5b85') }} {{ selectablePending.length }}）
         </label>
-        <span class="text-xs text-ink-500">已选 {{ selectedPendingIds.length }} 个</span>
+        <span class="text-xs text-ink-500">{{ $t('apps.已选_grpz') }} {{ selectedPendingIds.length }} {{ $t('apps.个_ffu') }}</span>
         <div class="flex-1"></div>
-        <button class="btn-ghost text-sm text-green-600" :disabled="!selectedPendingIds.length || batchActing" @click="batchReview('approve')">{{ batchActing ? '处理中…' : '批量通过' }}</button>
-        <button class="btn-ghost text-sm text-red-600" :disabled="!selectedPendingIds.length || batchActing" @click="batchReview('reject')">{{ batchActing ? '处理中…' : '批量驳回' }}</button>
+        <button class="btn-ghost text-sm text-green-600" :disabled="!selectedPendingIds.length || batchActing" @click="batchReview('approve')">{{ batchActing ? $t('apps.处理中_bpjyjf') : $t('apps.批量通过_d16pk3') }}</button>
+        <button class="btn-ghost text-sm text-red-600" :disabled="!selectedPendingIds.length || batchActing" @click="batchReview('reject')">{{ batchActing ? $t('apps.处理中_bpjyjf') : $t('apps.批量驳回_d185oh') }}</button>
       </div>
 
       <div v-if="filteredSubmissions.length === 0" class="card text-ink-500 text-center py-12">
@@ -1035,11 +1035,11 @@ function categoryLabel(c: string): string {
             <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
             <p class="text-xs text-ink-400 mt-1">{{ t('apps.author') }}: {{ app.author }} · {{ app.created_at }}</p>
             <div class="flex items-center gap-2 mt-1.5">
-              <span class="text-xs px-2 py-0.5 rounded bg-ink-100 text-ink-600">{{ productLabel(app.product) || app.product || 'Cenkor 平台' }}</span>
-              <span v-if="app.dev_method" class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">开发方式 · {{ devMethodLabel(app.dev_method) }}</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-ink-100 text-ink-600">{{ productLabel(app.product) || app.product || $t('apps.text_i7icwr') }}</span>
+              <span v-if="app.dev_method" class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">{{ $t('apps.开发方式_1sou02') }} {{ devMethodLabel(app.dev_method) }}</span>
               <span class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">schema v{{ app.schema_version ?? '-' }}</span>
-              <span class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">最低宿主 {{ app.min_core_version || '-' }}</span>
-              <span v-if="app.published_at" class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">上架 {{ app.published_at.slice(0, 10) }}</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">{{ $t('apps.最低宿主_dbqtka') }} {{ app.min_core_version || '-' }}</span>
+              <span v-if="app.published_at" class="text-xs px-2 py-0.5 rounded bg-ink-50 text-ink-500">{{ $t('apps.上架_ducs') }} {{ app.published_at.slice(0, 10) }}</span>
             </div>
             <p v-if="app.changelog" class="text-xs text-ink-500 mt-1 whitespace-pre-line">{{ app.changelog }}</p>
           </div>
@@ -1056,7 +1056,7 @@ function categoryLabel(c: string): string {
             <button class="btn-ghost text-sm" @click="openBundle(app.id)">{{ t("apps.审核材料_bztjk0") }}</button>
           </template>
           <template v-else-if="app.status === 'approved'">
-            <span class="text-sm text-blue-600">已通过 · 产品扩展，需在 {{ productLabel(app.product) || '对应产品' }} 实例安装</span>
+            <span class="text-sm text-blue-600">{{ $t('apps.已通过_1afz40') }} {{ productLabel(app.product) || $t('apps.对应产品_bzum0l') }} {{ $t('apps.实例安装_bw3pah') }}</span>
             <button class="btn-primary text-sm" :disabled="acting === `publish-${app.id}`" @click="publishSubmission(app.id)">{{ t("apps.上架_ducs") }}</button>
             <button class="btn-ghost text-sm" @click="openBundle(app.id)">{{ t("apps.审核材料_bztjk0") }}</button>
           </template>
@@ -1084,20 +1084,20 @@ function categoryLabel(c: string): string {
         <div v-else-if="bundle" class="space-y-4 text-sm">
           <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-ink-600">
             <span>key：{{ bundle.app_key }}</span>
-            <span>版本：{{ bundle.version }}</span>
-            <span>产品：{{ bundle.product }}</span>
-            <span>状态：{{ bundle.status }}</span>
+            <span>{{ $t('apps.版本_h9jue') }}{{ bundle.version }}</span>
+            <span>{{ $t('apps.产品_byjq8') }}{{ bundle.product }}</span>
+            <span>{{ $t('apps.状态_halin') }}{{ bundle.status }}</span>
             <span>schema_version：{{ bundle.schema_version ?? '-' }}</span>
-            <span>最低宿主：{{ bundle.min_core_version || '-' }}</span>
-            <span>上架时间：{{ bundle.published_at || '-' }}</span>
-            <span>撤回时间：{{ bundle.yanked_at || '-' }}</span>
+            <span>{{ $t('apps.最低宿主_1lykkz') }}{{ bundle.min_core_version || '-' }}</span>
+            <span>{{ $t('apps.上架时间_yiuvn4') }}{{ bundle.published_at || '-' }}</span>
+            <span>{{ $t('apps.撤回时间_1dqn3f') }}{{ bundle.yanked_at || '-' }}</span>
             <span class="col-span-2 break-all">SHA256：{{ bundle.file_sha256 }}</span>
             <span class="col-span-2" :class="bundle.file_hash_ok ? 'text-green-700' : 'text-red-600'">
-              盘上包体指纹：{{ bundle.file_hash_ok ? '与提交一致' : '不一致（包体可能被替换）' }} · {{ bundle.file_size }} 字节
+              {{ $t('apps.盘上包体_19j7py') }}{{ bundle.file_hash_ok ? $t('apps.与提交一_xzkwye') : $t('apps.不一致_1ab23q') }} · {{ bundle.file_size }} {{ $t('apps.字节_g93f') }}
             </span>
           </div>
           <div>
-            <p class="font-medium mb-1">权限清单（{{ (bundle.permissions || []).length }}）</p>
+            <p class="font-medium mb-1">{{ $t('apps.权限清单_1w0j4a') }}{{ (bundle.permissions || []).length }}）</p>
             <ul class="text-ink-600 space-y-0.5">
               <li v-for="p in bundle.permissions" :key="p.code"><code class="text-xs">{{ p.code }}</code> · {{ p.name }}</li>
               <li v-if="!(bundle.permissions || []).length" class="text-ink-400">{{ t("apps.无_k4g") }}</li>
@@ -1105,19 +1105,19 @@ function categoryLabel(c: string): string {
           </div>
           <div>
             <p class="font-medium mb-1">{{ t("apps.数据策略_d7r499") }}</p>
-            <p class="text-ink-600">保留策略：{{ bundle.data?.retention || 'keep' }}；自有表：{{ (bundle.data?.tables || []).filter((t: any) => t.mode === 'own').map((t: any) => t.name).join(', ') || '无' }}</p>
+            <p class="text-ink-600">{{ $t('apps.保留策略_17gj24') }}{{ bundle.data?.retention || 'keep' }}{{ $t('apps.text_juixgs') }}{{ (bundle.data?.tables || []).filter((t: any) => t.mode === 'own').map((t: any) => t.name).join(', ') || $t('apps.无_k4g') }}</p>
           </div>
           <div>
             <p class="font-medium mb-1">{{ t("apps.迁移静态_kye8rq") }}</p>
-            <p class="text-ink-600">文件：{{ (bundle.scan?.migrations || []).join(', ') || '无' }}</p>
-            <p v-if="(bundle.scan?.blocked || []).length" class="text-red-600">阻断项：{{ (bundle.scan.blocked || []).join('；') }}</p>
+            <p class="text-ink-600">{{ $t('apps.文件_fa6jv') }}{{ (bundle.scan?.migrations || []).join(', ') || $t('apps.无_k4g') }}</p>
+            <p v-if="(bundle.scan?.blocked || []).length" class="text-red-600">{{ $t('apps.阻断项_jdsheb') }}{{ (bundle.scan.blocked || []).join('；') }}</p>
             <p v-else class="text-green-700">{{ t("apps.未发现破_qqnrgv") }}</p>
-            <p v-if="(bundle.scan?.dirty_files || []).length" class="text-amber-700">脏文件：{{ (bundle.scan.dirty_files || []).join(', ') }}</p>
+            <p v-if="(bundle.scan?.dirty_files || []).length" class="text-amber-700">{{ $t('apps.脏文件_gpae64') }}{{ (bundle.scan.dirty_files || []).join(', ') }}</p>
           </div>
           <div>
-            <p class="font-medium mb-1">与上一版对比（{{ bundle.manifest_diff?.prev_version || '无' }}）</p>
-            <p class="text-ink-600">新增权限：{{ (bundle.manifest_diff?.added_permissions || []).join(', ') || '无' }}</p>
-            <p class="text-ink-600">移除权限：{{ (bundle.manifest_diff?.removed_permissions || []).join(', ') || '无' }}</p>
+            <p class="font-medium mb-1">{{ $t('apps.与上一版_1ek70f') }}{{ bundle.manifest_diff?.prev_version || $t('apps.无_k4g') }}）</p>
+            <p class="text-ink-600">{{ $t('apps.新增权限_1i24xp') }}{{ (bundle.manifest_diff?.added_permissions || []).join(', ') || $t('apps.无_k4g') }}</p>
+            <p class="text-ink-600">{{ $t('apps.移除权限_1y5xot') }}{{ (bundle.manifest_diff?.removed_permissions || []).join(', ') || $t('apps.无_k4g') }}</p>
           </div>
         </div>
       </div>
@@ -1129,8 +1129,7 @@ function categoryLabel(c: string): string {
         <div v-if="!cloudStatus.bound">
           <h3 class="font-semibold mb-1">{{ t("apps.连接_7fjy9i") }}</h3>
           <p class="text-sm text-ink-600 mb-3">
-            {{ t("apps.浏览目录_dayf1m") }}<strong>{{ t("apps.不需要绑_14oato") }}</strong>；绑定官方账号后，可自动匹配本账号已购的付费应用，省去手填授权码。
-            购买请前往
+            {{ t("apps.浏览目录_dayf1m") }}<strong>{{ t("apps.不需要绑_14oato") }}</strong>{{ $t('apps.text_1wt12z') }}
             <a
               :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps'"
               target="_blank"
@@ -1147,7 +1146,7 @@ function categoryLabel(c: string): string {
               class="text-sm text-blue-600 underline break-all"
             >{{ bindCode.verification_uri }}</a>
             <p class="text-xs text-ink-400 mt-2">
-              {{ bindPolling ? '正在等待门户确认…（也可直接点上面链接）' : '已停止等待，可重新发起' }}
+              {{ bindPolling ? $t('apps.正在等待_g3e9zu') : $t('apps.已停止等_1iuiw8') }}
             </p>
           </div>
 
@@ -1193,7 +1192,7 @@ function categoryLabel(c: string): string {
                 v-if="app.installed"
                 class="text-xs px-2 py-0.5 rounded-full"
                 :class="app.needs_upgrade ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'"
-              >{{ app.needs_upgrade ? '可升级' : '已安装' }}</span>
+              >{{ app.needs_upgrade ? $t('apps.可升级_cpfu7') : $t('apps.已安装_e7owe') }}</span>
             </div>
             <p class="text-sm text-ink-600 mt-1">{{ app.description }}</p>
             <p class="mt-1.5 text-sm">
@@ -1204,7 +1203,7 @@ function categoryLabel(c: string): string {
               <span
                 v-if="app.price && app.price.promo_state === 'active'"
                 class="ml-2 text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600"
-              >促销中{{ app.price.discount_label ? ' · ' + app.price.discount_label : '' }}</span>
+              >{{ $t('apps.促销中_cecs0') }}{{ app.price.discount_label ? ' · ' + app.price.discount_label : '' }}</span>
               <span v-else-if="app.price && app.price.discount_label" class="ml-2 text-xs text-red-600">
                 {{ app.price.discount_label }}
               </span>
@@ -1217,9 +1216,9 @@ function categoryLabel(c: string): string {
             class="btn-primary text-sm"
             :disabled="installing === app.app_key"
             @click="installCloud(app)"
-          >{{ installing === app.app_key ? '安装中…'
-              : app.installed ? (app.needs_upgrade ? '升级到最新' : '重新安装')
-              : (needsLicense(app) ? '填授权码安装' : '一键安装') }}</button>
+          >{{ installing === app.app_key ? $t('apps.安装中_c41791')
+              : app.installed ? (app.needs_upgrade ? $t('apps.升级到最_1lt7xy') : $t('apps.重新安装_itdfz3'))
+              : (needsLicense(app) ? $t('apps.填授权码_12y53a') : $t('apps.一键安装_aggzyi')) }}</button>
           <a
             v-if="needsLicense(app)"
             :href="(cloudStatus.gateway_url || 'https://portal.cenkor.cn') + '/apps/' + app.app_key"
@@ -1235,7 +1234,7 @@ function categoryLabel(c: string): string {
         <div v-if="expanded === app.app_key" class="mt-3 pt-3 border-t space-y-2 text-sm">
           <div class="flex flex-wrap gap-4 text-xs text-ink-500">
             <span>{{ t("apps.分类_cn2x1") }}<code class="bg-ink-50 px-1 rounded">{{ app.category }}</code></span>
-            <span>作者：{{ app.author }}</span>
+            <span>{{ $t('apps.作者_c9mvl') }}{{ app.author }}</span>
             <span v-if="app.installed_version">
               {{ t("apps.已装版本_twdw3n") }}<code class="bg-ink-50 px-1 rounded">{{ app.installed_version }}</code>
             </span>
@@ -1243,7 +1242,7 @@ function categoryLabel(c: string): string {
           <div v-if="purchaseOf(app.app_key)" class="text-xs text-ink-500">
             {{ t("apps.授权码_cznwvo") }}<code class="bg-ink-50 px-1 rounded">{{ purchaseOf(app.app_key)?.license_key }}</code>
             <span class="ml-2">
-              {{ purchaseOf(app.app_key)?.permanent ? '永久有效' : '有效期至 ' + purchaseOf(app.app_key)?.expires_at }}
+              {{ purchaseOf(app.app_key)?.permanent ? $t('apps.永久有效_dzch7w') : $t('apps.有效期至_df6o2b') + purchaseOf(app.app_key)?.expires_at }}
             </span>
           </div>
           <p v-else-if="app.is_free" class="text-xs text-ink-400">
@@ -1253,8 +1252,7 @@ function categoryLabel(c: string): string {
             {{ t("apps.本实例已_1t90tb") }}
           </p>
           <p v-else class="text-xs text-ink-400">
-            付费应用：到官方门户购买后拿到授权码，回来点「填授权码安装」；
-            也可在门户「我的应用」下载安装包，到「已安装」页用「上传安装包」离线安装。
+            {{ $t('apps.付费应用_1prgsj') }}
           </p>
         </div>
       </div>

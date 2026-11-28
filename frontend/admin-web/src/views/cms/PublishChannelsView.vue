@@ -193,18 +193,18 @@ onMounted(load)
                 class="rounded px-1.5 py-0.5 text-[11px]"
                 :class="c.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-ink-100 text-ink-500'"
               >
-                {{ c.enabled ? '已启用' : '未启用' }}
+                {{ c.enabled ? $t('publishChannels.已启用_e6c0b') : $t('publishChannels.未启用_fixz7') }}
               </span>
               <span v-if="c.is_default" class="rounded bg-ink-900 px-1.5 py-0.5 text-[11px] text-white">{{ t("publishChannels.默认_rs98") }}</span>
             </div>
-            <div class="mt-1 text-[12px] text-ink-400">标识 {{ c.key }} · 类型 {{ c.type }}</div>
+            <div class="mt-1 text-[12px] text-ink-400">{{ $t('publishChannels.标识_igm7') }} {{ c.key }} {{ $t('publishChannels.text_3v5vd') }} {{ c.type }}</div>
           </div>
           <button
             class="rounded-lg border px-2.5 py-1 text-[12px] transition"
             :class="c.enabled ? 'border-ink-200 text-ink-600 hover:bg-ink-50' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'"
             @click="toggle(c)"
           >
-            {{ c.enabled ? '停用' : '启用' }}
+            {{ c.enabled ? $t('publishChannels.停用_eb7w') : $t('publishChannels.启用_eymx') }}
           </button>
         </div>
 
@@ -220,19 +220,19 @@ onMounted(load)
             <div v-if="f.hint" class="mt-0.5 text-[11px] text-ink-400">{{ f.hint }}</div>
           </div>
           <button class="btn btn-primary text-[13px]" :disabled="saving === c.key" @click="save(c)">
-            {{ saving === c.key ? '保存中…' : '保存配置' }}
+            {{ saving === c.key ? $t('publishChannels.保存中_agdrec') : $t('publishChannels.保存配置_agpp98') }}
           </button>
         </div>
         <div v-else class="rounded-lg bg-ink-50 px-3 py-2 text-[12px] text-ink-500">
-          {{ c.type === 'export' ? '无需配置。发布时直接产出可粘贴的 HTML / 纯文本 / 封面清单。' : '无需在此配置，依赖「系统 / Webhook」里已有的订阅。' }}
+          {{ c.type === 'export' ? $t('publishChannels.无需配置_1ilg05') : $t('publishChannels.无需在此_oz0g0v') }}
         </div>
 
         <div class="flex flex-wrap items-center gap-2 border-t border-ink-100 pt-3">
           <button class="btn btn-ghost text-[13px]" :disabled="testing === c.key" @click="test(c)">
-            {{ testing === c.key ? '测试中…' : '连通性测试' }}
+            {{ testing === c.key ? $t('publishChannels.测试中_ed42yr') : $t('publishChannels.连通性测_cunp3p') }}
           </button>
           <button class="text-[12px] text-ink-500 hover:text-ink-900" @click="openSetup = openSetup === c.key ? null : c.key">
-            {{ openSetup === c.key ? '收起说明' : '怎么配' }}
+            {{ openSetup === c.key ? $t('publishChannels.收起说明_dcyh5n') : $t('publishChannels.怎么配_eglub') }}
           </button>
           <span
             v-if="testResult[c.key]"

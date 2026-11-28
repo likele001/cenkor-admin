@@ -552,7 +552,7 @@ nextTick(() => {})
           >
             <option value="">{{ t("workflowStudio.选择工作_sk4h24") }}</option>
             <option v-for="f in flows" :key="f.id" :value="f.id">
-              {{ f.name }}（{{ f.node_count ?? 0 }} 步）
+              {{ f.name }}（{{ f.node_count ?? 0 }} {{ $t('workflowStudio.步_jo04') }}
             </option>
           </select>
           <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="createFlow('content_chain')">
@@ -625,7 +625,7 @@ nextTick(() => {})
               <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="autoLayout">{{ t("workflowStudio.自动排列_gqha2r") }}</button>
               <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="validateFlow">{{ t("workflowStudio.校验_ik5n") }}</button>
               <button class="px-3 py-1.5 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" :disabled="saving" @click="saveFlow">
-                {{ saving ? '保存中…' : dirty ? '保存*' : '已保存' }}
+                {{ saving ? $t('workflowStudio.保存中_agdrec') : dirty ? $t('workflowStudio.保存_c4nlb') : $t('workflowStudio.已保存_e5ggd') }}
               </button>
               <button class="btn-primary" @click="openRun">{{ t("workflowStudio.运行_p7jw") }}</button>
               <button class="ml-auto px-3 py-1.5 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50" @click="deleteFlow(currentId)">
@@ -700,7 +700,7 @@ nextTick(() => {})
 
           <!-- 连线列表（画布上不好点中，给一份可点的） -->
           <div v-if="graph.edges.length" class="mt-3 bg-white border border-ink-200 rounded-xl p-3">
-            <div class="text-xs text-ink-500 mb-2">连线（{{ graph.edges.length }}）</div>
+            <div class="text-xs text-ink-500 mb-2">{{ $t('workflowStudio.连线_lpkef') }}{{ graph.edges.length }}）</div>
             <div class="flex flex-wrap gap-2">
               <span
                 v-for="e in graph.edges"
@@ -782,7 +782,7 @@ nextTick(() => {})
               />
               <label v-else-if="f.kind === 'bool'" class="flex items-center gap-2 mt-1">
                 <input v-model="selected.params[f.key]" type="checkbox" @change="dirty = true" />
-                <span class="text-[11px] text-ink-500">{{ f.help || '开启' }}</span>
+                <span class="text-[11px] text-ink-500">{{ f.help || $t('workflowStudio.开启_gmcv') }}</span>
               </label>
               <select
                 v-else-if="f.kind === 'select'"
@@ -804,7 +804,7 @@ nextTick(() => {})
 
             <div v-if="showVars" class="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 p-2">
               <div class="text-[11px] text-indigo-700 mb-1.5">
-                点一下填进「{{ varTarget || '（先选参数）' }}」
+                {{ $t('workflowStudio.点一下填_1k6cym') }}{{ varTarget || $t('workflowStudio.text_1tx4sc') }}」
               </div>
               <div class="max-h-40 overflow-y-auto flex flex-wrap gap-1">
                 <button
@@ -869,7 +869,7 @@ nextTick(() => {})
           </div>
 
           <div v-if="runDetail" class="mt-4 border-t border-ink-200 pt-3">
-            <div class="text-xs font-semibold mb-2">执行 #{{ runDetail.run.id }} 节点明细</div>
+            <div class="text-xs font-semibold mb-2">{{ $t('workflowStudio.执行_cyrs7c') }}{{ runDetail.run.id }} {{ $t('workflowStudio.节点明细_gxljjj') }}</div>
             <div v-for="s in runDetail.steps" :key="s.node_id" class="mb-2 border border-ink-200 rounded-lg p-2">
               <div class="flex items-center gap-2">
                 <span class="text-xs px-1.5 py-0.5 rounded border" :class="STATUS_STYLE[s.status] || STATUS_STYLE.pending">
@@ -910,7 +910,7 @@ nextTick(() => {})
         <div class="flex justify-end gap-2 mt-5">
           <button class="px-4 py-2 text-sm rounded-lg border border-ink-200 hover:bg-ink-50" @click="showRun = false">{{ t("workflowStudio.cancel") }}</button>
           <button class="btn-primary" :disabled="running" @click="triggerRun">
-            {{ running ? '触发中…' : '开始运行' }}
+            {{ running ? $t('workflowStudio.触发中_hqsmmc') : $t('workflowStudio.开始运行_cd7lon') }}
           </button>
         </div>
       </div>

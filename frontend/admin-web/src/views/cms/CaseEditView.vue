@@ -67,7 +67,7 @@ async function save() {
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-4xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/cms/cases" class="text-sm text-ink-500 hover:text-ink-900">{{ t('caseEdit.text_xav8zo') }}</router-link>
-        <span class="font-semibold">{{ isNew ? '新建案例' : '编辑案例' }}</span>
+        <span class="font-semibold">{{ isNew ? $t('caseEdit.新建案例_d851xp') : $t('caseEdit.编辑案例_gmkybi') }}</span>
       </div>
     </header>
 
@@ -133,7 +133,7 @@ async function save() {
         <div v-if="error" class="text-sm text-red-600">{{ error }}</div>
         <div class="flex gap-3">
           <button type="submit" :disabled="saving" class="btn-primary">
-            {{ saving ? '保存中…' : isNew ? '创建案例' : '保存修改' }}
+            {{ saving ? $t('caseEdit.保存中_agdrec') : isNew ? $t('caseEdit.创建案例_ar84oy') : $t('caseEdit.保存修改_agefs6') }}
           </button>
           <router-link to="/cms/cases" class="btn-ghost">{{ t('usersList.取消_ev02') }}</router-link>
         </div>

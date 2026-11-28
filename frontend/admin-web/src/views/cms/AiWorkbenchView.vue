@@ -458,8 +458,8 @@ onUnmounted(() => {
     <header class="bg-white border-b border-ink-200">
       <div class="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
         <router-link to="/" class="text-sm text-ink-500 hover:text-ink-900">← Dashboard</router-link>
-        <span class="font-semibold">AI 内容工作台</span>
-        <span class="text-xs text-ink-400">起草 · 翻译 · SEO · 相似推荐</span>
+        <span class="font-semibold">{{ $t('aiWorkbench.text_ne1l65') }}</span>
+        <span class="text-xs text-ink-400">{{ $t('aiWorkbench.起草_3ltmj8') }}</span>
       </div>
     </header>
 
@@ -468,8 +468,8 @@ onUnmounted(() => {
         v-if="aiUnavailable"
         class="mb-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3"
       >
-        AI 尚未配置。
-        <router-link to="/cms/ai-settings" class="font-medium underline">去 AI 设置绑定服务商与密钥 →</router-link>
+        {{ $t('aiWorkbench.text_1uf9iq') }}
+        <router-link to="/cms/ai-settings" class="font-medium underline">{{ $t('aiWorkbench.去_1kv3c3') }}</router-link>
       </div>
 
       <p v-if="errorMsg" class="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
@@ -483,9 +483,9 @@ onUnmounted(() => {
       <div class="card mb-6">
         <div class="flex flex-wrap items-end gap-4">
           <div class="min-w-[220px]">
-            <label class="block text-xs font-medium text-ink-700">内容类型</label>
+            <label class="block text-xs font-medium text-ink-700">{{ $t('aiWorkbench.内容类型_ao6o90') }}</label>
             <select v-model.number="ctId" class="input mt-1.5">
-              <option :value="null" disabled>选择内容类型</option>
+              <option :value="null" disabled>{{ $t('aiWorkbench.选择内容_r1tpok') }}</option>
               <option v-for="c in contentTypes" :key="c.id" :value="c.id">
                 {{ c.name }}（{{ c.key }}）
               </option>
@@ -493,12 +493,12 @@ onUnmounted(() => {
           </div>
           <div v-if="tab !== 'draft'" class="flex-1 min-w-[280px]">
             <label class="block text-xs font-medium text-ink-700">
-              目标条目 <span class="text-ink-400 font-normal">（{{ filteredEntries.length }} 条）</span>
+              {{ $t('aiWorkbench.目标条目_ffradi') }} <span class="text-ink-400 font-normal">（{{ filteredEntries.length }} {{ $t('aiWorkbench.条_izew') }}</span>
             </label>
             <div class="mt-1.5 flex gap-2">
-              <input v-model="entryFilter" class="input" placeholder="按标题筛选…" />
+              <input v-model="entryFilter" class="input" :placeholder="$t('aiWorkbench.按标题筛_31yse')" />
               <select v-model.number="entryId" class="input w-64">
-                <option :value="null" disabled>选择条目</option>
+                <option :value="null" disabled>{{ $t('aiWorkbench.选择条目_il03ot') }}</option>
                 <option v-for="e in filteredEntries" :key="e.id" :value="e.id">
                   #{{ e.id }} {{ e.title }}
                 </option>
@@ -507,8 +507,8 @@ onUnmounted(() => {
           </div>
         </div>
         <p v-if="!contentTypes.length" class="mt-3 text-xs text-ink-500">
-          还没有内容类型。
-          <router-link to="/cms/ai-builder" class="underline font-medium">用 AI 建模向导创建一个 →</router-link>
+          {{ $t('aiWorkbench.还没有内_ltxom6') }}
+          <router-link to="/cms/ai-builder" class="underline font-medium">{{ $t('aiWorkbench.用_4zb1fx') }}</router-link>
         </p>
       </div>
 
@@ -533,19 +533,19 @@ onUnmounted(() => {
       <!-- 起草 -->
       <div v-if="tab === 'draft'" class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div class="lg:col-span-2 card h-fit">
-          <h3 class="text-base font-semibold text-ink-900">给素材，AI 写草稿</h3>
+          <h3 class="text-base font-semibold text-ink-900">{{ $t('aiWorkbench.给素材_z0bna2') }}</h3>
           <p class="mt-1 text-xs text-ink-500 leading-relaxed">
-            素材里没有的具体数字、客户名、日期，AI 不会编，会标「（待补充）」。
+            {{ $t('aiWorkbench.素材里没_1iv07o') }}
           </p>
 
           <div class="mt-4 flex items-center justify-between gap-2">
-            <label class="text-xs font-medium text-ink-700">素材 / 大纲</label>
+            <label class="text-xs font-medium text-ink-700">{{ $t('aiWorkbench.素材_nnrmy4') }}</label>
             <button
               v-if="brief"
               class="text-[11px] text-ink-400 hover:text-red-500"
               @click="resetBrief"
             >
-              清空
+              {{ $t('aiWorkbench.清空_jdw5') }}
             </button>
           </div>
 
@@ -569,15 +569,15 @@ onUnmounted(() => {
             <p class="text-xs text-ink-600">
               <template v-if="ingesting">
                 <span class="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse align-middle"></span>
-                正在解析素材…
+                {{ $t('aiWorkbench.正在解析_dsjkck') }}
               </template>
               <template v-else>
-                拖入 PDF / Word / Excel / 图片 / 视频，或
-                <span class="font-medium text-ink-900 underline">点击选择</span>
+                {{ $t('aiWorkbench.拖入_1271bt') }}
+                <span class="font-medium text-ink-900 underline">{{ $t('aiWorkbench.点击选择_ekj84i') }}</span>
               </template>
             </p>
             <p class="mt-1 text-[11px] text-ink-400">
-              扫描件自动 OCR，视频抽 3 帧识别 · 单个 ≤ 20MB · 一次最多 5 个
+              {{ $t('aiWorkbench.扫描件自_14sehc') }}
             </p>
           </div>
 
@@ -588,7 +588,7 @@ onUnmounted(() => {
               class="inline-flex items-center gap-1 rounded-md bg-ink-100 px-2 py-1 text-[11px] text-ink-700"
               :title="f.warnings.join('；')"
             >
-              {{ KIND_LABEL[f.kind] || f.kind }} · {{ f.name }} · {{ f.chars }} 字
+              {{ KIND_LABEL[f.kind] || f.kind }} · {{ f.name }} · {{ f.chars }} {{ $t('aiWorkbench.字_i1j') }}
             </span>
           </div>
           <p v-if="ingestError" class="mt-1.5 text-[11px] text-red-500">{{ ingestError }}</p>
@@ -597,20 +597,20 @@ onUnmounted(() => {
             v-model="brief"
             rows="9"
             class="input mt-1.5 resize-y"
-            placeholder="例：介绍 DN100 不锈钢法兰球阀，用于化工管道，工作压力 1.6MPa，材质 304，连接方式法兰，适用介质酸碱液体。客户反馈密封性好、维护方便。"
+            :placeholder="$t('aiWorkbench.例_18hed2')"
           ></textarea>
 
-          <label class="block mt-3 text-xs font-medium text-ink-700">输出语言</label>
+          <label class="block mt-3 text-xs font-medium text-ink-700">{{ $t('aiWorkbench.输出语言_iglsca') }}</label>
           <select v-model="draftLang" class="input mt-1.5">
-            <option value="zh-CN">简体中文</option>
+            <option value="zh-CN">{{ $t('aiWorkbench.简体中文_fwrpxp') }}</option>
             <option v-for="l in languages" :key="l.code" :value="l.code">{{ l.name }}（{{ l.code }}）</option>
           </select>
 
           <div class="flex items-center justify-between gap-3 mt-4">
             <button class="btn-primary flex-1" :disabled="!canDraft" @click="doDraft">
-              {{ busy ? '正在生成…' : '生成草稿' }}
+              {{ busy ? $t('aiWorkbench.正在生成_56cv8w') : $t('aiWorkbench.生成草稿_f6syp3') }}
             </button>
-            <button v-if="busy && streaming" class="btn-outline shrink-0" @click="cancelDraft">取消</button>
+            <button v-if="busy && streaming" class="btn-outline shrink-0" @click="cancelDraft">{{ $t('aiWorkbench.取消_ev02') }}</button>
           </div>
         </div>
 
@@ -622,10 +622,10 @@ onUnmounted(() => {
               <h3 class="text-sm font-semibold text-ink-900">
                 {{
                   streaming.phase === 'connecting'
-                    ? 'AI 正在构思…'
+                    ? $t('aiWorkbench.text_1gypzh')
                     : streaming.phase === 'writing'
-                      ? '正在写作…'
-                      : '正在补充摘要与字段…'
+                      ? $t('aiWorkbench.正在写作_512dem')
+                      : $t('aiWorkbench.正在补充_hgfdwo')
                 }}
               </h3>
             </div>
@@ -638,51 +638,51 @@ onUnmounted(() => {
               class="mt-3 text-xs text-ink-700 bg-ink-50 border border-ink-200 rounded-lg p-3 whitespace-pre-wrap break-words max-h-96 overflow-auto"
               >{{ streaming.body }}▌</pre
             >
-            <p v-else class="mt-6 text-xs text-ink-400">正在等模型出第一句…（约 5~15 秒）</p>
+            <p v-else class="mt-6 text-xs text-ink-400">{{ $t('aiWorkbench.正在等模_gnq8i1') }}</p>
           </div>
 
           <div v-else-if="!draft" class="card flex flex-col items-center justify-center py-20 text-center">
             <div class="text-4xl">✍️</div>
-            <p class="mt-3 text-sm font-medium text-ink-700">还没有草稿</p>
+            <p class="mt-3 text-sm font-medium text-ink-700">{{ $t('aiWorkbench.还没有草_8befee') }}</p>
             <p class="mt-1 text-xs text-ink-400 max-w-xs leading-relaxed">
-              左侧粘贴素材，AI 按当前内容类型的字段结构生成草稿。生成后是草稿状态，需要人工过一遍再发布。
+              {{ $t('aiWorkbench.左侧粘贴_1bwtos') }}
             </p>
           </div>
 
           <div v-else class="space-y-4">
             <div v-if="savedEntryId" class="card border-emerald-200 bg-emerald-50">
-              <p class="text-sm font-medium text-emerald-800">已保存为草稿条目 #{{ savedEntryId }}</p>
-              <button class="btn-outline mt-3" @click="openEntry(savedEntryId)">打开条目编辑 →</button>
+              <p class="text-sm font-medium text-emerald-800">{{ $t('aiWorkbench.已保存为_13gvg2') }}{{ savedEntryId }}</p>
+              <button class="btn-outline mt-3" @click="openEntry(savedEntryId)">{{ $t('aiWorkbench.打开条目_zz5v8n') }}</button>
             </div>
 
             <div class="card">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <p class="text-xs text-ink-400">标题</p>
+                  <p class="text-xs text-ink-400">{{ $t('aiWorkbench.标题_ij5d') }}</p>
                   <h3 class="mt-1 text-lg font-semibold text-ink-900">{{ draft.title }}</h3>
                   <p v-if="draft.slug" class="mt-1 text-xs font-mono text-ink-400">/{{ draft.slug }}</p>
                 </div>
-                <span class="shrink-0 px-2 py-1 rounded-full text-xs bg-ink-100 text-ink-600">草稿</span>
+                <span class="shrink-0 px-2 py-1 rounded-full text-xs bg-ink-100 text-ink-600">{{ $t('aiWorkbench.草稿_n02e') }}</span>
               </div>
 
               <div v-if="draft.dropped_fields?.length" class="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                模型多给了这些字段，但内容类型里没有定义，已丢弃：<code class="font-mono">{{ draft.dropped_fields.join(', ') }}</code>
+                {{ $t('aiWorkbench.模型多给_7tky4r') }}<code class="font-mono">{{ draft.dropped_fields.join(', ') }}</code>
               </div>
 
               <div v-if="draft.content?.summary" class="mt-4">
-                <p class="text-xs font-medium text-ink-700">摘要</p>
+                <p class="text-xs font-medium text-ink-700">{{ $t('aiWorkbench.摘要_htm1') }}</p>
                 <p class="mt-1 text-sm text-ink-600 leading-relaxed">{{ draft.content.summary }}</p>
               </div>
 
               <div v-if="draft.content?.body" class="mt-4">
-                <p class="text-xs font-medium text-ink-700">正文</p>
+                <p class="text-xs font-medium text-ink-700">{{ $t('aiWorkbench.正文_itms') }}</p>
                 <div class="mt-1 bg-ink-50 border border-ink-200 rounded-lg p-3 max-h-72 overflow-auto">
                   <RichTextContent :content="draft.content.body" format="markdown" />
                 </div>
               </div>
 
               <div v-if="Object.keys(draft.custom_fields || {}).length" class="mt-4">
-                <p class="text-xs font-medium text-ink-700">自定义字段</p>
+                <p class="text-xs font-medium text-ink-700">{{ $t('aiWorkbench.自定义字_mmnfx3') }}</p>
                 <table class="mt-1.5 w-full text-xs">
                   <tbody>
                     <tr v-for="(v, k) in draft.custom_fields" :key="k" class="border-b border-ink-100 last:border-0">
@@ -700,9 +700,9 @@ onUnmounted(() => {
 
               <div class="mt-5 flex items-center gap-3">
                 <button class="btn-primary" :disabled="busy || !!savedEntryId" @click="saveDraft">
-                  {{ savedEntryId ? '已保存' : busy ? '保存中…' : '保存为草稿条目' }}
+                  {{ savedEntryId ? $t('aiWorkbench.已保存_e5ggd') : busy ? $t('aiWorkbench.保存中_agdrec') : $t('aiWorkbench.保存为草_9ggegy') }}
                 </button>
-                <span class="text-xs text-ink-400">落库后状态固定为 draft，不能直接发布</span>
+                <span class="text-xs text-ink-400">{{ $t('aiWorkbench.落库后状_tmxzwn') }}</span>
               </div>
             </div>
           </div>
@@ -712,15 +712,15 @@ onUnmounted(() => {
       <!-- 翻译 -->
       <div v-if="tab === 'translate'" class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div class="lg:col-span-2 card h-fit">
-          <h3 class="text-base font-semibold text-ink-900">批量翻译</h3>
+          <h3 class="text-base font-semibold text-ink-900">{{ $t('aiWorkbench.批量翻译_d13y24') }}</h3>
           <p class="mt-1 text-xs text-ink-500 leading-relaxed">
-            JSON 结构与 key 保持不变，只翻译值；品牌名、型号、URL 原样保留。
+            {{ $t('aiWorkbench.text_1y35s1') }}
           </p>
 
-          <label class="block mt-4 text-xs font-medium text-ink-700">目标语言</label>
+          <label class="block mt-4 text-xs font-medium text-ink-700">{{ $t('aiWorkbench.目标语言_ffxlxo') }}</label>
           <div v-if="!translatableLangs.length" class="mt-2 text-xs text-ink-500">
-            没有可用目标语言。
-            <router-link to="/cms/languages" class="underline">先去语言管理添加 →</router-link>
+            {{ $t('aiWorkbench.没有可用_41reb9') }}
+            <router-link to="/cms/languages" class="underline">{{ $t('aiWorkbench.先去语言_11ifok') }}</router-link>
           </div>
           <div v-else class="mt-2 flex flex-wrap gap-2">
             <button
@@ -736,7 +736,7 @@ onUnmounted(() => {
 
           <label class="mt-4 inline-flex items-center gap-2 text-xs text-ink-700">
             <input v-model="overwrite" type="checkbox" class="rounded border-ink-300" />
-            覆盖已存在的译文
+            {{ $t('aiWorkbench.覆盖已存_1fb5gx') }}
           </label>
 
           <button
@@ -744,14 +744,14 @@ onUnmounted(() => {
             :disabled="!canEntryAction || !targetLangs.length"
             @click="doTranslate"
           >
-            {{ busy ? '翻译中…' : `翻译到 ${targetLangs.length} 种语言` }}
+            {{ busy ? $t('aiWorkbench.翻译中_gpyp8v') : `翻译到 ${targetLangs.length} 种语言` }}
           </button>
         </div>
 
         <div class="lg:col-span-3 card">
-          <h3 class="text-sm font-semibold text-ink-900">结果</h3>
+          <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiWorkbench.结果_m52h') }}</h3>
           <div v-if="!translateResult" class="py-16 text-center text-xs text-ink-400">
-            选择条目与目标语言后开始翻译
+            {{ $t('aiWorkbench.选择条目_1qbiie') }}
           </div>
           <ul v-else class="mt-3 space-y-2">
             <li
@@ -764,9 +764,9 @@ onUnmounted(() => {
                 class="shrink-0 px-2 py-0.5 rounded-full"
                 :class="r.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'"
               >
-                {{ r.ok ? '成功' : '失败' }}
+                {{ r.ok ? $t('aiWorkbench.成功_h4sv') : $t('aiWorkbench.失败_fy1g') }}
               </span>
-              <span class="text-ink-500 break-words">{{ r.ok ? (r.status || '已写入译文') : (r.error || '未知错误') }}</span>
+              <span class="text-ink-500 break-words">{{ r.ok ? (r.status || $t('aiWorkbench.已写入译_mt7cms')) : (r.error || $t('aiWorkbench.未知错误_diprg1')) }}</span>
             </li>
           </ul>
         </div>
@@ -775,17 +775,17 @@ onUnmounted(() => {
       <!-- SEO -->
       <div v-if="tab === 'seo'" class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div class="lg:col-span-2 card h-fit">
-          <h3 class="text-base font-semibold text-ink-900">SEO 元数据建议</h3>
+          <h3 class="text-base font-semibold text-ink-900">{{ $t('aiWorkbench.text_ixyv0y') }}</h3>
           <p class="mt-1 text-xs text-ink-500 leading-relaxed">
-            基于标题、正文与自定义字段生成。这里只给建议，不会覆盖条目现有 SEO。
+            {{ $t('aiWorkbench.基于标题_p3hvf8') }}
           </p>
           <button class="btn-primary w-full mt-4" :disabled="!canEntryAction" @click="doSeo">
-            {{ busy ? '生成中…' : '生成建议' }}
+            {{ busy ? $t('aiWorkbench.生成中_f6jfoq') : $t('aiWorkbench.生成建议_f6mvt1') }}
           </button>
         </div>
         <div class="lg:col-span-3 card">
-          <h3 class="text-sm font-semibold text-ink-900">建议</h3>
-          <div v-if="!seoResult" class="py-16 text-center text-xs text-ink-400">选择条目后生成</div>
+          <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiWorkbench.建议_gx6c') }}</h3>
+          <div v-if="!seoResult" class="py-16 text-center text-xs text-ink-400">{{ $t('aiWorkbench.选择条目_3wst5e') }}</div>
           <dl v-else class="mt-3 space-y-3">
             <div v-for="(v, k) in seoResult" :key="k">
               <dt class="text-xs font-medium text-ink-500 font-mono">{{ k }}</dt>
@@ -801,8 +801,8 @@ onUnmounted(() => {
       <div v-if="tab === 'similar'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="card">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-ink-900">与选中条目相似</h3>
-            <button class="btn-ghost text-xs" :disabled="!canEntryAction" @click="doSimilar">查找相似</button>
+            <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiWorkbench.与选中条_mtx9qb') }}</h3>
+            <button class="btn-ghost text-xs" :disabled="!canEntryAction" @click="doSimilar">{{ $t('aiWorkbench.查找相似_diqurh') }}</button>
           </div>
           <ul v-if="similarHits.length" class="mt-3 space-y-2">
             <li
@@ -817,26 +817,26 @@ onUnmounted(() => {
               </div>
               <p v-if="h.snippet" class="mt-1 text-xs text-ink-500 line-clamp-2">{{ h.snippet }}</p>
               <p class="mt-1 text-xs text-ink-400">
-                向量 {{ (h.vector_score * 100).toFixed(0) }}% · 关键词 {{ (h.keyword_score * 100).toFixed(0) }}%
+                {{ $t('aiWorkbench.向量_f3ku') }} {{ (h.vector_score * 100).toFixed(0) }}{{ $t('aiWorkbench.text_1s66fl') }} {{ (h.keyword_score * 100).toFixed(0) }}%
               </p>
             </li>
           </ul>
-          <p v-else class="py-14 text-center text-xs text-ink-400">选择条目后查找相似内容</p>
+          <p v-else class="py-14 text-center text-xs text-ink-400">{{ $t('aiWorkbench.选择条目_1j32ry') }}</p>
         </div>
 
         <div class="card">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="text-sm font-semibold text-ink-900">自然语言检索</h3>
+            <h3 class="text-sm font-semibold text-ink-900">{{ $t('aiWorkbench.自然语言_cme38h') }}</h3>
           </div>
           <div class="mt-3 flex gap-2">
             <input
               v-model="searchQ"
               class="input"
-              placeholder="例：耐高温的化工用阀门"
+              :placeholder="$t('aiWorkbench.例_pipz8v')"
               @keyup.enter="doSearch"
             />
             <button class="btn-outline shrink-0" :disabled="!searchQ.trim() || busy" @click="doSearch">
-              检索
+              {{ $t('aiWorkbench.检索_ii5e') }}
             </button>
           </div>
           <ul v-if="searchHits.length" class="mt-3 space-y-2">
@@ -854,7 +854,7 @@ onUnmounted(() => {
             </li>
           </ul>
           <p v-else class="py-14 text-center text-xs text-ink-400">
-            {{ searchQ ? '输入后回车检索' : '向量 + 关键词混合检索当前内容类型' }}
+            {{ searchQ ? $t('aiWorkbench.输入后回_1b98se') : $t('aiWorkbench.向量_1ryqhs') }}
           </p>
         </div>
       </div>

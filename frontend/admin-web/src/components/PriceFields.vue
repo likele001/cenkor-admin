@@ -63,9 +63,9 @@ const previewText = computed(() => {
           <p class="text-xs text-ink-400 mt-1">{{ t("priceFields.仅用于划_11ncn9") }}</p>
         </div>
         <div>
-          <label class="block text-xs text-ink-500 mb-1">{{ isSeat ? '售价（元/席）' : '售价（元）' }}</label>
+          <label class="block text-xs text-ink-500 mb-1">{{ isSeat ? $t('priceFields.售价_1qj87o') : $t('priceFields.售价_1nxp6o') }}</label>
           <input v-model="form.price" type="number" min="0" step="0.01" class="input" placeholder="99.00" />
-          <p class="text-xs text-ink-400 mt-1">{{ isSeat ? '每席位单价，按席位数量相乘' : '常规成交价' }}</p>
+          <p class="text-xs text-ink-400 mt-1">{{ isSeat ? $t('priceFields.每席位单_1egkji') : $t('priceFields.常规成交_v0vniv') }}</p>
         </div>
       </div>
 
@@ -98,7 +98,7 @@ const previewText = computed(() => {
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-ink-500 mb-1">{{ isSeat ? '促销价（元/席）' : '促销价（元）' }}</label>
+            <label class="block text-xs text-ink-500 mb-1">{{ isSeat ? $t('priceFields.促销价_12waql') : $t('priceFields.促销价_x091is') }}</label>
             <input v-model="form.promo_price" type="number" min="0" step="0.01" class="input" :placeholder="t('priceFields.不促销留_vqh8a3')" />
           </div>
           <div>

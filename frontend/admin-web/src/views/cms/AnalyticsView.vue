@@ -195,9 +195,9 @@ onMounted(load)
   <div class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-lg font-medium text-ink-900">内容效果</h1>
+        <h1 class="text-lg font-medium text-ink-900">{{ $t('analytics.内容效果_ao2td4') }}</h1>
         <p class="mt-1 text-[13px] text-ink-500">
-          发布之后发生了什么。数据来自埋点，按 Asia/Shanghai 自然日统计。
+          {{ $t('analytics.发布之后_1x6vrt') }}
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -209,11 +209,11 @@ onMounted(load)
             :class="days === d ? 'bg-ink-900 text-white' : 'bg-white text-ink-600 hover:bg-ink-50'"
             @click="setDays(d)"
           >
-            近 {{ d }} 天
+            {{ $t('analytics.近_sep') }} {{ d }} {{ $t('analytics.天_hm1') }}
           </button>
         </div>
-        <button class="btn btn-ghost" :disabled="loading" @click="refresh">重算</button>
-        <button class="btn btn-ghost" @click="toggleSetup">接入埋点</button>
+        <button class="btn btn-ghost" :disabled="loading" @click="refresh">{{ $t('analytics.重算_ph7u') }}</button>
+        <button class="btn btn-ghost" @click="toggleSetup">{{ $t('analytics.接入埋点_cwsv5a') }}</button>
       </div>
     </div>
 
@@ -221,16 +221,16 @@ onMounted(load)
 
     <!-- 没数据时不画空图，直接给接入方式 -->
     <div v-if="!loading && !hasData" class="card space-y-4">
-      <div class="text-[15px] font-medium text-ink-900">还没有效果数据</div>
+      <div class="text-[15px] font-medium text-ink-900">{{ $t('analytics.还没有效_x11ynm') }}</div>
       <p class="text-[13px] leading-relaxed text-ink-600">
-        埋点脚本没接入之前，看板不会有任何数字。接入只要一行标签，放在官网模板
-        <code class="rounded bg-ink-100 px-1 py-0.5 text-[12px]">&lt;/head&gt;</code> 之前，全站一次即可。
+        {{ $t('analytics.埋点脚本_z99frl') }}
+        <code class="rounded bg-ink-100 px-1 py-0.5 text-[12px]">&lt;/head&gt;</code> {{ $t('analytics.之前_5wtalm') }}
       </p>
       <div v-if="setup" class="space-y-3">
         <div class="relative">
           <pre class="overflow-x-auto rounded-lg bg-ink-900 p-3 text-[12px] leading-relaxed text-ink-50">{{ setup.snippet }}</pre>
           <button class="absolute right-2 top-2 rounded bg-white/15 px-2 py-1 text-[12px] text-white" @click="copySnippet">
-            复制
+            {{ $t('analytics.复制_fljd') }}
           </button>
         </div>
         <ul class="space-y-1.5">
@@ -239,40 +239,40 @@ onMounted(load)
           </li>
         </ul>
       </div>
-      <div v-else class="text-[13px] text-ink-400">正在读取接入指引…</div>
+      <div v-else class="text-[13px] text-ink-400">{{ $t('analytics.正在读取_iy0w3c') }}</div>
     </div>
 
     <template v-else>
       <!-- 指标卡 -->
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div class="card">
-          <div class="text-[12px] text-ink-500">浏览量 PV</div>
+          <div class="text-[12px] text-ink-500">{{ $t('analytics.浏览量_qc1mfk') }}</div>
           <div class="mt-1 text-2xl font-medium text-ink-900">{{ overview?.pv ?? 0 }}</div>
-          <div class="mt-1 text-[12px] text-ink-400">{{ overview?.entries ?? 0 }} 篇内容有访问</div>
+          <div class="mt-1 text-[12px] text-ink-400">{{ overview?.entries ?? 0 }} {{ $t('analytics.篇内容有_1q2e1b') }}</div>
         </div>
         <div class="card">
-          <div class="text-[12px] text-ink-500">独立访客 UV</div>
+          <div class="text-[12px] text-ink-500">{{ $t('analytics.独立访客_1cm1g6') }}</div>
           <div class="mt-1 text-2xl font-medium text-ink-900">{{ overview?.uv ?? 0 }}</div>
           <div class="mt-1 text-[12px] text-ink-400">
-            人均 {{ overview?.uv ? ((overview.pv ?? 0) / overview.uv).toFixed(1) : '0' }} 次
+            {{ $t('analytics.人均_dvbh') }} {{ overview?.uv ? ((overview.pv ?? 0) / overview.uv).toFixed(1) : '0' }} {{ $t('analytics.次_l5t') }}
           </div>
         </div>
         <div class="card">
-          <div class="text-[12px] text-ink-500">平均读完</div>
+          <div class="text-[12px] text-ink-500">{{ $t('analytics.平均读完_cabep1') }}</div>
           <div class="mt-1 text-2xl font-medium text-ink-900">{{ pct(overview?.avg_scroll_pct) }}</div>
-          <div class="mt-1 text-[12px] text-ink-400">停留 {{ dur(overview?.avg_duration_ms) }}</div>
+          <div class="mt-1 text-[12px] text-ink-400">{{ $t('analytics.停留_eb99') }} {{ dur(overview?.avg_duration_ms) }}</div>
         </div>
         <div class="card">
-          <div class="text-[12px] text-ink-500">线索转化</div>
+          <div class="text-[12px] text-ink-500">{{ $t('analytics.线索转化_giivn1') }}</div>
           <div class="mt-1 text-2xl font-medium text-ink-900">{{ overview?.conversions ?? 0 }}</div>
-          <div class="mt-1 text-[12px] text-ink-400">跳出率 {{ pct(overview?.bounce_rate) }}</div>
+          <div class="mt-1 text-[12px] text-ink-400">{{ $t('analytics.跳出率_l72m8') }} {{ pct(overview?.bounce_rate) }}</div>
         </div>
       </div>
 
       <!-- 趋势 -->
       <div class="card">
         <div class="mb-4 flex items-center justify-between">
-          <div class="text-[14px] font-medium text-ink-900">访问趋势</div>
+          <div class="text-[14px] font-medium text-ink-900">{{ $t('analytics.访问趋势_i96bj7') }}</div>
           <div class="flex items-center gap-3 text-[12px] text-ink-500">
             <span class="flex items-center gap-1"><i class="inline-block h-2 w-2 rounded-sm bg-ink-800" />PV</span>
             <span class="flex items-center gap-1"><i class="inline-block h-2 w-2 rounded-sm bg-ink-300" />UV</span>
@@ -300,21 +300,21 @@ onMounted(load)
       <!-- 内容排行 -->
       <div class="card">
         <div class="mb-3 flex items-center justify-between">
-          <div class="text-[14px] font-medium text-ink-900">内容表现排行</div>
-          <div class="text-[12px] text-ink-400">按表现分排序，不是按 PV</div>
+          <div class="text-[14px] font-medium text-ink-900">{{ $t('analytics.内容表现_ssoxzq') }}</div>
+          <div class="text-[12px] text-ink-400">{{ $t('analytics.按表现分_v0vy0p') }}</div>
         </div>
-        <div v-if="!rows.length" class="py-6 text-center text-[13px] text-ink-400">这段时间内没有内容被访问</div>
+        <div v-if="!rows.length" class="py-6 text-center text-[13px] text-ink-400">{{ $t('analytics.这段时间_14wiw1') }}</div>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-[13px]">
             <thead>
               <tr class="border-b border-ink-100 text-left text-[12px] text-ink-500">
-                <th class="py-2 pr-3 font-normal">内容</th>
+                <th class="py-2 pr-3 font-normal">{{ $t('analytics.内容_edas') }}</th>
                 <th class="px-2 py-2 text-right font-normal">PV</th>
-                <th class="px-2 py-2 text-right font-normal">读完</th>
-                <th class="px-2 py-2 text-right font-normal">停留</th>
-                <th class="px-2 py-2 text-right font-normal">跳出</th>
-                <th class="px-2 py-2 text-right font-normal">线索</th>
-                <th class="px-3 py-2 text-right font-normal">表现分</th>
+                <th class="px-2 py-2 text-right font-normal">{{ $t('analytics.读完_ob8x') }}</th>
+                <th class="px-2 py-2 text-right font-normal">{{ $t('analytics.停留_eb99') }}</th>
+                <th class="px-2 py-2 text-right font-normal">{{ $t('analytics.跳出_olev') }}</th>
+                <th class="px-2 py-2 text-right font-normal">{{ $t('analytics.线索_m8ub') }}</th>
+                <th class="px-3 py-2 text-right font-normal">{{ $t('analytics.表现分_kje7y') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -342,9 +342,9 @@ onMounted(load)
       <!-- 三类洞察 -->
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div class="card">
-          <div class="mb-1 text-[14px] font-medium text-ink-900">有流量没读完</div>
-          <p class="mb-3 text-[12px] text-ink-400">标题和正文对不上，或者开头太虚</p>
-          <div v-if="!lowPerformers.length" class="py-4 text-center text-[13px] text-ink-400">没有明显问题内容</div>
+          <div class="mb-1 text-[14px] font-medium text-ink-900">{{ $t('analytics.有流量没_7845tn') }}</div>
+          <p class="mb-3 text-[12px] text-ink-400">{{ $t('analytics.标题和正_1w4r8q') }}</p>
+          <div v-if="!lowPerformers.length" class="py-4 text-center text-[13px] text-ink-400">{{ $t('analytics.没有明显_1pud7w') }}</div>
           <ul v-else class="space-y-2.5">
             <li v-for="it in lowPerformers.slice(0, 8)" :key="it.entry_id" class="border-b border-ink-50 pb-2 last:border-0">
               <div class="truncate text-[13px] text-ink-900">{{ it.title }}</div>
@@ -354,28 +354,28 @@ onMounted(load)
         </div>
 
         <div class="card">
-          <div class="mb-1 text-[14px] font-medium text-ink-900">发布后零访问</div>
-          <p class="mb-3 text-[12px] text-ink-400">多半是没分发出去，不是内容问题</p>
-          <div v-if="!deadContent.length" class="py-4 text-center text-[13px] text-ink-400">全部内容都有访问</div>
+          <div class="mb-1 text-[14px] font-medium text-ink-900">{{ $t('analytics.发布后零_pklc09') }}</div>
+          <p class="mb-3 text-[12px] text-ink-400">{{ $t('analytics.多半是没_y9mdoe') }}</p>
+          <div v-if="!deadContent.length" class="py-4 text-center text-[13px] text-ink-400">{{ $t('analytics.全部内容_m8tzpr') }}</div>
           <ul v-else class="space-y-2.5">
             <li v-for="it in deadContent.slice(0, 8)" :key="it.entry_id" class="border-b border-ink-50 pb-2 last:border-0">
               <div class="truncate text-[13px] text-ink-900">{{ it.title }}</div>
-              <div class="mt-0.5 text-[12px] text-ink-500">发布 {{ (it.published_at || '').slice(0, 10) }}</div>
+              <div class="mt-0.5 text-[12px] text-ink-500">{{ $t('analytics.发布_erte') }} {{ (it.published_at || '').slice(0, 10) }}</div>
             </li>
           </ul>
         </div>
 
         <div class="card">
-          <div class="mb-1 text-[14px] font-medium text-ink-900">哪类主题值得再写</div>
-          <p class="mb-3 text-[12px] text-ink-400">按分类汇总的表现分</p>
-          <div v-if="!topics.length" class="py-4 text-center text-[13px] text-ink-400">还没有分类数据</div>
+          <div class="mb-1 text-[14px] font-medium text-ink-900">{{ $t('analytics.哪类主题_1lxhyc') }}</div>
+          <p class="mb-3 text-[12px] text-ink-400">{{ $t('analytics.按分类汇_wf2ozw') }}</p>
+          <div v-if="!topics.length" class="py-4 text-center text-[13px] text-ink-400">{{ $t('analytics.还没有分_uoo383') }}</div>
           <ul v-else class="space-y-2.5">
             <li v-for="t in topics.slice(0, 8)" :key="t.category" class="border-b border-ink-50 pb-2 last:border-0">
               <div class="flex items-center justify-between">
                 <span class="truncate text-[13px] text-ink-900">{{ t.category }}</span>
                 <span class="ml-2 shrink-0 font-medium tabular-nums" :class="scoreClass(t.score)">{{ t.score }}</span>
               </div>
-              <div class="mt-0.5 text-[12px] text-ink-500">{{ t.entries }} 篇 · PV {{ t.pv }} · {{ t.reason }}</div>
+              <div class="mt-0.5 text-[12px] text-ink-500">{{ t.entries }} {{ $t('analytics.篇_g0tqdk') }} {{ t.pv }} · {{ t.reason }}</div>
             </li>
           </ul>
         </div>
@@ -383,14 +383,14 @@ onMounted(load)
 
       <!-- 存储健康度 -->
       <div v-if="storage" class="card flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] text-ink-500">
-        <span>原始事件 {{ storage.total }} 条</span>
-        <span>今日 {{ storage.today }} 条</span>
-        <span>最早 {{ storage.oldest || '—' }}</span>
+        <span>{{ $t('analytics.原始事件_ax85w7') }} {{ storage.total }} {{ $t('analytics.条_kf5') }}</span>
+        <span>{{ $t('analytics.今日_dyl7') }} {{ storage.today }} {{ $t('analytics.条_kf5') }}</span>
+        <span>{{ $t('analytics.最早_i2uh') }} {{ storage.oldest || '—' }}</span>
         <span :class="storage.today_unlinked ? 'text-amber-600' : ''">
-          今日未关联内容 {{ storage.today_unlinked }} 条
+          {{ $t('analytics.今日未关_16d01v') }} {{ storage.today_unlinked }} {{ $t('analytics.条_kf5') }}
         </span>
-        <span>单 IP 每日上限 {{ storage.quota_per_ip }}</span>
-        <span class="text-ink-400">明细保留 90 天，汇总永久保留</span>
+        <span>{{ $t('analytics.单_fwmdfu') }} {{ storage.quota_per_ip }}</span>
+        <span class="text-ink-400">{{ $t('analytics.明细保留_189892') }}</span>
       </div>
     </template>
   </div>

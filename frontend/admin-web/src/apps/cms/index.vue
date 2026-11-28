@@ -3,5 +3,5 @@
 </script>
 
 <template>
-  <div>CMS 前端模块</div>
+  <div>{{ $t('index.text_1lo34x') }}</div>
 </template>

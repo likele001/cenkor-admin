@@ -261,7 +261,7 @@ function fmtTime(s?: string | null) {
         <!-- 正文对比 -->
         <div v-if="tab === 'text'" class="flex-1 overflow-auto">
           <div v-if="loading" class="p-8 text-center text-xs text-ink-400">{{ t("apiKeys.加载中_b0k5km") }}</div>
-          <div v-else-if="!data" class="p-8 text-center text-xs text-ink-400">{{ error || '暂无数据' }}</div>
+          <div v-else-if="!data" class="p-8 text-center text-xs text-ink-400">{{ error || $t('versionDiffDialog.暂无数据_dcv57g') }}</div>
           <div v-else-if="!data.text.rows.length" class="p-8 text-center text-xs text-ink-400">
             {{ t("versionDiffDialog.两版正文_1drg9a") }}
           </div>
@@ -275,13 +275,13 @@ function fmtTime(s?: string | null) {
                 <div :class="cellClass(row, 'left')" class="flex gap-2">
                   <span class="text-ink-300 select-none w-6 shrink-0 text-right">{{ row.left?.no ?? '' }}</span>
                   <span :class="kindClass(lineKind(row.left))" class="min-w-0 flex-1">
-                    {{ row.left ? (row.left.empty ? '（空行）' : row.left.text) : '' }}
+                    {{ row.left ? (row.left.empty ? $t('versionDiffDialog.text_womdyn') : row.left.text) : '' }}
                   </span>
                 </div>
                 <div :class="cellClass(row, 'right')" class="flex gap-2">
                   <span class="text-ink-300 select-none w-6 shrink-0 text-right">{{ row.right?.no ?? '' }}</span>
                   <span :class="kindClass(lineKind(row.right))" class="min-w-0 flex-1">
-                    {{ row.right ? (row.right.empty ? '（空行）' : row.right.text) : '' }}
+                    {{ row.right ? (row.right.empty ? $t('versionDiffDialog.text_womdyn') : row.right.text) : '' }}
                   </span>
                 </div>
               </template>
@@ -292,7 +292,7 @@ function fmtTime(s?: string | null) {
         <!-- 字段变化 -->
         <div v-else class="flex-1 overflow-auto p-4 space-y-3">
           <div v-if="loading" class="text-center text-xs text-ink-400 py-8">{{ t("apiKeys.加载中_b0k5km") }}</div>
-          <div v-else-if="!data" class="text-center text-xs text-ink-400 py-8">{{ error || '暂无数据' }}</div>
+          <div v-else-if="!data" class="text-center text-xs text-ink-400 py-8">{{ error || $t('versionDiffDialog.暂无数据_dcv57g') }}</div>
           <div v-else-if="!data.fields.length" class="text-center text-xs text-ink-400 py-8">
             {{ t("versionDiffDialog.两个版本_4cs7ag") }}
           </div>
@@ -309,10 +309,10 @@ function fmtTime(s?: string | null) {
               >
                 <span class="font-mono text-ink-500 truncate" :title="it.key">{{ it.key }}</span>
                 <span class="bg-red-50 text-red-800 rounded px-1.5 py-0.5 whitespace-pre-wrap break-words">
-                  {{ it.from || '（空）' }}
+                  {{ it.from || $t('versionDiffDialog.text_11z07r') }}
                 </span>
                 <span class="bg-green-50 text-green-800 rounded px-1.5 py-0.5 whitespace-pre-wrap break-words">
-                  {{ it.to || '（空）' }}
+                  {{ it.to || $t('versionDiffDialog.text_11z07r') }}
                 </span>
               </div>
             </div>
@@ -320,10 +320,10 @@ function fmtTime(s?: string | null) {
             <!-- 标量字段 -->
             <div v-else class="grid grid-cols-2 gap-2 text-xs">
               <span class="bg-red-50 text-red-800 rounded px-2 py-1 whitespace-pre-wrap break-words">
-                {{ f.from || '（空）' }}
+                {{ f.from || $t('versionDiffDialog.text_11z07r') }}
               </span>
               <span class="bg-green-50 text-green-800 rounded px-2 py-1 whitespace-pre-wrap break-words">
-                {{ f.to || '（空）' }}
+                {{ f.to || $t('versionDiffDialog.text_11z07r') }}
               </span>
             </div>
           </div>

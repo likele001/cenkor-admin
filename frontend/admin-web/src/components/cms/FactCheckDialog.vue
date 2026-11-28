@@ -225,7 +225,7 @@ watch(
             </div>
           </div>
           <div class="text-[11px] text-ink-400 mt-2">
-            依据来源：{{ sourceLine }}
+            {{ $t('factCheckDialog.依据来源_145102') }}{{ sourceLine }}
             <span v-if="data.summary.truncated" class="text-amber-600 ml-2">{{ t("factCheckDialog.text_tcm7ex") }}</span>
           </div>
           <div
@@ -243,14 +243,14 @@ watch(
             :class="tab === 'bad' ? 'bg-white border border-b-white -mb-px text-ink-800 font-medium' : 'text-ink-400 hover:text-ink-600'"
             @click="tab = 'bad'"
           >
-            查无依据 {{ badItems.length }}
+            {{ $t('factCheckDialog.查无依据_dj23ws') }} {{ badItems.length }}
           </button>
           <button
             class="px-3 py-1.5 rounded-t"
             :class="tab === 'unsure' ? 'bg-white border border-b-white -mb-px text-ink-800 font-medium' : 'text-ink-400 hover:text-ink-600'"
             @click="tab = 'unsure'"
           >
-            无法确认 {{ unsureItems.length }}
+            {{ $t('factCheckDialog.无法确认_db3u7f') }} {{ unsureItems.length }}
           </button>
         </div>
 
@@ -304,8 +304,7 @@ watch(
 
         <!-- 底部提示 -->
         <div class="px-5 py-2 border-t text-[11px] text-ink-400 leading-relaxed">
-          核验只做提示，不阻断发布。依据来自起草素材、企业知识库与站内已发布内容；
-          站外事实（新闻原报道、行业公知）本来就核不了，判为「查无依据」属正常，请以人工核实为准。
+          {{ $t('factCheckDialog.核验只做_9j3mjx') }}
         </div>
       </template>
     </div>

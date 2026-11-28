@@ -473,10 +473,10 @@ onUnmounted(() => {
                     </span>
                   </div>
                   <p class="mt-1 text-xs text-ink-400">
-                    {{ detail.content_type_key }} · 共 {{ detail.total }} 篇 · 并发
-                    {{ detail.concurrency }} · 创建于 {{ fmtTime(detail.created_at) }}
-                    <span v-if="detail.started_at"> · 开始 {{ fmtTime(detail.started_at) }}</span>
-                    <span v-if="detail.finished_at"> · 结束 {{ fmtTime(detail.finished_at) }}</span>
+                    {{ detail.content_type_key }} {{ $t('aiBatch.text_48js') }} {{ detail.total }} {{ $t('aiBatch.篇_g1a7dp') }}
+                    {{ detail.concurrency }} {{ $t('aiBatch.text_35ob46') }} {{ fmtTime(detail.created_at) }}
+                    <span v-if="detail.started_at"> {{ $t('aiBatch.text_3q5sk') }} {{ fmtTime(detail.started_at) }}</span>
+                    <span v-if="detail.finished_at"> {{ $t('aiBatch.text_3vncl') }} {{ fmtTime(detail.finished_at) }}</span>
                   </p>
                 </div>
 
@@ -487,7 +487,7 @@ onUnmounted(() => {
                     :disabled="busy || !canManage"
                     @click="act('start', '已开始')"
                   >
-                    {{ detail.status === 'paused' ? '继续' : '开始' }}
+                    {{ detail.status === 'paused' ? $t('aiBatch.继续_ma5i') : $t('aiBatch.开始_gngr') }}
                   </button>
                   <button
                     v-if="detail.status === 'running'"
@@ -503,7 +503,7 @@ onUnmounted(() => {
                     :disabled="busy || !canManage"
                     @click="act('retry-failed', '失败项已重新入队')"
                   >
-                    重试失败 {{ detail.failed }}
+                    {{ $t('aiBatch.重试失败_iyy7cs') }} {{ detail.failed }}
                   </button>
                   <button
                     v-if="detail.status === 'running' || detail.status === 'paused' || detail.status === 'pending'"
@@ -527,9 +527,7 @@ onUnmounted(() => {
               <div class="mt-4">
                 <div class="flex items-center justify-between text-xs text-ink-500 mb-1.5">
                   <span>
-                    成功 {{ detail.succeeded }} ·
-                    失败 <span :class="detail.failed ? 'text-red-600 font-medium' : ''">{{ detail.failed }}</span> ·
-                    跳过 {{ detail.skipped }} · 共 {{ detail.total }}
+                    {{ $t('aiBatch.成功_h4sv') }} {{ detail.succeeded }} {{ $t('aiBatch.text_3pgd9') }} <span :class="detail.failed ? 'text-red-600 font-medium' : ''">{{ detail.failed }}</span> {{ $t('aiBatch.text_3yfy5') }} {{ detail.skipped }} {{ $t('aiBatch.text_48js') }} {{ detail.total }}
                   </span>
                   <span class="font-mono">{{ pct(detail) }}%</span>
                 </div>
@@ -550,7 +548,7 @@ onUnmounted(() => {
               </div>
 
               <p v-if="detail.last_error" class="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">
-                执行器报错：{{ detail.last_error }}
+                {{ $t('aiBatch.执行器报_153w76') }}{{ detail.last_error }}
               </p>
               <p v-if="!canManage" class="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
                 {{ t("aiBatch.你当前是_19u1ul") }} <span class="font-mono">cms:ai:manage</span>{{ t("aiBatch.text_1gjmcm") }}
