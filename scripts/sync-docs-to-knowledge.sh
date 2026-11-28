@@ -127,6 +127,12 @@ else
   npm run docs:build
 fi
 
+# ⚠️ llms.txt 只在 package.json 的 `docs:build` 里生成，而上面为了绕开 pnpm
+#    依赖检查是直接调 vitepress 二进制的 —— 绕过构建脚本就等于绕过这一步，
+#    线上 /llms.txt 会 404（2026-11-28 发现）。这里显式补上，两条路径都保证产出。
+echo "▸ 生成 llms.txt（供 AI 爬虫的站点索引）..."
+[ -f scripts/gen-llms-txt.mjs ] && node scripts/gen-llms-txt.mjs || echo "  ⚠️ 缺少 scripts/gen-llms-txt.mjs，跳过"
+
 echo "▸ 修正属主（避免 www 后续无法覆盖）..."
 chown -R www:www "$DEST" "$KNOWLEDGE/docs/.vitepress/dist"
 
