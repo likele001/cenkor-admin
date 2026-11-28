@@ -1,0 +1,23 @@
+{
+  "先把站点_1g0yzd": "Describe the site requirements first, at least one sentence",
+  "先选一个_1ew1jh": "Select a CSV file first",
+  "关键词包_1ktiow": "Failed to parse the keyword package",
+  "确认失败_frpz7u": "Confirmation failed",
+  "执行失败_cz7pg9": "Run failed",
+  "建站编排_chv0rf": "Site build orchestration",
+  "一句话说_kconoh": "Describe in one sentence what site you need; it generates a section tree and the first batch of topics, and only writes to the database after you confirm.",
+  "站点需求_fz1mbm": "Site requirements",
+  "关键词_18rkkz": "Keywords (comma-separated)",
+  "栏目数_fthg1": "Sections",
+  "选题数_lu081": "Topic count",
+  "导入关键_16j98y": "Import keyword package",
+  "方案预览_d9wdyr": "Proposal preview",
+  "保存方案_agi5u2": "Save proposal",
+  "confirm": "Confirm",
+  "预览差异_jt5kew": "Preview diff",
+  "执行_hhhh": "Run",
+  "历史方案_aw1g4b": "Past proposals",
+  "还没有方_8b9atr": "No proposals yet",
+  "例如_1enkkm": "e.g. Hydraulic equipment website targeting factory customers in Shandong, needing products, case studies, and technical articles",
+  "液压油缸_c5a1jd": "Hydraulic cylinders, hydraulic pump stations"
+}

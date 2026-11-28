@@ -13,5 +13,8 @@
   "变更前_cs2i9": "Before change",
   "变更后_cs2uq": "After change",
   "该请求无_1osgc6": "This request has no diff data (likely a query operation or diff logging is not enabled).",
-  "错误_q4mu": "Error"
+  "错误_q4mu": "Error",
+  "status": "Status",
+  "耗时_mchr_2": "Duration",
+  "time": "Time"
 }

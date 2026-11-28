@@ -1,0 +1,15 @@
+{
+  "已删除_e65yu": "Deleted",
+  "拿不到目_fg4g5l": "Cannot get the target address, so it cannot be inserted",
+  "内链管理_awknz2": "Internal links",
+  "先保存一_1vzmh7": "Save once first, then manage internal links",
+  "锚文本_j8es4b": "Anchor text:",
+  "通过_past": "Approve",
+  "标记已插_1xlr3m": "Mark as inserted",
+  "拒绝_hi6j": "Reject",
+  "delete": "Delete",
+  "该状态下_19d3m9": "No internal links in this status",
+  "还没有内_1clvkr": "No internal links yet. Click \"Analyze suggestions\" to find content that should link to each other; you can review and manage them after saving.",
+  "插入会追_1h3fli": "Inserted as a \"Related reading\" section appended to the body; the position can still be adjusted after saving",
+  "用向量召_a9w5zy": "Vector recall picks candidates, then the model decides whether each link fits"
+}

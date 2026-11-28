@@ -12,5 +12,12 @@
   "状态_k1e3": "Status",
   "已发布_e656s": "Published",
   "草稿_n02e": "Draft",
-  "取消_ev02": "Cancel"
+  "取消_ev02": "Cancel",
+  "覆盖站点_xt4zpn": "Overrides the site's default meta; leave empty to use the site's global configuration.",
+  "text_yql8tp": "Meta title",
+  "text_m48vg9": "Meta description",
+  "text_12jxmu": "Meta keywords (comma-separated)",
+  "辰科_8xln96": "Chenke MES",
+  "案例摘要_1v1bgm": "Case summary + customer outcome keywords",
+  "客户案例_8m0p7t": "Customer cases, industries, solutions"
 }

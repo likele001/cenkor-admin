@@ -1,0 +1,23 @@
+{
+  "这里的内_1uug9j": "Content here is rendered directly to",
+  "官网内容_1k9lf6": "Website content · Summary",
+  "一句话摘_w0oh4x": "One-line summary",
+  "留空则回_1tr1ky": "Leave empty to fall back to the one-line tag. 40 characters or fewer is recommended.",
+  "暂无内容_sjbso": "No content yet. Click \"Add item\" below to start.",
+  "上移_dxyp": "Move up",
+  "下移_dxzk": "Move down",
+  "delete": "Delete",
+  "特性起止_awnjsl": "Feature start/end indexes (0-based)",
+  "起始_ojzo": "Start",
+  "结束_14364m": "End (exclusive)",
+  "text_stivus": "+ Add item",
+  "暂无内容_1mub4u": "No content yet.",
+  "落地页文_vgobc3": "Landing page copy",
+  "仅对_q5ql8t": "Landing pages are generated only for products with an empty Website field; for products with a website URL, the detail page button links straight to the external site.",
+  "主标题_bz1f0": "Main heading",
+  "副标题_cl7a8": "Subheading",
+  "核心要点_djwsgz": "Key points",
+  "暂无要点_1n2lws": "No key points yet.",
+  "text_stt22j": "+ Add key point",
+  "用于首页_19eyer": "Used for the homepage product cards and Hero panel"
+}

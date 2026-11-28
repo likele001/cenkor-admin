@@ -1,0 +1,10 @@
+{
+  "已提交_4dz1o4": "Submitted — the provider is queuing it",
+  "生成中_194djy": "Generating — usually 1–3 minutes",
+  "已完成_u4e3dj": "Done — ready to attach to articles",
+  "已取消_e68dg": "Cancelled",
+  "text_1eb9uw": "AI API unavailable. Check that the backend has been restarted on the latest version.",
+  "图生视频_q0kcf1": "Image-to-video needs an image generated above first, to use as the first frame",
+  "已填入摘_eyq403": "Summary field filled in; takes effect after saving",
+  "已按_1qjzpl": "Slug filled in from the SEO title; you can still adjust it manually"
+}

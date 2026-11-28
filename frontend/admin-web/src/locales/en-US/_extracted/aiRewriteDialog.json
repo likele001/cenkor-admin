@@ -1,0 +1,17 @@
+{
+  "text_1j0euc": "AI rewrite API is unavailable. Make sure the backend has been restarted to the latest version.",
+  "这里还没_1ajibc": "There is no content here to rewrite",
+  "自定义改_1balvp": "Custom rewriting requires you to describe what you want first",
+  "无法解析_gx72w3": "Could not parse the rich text content",
+  "这段正文_8gu805": "This text has no content that can be rewritten yet",
+  "text_1uf9iq": "AI is not configured yet.",
+  "去_1kv3c3": "Go to AI Settings to bind a provider and API key →",
+  "正在改写_53y8gx": "Rewriting…",
+  "改写结果_d46hm1": "Rewrite result",
+  "修改前_c74wy": "Before",
+  "模型这次_1x7ov9": "The model made no changes this time — the content may be too short, or it decided no adjustment was needed. Try a different action, add a requirement, or click \"Try again\".",
+  "应用到当_1gem01": "Apply to current field",
+  "cancel": "Cancel",
+  "应用只改_q5ble4": "Applying only updates the form; it is saved to the database after you save",
+  "想要什么_y5lkeh": "What effect do you want? For example: make it sound like a Xiaohongshu post, emphasize value for money, keep it under 60 characters"
+}

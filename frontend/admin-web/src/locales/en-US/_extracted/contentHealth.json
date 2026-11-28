@@ -1,0 +1,22 @@
+{
+  "体检失败_afyt29": "Health check failed",
+  "text_11t59o": "HTML report downloaded. Send it to the client or print it to PDF.",
+  "未知错误_diprg1": "Unknown error",
+  "text_11m1s0": "← AI cockpit",
+  "内容体检_anz34x": "Content health check",
+  "结构_1uywg1": "Three dimensions: structure · SEO · results",
+  "陈旧阈值_4yarth": "Staleness threshold (days)",
+  "过薄阈值_1wf3no": "Thin-content threshold (characters)",
+  "连同草稿_1kdz0u": "Include drafts in the health check",
+  "预览报告_jt6b61": "Preview report",
+  "站点健康_1wpbql": "Site health score",
+  "未启用_fixz7": "Disabled",
+  "先改这几_1b1pp2": "Fix these first",
+  "按_11jzn6": "Sorted by hits × penalty per item",
+  "检查项命_30pgxt": "Check hit distribution",
+  "本次体检_1o3imm": "This health check found no issues.",
+  "待处理条_u1dho4": "Pending items",
+  "按分数升_ekmymj": "Ascending by score, the ones most in need of fixing first",
+  "没有需要_131qzl": "No items to process.",
+  "去修_eoib": "Fix it"
+}

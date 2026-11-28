@@ -1,0 +1,23 @@
+{
+  "确认删除_dp1yrm": "Delete this form? Submission records will be deleted as well.",
+  "text_1340ly": "📋 Forms / surveys",
+  "新增表单_d7d07v": "New form",
+  "表单_nnql": "Form",
+  "提交数_f08po": "Submissions",
+  "status": "Status",
+  "actions": "Actions",
+  "提交记录_cxej5l": "Submission records",
+  "export": "Export",
+  "edit": "Edit",
+  "delete": "Delete",
+  "暂无表单_dd105n": "No forms yet",
+  "title": "Title",
+  "description": "Description",
+  "字段定义_11xni8": "Field definitions (JSON)",
+  "成功提示_cputkp": "Success message",
+  "enable": "Enable",
+  "cancel": "Cancel",
+  "保存_e32z": "Save",
+  "暂无提交_dcur5e": "No submissions yet",
+  "提交成功_cx7dr7": "Submitted successfully"
+}

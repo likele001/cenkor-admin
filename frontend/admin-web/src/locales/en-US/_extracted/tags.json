@@ -7,5 +7,7 @@
   "标签名称_dmuom2": "Tag name",
   "颜色_qo9i": "Color",
   "取消_ev02": "Cancel",
-  "确定删除_hxlnzo": "Are you sure you want to delete tag \"${tag.name}\"?"
+  "确定删除_hxlnzo": "Are you sure you want to delete tag \"${tag.name}\"?",
+  "标签页地_ul7b8q": "Tab page URL rules (optional)",
+  "决定这个_l1h4u2": "Sets the address of this tab page. Tab pages are the most SEO-friendly, so a short slug is recommended."
 }

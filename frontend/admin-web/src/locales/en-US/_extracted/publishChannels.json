@@ -1,0 +1,22 @@
+{
+  "success": "Success",
+  "failed": "Failed",
+  "待执行_eh5oq": "Queued",
+  "执行中_f2hhk": "Running",
+  "已跳过_egazq": "Skipped",
+  "测试失败_ed6jy6": "Test failed",
+  "分发渠道_ap981q": "Distribution channels",
+  "内容审核_19qejk": "Where approved content is published. Each channel runs and retries independently, so one failure does not affect the others.",
+  "执行待处_u23cdk": "Run pending tasks",
+  "默认_rs98": "Default",
+  "需要准备_jm698i": "What you need to prepare",
+  "步骤_j467": "Steps",
+  "最近发布_1n6o8i": "Recent publish tasks",
+  "刷新_ejix": "Refresh",
+  "还没有发_1pgrrk": "No publish records yet. They appear here after you click Publish on the content editor page.",
+  "条目_i8j1": "Items",
+  "渠道_jiur": "Channels",
+  "status": "Status",
+  "尝试_gfo8": "Try",
+  "结果_1fnmce": "Result / Reason"
+}

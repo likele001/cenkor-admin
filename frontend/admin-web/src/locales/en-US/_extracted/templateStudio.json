@@ -1,0 +1,22 @@
+{
+  "标签列表_1ez6qn": "Failed to load the tag list",
+  "结构_m51t": "Structure",
+  "站点_liio": "Site",
+  "其他_eae8": "Other",
+  "先在左侧_1acoh1": "Select a template file on the left first",
+  "页面模板_juxtxn": "Page templates",
+  "预览请求_6uu1qb": "Preview request failed",
+  "这个文件_1yrdao": "This file was never overwritten, so there is nothing to restore",
+  "已回落到_1310od": "Reverted to the built-in version",
+  "还原失败_ihtwkb": "Restore failed",
+  "没有覆盖_1s8inc": "No covering version, so there is nothing to diff",
+  "text_omnkhu": "(identical to the built-in version)",
+  "读取差异_1agslu": "Failed to load the diff",
+  "当前改动_1rzh19": "Unsaved changes will be discarded if you switch themes. Continue?",
+  "创建主题_ybk500": "Failed to create theme",
+  "切换生效_1n97j8": "Failed to switch the active theme",
+  "删除主题_149hgi": "Failed to delete theme",
+  "主题包已_3dia6g": "Theme package exported",
+  "导出失败_by46j6": "Export failed",
+  "导入失败_by141p": "Import failed"
+}

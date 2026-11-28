@@ -1,0 +1,21 @@
+{
+  "起止路径_14dywn": "Start and end paths are required",
+  "确认删除_138jsj": "Delete this redirect?",
+  "text_s59308": "↪️ URL redirects",
+  "新增重定_1i82bh": "New redirect",
+  "来源路径_dicrk0": "Source path",
+  "目标路径_ffxpu6": "Target path",
+  "状态码_h9uty": "Status code",
+  "enable": "Enable",
+  "actions": "Actions",
+  "edit": "Edit",
+  "delete": "Delete",
+  "暂无重定_1n3q9k": "No redirects yet",
+  "来源路径_1ody88": "Source path (from_path)",
+  "目标路径_bkfgxm": "Target path (to_path)",
+  "text_nbczrc": "301 (Permanent)",
+  "text_n7mjn8": "302 (Temporary)",
+  "cancel": "Cancel",
+  "保存_e32z": "Save",
+  "搜索路径_1gn6cq": "Search paths…"
+}

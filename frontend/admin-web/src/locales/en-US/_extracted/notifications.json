@@ -1,0 +1,23 @@
+{
+  "发送失败_b643fo": "Failed to send",
+  "查看系统_nfi3i6": "View system notifications and messages",
+  "全部已读_avbop5": "All read",
+  "发送通知_b6dbh7": "Send notification",
+  "暂无通知_dd2ii1": "No notifications yet",
+  "查看_ibpi": "View",
+  "已读_gqx5": "Read",
+  "delete": "Delete",
+  "上一页_btlof": "Previous page",
+  "下一页_btmf4": "Next page",
+  "发送系统_d0fhcv": "Send a system notification",
+  "type": "Type",
+  "系统通知_garqz3": "System notifications",
+  "任务通知_abf72p": "Task notifications",
+  "title": "Title",
+  "content": "Content",
+  "link": "Link",
+  "cancel": "Cancel",
+  "通知标题_iodwho": "Notification title",
+  "通知内容_bw7qw6": "Notification content (optional)",
+  "text_1m9n0q": "/system/notifications (optional)"
+}

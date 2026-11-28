@@ -1,0 +1,20 @@
+{
+  "内容还没_151wj6": "The content is not saved yet — save it before checking",
+  "核验失败_dsap9k": "Verification failed",
+  "事实核验_aakhdz": "Fact check",
+  "重新核验_itfp5j": "Verify again",
+  "正在核验_1m7iy5": "Verifying specific claims in the body…",
+  "逐句交给_j7l1d9": "Each sentence is judged by the model; usually takes 20–60 seconds",
+  "有依据占_13iu6o": "Grounded ratio (judgeable items only)",
+  "处具体说_3iefj5": "the exact claim",
+  "有依据_fhe0q": "Grounded",
+  "查无依据_dj23ws": "No sources found",
+  "无法确认_db3u7f": "Cannot confirm",
+  "text_tcm7ex": "(body too long — only the first 12000 characters are verified)",
+  "正文里没_ixj74n": "The body contains no verifiable numbers, dates, or proper nouns — it is purely descriptive, so no verification is needed.",
+  "没有_1v2wty": "No unsupported claims — every specific statement in this draft holds up.",
+  "没有_f4fwup": "There are no \"cannot confirm\" sentences.",
+  "规则比对_hq386y": "Rule comparison",
+  "模型判定_dr45q8": "Model verdict",
+  "未引用任_b2du2w": "Cites no sources"
+}

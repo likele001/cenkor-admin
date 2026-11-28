@@ -34,5 +34,6 @@
   "密码至少_nlidtq": "密码至少 8 位",
   "密码已重_j7r1zs": "密码已重置",
   "确定将_cavmi0": "确定将 ${user.username} 状态改为 ${newStatus}？",
-  "确定软删_ew94ht": "确定软删 ${user.username}？"
+  "确定软删_ew94ht": "确定软删 ${user.username}？",
+  "下一页_btmf4_2": "下一页"
 }

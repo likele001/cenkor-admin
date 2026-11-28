@@ -34,5 +34,6 @@
   "密码至少_nlidtq": "Password must be at least 8 characters",
   "密码已重_j7r1zs": "Password reset",
   "确定将_cavmi0": "Are you sure you want to change ${user.username} status to ${newStatus}?",
-  "确定软删_ew94ht": "Are you sure you want to soft delete ${user.username}?"
+  "确定软删_ew94ht": "Are you sure you want to soft delete ${user.username}?",
+  "下一页_btmf4_2": "Next page"
 }

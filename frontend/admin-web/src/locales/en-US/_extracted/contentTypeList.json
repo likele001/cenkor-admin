@@ -16,5 +16,6 @@
   "支持分类_d6cdpj": "Supports categories",
   "支持标签_d6g495": "Supports tags",
   "取消_ev02": "Cancel",
-  "确定删除_16egdo": "Are you sure you want to delete content type \"${ct.name}\"?"
+  "确定删除_16egdo": "Are you sure you want to delete content type \"${ct.name}\"?",
+  "text_jeoarl": "🌐 Multilingual"
 }

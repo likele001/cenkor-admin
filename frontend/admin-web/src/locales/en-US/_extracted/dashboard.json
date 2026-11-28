@@ -7,5 +7,15 @@
   "媒体_fu9t": "Media",
   "text_6aj7tf": "API Calls · Last 7 days",
   "text_1pts9l": "HTTP Method Distribution",
-  "状态码分_rqpg1n": "Status code distribution · Last 7 days"
+  "状态码分_rqpg1n": "Status code distribution · Last 7 days",
+  "loadFailed": "Failed to load",
+  "建议升级_e49h5x": "Upgrading to the latest version is recommended for fixes and new features.",
+  "查看升级_1ytcfb": "View upgrade options",
+  "更新日志_dev07i": "Changelog",
+  "暂不提醒_d9dhvx": "Remind me later",
+  "系统更新_vgymtu": "System changelog",
+  "查看全部_dll6ti": "View all",
+  "置顶_mifc": "Pin to top",
+  "重要_pjys": "Important",
+  "暂无更新_1f2tmj": "No changelog yet"
 }
