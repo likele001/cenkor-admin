@@ -293,7 +293,11 @@ async def _latest_version_map(db: AsyncSession, keys: list[str]) -> dict[tuple[s
     out: dict[tuple[str, str | None], str] = {}
     decided: set[tuple[str, str | None]] = set()
     for app_key, product, version, file_path, _id in rows:
-        for pair in ((app_key, product or None), (app_key, None)):
+        # 有产品轴的发布行只归到自己的产品轴；只有「无产品轴」的历史行才落 None 兜底键。
+        # 之前无差别补 (app_key, None)，会把 A 产品的包当成 B 产品授权的最新可分发版本，
+        # 实例按 B 下载必然 404（如 shopfloor_exec 仅 cenkor-process 有包却出现在 cenkormes）。
+        pairs = [(app_key, product or None)] if product else [(app_key, None)]
+        for pair in pairs:
             if pair in decided:
                 continue
             # 每个键只由「版本号最大的那条」决定：有包就报版本，没包就不报，绝不回退到旧版本。
@@ -358,10 +362,8 @@ async def _purchases_for(db: AsyncSession, portal_user_id: int, product: str | N
             # 最新可分发版本：实例侧 `/market/status` 据此算「可更新 N 个」。
             # 空串 = 未知（老 hub、或该 app_key 没有已审核且文件在位的发布行），
             # 实例侧对空值一律不计入可更新，绝不拿空值当「有新版」。
-            "latest_version": (
-                versions.get((l.app_key, l.product or None))
-                or versions.get((l.app_key, None), "")
-            ),
+            # 严格按授权自己的产品轴取版本，绝不回退到其它产品的行。
+            "latest_version": versions.get((l.app_key, l.product or None), ""),
         })
     return out
 

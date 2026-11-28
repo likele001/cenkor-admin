@@ -63,6 +63,29 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
+async def _assert_distributable(db: AsyncSession, app_key: str, product: str) -> None:
+    """下单/签发前确认该产品轴下确实有可分发版本。
+
+    同一 app_key 可能在多个产品轴各有包；若只按定价行解析出 product 就直接
+    签发授权，实例会拿到一份「本产品没有包」的授权，安装时 hub 只能 404
+    （历史事故：11 个 cenkor-process 应用被以 cenkormes 试用授权签发）。
+    """
+    row = (await db.execute(
+        select(store_models.AppSubmission.id).where(
+            store_models.AppSubmission.app_key == app_key,
+            store_models.AppSubmission.product == product,
+            store_models.AppSubmission.status.in_(("approved", "published", "installed")),
+            store_models.AppSubmission.yanked_at.is_(None),
+        ).limit(1)
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            400,
+            f"该应用在 {product} 产品轴下暂无已上架版本，无法下单或签发授权；"
+            "请先在对应产品下发布版本，或改用其它产品轴",
+        )
+
+
 # 「删除」的分层判据，与支付中心 router 同一口径：
 #   · 从未收到钱（待支付 / 已取消 / 已过期）且未签发授权 → 允许物理删
 #   · 已支付 / 已退款 → 只能作废隐藏（钱、分账、授权都在以它们为凭据）
@@ -304,6 +327,7 @@ async def create_order(
 
     # 分账快照：归属与扣点在下单这一刻定死，日后改定价/扣点都不影响本单
     dev_id = price_row.developer_id
+    await _assert_distributable(db, app_key, product)
     fee_bp = await ledger.resolve_fee_bp(db, price_row, dev_id)
     fee_cents, income_cents = ledger.split_amount(amount, fee_bp)
 
@@ -974,6 +998,7 @@ async def issue_license_manual(
     if not app_key:
         raise HTTPException(400, "app_key 必填")
     product = await _resolve_product(db, app_key, body.get("product"))
+    await _assert_distributable(db, app_key, product)
     model = str(body.get("model") or "one_time")
     if model not in cm.PRICING_MODELS:
         raise HTTPException(400, "model 不合法")
