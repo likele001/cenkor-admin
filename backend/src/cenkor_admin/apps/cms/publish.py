@@ -542,10 +542,31 @@ async def run_pending(db: AsyncSession, *, limit: int = 10) -> dict[str, int]:
         )
     ).scalars().all()
     if not rows:
-        return {"ran": 0, "success": 0, "failed": 0, "retry": 0}
+        return {"ran": 0, "success": 0, "failed": 0, "retry": 0, "skipped": 0}
 
-    stats = {"ran": 0, "success": 0, "failed": 0, "retry": 0}
+    stats = {"ran": 0, "success": 0, "failed": 0, "retry": 0, "skipped": 0}
     for job in rows:
+        # 站点关闭 auto_push 时，排队中的自动任务不再执行：
+        # 标 skipped 而不是删掉，运营在列表里能看到「为什么没发出去」。
+        # 手动发布走 publish_entry → run_job，不经过这里，不受开关影响。
+        channel_site = (
+            await db.execute(
+                select(am.CmsPublishChannel.site_id).where(
+                    am.CmsPublishChannel.id == job.channel_id
+                )
+            )
+        ).scalar()
+        if channel_site is not None:
+            from cenkor_admin.apps.cms.feature_flags import is_feature_enabled
+
+            if not await is_feature_enabled(db, channel_site, "auto_push"):
+                job.status = "skipped"
+                job.error = "站点已关闭自动推送（feature.auto_push=off）"
+                job.finished_at = datetime.now(UTC)
+                stats["skipped"] += 1
+                await db.commit()
+                continue
+
         res = await run_job(db, job)
         stats["ran"] += 1
         if res.ok:

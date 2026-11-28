@@ -60,6 +60,15 @@ _current_site_id: ContextVar[int | None] = ContextVar("cms_current_site_id", def
 # 豁免开关：站点管理、跨站统计等需要看全部数据
 _bypass: ContextVar[bool] = ContextVar("cms_site_bypass", default=False)
 
+
+class SiteScopeMissing(RuntimeError):
+    """strict 模式下查了带站点的表，却没有站点上下文。"""
+
+
+# fail-open / fail-closed 开关。默认 False 保持脚本与 CLI 的旧行为，
+# HTTP 请求由中间件打开；后台任务用 site_scope_for() 打开。
+_strict: ContextVar[bool] = ContextVar("cms_site_strict", default=False)
+
 _SCOPED: tuple[type, ...] | None = None
 
 
@@ -68,23 +77,64 @@ def scoped_models() -> tuple[type, ...]:
     global _SCOPED
     if _SCOPED is None:
         from cenkor_admin.apps.builder.models import Page
-        from cenkor_admin.apps.cms.ai.models import CmsAiBatchItem, CmsAiBatchJob
+        from cenkor_admin.apps.cms.ai.models import (
+            CmsAiAbRun,
+            CmsAiBatchItem,
+            CmsAiBatchJob,
+            CmsAiEntryDigest,
+            CmsAiGeneration,
+            CmsAiMemory,
+            CmsAiReview,
+            CmsAiSession,
+            CmsAiVideoJob,
+        )
+        from cenkor_admin.apps.cms.ai.workflow_models import CmsWorkflow, CmsWorkflowRun
+        from cenkor_admin.apps.cms.analytics_models import (
+            CmsEntryStatsDaily,
+            CmsPublishChannel,
+            CmsSearchLog,
+            CmsTrackEvent,
+        )
+        from cenkor_admin.apps.cms.knowledge_models import KbDoc
+        from cenkor_admin.apps.cms.site_plan_models import SitePlan, SitePlanItem
+        from cenkor_admin.apps.cms.seo_push_models import SeoPushJob
+        from cenkor_admin.apps.cms.ab_models import AbTest
+        # monitor 是商业闭源模块（不进公开仓库）。公开包里没有它，
+        # 这里必须降级成空元组，否则 scoped_models() 直接 ImportError。
+        try:
+            from cenkor_admin.apps.monitor.models import MonTarget, MonChannel
+            _mon_models: tuple[type, ...] = (MonTarget, MonChannel)
+        except (ImportError, ModuleNotFoundError):
+            _mon_models = ()
         from cenkor_admin.apps.cms.models import (
             Case,
             Category,
             Entry,
+            EntryLink,
             Media,
             News,
             Product,
             Tag,
         )
+        from cenkor_admin.apps.cms.template_models import CmsTemplate
         from cenkor_admin.apps.forms.models import Form
 
         # 批次与批次条目也带 site_id：一个站点的批量生产不该被别的站点看到，
         # 更不该把草稿写进别的站点。
         _SCOPED = (
-            Entry, Category, Tag, Media, Product, Case, News, Page, Form,
-            CmsAiBatchJob, CmsAiBatchItem,
+            # 内容归属
+            Entry, EntryLink, Category, Tag, Media, Product, Case, News, Page, Form,
+            # 批量生产与 AI 产物
+            CmsAiBatchJob, CmsAiBatchItem, CmsAiGeneration, CmsAiReview,
+            CmsAiAbRun, CmsAiVideoJob, CmsAiMemory, CmsAiEntryDigest, CmsAiSession,
+            # 工作流 / 知识库 / 模板
+            CmsWorkflow, CmsWorkflowRun, KbDoc, CmsTemplate,
+            # 发布与统计
+            CmsPublishChannel, CmsTrackEvent, CmsEntryStatsDaily, CmsSearchLog,
+            # 建站方案 / 收录推送 / A/B
+            SitePlan, SitePlanItem, SeoPushJob, AbTest,
+            # 巡检（闭源模块，公开包中为空）
+            *_mon_models,
         )
     return _SCOPED
 
@@ -103,6 +153,28 @@ def set_current_site(site_id: int | None) -> Any:
 
 def reset_current_site(token: Any) -> None:
     _current_site_id.reset(token)
+
+
+@contextmanager
+def site_scope_for(site_id: int | None) -> Iterator[None]:
+    """后台任务/定时任务入口：设站点上下文，并开启 strict。"""
+    sid_token = _current_site_id.set(site_id)
+    strict_token = _strict.set(site_id is not None)
+    try:
+        yield
+    finally:
+        _strict.reset(strict_token)
+        _current_site_id.reset(sid_token)
+
+
+@contextmanager
+def site_scope_strict(enabled: bool = True) -> Iterator[None]:
+    """只切 fail-closed 开关，不动当前站点（临时演练用）。"""
+    token = _strict.set(enabled)
+    try:
+        yield
+    finally:
+        _strict.reset(token)
 
 
 @contextmanager
@@ -129,8 +201,18 @@ def require_site_id() -> int:
 def _install_events() -> None:
     @event.listens_for(Session, "do_orm_execute")
     def _apply_site_filter(execute_state: Any) -> None:
+        if _bypass.get():
+            return
         sid = _current_site_id.get()
-        if sid is None or _bypass.get():
+        if sid is None:
+            # 旧行为：静默放行（脚本/迁移）。strict 下改成直接报错，
+            # 否则后台任务会把 A 站的数据当成 B 站的。
+            if _strict.get():
+                raise SiteScopeMissing(
+                    "站点上下文缺失：本次查询命中带 site_id 的表，但没有当前站点。"
+                    "后台任务入口请用 site_scope_for(site_id) 包一层；"
+                    "确需跨站请显式 with site_scope_bypass()。"
+                )
             return
         if not execute_state.is_select:
             return
@@ -148,8 +230,20 @@ def _install_events() -> None:
 
     @event.listens_for(Session, "before_flush")
     def _stamp_site_id(session: Session, flush_context: Any, instances: Any) -> None:
+        if _bypass.get():
+            return
         sid = _current_site_id.get()
-        if sid is None or _bypass.get():
+        if sid is None:
+            # 不拦的话会写出 site_id=NULL 的行，之后任何站点都查不到，
+            # 变成「看得见写入、看不见数据」的幽灵记录。
+            if _strict.get() and any(
+                isinstance(o, scoped_models()) and getattr(o, "site_id", None) is None
+                for o in session.new
+            ):
+                raise SiteScopeMissing(
+                    "写入被拦：对象缺 site_id 且没有当前站点。"
+                    "请用 site_scope_for(site_id) 包住写入逻辑。"
+                )
             return
         models = scoped_models()
         for obj in session.new:
@@ -262,11 +356,13 @@ async def site_scope_middleware(request: Request, call_next: Any) -> Any:
         sid, source = cache.default, "default"
 
     token = _current_site_id.set(sid)
+    strict_token = _strict.set(True)
     try:
         request.state.site_id = sid
         request.state.site_source = source
         return await call_next(request)
     finally:
+        _strict.reset(strict_token)
         _current_site_id.reset(token)
 
 

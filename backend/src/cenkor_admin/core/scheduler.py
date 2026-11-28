@@ -59,6 +59,19 @@ async def scheduler_tick() -> dict[str, int]:
                 models.Entry.scheduled_at <= now,
             )
         )).all()
+
+        # 站点级开关：关掉 auto_publish 的站点，到点也不发，停在 approved 等人点。
+        # 必须在算 due_ids 之前过滤，否则关闭开关的站点会跟着一起上线。
+        if due_rows:
+            from cenkor_admin.apps.cms.feature_flags import is_feature_enabled
+
+            allowed = {
+                sid
+                for sid in {r.site_id for r in due_rows}
+                if await is_feature_enabled(db, sid, "auto_publish")
+            }
+            due_rows = [r for r in due_rows if r.site_id in allowed]
+
         due_ids = [r.id for r in due_rows]
         if due_ids:
             await db.execute(

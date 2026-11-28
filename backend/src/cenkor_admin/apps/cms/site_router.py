@@ -390,3 +390,43 @@ async def site_legacy(site_id: int, db: DBSession) -> dict[str, int]:
 
 
 __all__ = ["router"]
+
+
+# ---------------------------------------------------------------- 站点自动化开关
+class SiteFeaturesIn(BaseModel):
+    """只允许改这五个键，未知键在 service 层拒绝。"""
+
+    auto_publish: bool | None = None
+    auto_image: bool | None = None
+    auto_seo: bool | None = None
+    auto_push: bool | None = None
+    auto_translate: bool | None = None
+
+
+@router.get("/{site_id}/features", summary="站点自动化开关")
+async def get_site_features(site_id: int, db: DBSession) -> dict[str, Any]:
+    from cenkor_admin.apps.cms.feature_flags import FEATURES, get_features
+
+    try:
+        feats = await get_features(db, site_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "features": feats,
+        "labels": {k: v["label"] for k, v in FEATURES.items()},
+        "defaults": {k: v["default"] for k, v in FEATURES.items()},
+    }
+
+
+@router.put("/{site_id}/features", summary="修改站点自动化开关")
+async def put_site_features(
+    site_id: int, body: SiteFeaturesIn, db: DBSession
+) -> dict[str, Any]:
+    from cenkor_admin.apps.cms.feature_flags import FEATURES, set_features
+
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    try:
+        feats = await set_features(db, site_id, patch)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"features": feats, "labels": {k: v["label"] for k, v in FEATURES.items()}}
