@@ -23,6 +23,18 @@ from cenkor_admin.apps.cms.public_router import router as cms_public_router
 from cenkor_admin.apps.cms.rbac_guard import cms_permission_guard
 from cenkor_admin.apps.cms.router import router as cms_router
 from cenkor_admin.apps.cms.site_router import router as cms_site_router
+from cenkor_admin.apps.cms.site_plan_router import router as cms_site_plan_router
+from cenkor_admin.apps.cms.sensitive_router import router as cms_sensitive_router
+from cenkor_admin.apps.cms.product_ai_router import router as cms_product_ai_router
+# 站点监控是商业闭源模块，公开包中没有它
+try:
+    from cenkor_admin.apps.monitor.router import router as monitor_router
+except (ImportError, ModuleNotFoundError):
+    monitor_router = None  # type: ignore[assignment]
+from cenkor_admin.apps.cms.bulk_edit_router import router as cms_bulk_edit_router
+from cenkor_admin.apps.cms.seo_push_router import router as cms_seo_push_router
+from cenkor_admin.apps.cms.ab_router import router as cms_ab_router
+from cenkor_admin.apps.cms.export_router import router as cms_delivery_router
 from cenkor_admin.apps.cms.template_router import router as template_router
 from cenkor_admin.apps.cms.theme_asset_router import router as cms_theme_asset_router
 from cenkor_admin.apps.cms.theme_market_router import router as theme_market_router
@@ -129,6 +141,47 @@ api_v1_router.include_router(
     cms_site_router, prefix="/cms", tags=["cms-sites"],
     dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
 )
+# 建站方案编排（需求 → 栏目+选题 → 确认 → 执行）
+api_v1_router.include_router(
+    cms_site_plan_router, prefix="/cms", tags=["cms-site-plans"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 敏感词库（block 拦截提交 / warn 审核提示）
+api_v1_router.include_router(
+    cms_sensitive_router, prefix="/cms", tags=["cms-sensitive"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 产品内容专用链路（文案 / 参数亮点 / TDK）
+api_v1_router.include_router(
+    cms_product_ai_router, prefix="/cms", tags=["cms-product-ai"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 批量编辑（TDK / 品牌词替换 / 外链体检）
+api_v1_router.include_router(
+    cms_bulk_edit_router, prefix="/cms", tags=["cms-bulk-edit"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 收录推送（IndexNow / 百度）
+api_v1_router.include_router(
+    cms_seo_push_router, prefix="/cms", tags=["cms-seo-push"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 页面级 A/B
+api_v1_router.include_router(
+    cms_ab_router, prefix="/cms", tags=["cms-ab"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 静态包导出 / CDN 刷新
+api_v1_router.include_router(
+    cms_delivery_router, prefix="/cms", tags=["cms-delivery"],
+    dependencies=[Depends(get_current_user), Depends(cms_permission_guard)],
+)
+# 站点监控（可用性巡检 + 企微/钉钉告警）—— 闭源模块，未安装则整块跳过
+if monitor_router is not None:
+    api_v1_router.include_router(
+        monitor_router, tags=["monitor"],
+        dependencies=[Depends(get_current_user)],
+    )
 # CMS MCP（Agent 接入）：鉴权走 MCP_API_KEY，绝不能套登录依赖，否则 Agent 进不来
 api_v1_router.include_router(cms_mcp_router, prefix="/cms", tags=["cms-mcp"])
 api_v1_router.include_router(

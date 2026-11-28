@@ -176,6 +176,13 @@ _PERM_RULES: tuple[tuple[str, str | None, str | None], ...] = (
     # 模板渲染决定对外呈现，等价于改站点配置
     # 站点增删改是对整个站群的写操作，跟 site-config 同级
     ("/sites", "cms:site:read", "cms:site:write"),
+    # 建站方案等同于改站点结构，跟站点管理同权限
+    ("/site-plans", "cms:site:read", "cms:site:write"),
+    # 敏感词影响全站发布口径，按站点写权限
+    ("/sensitive-words", "cms:site:read", "cms:site:write"),
+    ("/seo", "cms:site:read", "cms:site:write"),
+    ("/delivery", "cms:site:read", "cms:site:write"),
+    ("/ab", "cms:site:read", "cms:site:write"),
     ("/site-config", "cms:site:read", "cms:site:write"),
     ("/templates", "cms:site:read", "cms:site:write"),
     # ---------------- 媒体 ----------------
