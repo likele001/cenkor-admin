@@ -7,5 +7,19 @@
   "编辑_mekb": "Edit",
   "删除_eslg": "Delete",
   "该分类下_1bsetq": "This category has ${cat.children.length} subcategories. Please delete them first.",
-  "确定删除_k0guvi": "Are you sure you want to delete category \"${cat.name}\"?"
+  "确定删除_k0guvi": "Are you sure you want to delete category \"${cat.name}\"?",
+  "子分类_ds4g5": "Subcategories",
+  "栏目页地_119m3w": "Category page URL rule (optional)",
+  "留空_1tgby0": "Leave blank to use the site default, e.g. category/{slug}/",
+  "只决定这_1qw4zn": "Only sets this category page's own URL; article URLs under the category are unaffected.",
+  "该栏目下_xc1aj4": "Article URL rule for this category (optional)",
+  "留空_1r16sk": "Leave blank to use the site default, e.g. {catdir}/{slug}.html",
+  "只对这个_1i0ep1": "Applies only to article detail pages in this category; after a rule change old URLs 301 automatically instead of 404.",
+  "栏目模板_8qb3gk": "Category template (optional)",
+  "留空_lt6vao": "Leave blank to use the default template",
+  "主题内的_n1yr2e": "Template filename inside the theme (editable online in Template Preview). A nonexistent filename falls back to the default template.",
+  "编辑分类_gmhewg": "Edit category",
+  "新建分类_d81iin": "New category",
+  "保存中_agdrec": "Saving…",
+  "保存_e32z": "Save"
 }

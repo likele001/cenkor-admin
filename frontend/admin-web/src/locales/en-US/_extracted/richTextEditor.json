@@ -44,5 +44,7 @@
   "合并单元_1kp8i8": "Merge cells",
   "拆分单元_15qqxd": "Split cell",
   "替换图片_denfyk": "Replace image",
-  "删除图片_azcrpp": "Delete image"
+  "删除图片_azcrpp": "Delete image",
+  "支持粘贴_7c4tn4": "Paste images / Markdown shortcuts (`# `, `- `, `> `, `---`)",
+  "字_i1j": "chars"
 }

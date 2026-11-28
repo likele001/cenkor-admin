@@ -13,5 +13,13 @@
   "应用到当_1gem01": "Apply to current field",
   "cancel": "Cancel",
   "应用只改_q5ble4": "Applying only updates the form; it is saved to the database after you save",
-  "想要什么_y5lkeh": "What effect do you want? For example: make it sound like a Xiaohongshu post, emphasize value for money, keep it under 60 characters"
+  "想要什么_y5lkeh": "What effect do you want? For example: make it sound like a Xiaohongshu post, emphasize value for money, keep it under 60 characters",
+  "正文按段_1myhoh": "Rewrites the body paragraph by paragraph, keeping formatting",
+  "整段改写_d8xczl": "Rewrite whole section",
+  "改写中_d3xtll": "Rewriting…",
+  "再来一次_aptj15": "Try again",
+  "上面选个_1vzmqi": "Pick an action above to try it",
+  "选择一个_d2kvvi": "Choose a rewrite action",
+  "收起修改_1mrcb2": "Hide before-edit",
+  "查看修改_1uf9tz": "View before-edit"
 }

@@ -25,5 +25,22 @@
   "应到账_ca6qj4": "Amount due:",
   "打款凭证_1u74zh": "Payout proof (transfer or transaction number)",
   "如_dw41l3": "e.g. Payment details do not match the verified name — please correct and resubmit",
-  "如_8olvp1": "e.g. Alipay transaction 2026092300123"
+  "如_8olvp1": "e.g. Alipay transaction 2026092300123",
+  "审核通过_67o9im": "Once approved, pay offline and then record the receipt; if rejected, the amount returns to the developer's withdrawable balance. Total",
+  "单_ggl": "",
+  "凭证_ep9w": "Receipt",
+  "申请_kpb8": "Requested",
+  "打款_hb9n": "Paid",
+  "备注_fqo1": "Note",
+  "共_g35": "Total ",
+  "条_kf5": "items",
+  "申请_fcnpgp": "Requested ¥",
+  "text_82gwtg": "; if rejected the amount returns to their withdrawable balance.",
+  "开发者_cca1xi": "Developer: ",
+  "text_i32ldd": " (requested ¥",
+  "text_1pcyv8": ", fee ¥",
+  "收款_fdbo2": "Payee: ",
+  "提交中_cx3q0d": "Submitting…",
+  "确认驳回_fs0s3l": "Confirm rejection",
+  "确认已打_1qp7da": "Confirm payment sent"
 }

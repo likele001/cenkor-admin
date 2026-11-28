@@ -1,7 +1,7 @@
 {
   "text_13sgpm": "🌐 Language management",
   "内容多语_vu37kp": "Content multilingual i18n (M1·P0)",
-  "新增语言_d7dwkh": "New language",
+  "新增语言_d7dwkh": "Add language",
   "语言_ok37": "Language",
   "代码_e2ri": "Code",
   "默认_rs98": "Default",
@@ -17,5 +17,8 @@
   "cancel": "Cancel",
   "保存_e32z": "Save",
   "如_1nmqez": "e.g. en-US / ja-JP",
-  "如_1rw6yw": "e.g. English / 日本語"
+  "如_1rw6yw": "e.g. English / 日本語",
+  "启用_eymx": "Enable",
+  "停用_eb7w": "Disable",
+  "编辑语言_gmrc4u": "Edit language"
 }

@@ -35,5 +35,8 @@
   "密码已重_j7r1zs": "Password reset",
   "确定将_cavmi0": "Are you sure you want to change ${user.username} status to ${newStatus}?",
   "确定软删_ew94ht": "Are you sure you want to soft delete ${user.username}?",
-  "下一页_btmf4_2": "Next page"
+  "下一页_btmf4_2": "Next page",
+  "重置密码_1xu8ct": "Reset password — ",
+  "创建中_ar3fh4": "Creating…",
+  "创建_ehj3": "Create"
 }

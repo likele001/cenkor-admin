@@ -47,5 +47,17 @@
   "工作流名_mfpogd": "Workflow name",
   "一句话说_nopzgo": "Describe in one sentence what this pipeline does",
   "text_f3ja35": "cron, e.g. 0 8 * * 1",
-  "拖到另一_2m73j": "Drag onto another node to create a connection"
+  "拖到另一_2m73j": "Drag onto another node to create a connection",
+  "步_jo04": " steps)",
+  "连线_lpkef": "Connections (",
+  "点一下填_1k6cym": "Click to fill into “",
+  "执行_cyrs7c": "Run #",
+  "节点明细_gxljjj": "Node details",
+  "保存中_agdrec": "Saving…",
+  "保存_c4nlb": "Save*",
+  "已保存_e5ggd": "Saved",
+  "开启_gmcv": "On",
+  "text_1tx4sc": " (select options first)",
+  "触发中_hqsmmc": "Triggering…",
+  "开始运行_cd7lon": "Start run"
 }

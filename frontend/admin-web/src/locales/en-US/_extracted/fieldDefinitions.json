@@ -29,5 +29,12 @@
   "基础信息_blh1h0": "Basic info",
   "图标_fd8p": "Icon",
   "确定删除_7yjm52": "Are you sure you want to delete field \"${fd.label}\"?",
-  "确定删除_64vgld": "Are you sure you want to delete group \"${fg.label}\"? Fields will not be deleted but will become ungrouped."
+  "确定删除_64vgld": "Are you sure you want to delete group \"${fg.label}\"? Fields will not be deleted but will become ungrouped.",
+  "text_1syn26": "— Field management",
+  "编辑字段_gmiwmx": "Edit field",
+  "新建字段_d83094": "New field",
+  "保存中_agdrec": "Saving…",
+  "保存_e32z": "Save",
+  "编辑分组_gmhfcp": "Edit group",
+  "新建分组_d81iyw": "New group"
 }

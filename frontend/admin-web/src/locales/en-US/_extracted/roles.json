@@ -11,5 +11,13 @@
   "描述_hrlt": "Description",
   "取消_ev02": "Cancel",
   "确定删除_1xzm4h": "Are you sure you want to delete role \"${r.name}\"?",
-  "删除失败_1kc17l": "Delete failed:"
+  "删除失败_1kc17l": "Delete failed:",
+  "角色列表_1mgp1q": "Role list (",
+  "权限_fvgor": "Permissions (",
+  "个_ep0f": ")",
+  "新建角色_d8b1d6": "New role",
+  "编辑角色_gmqxqz": "Edit role",
+  "保存中_agdrec": "Saving…",
+  "创建_ehj3": "Create",
+  "保存_e32z": "Save"
 }

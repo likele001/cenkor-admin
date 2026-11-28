@@ -33,5 +33,9 @@
   "text_1qjfyc": "Google Cloud Console → OAuth 客户端 ID",
   "已获授权_u27nzj": "已获授权的重定向 URI 填完整地址",
   "text_15xhbh": "Authorization callback URL 填完整地址",
-  "填入开放_1js71l": "填入开放平台的应用 ID"
+  "填入开放_1js71l": "填入开放平台的应用 ID",
+  "还没有任_1ncqsd": "还没有任何渠道配置完整。前台登录页此时不会显示第三方按钮， 账号密码登录不受影响。",
+  "text_11tftu": "（当前",
+  "保存中_agdrec": "保存中…",
+  "保存域名_agfp0p": "保存域名"
 }

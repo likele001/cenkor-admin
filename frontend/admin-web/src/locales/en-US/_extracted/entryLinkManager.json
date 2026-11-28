@@ -11,5 +11,15 @@
   "该状态下_19d3m9": "No internal links in this status",
   "还没有内_1clvkr": "No internal links yet. Click \"Analyze suggestions\" to find content that should link to each other; you can review and manage them after saving.",
   "插入会追_1h3fli": "Inserted as a \"Related reading\" section appended to the body; the position can still be adjusted after saving",
-  "用向量召_a9w5zy": "Vector recall picks candidates, then the model decides whether each link fits"
+  "用向量召_a9w5zy": "Vector recall picks candidates, then the model decides whether each link fits",
+  "text_wb8tcs": "AI suggestions (",
+  "已保存_c6qkgr": "Saved (",
+  "分析中_arzalf": "Analyzing…",
+  "分析建议_as2qpq": "Analysis suggestions",
+  "保存中_agdrec": "Saving…",
+  "全部保存_av90uz": "Save all",
+  "再插入_cffvk": "Insert again",
+  "插入正文_cxovbr": "Insert into body",
+  "已保存_e5ggd": "Saved",
+  "保存待审_agh1cn": "Save for review"
 }

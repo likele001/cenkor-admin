@@ -1,7 +1,7 @@
 {
   "链接收藏_j7lz40": "Link collection",
   "书签与外_4crv2c": "Manage bookmarks and collected external links",
-  "添加链接_e8786k": "Add link",
+  "添加链接_e8786k": "Add bookmark",
   "通用_p5ji": "General",
   "开发_gma9": "Development",
   "设计_ojab": "Design",
@@ -20,5 +20,8 @@
   "收藏_hy6x": "Favorite",
   "cancel": "Cancel",
   "搜索标题_w7pnpz": "Search title/URL...",
-  "可选_f5tw8p": "Optional; defaults to the URL"
+  "可选_f5tw8p": "Optional; defaults to the URL",
+  "编辑链接_gmso2q": "Edit bookmark",
+  "保存中_vts3p8": "Saving...",
+  "保存_e32z": "Save"
 }

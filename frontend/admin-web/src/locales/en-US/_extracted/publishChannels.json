@@ -18,5 +18,19 @@
   "渠道_jiur": "Channels",
   "status": "Status",
   "尝试_gfo8": "Try",
-  "结果_1fnmce": "Result / Reason"
+  "结果_1fnmce": "Result / Reason",
+  "标识_igm7": "Key",
+  "text_3v5vd": "· type",
+  "已启用_e6c0b": "Enabled",
+  "未启用_fixz7": "Disabled",
+  "停用_eb7w": "Disable",
+  "启用_eymx": "Enable",
+  "保存中_agdrec": "Saving…",
+  "保存配置_agpp98": "Save configuration",
+  "无需配置_1ilg05": "No configuration needed. Publishing outputs paste-ready HTML / plain text / a cover list.",
+  "无需在此_oz0g0v": "No setup here — it uses the subscriptions already defined under System / Webhooks.",
+  "测试中_ed42yr": "Testing…",
+  "连通性测_cunp3p": "Connectivity test",
+  "收起说明_dcyh5n": "Hide description",
+  "怎么配_eglub": "How to configure"
 }

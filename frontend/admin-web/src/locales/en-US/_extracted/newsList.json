@@ -11,5 +11,7 @@
   "编辑_mekb": "Edit",
   "删除_eslg": "Delete",
   "确定删除_8vpeu5": "Are you sure you want to delete \"${n.title}\"?",
-  "删除失败_1kc17l": "Delete failed:"
+  "删除失败_1kc17l": "Delete failed:",
+  "新闻列表_1pplih": "News list (",
+  "已发布_e656s": "Published"
 }

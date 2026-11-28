@@ -5,5 +5,11 @@
   "text_i80r5k": ", write directly",
   "无法反解_daxlkb": "Cannot be reversed",
   "示例_i65k9": "Example:",
-  "选择常用_52widf": "Select a common rule template"
+  "选择常用_52widf": "Select a common rule template",
+  "text_bh7f9e": "⚠️ The rule must include",
+  "其中之一_1efbnb": " one of these, otherwise the frontend cannot resolve this URL",
+  "text_upy5ks": "⚠️ Duplicate variable: ",
+  "text_ambclj": " — using one variable twice makes the URL ambiguous",
+  "text_d1vzul": "⚠️ Unknown variable: ",
+  "text_o3tq16": " — check for typos"
 }

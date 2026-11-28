@@ -21,5 +21,11 @@
   "撤销失败_1liumu": "Revoke failed:",
   "删除_1aggqu": "Are you sure you want to delete \"${k.name}\"? This action cannot be undone.",
   "删除失败_1kc17l": "Delete failed:",
-  "复制失败_1xgj2m": "Copy failed, please select and copy manually"
+  "复制失败_1xgj2m": "Copy failed, please select and copy manually",
+  "取消_ev02": "Cancel",
+  "text_1elae6": "+ New API Key",
+  "创建中_ar3fh4": "Creating…",
+  "创建_ehj3": "Create",
+  "已复制_e6ywr": "Copied",
+  "复制_fljd": "Copy"
 }

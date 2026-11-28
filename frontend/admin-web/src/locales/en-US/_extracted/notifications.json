@@ -19,5 +19,9 @@
   "cancel": "Cancel",
   "通知标题_iodwho": "Notification title",
   "通知内容_bw7qw6": "Notification content (optional)",
-  "text_1m9n0q": "/system/notifications (optional)"
+  "text_1m9n0q": "/system/notifications (optional)",
+  "查看全部_dll6ti": "View all",
+  "只看未读_b2yt6a": "Unread only",
+  "发送中_6kni41": "Sending...",
+  "发送给所_d4ikfc": "Send to everyone"
 }

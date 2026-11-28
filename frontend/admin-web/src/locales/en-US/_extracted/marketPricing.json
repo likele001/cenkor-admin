@@ -28,5 +28,13 @@
   "平台自营_17p7b2": "The platform charges no commission on its own products; the rate is always 0.",
   "cancel": "Cancel",
   "搜索_mamtnr": "Search app_key",
-  "原价_1rm6if": "Original price (strikethrough, display only, not used for settlement)"
+  "原价_1rm6if": "Original price (strikethrough, display only, not used for settlement)",
+  "共_g35": "Total ",
+  "个商品_1ybz4j": " products · global default fee",
+  "条_kf5": "items",
+  "用全局默_14pw8u": "Use global default (",
+  "在售_faiu": "On sale",
+  "已下架_e57r1": "Delisted",
+  "保存中_agdrec": "Saving…",
+  "保存_e32z": "Save"
 }

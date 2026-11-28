@@ -32,5 +32,17 @@
   "打开草稿_hysuqd": "Open draft →",
   "左侧选一_8donlr": "Select a batch on the left to see details, or click \"New\" to start one.",
   "默认用_tfpd0m": "Defaults to \"Type · Time\"",
-  "春季新品_1dp6lb": "Spring product launch: focus on lightweight portability, aimed at commuters&#10;Customer follow-up: 5 key points of equipment maintenance&#10;Industry watch: three changes in content marketing in 2026"
+  "春季新品_1dp6lb": "Spring product launch: focus on lightweight portability, aimed at commuters&#10;Customer follow-up: 5 key points of equipment maintenance&#10;Industry watch: three changes in content marketing in 2026",
+  "text_48js": " · total ",
+  "篇_g1a7dp": " articles · concurrency ",
+  "text_35ob46": "· created ",
+  "text_3q5sk": "· started ",
+  "text_3vncl": "· finished ",
+  "重试失败_iyy7cs": "Retry failed",
+  "成功_h4sv": "Success",
+  "text_3pgd9": "· failed",
+  "text_3yfy5": "· skipped",
+  "执行器报_153w76": "Executor error: ",
+  "继续_ma5i": "Continue",
+  "开始_gngr": "Start"
 }

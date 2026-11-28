@@ -26,5 +26,11 @@
   "删除失败_1kc17l": "Delete failed:",
   "密码至少_l7s2vy": "Password must be at least 8 characters",
   "密码已重_j7r1zs": "Password reset",
-  "失败_drpmu": "Failed:"
+  "失败_drpmu": "Failed:",
+  "用户列表_18mt02": "User list (",
+  "新建用户_d87cgp": "New user",
+  "编辑用户_gmn8ui": "Edit user",
+  "保存中_agdrec": "Saving…",
+  "创建_ehj3": "Create",
+  "保存_e32z": "Save"
 }

@@ -19,5 +19,7 @@
   "打开_h8ul": "Open",
   "删除_eslg": "Delete",
   "确定删除_1iag8y": "Are you sure you want to delete media ${m.key}?",
-  "删除失败_1kc17l": "Delete failed:"
+  "删除失败_1kc17l": "Delete failed:",
+  "text_b4l9ym": "✓ Copied",
+  "复制_yf5v20": "Copy URL"
 }

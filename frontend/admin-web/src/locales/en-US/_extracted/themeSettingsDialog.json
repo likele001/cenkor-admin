@@ -8,5 +8,13 @@
   "全部恢复_4rrwxj": "Restore all defaults",
   "cancel": "Cancel",
   "已从默认_89l04j": "Changed from default",
-  "恢复此项_1kzkib": "Restore this item's default value"
+  "恢复此项_1kzkib": "Restore this item's default value",
+  "已改_gj9j": "Changed",
+  "项_u49": "",
+  "里声明主_106pur": " declare options such as primary color and font size; a form appears here automatically once declared.",
+  "开_irk": "On",
+  "关_g37": "Off",
+  "改动保存_1jd3at": "Saving takes effect on the next frontend refresh",
+  "保存中_agdrec": "Saving…",
+  "保存_e32z": "Save"
 }

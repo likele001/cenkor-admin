@@ -9,5 +9,10 @@
   "取消_ev02": "Cancel",
   "确定删除_hxlnzo": "Are you sure you want to delete tag \"${tag.name}\"?",
   "标签页地_ul7b8q": "Tab page URL rules (optional)",
-  "决定这个_l1h4u2": "Sets the address of this tab page. Tab pages are the most SEO-friendly, so a short slug is recommended."
+  "决定这个_l1h4u2": "Sets the address of this tab page. Tab pages are the most SEO-friendly, so a short slug is recommended.",
+  "留空_rqvi1g": "Leave blank to use the site default, e.g. tag/{slug}/",
+  "编辑标签_gml5g2": "Edit tag",
+  "新建标签_d85929": "New tag",
+  "保存中_agdrec": "Saving…",
+  "保存_e32z": "Save"
 }

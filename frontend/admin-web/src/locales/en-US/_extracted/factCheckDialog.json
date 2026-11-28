@@ -16,5 +16,7 @@
   "没有_f4fwup": "There are no \"cannot confirm\" sentences.",
   "规则比对_hq386y": "Rule comparison",
   "模型判定_dr45q8": "Model verdict",
-  "未引用任_b2du2w": "Cites no sources"
+  "未引用任_b2du2w": "Cites no sources",
+  "依据来源_145102": "Sources: ",
+  "核验只做_9j3mjx": "Verification only warns; it does not block publishing. Sources are the drafting material, the enterprise knowledge base and published on-site content. Off-site facts (original news coverage, industry common knowledge) inherently cannot be verified, so “no basis found” is normal — please confirm manually."
 }

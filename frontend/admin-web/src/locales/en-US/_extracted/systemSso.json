@@ -33,5 +33,9 @@
   "text_1qjfyc": "Google Cloud Console → OAuth Client ID",
   "已获授权_u27nzj": "Enter the full authorized redirect URI",
   "text_15xhbh": "Enter the full Authorization callback URL",
-  "填入开放_1js71l": "Enter the app ID from the open platform"
+  "填入开放_1js71l": "Enter the app ID from the open platform",
+  "还没有任_1ncqsd": "No channel is fully configured yet. The public login page shows no third-party buttons; username/password login is unaffected.",
+  "text_11tftu": " (current ",
+  "保存中_agdrec": "Saving…",
+  "保存域名_agfp0p": "Save domain"
 }

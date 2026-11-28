@@ -24,5 +24,8 @@
   "成交后经_be9m0h": "Transferred to the withdrawable balance N days after the deal closes",
   "单笔提现_16ylge": "Minimum withdrawal amount (CNY)",
   "提现手续_i7yys5": "Withdrawal fee (%)",
-  "text_admtw2": "0 means the platform covers the fee"
+  "text_admtw2": "0 means the platform covers the fee",
+  "合计_b6082m": "Total ¥",
+  "保存中_agdrec": "Saving…",
+  "保存参数_agf39l": "Save parameters"
 }
