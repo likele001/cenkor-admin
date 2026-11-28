@@ -75,6 +75,29 @@
   捕获不受影响）、删掉指向未启用规则 `BLE001` 的失效 `# noqa`（RUF100）并改写成解释性注释
 - 关掉 pnpm 时代的残留：删 `frontend/*/pnpm-workspace.yaml`，`.gitignore` 补
   `pnpm-lock.yaml` / `yarn.lock` / `frontend/*/package-lock.json` 防回归
+- **i18n 批量改造脚本推翻重写**（`codemod-rewrite.mjs`，357 → 709 行）。上一版跑出的 122 文件
+  改动**不可用**：页面会直接显示 `t("ns.key")` 这串字面文字。根因是它只替换引号内部——`'保存'`
+  被改成 `'t("usersList.保存")'`，外层引号还在，结果只是个普通字符串。实测 631 处、62 个文件
+- 重写时共修掉 9 个缺陷，后 4 个是跑 `vue-tsc` 才暴露的，光读代码发现不了：
+  ① 只替换引号内部 → 死字符串；② 反查索引只认裸 key，认不出 `_index.json` 的带前缀 key，
+  明明有翻译却重复造键；③ `seenSlugs` 是全局 Set，跨命名空间互相顶掉；④ 只扫 `src/views`，
+  漏掉 components / layouts；⑤ 写回 `common.json` 嵌套结构，与现存的 `_extracted/<ns>.json`
+  扁平结构不一致；⑥ HEAD 里**本来就有 86 处**历史死字符串（上一版遗留）无人处理；
+  ⑦ 模块顶层 `const L={a:t('中文')}` 只在加载时求值，切语言不更新；
+  ⑧ **参数名遮蔽 `t`** —— `async function removeTurn(t: TurnItem)` 里的 `t` 是业务参数，
+  注入 `t("key")` 等于把对象当函数调用，类型检查报 `not callable`、运行时必崩；
+  ⑨ `v-for="t in list"` 同样遮蔽，模板侧也要防
+- 顺带修两个语法坑：`:srcdoc="...'<p>中文</p>'"` 这类属性值内嵌标签会被误当文本节点改写
+  （改用 `maskTags` 逐字符扫描，保留标签 `<>` 边界、抹平属性值内容）；属性值内 `t()` 用双引号
+  会与 HTML 属性引号冲突，统一改单引号
+- **清理 30 条历史遗留垃圾键**：`common.json` 里形如 `"保存": "保存'"`、
+  `"includeDeletedundefinedt": "includeDeleted ? undefined : t(...)"` 的脏数据，
+  来自 `a47fdb1`（2026-07-02，提交说明写的是「更新并重构 V2 架构文档」，实际混进 307 行
+  被错误处理的 i18n），埋了 4 个月。全部是孤儿键（无任何 `t()` 引用），删除零风险；
+  注意 `_index.json` 是带前缀镜像，必须同步删，否则仍会被 `mergeModules` 加载
+- 改造后验收：死字符串 631 → 0、key 命中率 98.2%（缺失 40 个全是 HEAD 原有）、
+  长文本跨模块串用 0 种、`npm run build` 通过（22.07s），且类型检查报错与原始 HEAD
+  **完全一致**（仅 5 条 echarts 环境问题）
 
 ## 2026-11-24　部署链路修补：三种容器化方式的 nginx 缺口
 
