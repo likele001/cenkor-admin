@@ -521,10 +521,16 @@ async def main() -> None:
             print("=" * 68 + "\n")
 
         # ---- 站点配置 ----
+        # seed 场景没有站点上下文（CLI 脚本），初始化配置一律落在主站
+        # site_id=1。多站点的其余配置由 create_site 从主站复制。
         for key, value, desc in DEFAULT_SITE_CONFIGS:
-            existing = await db.get(cms_models.SiteConfig, key)
+            existing = await db.get(cms_models.SiteConfig, (1, key))
             if not existing:
-                db.add(cms_models.SiteConfig(key=key, value=value, description=desc))
+                db.add(
+                    cms_models.SiteConfig(
+                        site_id=1, key=key, value=value, description=desc
+                    )
+                )
         await db.commit()
         log.info("seed.site_config.done", count=len(DEFAULT_SITE_CONFIGS))
 

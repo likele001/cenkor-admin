@@ -817,11 +817,19 @@ class Site(Base):
 
 class SiteConfig(Base):
 
-    """站点配置 KV（key-value，value 为 JSON）"""
+    """站点配置 KV（key-value，value 为 JSON）。
+
+    复合主键 ``(site_id, key)``：多站点下每个站要有自己的品牌名、SEO 默认值、
+    联系方式。改造前 key 是单列主键，``brand.name`` 全站只能有一份。
+
+    存量 72 条配置归属 site_id=1（主站）。新建站点时由 ``site_router.create_site``
+    从主站复制一份作为初始值，之后各站独立演进 —— 这比「读取时回退到主站」
+    更直观：后台看到的就是本站实际生效的值，不需要猜「这个值继承自谁」。
+    """
 
     __tablename__ = "cms_site_config"
 
-
+    site_id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     key: Mapped[str] = mapped_column(String(80), primary_key=True)
 

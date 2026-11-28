@@ -118,6 +118,7 @@ def scoped_models() -> tuple[type, ...]:
             Media,
             News,
             Product,
+            SiteConfig,
             Tag,
         )
         from cenkor_admin.apps.cms.template_models import CmsTemplate
@@ -126,6 +127,10 @@ def scoped_models() -> tuple[type, ...]:
         # 批次与批次条目也带 site_id：一个站点的批量生产不该被别的站点看到，
         # 更不该把草稿写进别的站点。
         _SCOPED = (
+            # 站点配置：brand.name / seo.* / contact.* 必须按站隔离，
+            # 否则 A 站改品牌名会把 B 站一起改掉。
+            # 注意它没有 deleted_at，也不参与软删除，是纯归属表。
+            SiteConfig,
             # 内容归属
             Entry, EntryLink, Category, Tag, Media, Product, Case, News, Page, Form,
             # 批量生产与 AI 产物

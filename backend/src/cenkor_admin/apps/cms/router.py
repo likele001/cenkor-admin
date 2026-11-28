@@ -18,6 +18,7 @@ from cenkor_admin.core.compat import order_nulls_last
 from cenkor_admin.core.config import get_settings
 from cenkor_admin.core.db import get_db
 from cenkor_admin.core.hooks import dispatch
+from cenkor_admin.core.site_scope import current_site_id
 from cenkor_admin.core.repository import (
     apply_filters,
     paginate,
@@ -373,13 +374,19 @@ async def batch_delete_cases(body: dict, db: AsyncSession = Depends(get_db)):
 # ===== Site Config =====
 @router.get("/site-config", response_model=dict[str, Any])
 async def list_site_configs(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.SiteConfig))
+    # 显式带 site_id：scoped_models 已含 SiteConfig，但后台管理页有时在
+    # bypass 上下文（跨站统计）里调用，不能依赖隐式过滤。
+    sid = current_site_id() or 1
+    result = await db.execute(
+        select(models.SiteConfig).where(models.SiteConfig.site_id == sid)
+    )
     return {"items": [_to_site_config_dict(s) for s in result.scalars().all()]}
 
 
 @router.get("/site-config/{key}", response_model=schemas.SiteConfigOut)
 async def get_site_config(key: str, db: AsyncSession = Depends(get_db)):
-    obj = await db.get(models.SiteConfig, key)
+    # 复合主键 (site_id, key)：必须带上当前站点，否则 db.get 会报主键参数个数不符
+    obj = await db.get(models.SiteConfig, (current_site_id() or 1, key))
     if not obj:
         raise HTTPException(404, "Config not found")
     return obj
@@ -389,13 +396,18 @@ async def get_site_config(key: str, db: AsyncSession = Depends(get_db)):
 async def upsert_site_config(
     key: str, body: schemas.SiteConfigUpdate, db: AsyncSession = Depends(get_db)
 ):
-    obj = await db.get(models.SiteConfig, key)
+    # 只读写**当前站点**那一行。别的站点的同名配置不受影响 ——
+    # 这是多站点改造的核心：A 站改 brand.name 不该动到 B 站。
+    sid = current_site_id() or 1
+    obj = await db.get(models.SiteConfig, (sid, key))
     old_value = obj.value if obj is not None else None
     if obj:
         obj.value = body.value
         obj.description = body.description
     else:
-        obj = models.SiteConfig(key=key, value=body.value, description=body.description)
+        obj = models.SiteConfig(
+            site_id=sid, key=key, value=body.value, description=body.description
+        )
         db.add(obj)
     # 改 URL 规则时把旧规则存档 —— 老地址要 301 到新地址，不能 404。
     #

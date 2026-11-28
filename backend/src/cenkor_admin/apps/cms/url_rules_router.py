@@ -33,6 +33,7 @@ from cenkor_admin.api.deps import get_current_user, require_permission
 from cenkor_admin.apps.auth import models as auth_models
 from cenkor_admin.apps.cms import models, permalink, url_resolver
 from cenkor_admin.core.db import get_db
+from cenkor_admin.core.site_scope import current_site_id
 
 log = structlog.get_logger(__name__)
 router = APIRouter()
@@ -321,7 +322,7 @@ async def save_url_rule(
         raise HTTPException(400, f"未知的规则类型 `{kind}`")
 
     pattern = body.pattern.strip()
-    old_row = await db.get(models.SiteConfig, key)
+    old_row = await db.get(models.SiteConfig, (current_site_id() or 1, key))
     old_value = old_row.value if old_row is not None else None
 
     if not pattern:
@@ -380,7 +381,11 @@ async def save_url_rule(
     if old_row is not None:
         old_row.value = normalized
     else:
-        db.add(models.SiteConfig(key=key, value=normalized))
+        db.add(
+            models.SiteConfig(
+                site_id=current_site_id() or 1, key=key, value=normalized
+            )
+        )
     await db.commit()
     # 缓存必须在 commit 之后清：commit 前清的话，并发请求会在 commit 前
     # 把**旧**规则重新写回缓存，改动等于没生效。
