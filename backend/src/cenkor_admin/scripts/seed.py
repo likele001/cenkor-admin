@@ -108,8 +108,10 @@ DEFAULT_MENUS = [
     ("cms:products", "cms", "产品", "package", "/cms/products", 54),
     ("cms:cases", "cms", "案例", "briefcase", "/cms/cases", 55),
     ("cms:news", "cms", "新闻", "file-text", "/cms/news", 56),
-    ("cms:site", "cms", "站点配置", "settings", "/cms/site", 57),
-    ("cms:url-rules", "cms", "URL 规则", "link", "/cms/url-rules", 57),
+    ("cms:sites", "cms", "站点管理", "globe", "/cms/sites", 57),
+    ("cms:site-plans", "cms", "建站方案", "sparkles", "/cms/site-plans", 58),
+    ("cms:site", "cms", "站点配置", "settings", "/cms/site", 59),
+    ("cms:url-rules", "cms", "URL 规则", "link", "/cms/url-rules", 61),
     # AI 内容中心：低频但必备的 AI 能力集中在此，避免散落各处点不到。
     # 高频三项（建模向导 / 内容工作台 / 能力配置）仍挂在「内容管理」组首。
     ("cms-ai-center", None, "AI 内容中心", "🧠", None, 40),
@@ -174,7 +176,8 @@ DEFAULT_ROLES = [
          "cms:ai:read"],
         ["dashboard", "cms", "cms:ai-settings", "cms:search", "cms:content-types",
          "cms:languages", "cms:categories", "cms:tags", "cms:entries", "cms:templates",
-         "cms:theme-market", "cms:products", "cms:cases", "cms:news", "cms:site", "cms:media"],
+         "cms:theme-market", "cms:products", "cms:cases", "cms:news",
+         "cms:sites", "cms:site-plans", "cms:site", "cms:media"],
     ),
     (
         "viewer", "访客", "只读权限", False,
@@ -182,7 +185,8 @@ DEFAULT_ROLES = [
          "cms:tags:read", "cms:entries:read",
          "cms:product:read", "cms:case:read", "cms:news:read", "cms:site:read"],
         ["dashboard", "cms", "cms:search", "cms:content-types", "cms:categories",
-         "cms:tags", "cms:entries", "cms:products", "cms:cases", "cms:news", "cms:site"],
+         "cms:tags", "cms:entries", "cms:products", "cms:cases", "cms:news",
+         "cms:sites", "cms:site-plans", "cms:site"],
     ),
 ]
 

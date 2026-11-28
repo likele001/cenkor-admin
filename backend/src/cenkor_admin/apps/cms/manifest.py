@@ -122,10 +122,18 @@ MANIFEST = AppManifest(
                 {"key": "cms:products", "title": "产品", "path": "/cms/products", "sort": 54},
                 {"key": "cms:cases",    "title": "案例", "path": "/cms/cases", "sort": 55},
                 {"key": "cms:news",     "title": "新闻", "path": "/cms/news", "sort": 56},
-                {"key": "cms:site",     "title": "站点配置", "path": "/cms/site", "sort": 57},
-                {"key": "cms:media",    "title": "媒体库", "path": "/cms/media", "sort": 58},
+                # 多站点：先「站点管理」（建站 / 切换 / 删除），再「建站方案」（AI 规划），
+                # 最后「站点配置」（调当前站的细节）。这个顺序对应真实使用路径：
+                # 建站 → 规划内容 → 调参数。此前只登记了「站点配置」，
+                # 站点管理页和方案页有路由有组件却没菜单行 → 导航里根本点不到。
+                {"key": "cms:sites",    "title": "站点管理", "icon": "globe",
+                 "path": "/cms/sites", "sort": 57},
+                {"key": "cms:site-plans", "title": "建站方案", "icon": "sparkles",
+                 "path": "/cms/site-plans", "sort": 58},
+                {"key": "cms:site",     "title": "站点配置", "path": "/cms/site", "sort": 59},
+                {"key": "cms:media",    "title": "媒体库", "path": "/cms/media", "sort": 60},
                 {"key": "cms:url-rules", "title": "URL 规则", "icon": "link",
-                 "path": "/cms/url-rules", "sort": 57},
+                 "path": "/cms/url-rules", "sort": 61},
                 {"key": "builder", "title": "页面构建", "icon": "🧩",
                  "path": "/builder/pages", "sort": 90},
             ],
