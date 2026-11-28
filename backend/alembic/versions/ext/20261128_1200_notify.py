@@ -48,22 +48,45 @@ depends_on: str | None = None
 
 def upgrade() -> None:
     # ---- 1. 渠道表原地扩展 ----
-    # wecom_robot=11 / feishu_robot=12 / dingtalk_robot=14 / wecom_app=9，
-    # 原来的 16 不够留给后续 kind，统一放宽到 24。
-    op.alter_column(
-        "mon_channels",
-        "kind",
-        existing_type=sa.String(16),
-        type_=sa.String(24),
-        existing_nullable=False,
-        existing_server_default="wecom",
-    )
+    insp = sa.inspect(op.get_bind())
+    if not insp.has_table("mon_channels"):
+        # 公开视图自愈：apps/monitor 闭源（其迁移被 .gitignore 排除），
+        # 干净库里 mon_channels 不存在。此处按「闭源建表 + 本迁移扩展」后的
+        # 最终状态直接建表（kind 已是 24 字符、含 events），保证 notify_outbox
+        # 外键与 ORM 漂移检查在公开 / 闭源两种视图下都成立。
+        op.create_table(
+            "mon_channels",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("site_id", sa.Integer(), nullable=True),
+            sa.Column("kind", sa.String(24), nullable=False, server_default="wecom"),
+            sa.Column("name", sa.String(80), nullable=False),
+            sa.Column("secret", sa.Text(), nullable=False),
+            sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column("silence_minutes", sa.Integer(), nullable=False, server_default="30"),
+            sa.Column("extra", postgresql.JSONB(), nullable=True),
+            sa.Column("events", postgresql.JSONB(), nullable=True),
+            sa.Column(
+                "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            ),
+        )
+        op.create_index("ix_mon_channels_site_id", "mon_channels", ["site_id"])
+    else:
+        # wecom_robot=11 / feishu_robot=12 / dingtalk_robot=14 / wecom_app=9，
+        # 原来的 16 不够留给后续 kind，统一放宽到 24。
+        op.alter_column(
+            "mon_channels",
+            "kind",
+            existing_type=sa.String(16),
+            type_=sa.String(24),
+            existing_nullable=False,
+            existing_server_default="wecom",
+        )
 
-    # NULL = 全部事件；数组 = 只订阅列出的 event。
-    op.add_column(
-        "mon_channels",
-        sa.Column("events", postgresql.JSONB(), nullable=True),
-    )
+        # NULL = 全部事件；数组 = 只订阅列出的 event。
+        op.add_column(
+            "mon_channels",
+            sa.Column("events", postgresql.JSONB(), nullable=True),
+        )
 
     # ---- 2. 发送 outbox ----
     op.create_table(
@@ -109,13 +132,22 @@ def downgrade() -> None:
     op.drop_index("ix_notify_outbox_site_id", table_name="notify_outbox")
     op.drop_table("notify_outbox")
 
-    op.drop_column("mon_channels", "events")
-    # 注意：若已存在长度 > 16 的 kind，downgrade 会失败，这是预期行为。
-    op.alter_column(
-        "mon_channels",
-        "kind",
-        existing_type=sa.String(24),
-        type_=sa.String(16),
-        existing_nullable=False,
-        existing_server_default="wecom",
-    )
+    insp = sa.inspect(op.get_bind())
+    if not insp.has_table("mon_channels"):
+        return
+    if insp.has_table("mon_targets"):
+        # 闭源 monitor 链在位：只撤销本迁移的原地扩展。
+        op.drop_column("mon_channels", "events")
+        # 注意：若已存在长度 > 16 的 kind，downgrade 会失败，这是预期行为。
+        op.alter_column(
+            "mon_channels",
+            "kind",
+            existing_type=sa.String(24),
+            type_=sa.String(16),
+            existing_nullable=False,
+            existing_server_default="wecom",
+        )
+    else:
+        # 表由本迁移在公开视图自愈创建：整表删除。
+        op.drop_index("ix_mon_channels_site_id", table_name="mon_channels")
+        op.drop_table("mon_channels")
